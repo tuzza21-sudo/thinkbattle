@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nietzsche"
+  short_description: "Nietzschean value critique for debate"
+  default_prompt: "Use Nietzsche to challenge inherited values, hidden motives, power relations, and self-deception in a debate."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Socrates"
+  short_description: "Socratic questioning for debate"
+  default_prompt: "Use Socrates to clarify concepts, expose assumptions, and guide a debate through disciplined questions."

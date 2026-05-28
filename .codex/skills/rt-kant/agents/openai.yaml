@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kant"
+  short_description: "Kantian principles for debate"
+  default_prompt: "Use Kant to test maxims, duties, dignity, and universalizability in a debate."
