@@ -1,47 +1,28 @@
 import React, { useState } from 'react';
-import { X, Clock, User, Cpu, Scale, UsersRound } from 'lucide-react';
-import type { BattleConfig, DebatePosition, GameMode, PersonaId } from '../types';
+import { Clock, Layers3, Scale, Target, X } from 'lucide-react';
+import type { BattleConfig, DebateFocus, DebateLevel, DebatePosition } from '../types';
 
 interface CreateBattleModalProps {
   onClose: () => void;
   onStart: (config: BattleConfig) => void;
 }
 
-const modeOptions: Array<{
-  value: GameMode;
-  label: string;
-  icon: React.ComponentType<{ size?: number; color?: string }>;
-  color: string;
-  shadow: string;
-}> = [
-  { value: 'debate', label: '정식 토론', icon: Scale, color: 'var(--accent-amber)', shadow: 'var(--shadow-glow-timer)' },
-  { value: 'persona', label: '개별 페르소나', icon: Cpu, color: 'var(--primary)', shadow: 'var(--shadow-glow-cyan)' },
-  { value: 'roundtable', label: '라운드테이블', icon: UsersRound, color: 'var(--accent-coral)', shadow: '0 0 20px rgba(255, 93, 108, 0.35)' },
-  { value: 'pvp', label: '사람 vs 사람', icon: User, color: 'var(--secondary)', shadow: 'var(--shadow-glow-pink)' },
-];
-
-const personaOptions: Array<{ value: PersonaId; label: string }> = [
-  { value: 'socrates', label: '소크라테스' },
-  { value: 'jeong_yakyong', label: '정약용' },
-  { value: 'kant', label: '칸트' },
-  { value: 'nietzsche', label: '니체' },
-];
-
 export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, onStart }) => {
   const [topic, setTopic] = useState('');
-  const [timeLimit, setTimeLimit] = useState<number>(300);
-  const [gameMode, setGameMode] = useState<GameMode>('debate');
-  const [personaId, setPersonaId] = useState<PersonaId>('socrates');
+  const [timeLimit, setTimeLimit] = useState<number>(600);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
+  const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
+  const [debateFocus, setDebateFocus] = useState<DebateFocus>('fact');
 
   const handleStart = () => {
     if (!topic.trim()) return;
     onStart({
-      topic,
+      topic: topic.trim(),
       timeLimit,
-      gameMode,
-      personaId: gameMode === 'persona' ? personaId : undefined,
-      userPosition: gameMode === 'debate' ? userPosition : undefined,
+      gameMode: 'debate',
+      userPosition,
+      debateLevel,
+      debateFocus,
     });
   };
 
@@ -50,107 +31,124 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
       <div className="modal-content" style={{ padding: '2rem' }}>
         <div className="flex justify-between items-center mb-6">
           <h2 style={{ fontSize: '1.8rem', color: 'var(--primary)', textShadow: '0 0 10px rgba(0,229,255,0.3)', margin: 0 }}>
-            토론 배틀 개설
+            정식 토론 배틀 개설
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} aria-label="닫기">
             <X size={24} />
           </button>
         </div>
 
         <div className="flex flex-col gap-6">
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>게임 모드</label>
-            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
-              {modeOptions.map(option => {
-                const Icon = option.icon;
-                const isSelected = gameMode === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    className={`card flex items-center justify-center gap-2 ${isSelected ? 'highlight' : ''}`}
-                    style={{
-                      cursor: 'pointer',
-                      border: isSelected ? `2px solid ${option.color}` : '1px solid var(--border-color)',
-                      boxShadow: isSelected ? option.shadow : 'none',
-                    }}
-                    onClick={() => setGameMode(option.value)}
-                  >
-                    <Icon size={20} color={isSelected ? option.color : 'var(--text-muted)'} />
-                    <span style={{ fontWeight: 800, color: isSelected ? 'var(--text-light)' : 'var(--text-muted)' }}>{option.label}</span>
-                  </button>
-                );
-              })}
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>토론 형식</label>
+            <div
+              className="card flex items-center gap-3"
+              style={{
+                border: '2px solid var(--accent-amber)',
+                boxShadow: 'var(--shadow-glow-timer)',
+              }}
+            >
+              <Scale size={22} color="var(--accent-amber)" />
+              <div>
+                <div style={{ fontWeight: 900, color: 'var(--text-light)' }}>정식 토론</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                  라운드테이블과 페르소나 모드는 잠시 비활성화되어 있습니다.
+                </div>
+              </div>
             </div>
           </div>
 
-          {gameMode === 'debate' && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>내 입장</label>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { value: 'affirmative' as DebatePosition, label: '찬성' },
-                  { value: 'negative' as DebatePosition, label: '반대' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    className="card flex items-center justify-center gap-2"
-                    style={{
-                      cursor: 'pointer',
-                      border: userPosition === option.value ? '2px solid var(--accent-amber)' : '1px solid var(--border-color)',
-                      color: userPosition === option.value ? 'var(--accent-amber)' : 'var(--text-muted)',
-                      fontWeight: 800,
-                    }}
-                    onClick={() => setUserPosition(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>내 입장</label>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { value: 'affirmative' as DebatePosition, label: '찬성' },
+                { value: 'negative' as DebatePosition, label: '반대' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="card flex items-center justify-center gap-2"
+                  style={{
+                    cursor: 'pointer',
+                    minHeight: '58px',
+                    border: userPosition === option.value ? '2px solid var(--accent-amber)' : '1px solid var(--border-color)',
+                    color: userPosition === option.value ? 'var(--accent-amber)' : 'var(--text-muted)',
+                    fontWeight: 900,
+                  }}
+                  onClick={() => setUserPosition(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-          )}
-
-          {gameMode === 'persona' && (
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>AI 페르소나</label>
-              <div className="flex gap-3 overflow-x-auto" style={{ paddingBottom: '0.5rem' }}>
-                {personaOptions.map(option => (
-                  <button
-                    key={option.value}
-                    className="card"
-                    style={{
-                      flex: '0 0 auto',
-                      width: '132px',
-                      padding: '1rem',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      border: personaId === option.value ? '2px solid var(--primary)' : '1px solid var(--border-color)',
-                    }}
-                    onClick={() => setPersonaId(option.value)}
-                  >
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: personaId === option.value ? 'var(--text-light)' : 'var(--text-muted)' }}>
-                      {option.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {gameMode === 'roundtable' && (
-            <div className="card" style={{ border: '1px solid rgba(255, 93, 108, 0.45)', boxShadow: '0 0 18px rgba(255, 93, 108, 0.18)' }}>
-              <div style={{ fontWeight: 900, color: 'var(--text-light)', marginBottom: '0.4rem' }}>참가자</div>
-              <div style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                소크라테스가 개념을 묻고, 칸트가 원칙을 검증하며, 니체가 숨은 가치와 동기를 흔듭니다.
-              </div>
-            </div>
-          )}
+          </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>제한 시간</label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>토론 수준</label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'beginner' as DebateLevel, label: '초급' },
+                { value: 'intermediate' as DebateLevel, label: '중급' },
+                { value: 'advanced' as DebateLevel, label: '고급' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="card flex items-center justify-center gap-2"
+                  style={{
+                    cursor: 'pointer',
+                    minHeight: '58px',
+                    padding: '0.8rem',
+                    border: debateLevel === option.value ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                    color: debateLevel === option.value ? 'var(--primary)' : 'var(--text-muted)',
+                    fontWeight: 900,
+                  }}
+                  onClick={() => setDebateLevel(option.value)}
+                >
+                  <Layers3 size={17} />
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>논제 초점</label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'fact' as DebateFocus, label: '사실확인형' },
+                { value: 'policy' as DebateFocus, label: '정책형' },
+                { value: 'value' as DebateFocus, label: '가치판단형' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="card flex items-center justify-center gap-2"
+                  style={{
+                    cursor: 'pointer',
+                    minHeight: '58px',
+                    padding: '0.8rem',
+                    border: debateFocus === option.value ? '2px solid var(--secondary)' : '1px solid var(--border-color)',
+                    color: debateFocus === option.value ? 'var(--secondary)' : 'var(--text-muted)',
+                    fontWeight: 900,
+                  }}
+                  onClick={() => setDebateFocus(option.value)}
+                >
+                  <Target size={17} />
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>권장 총 시간</label>
             <div className="flex gap-4">
-              {[300, 600, 900].map(time => (
+              {[600, 900, 1200].map(time => (
                 <button
                   key={time}
+                  type="button"
                   className="card flex items-center justify-center gap-2"
                   style={{
                     flex: 1,
@@ -186,7 +184,7 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
             disabled={!topic.trim()}
             onClick={handleStart}
           >
-            배틀 시작
+            토론 시작
           </button>
         </div>
       </div>

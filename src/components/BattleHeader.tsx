@@ -24,7 +24,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({ battleState }) => {
           overflow: 'hidden', 
           textOverflow: 'ellipsis', 
           textShadow: '0 0 15px rgba(255,255,255,0.3)', 
-          letterSpacing: '0.05em',
+          letterSpacing: 0,
           textTransform: 'uppercase'
         }}>
           {battleState.topic}

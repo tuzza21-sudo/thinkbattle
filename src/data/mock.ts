@@ -29,6 +29,8 @@ export const initialBattleState: BattleState = {
   gameMode: 'debate',
   userPosition: 'affirmative',
   aiPosition: 'negative',
+  debateLevel: 'beginner',
+  debateFocus: 'fact',
   timeLimit: 300,
   timeRemaining: 300,
   playerA: mockPlayerA,

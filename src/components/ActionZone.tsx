@@ -8,12 +8,25 @@ interface ActionZoneProps {
     current: number;
     total: number;
   };
+  timing?: {
+    recommendedSeconds: number;
+    elapsedSeconds: number;
+    remainingSeconds: number;
+    overtimeSeconds: number;
+  };
   isPlayerTurn: boolean;
   isAiThinking: boolean;
   onSubmit: (content: string) => void;
 }
 
-export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, isPlayerTurn, isAiThinking, onSubmit }) => {
+const formatTimer = (seconds: number) => {
+  const safeSeconds = Math.max(0, seconds);
+  const m = Math.floor(safeSeconds / 60);
+  const s = safeSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, onSubmit }) => {
   const [content, setContent] = useState('');
 
   const handleSubmit = () => {
@@ -33,16 +46,8 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   return (
     <div className={`input-zone ${isPlayerTurn ? 'my-turn' : ''}`}>
       <div className="input-container">
-        <div className="flex justify-between items-center mb-2">
-          <span style={{ 
-            fontWeight: 800, 
-            color: isPlayerTurn ? 'var(--primary)' : 'var(--text-muted)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.5rem',
-            textShadow: isPlayerTurn ? '0 0 10px rgba(0, 229, 255, 0.5)' : 'none',
-            letterSpacing: '0.05em'
-          }}>
+        <div className="composer-head">
+          <span>
             {isPlayerTurn ? (
               <><Zap size={18} /> 내 차례</>
             ) : isAiThinking ? (
@@ -52,20 +57,28 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
             )}
           </span>
           {isPlayerTurn && (
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-game)' }}>
+            <small>
               {content.length}/1200
-            </span>
+            </small>
           )}
         </div>
         {currentRound && (
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.4 }}>
-            <strong style={{ color: 'var(--text-light)' }}>
+          <div className="composer-round">
+            <strong>
               {roundProgress ? `${roundProgress.current}/${roundProgress.total} · ` : ''}{currentRound.title}
-            </strong> · {currentRound.instruction}
+            </strong>
+            <span>{currentRound.instruction}</span>
+            {timing && (
+              <span className={`stage-timer-chip ${timing.overtimeSeconds > 0 ? 'overtime' : timing.remainingSeconds <= 30 ? 'warning' : ''}`}>
+                {timing.overtimeSeconds > 0
+                  ? `권장 시간 +${formatTimer(timing.overtimeSeconds)} 초과`
+                  : `남은 권장 시간 ${formatTimer(timing.remainingSeconds)}`}
+              </span>
+            )}
           </div>
         )}
         
-        <div className="flex gap-4 items-end">
+        <div className="composer-row">
           <textarea
             className="input-textarea"
             placeholder={isPlayerTurn ? currentRound?.inputPlaceholder ?? "주장에 대한 반박이나 질문을 입력하세요..." : isAiThinking ? "상대방이 답변을 준비 중입니다..." : "대기 중..."}
@@ -76,10 +89,10 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
             maxLength={1200}
           />
           <button 
-            className="btn btn-primary" 
-            style={{ padding: '0 1.5rem', borderRadius: 'var(--radius-sm)', height: '80px' }}
+            className="btn btn-primary send-button" 
             onClick={handleSubmit}
             disabled={!isPlayerTurn || !content.trim()}
+            title="보내기"
           >
             <Send size={24} />
           </button>

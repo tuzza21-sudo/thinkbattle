@@ -21,6 +21,8 @@ export type AppUser = {
 export type PersonaId = 'socrates' | 'jeong_yakyong' | 'kant' | 'nietzsche';
 export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';
 export type DebatePosition = 'affirmative' | 'negative';
+export type DebateLevel = 'beginner' | 'intermediate' | 'advanced';
+export type DebateFocus = 'fact' | 'policy' | 'value';
 export type DebateRoundId =
   | 'opening'
   | 'rebuttal'
@@ -35,6 +37,8 @@ export type BattleConfig = {
   gameMode: GameMode;
   personaId?: PersonaId;
   userPosition?: DebatePosition;
+  debateLevel?: DebateLevel;
+  debateFocus?: DebateFocus;
 };
 
 export type DebateStep = {
@@ -43,6 +47,7 @@ export type DebateStep = {
   title: string;
   actor: 'user' | 'ai' | 'judge';
   instruction: string;
+  recommendedDurationSeconds?: number;
   inputPlaceholder?: string;
 };
 
@@ -54,6 +59,9 @@ export type Argument = {
   timestamp: string;
   roundId?: DebateRoundId;
   roundTitle?: string;
+  recommendedDurationSeconds?: number;
+  elapsedSeconds?: number;
+  overtimeSeconds?: number;
   nextTask?: string;
   // AI-specific parsed fields (from the prompt)
   aiQuestion?: string;
@@ -75,6 +83,8 @@ export type BattleState = {
   personaId?: PersonaId;
   userPosition?: DebatePosition;
   aiPosition?: DebatePosition;
+  debateLevel?: DebateLevel;
+  debateFocus?: DebateFocus;
   timeLimit: number; // in seconds (e.g., 180, 300, 600)
   timeRemaining: number; // in seconds
   playerA: Player;
@@ -98,6 +108,8 @@ export type DebateRecord = {
   gameMode: GameMode;
   userPosition?: DebatePosition;
   aiPosition?: DebatePosition;
+  debateLevel?: DebateLevel;
+  debateFocus?: DebateFocus;
   durationSeconds: number;
   completedAt: string;
   arguments: Argument[];
