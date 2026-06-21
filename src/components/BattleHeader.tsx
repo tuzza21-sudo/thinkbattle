@@ -8,7 +8,7 @@ interface BattleHeaderProps {
 
 export const BattleHeader: React.FC<BattleHeaderProps> = ({ battleState }) => {
   return (
-    <header className="flex justify-between items-center" style={{ padding: '1rem 0', marginBottom: '1rem' }}>
+    <header className="flex justify-between items-center" style={{ padding: '1rem 0', marginBottom: '1rem', gap: '1rem', rowGap: '0.85rem', flexWrap: 'wrap' }}>
       <div className="flex gap-2" style={{ flex: 1 }}>
         <div className="badge" style={{ background: 'rgba(0, 229, 255, 0.1)', color: 'var(--primary)', border: '1px solid var(--border-cyan)' }}>
           {battleState.matchType}
@@ -31,7 +31,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({ battleState }) => {
         </h1>
       </div>
       
-      <div className="flex gap-3 justify-end" style={{ flex: 1 }}>
+      <div className="flex gap-3 justify-end" style={{ flex: 1, rowGap: '0.75rem', flexWrap: 'wrap' }}>
         <button className="btn btn-secondary" style={{ padding: '0.6rem' }} title="배틀 규칙">
           <LayoutDashboard size={18} />
         </button>

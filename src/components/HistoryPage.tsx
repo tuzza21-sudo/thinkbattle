@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BarChart2, BookOpen, Clock, FileText } from 'lucide-react';
-import { getDebateRecords } from '../lib/history';
-import type { AppUser, DebateRecord } from '../types';
+import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages } from 'lucide-react';
+import { getDebateRecords, saveEnglishRephraseEntry } from '../lib/history';
+import { EnglishRephrasePanel } from './EnglishRephrasePanel';
+import type { AppUser, DebateRecord, EnglishRephraseEntry } from '../types';
 
 interface HistoryPageProps {
   user: AppUser | null;
@@ -17,11 +18,48 @@ const formatDate = (isoDate: string) =>
 
 const formatDuration = (seconds: number) => `${Math.max(1, Math.round(seconds / 60))}분`;
 
+const getHistoryArgumentStage = (record: DebateRecord, index: number) => {
+  const argument = record.arguments[index];
+  if (!argument) return '자유 발언';
+  if (!argument.isAi) return argument.roundTitle ?? argument.roundId ?? '내 발언';
+  if (argument.roundTitle?.startsWith('AI')) return argument.roundTitle;
+
+  const previousUserArgument = [...record.arguments.slice(0, index)].reverse().find(item => !item.isAi);
+  const previousTitle = previousUserArgument?.roundTitle ?? '';
+
+  if (previousTitle.includes('입론')) return 'AI 입론';
+  if (previousTitle.includes('교차질문')) return 'AI 답변 · 교차질문';
+  if (previousTitle.includes('반박')) return 'AI 반론';
+  if (previousTitle.includes('중요성') || previousTitle.includes('최종') || previousTitle.includes('결론')) return 'AI 최종 발언';
+  if (previousTitle) return `AI 응답 · ${previousTitle}`;
+
+  return argument.roundTitle ?? argument.roundId ?? 'AI 발언';
+};
+
 export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }) => {
   const navigate = useNavigate();
-  const records = useMemo(() => user ? getDebateRecords(user.id) : [], [user]);
+  const [records, setRecords] = useState<DebateRecord[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState(records[0]?.id ?? '');
+  const [isEnglishReplayMode, setIsEnglishReplayMode] = useState(false);
   const selectedRecord: DebateRecord | undefined = records.find(record => record.id === selectedRecordId) ?? records[0];
+
+  useEffect(() => {
+    const loadRecords = () => {
+      const nextRecords = user ? getDebateRecords(user.id) : [];
+      setRecords(nextRecords);
+      setSelectedRecordId(current => current || nextRecords[0]?.id || '');
+    };
+    loadRecords();
+  }, [user]);
+
+  const handleSaveEnglishRephrase = (record: DebateRecord, entry: EnglishRephraseEntry) => {
+    if (!user) return;
+
+    const updatedRecord = saveEnglishRephraseEntry(user.id, record.id, entry);
+    if (!updatedRecord) return;
+
+    setRecords(prev => prev.map(item => item.id === updatedRecord.id ? updatedRecord : item));
+  };
 
   if (!user) {
     return (
@@ -37,6 +75,22 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
           <h2>로그인이 필요합니다</h2>
           <p>회원가입 또는 로그인 후 토론 기록과 최종 보고서를 확인할 수 있습니다.</p>
         </main>
+      </div>
+    );
+  }
+
+  if (isEnglishReplayMode && selectedRecord) {
+    return (
+      <div className="app-container page-scroll">
+        <EnglishRephrasePanel
+          key={selectedRecord.id}
+          topic={selectedRecord.topic}
+          arguments={selectedRecord.arguments}
+          initialRephrases={selectedRecord.englishRephrases ?? []}
+          onSaveRephrase={entry => handleSaveEnglishRephrase(selectedRecord, entry)}
+          onBackToReport={() => setIsEnglishReplayMode(false)}
+          onExit={() => setIsEnglishReplayMode(false)}
+        />
       </div>
     );
   }
@@ -118,13 +172,32 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
 
               <div className="report-panel">
                 <h3><FileText size={18} /> 발언 기록</h3>
+                <button className="btn btn-secondary" style={{ marginBottom: '0.85rem' }} onClick={() => setIsEnglishReplayMode(true)}>
+                  <Languages size={18} /> 영어 리프레이징 관리
+                </button>
                 <div className="history-transcript">
-                  {selectedRecord.arguments.map(argument => (
-                    <div key={argument.id} className={argument.isAi ? 'ai' : 'user'}>
-                      <strong>{argument.isAi ? 'AI' : user.nickname}</strong>
-                      <span>{argument.content}</span>
-                    </div>
-                  ))}
+                  {selectedRecord.arguments.map((argument, index) => {
+                    const savedRephrase = selectedRecord.englishRephrases?.find(item => item.argumentId === argument.id);
+                    const stageLabel = getHistoryArgumentStage(selectedRecord, index);
+
+                    return (
+                      <div key={argument.id} className={argument.isAi ? 'ai' : 'user'}>
+                        <strong>{argument.isAi ? 'AI' : user.nickname}</strong>
+                        <em>{stageLabel}</em>
+                        <span>{argument.content}</span>
+                        {!argument.isAi && savedRephrase && (
+                          <section className="history-english-rephrase">
+                            <strong>내 영어 초안</strong>
+                            <p>{savedRephrase.englishDraft}</p>
+                            <strong>원어민식 표현</strong>
+                            <p>{savedRephrase.feedback.nativeVersion}</p>
+                            <strong>내 초안을 살린 표현</strong>
+                            <p>{savedRephrase.feedback.draftBasedVersion}</p>
+                          </section>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </section>

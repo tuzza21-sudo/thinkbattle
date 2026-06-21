@@ -1,4 +1,4 @@
-import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, FinalReport, PersonaId } from '../types';
+import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, PersonaId } from '../types';
 import { getDebateFocusLabel, getDebateLevelLabel, getPositionLabel } from './debateEngine';
 
 const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
@@ -121,16 +121,19 @@ const getPersonaPhaseGuide = (phase: PersonaPhase): string => {
 const DEBATE_SKILL_RUBRIC = `
 [Core Debate Skill Rubric]
 Every response should train at least one of these skills:
-1. Claim clarity: Is the student's position precise, bounded, and testable?
-2. Opponent flaw analysis: Did the student identify the weakest premise, missing standard, contradiction, or tradeoff in the opponent's claim?
-3. Evidence quality: Is the evidence relevant, representative, causal rather than merely correlated, recent enough, and sufficient?
-4. Impact: Did the student explain why their point matters in real consequences, affected groups, scale, probability, or urgency?
-5. Weighing: Did the student explain why their impact or standard should matter more than the opponent's?
-6. Rebuttal recovery: Did the student actually answer the previous objection, or did they dodge, repeat, or change the subject?
+1. Claim clarity: Is the student's Claim a clear position or solution on the topic?
+2. Reason connection: Does the student give Reasons that actually support the Claim?
+3. Evidence quality: Does the student distinguish Evidence from Reason, and is the Evidence factual, relevant, representative, causal when needed, recent enough, and sufficient?
+4. Warrant quality: Is the warrant, the principle connecting Reason and Claim, reasonable and not merely assumed?
+5. Opponent flaw analysis: Did the student identify the weakest premise, missing standard, contradiction, tradeoff, weak Evidence, or weak warrant in the opponent's Claim?
+6. Impact and weighing: Did the student explain why their point matters, then compare scale, scope, probability, urgency, feasibility, or reversibility against the opponent?
+7. Rebuttal recovery: Did the student actually answer the previous objection, or did they dodge, repeat, or change the subject?
 
 When replying, choose the weakest missing skill from the student's latest message.
+If the selected debate level is beginner, do not choose warrant quality, hidden-premise analysis, clash-point weighing, or comparison criteria as the student's required next skill.
 If the student used one skill well, briefly acknowledge the exact repair, then pressure the next missing skill.
 The next task should make the student practice a specific skill from this rubric.
+Use the level checklist as the baseline. If the context requires an additional check not listed in the checklist, judge it yourself and mention it briefly.
 `;
 
 const toGeminiGenerateContentRequest = (request: ChatCompletionRequest): GeminiGenerateContentRequest => {
@@ -220,7 +223,7 @@ Tone: Calm, precise, respectful, and student-friendly. Be active and challenging
 Output format MUST BE VALID JSON:
 {
   "argument": "A direct Socratic debate move against one weakness in the student's point (2 sentences max).",
-  "question": "One focused question that forces a definition, example, reason, or possible exception.",
+  "question": "One focused question that forces a definition, example, Reason, or possible exception.",
   "lesson": "Briefly name the Socratic thinking skill the student is practicing."
 }
 
@@ -371,7 +374,7 @@ If time is nearly over, prioritize a concise synthesis over a new attack.
 ${historyText}
 
 Based on the last message from the Student, generate your debate response in JSON format.
-You must actively advance the debate: challenge one weakness, pressure one assumption, test evidence, expose an opponent-flaw analysis gap, or force impact/weighing.
+You must actively advance the debate: challenge one weakness, pressure one assumption, test Evidence, expose an opponent-flaw analysis gap, or force impact/weighing.
 Stay in the selected persona's style, but use the rubric to decide what debate skill the student must practice next.
 Keep the response concrete, plain, and useful for the student's next turn. Avoid sounding academic, theatrical, or overly abstract.
 Ask exactly one main follow-up question.
@@ -571,23 +574,24 @@ const getDebateLevelGuide = (level?: DebateLevel): string => {
   if (level === 'intermediate') {
     return `
 [Intermediate Debate Flow]
-Pre-session: The user selects a position and a topic focus.
-1. Term definition: the user defines key terms and standards.
-2. User opening: the user gives claim, reason, evidence, and impact.
+Pre-session: The user selects a position. In the first definition phase, the user may frame the topic as fact-checking, policy, or value-judgment.
+1. 논제 확인 및 용어 정리: the user identifies the core question, defines key terms, bounds the debate, and sets 1-2 judging standards.
+2. 입론: the user gives a clear position, judging standard, at least two grounds, Reasons, examples, expected effects, and a basic expected-objection response.
 3. AI opponent opening: after the user opening, you must give your own full opening case.
-4. Issue extraction: the user identifies the main clash between both openings.
-5. Rebuttal.
-6. Cross-question.
-7. Counter-rebuttal.
-8. Closing.
-9. Evaluation.
+4. 교차질문: the user tests your premise, Evidence sufficiency, scope, alternative, or priority.
+5. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Evidence, scope, standard, or warrant.
+6. AI 교차질문 답변: the user answers your cross-question and reinforces their opening.
+7. 상대 주장 점검: the user identifies the winning issue, exposes your core premise, tests Evidence credibility/relevance/sufficiency, and identifies the main clash point.
+8. 반박: the user should not merely deny your conclusion; they should rebut the weakest premise, Evidence validity, solution, or priority needed for your conclusion, using the issue/premise/Evidence checks from 상대 주장 점검, and propose a realistic alternative with fewer side effects.
+9. 충돌 지점 확인 및 중요성 비교: the user identifies 2-3 clash points and weighs severity, scope, probability, urgency, feasibility, or reversibility.
+10. 최종 입장 확인: the user summarizes the debate without adding a new claim.
 `;
   }
 
   if (level === 'advanced') {
     return `
 [Advanced Debate Flow]
-Pre-session: The user selects a position and a topic focus.
+Pre-session: The user selects a position. The topic focus can be refined during framing.
 1. Framing: define the topic, standards, and burden.
 2. User opening.
 3. AI opponent opening: after the user opening, you must give your own full opening case.
@@ -603,13 +607,14 @@ Pre-session: The user selects a position and a topic focus.
   return `
 [Beginner Debate Flow]
 Pre-session: The user selects a position.
-1. User opening: claim + evidence/reason + why.
+1. 입론: user may choose whether to frame the topic as fact-checking, policy, or value-judgment, then gives position, Claim, 1-2 Reasons, Evidence if possible, and a simple example. Do not require the user to write a warrant in the opening.
 2. AI opponent opening: after the user opening, you must give your own full opening case.
-3. User checks the AI claim, then rebuts it.
-4. User strengthens their own claim.
-5. User closing.
-6. AI feedback.
-7. User rewrites.
+3. 교차질문: user asks about the opponent's meaning, Evidence, Reason, example, or weak point. Do not require warrant or hidden-premise analysis at beginner level.
+4. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Reason, Evidence, or example.
+5. AI 교차질문 답변: user answers your cross-question and reinforces their opening.
+6. 상대 주장 점검: user identifies the opponent's core Claim, checks Evidence credibility/relevance/sufficiency, and finds one weak point.
+7. 반박: user should not merely deny the opponent's conclusion; user rebuts the weakest Reason, Evidence, or solution from 상대 주장 점검, and may propose a realistic alternative with fewer side effects.
+8. 최종발언: user restates their final position, strongest Reason, supporting Evidence or example, and gives the final statement. Do not require clash-point weighing or comparison criteria at beginner level.
 `;
 };
 
@@ -642,20 +647,41 @@ export async function generateDebateResponse(
   const latestUserArgument = [...history].reverse().find(a => !a.isAi);
   const latestUserMessage = latestUserArgument?.content ?? '';
   const latestUserRoundTitle = latestUserArgument?.roundTitle ?? '';
-  const hasAiOpeningCase = history.some(a => a.isAi && a.content.includes('내 주장:'));
+  const hasAiOpeningCase = history.some(a =>
+    a.isAi &&
+    (a.content.includes('내 주장:') || a.content.includes('AI 주장:') || a.content.includes('주장:')),
+  );
   const isAiOpeningCase =
     currentRound === 'opening' &&
     !hasAiOpeningCase &&
     (latestUserRoundTitle.includes('입론') || (debateLevel === 'beginner' && userTurnCount === 1));
   const isBeginnerFeedback =
     debateLevel === 'beginner' &&
-    (latestUserRoundTitle.includes('결론') || latestUserRoundTitle.includes('최종 발언'));
+    (
+      latestUserRoundTitle.includes('내 주장의 중요성 및 최종발언') ||
+      latestUserRoundTitle.includes('최종발언') ||
+      latestUserRoundTitle.includes('중요성 비교') ||
+      latestUserRoundTitle.includes('결론') ||
+      latestUserRoundTitle.includes('최종 발언')
+    );
+  const isFinalUserTurn =
+    latestUserRoundTitle.includes('최종') ||
+    latestUserRoundTitle.includes('결론') ||
+    latestUserRoundTitle.includes('내 주장의 중요성 및 최종발언') ||
+    latestUserRoundTitle.includes('최종발언');
+  const isUserAskingCrossQuestion =
+    currentRound === 'cross-question' &&
+    latestUserRoundTitle === '교차질문';
+  const isUserAnsweringAiCrossQuestion =
+    currentRound === 'cross-question' &&
+    latestUserRoundTitle.includes('AI 교차질문 답변');
 
   const systemPrompt = `
 You are a sharp Korean debate opponent in a structured level-based debate.
 
 Your role is to keep a real back-and-forth debate going while following the selected level flow.
 Every user message is one turn; answer with the correct debate move for the current phase, then hand the turn back.
+If "Must give final AI statement now" is YES, this is the last opponent response before the final report. Do not ask the user to continue.
 
 Debate topic: ${topic}
 User position: ${getPositionLabel(userPosition)}
@@ -669,6 +695,9 @@ Time remaining: ${timeRemaining} seconds
 Remaining ratio: ${remainingRatio.toFixed(2)}
 Must produce AI opening case now: ${isAiOpeningCase ? 'YES' : 'NO'}
 Must give beginner feedback now: ${isBeginnerFeedback ? 'YES' : 'NO'}
+Must give final AI statement now: ${isFinalUserTurn ? 'YES' : 'NO'}
+Must answer user cross-question and ask AI cross-question now: ${isUserAskingCrossQuestion ? 'YES' : 'NO'}
+Must acknowledge user's answer to AI cross-question now: ${isUserAnsweringAiCrossQuestion ? 'YES' : 'NO'}
 Latest user message:
 ${latestUserMessage}
 
@@ -687,42 +716,59 @@ General rules:
 - Do not praise the user unless it is strategically relevant.
 - Do not give neutral coaching first. Take the AI position and debate.
 - If the user is vague, attack the missing standard or ask for a concrete criterion.
-- If the user gives evidence, test whether the evidence is representative, causal, recent, or sufficient.
+- If the user gives Evidence, test whether the Evidence is representative, causal, recent, or sufficient.
+- For beginner level, train Claim, Reason, and Evidence. Do not assign warrant, hidden-premise analysis, clash-point weighing, or comparison criteria as the user's next mission.
+- For intermediate and advanced levels, distinguish Claim, Reason, Evidence, and warrant. If the student confuses Reason with Evidence, point out the exact gap.
 - If the user attacks your position, check whether they named the actual flaw or only disagreed with the conclusion.
 - If the user gives a point without impact, force them to explain why it matters.
 - If both sides have plausible impacts, force weighing: scale, probability, urgency, reversibility, or affected groups.
+- Use the checklist for the current level as the baseline, but add any contextually necessary check yourself when the user's answer has vague Evidence, an unfair summary, or an unsupported comparison.
 - If the user answers your previous objection, acknowledge the exact repair and raise the next strongest objection.
 - Never repeat the same objection twice unless the user avoided it.
 - The user must always have an AI claim to rebut. Do not only attack the user's argument without stating your own position when the phase calls for an opening case.
+- If "Must give final AI statement now" is YES, do not introduce a new objection that requires another answer. Give a concise final response from the AI side, acknowledge the main disagreement, state what remains strongest for your side, and say the final evaluation will follow.
 
 Round rules:
 Opening:
 If "Must produce AI opening case now" is YES, give your own full opening case from the AI position. It must include:
-1. "내 주장:" one clear claim for the AI side.
-2. "근거:" at least one concrete reason, evidence type, example, or causal explanation.
-3. "이유:" why that ground supports the AI position.
-4. "중요성:" why this matters in the debate.
-You may briefly mention the user's opening, but do not make the response only a rebuttal. The next task must tell the user to summarize the AI claim and rebut it.
+1. "내 주장:" one clear Claim for the AI side.
+2. "이유:" at least one Reason supporting the Claim.
+3. "근거:" at least one factual Evidence, example, data type, or concrete observation.
+${debateLevel === 'beginner'
+    ? '4. "중요성:" why this matters in the debate. Do not include a separate "전제:" item for beginner level.'
+    : '4. "전제:" the warrant connecting the Reason to the Claim.\n5. "중요성:" why this matters in the debate.'}
+You may briefly mention the user's opening, but do not make the response only a rebuttal. The next task must tell the user to ask a cross-question about the AI Claim, Reason, Evidence, or example.
 If the phase is opening but an AI opening already exists in the history, test the user's latest opening or definition.
 
 Rebuttal:
 Challenge the user’s argument with the strongest relevant counterargument.
 
 Cross-question:
-Ask one focused question that exposes an assumption or missing standard.
+If "Must answer user cross-question and ask AI cross-question now" is YES:
+1. First answer the user's cross-question from the AI position in 2-3 sentences.
+2. Then ask exactly one focused cross-question about the user's opening Claim, Reason, Evidence, example, scope, or standard. For beginner level, keep it to Claim, Reason, Evidence, or example.
+3. The "question" field must contain that AI cross-question.
+4. The "nextTask" field must tell the user to answer the AI cross-question directly.
+If "Must acknowledge user's answer to AI cross-question now" is YES:
+1. Briefly acknowledge or challenge the user's answer in 2-3 sentences.
+2. Do not ask another cross-question.
+3. Set "question" to one short transition question that prepares the user to check the AI position.
+4. The "nextTask" field must tell the user to check the AI Claim-Reason logic and Evidence sufficiency.
+Otherwise, ask one focused question that exposes an assumption or missing standard.
 
 Counter-rebuttal:
 Help the user respond to the strongest objection.
 
 Closing:
-If "Must give beginner feedback now" is YES, stop adding new objections. Give AI feedback on the user's claim structure, evidence/reason quality, response to your opening, and conclusion. The next task must ask the user to rewrite the opening in claim + evidence/reason + why structure.
+If "Must give final AI statement now" is YES, give the AI side's final comment in 3-5 Korean sentences. Do not set up another user task.
+If "Must give beginner feedback now" is YES, stop adding new objections. Give AI feedback on the user's Claim structure, Evidence/Reason quality, response to your opening, and conclusion. The next task must ask the user to rewrite the opening in Claim + Reason + Evidence + why structure.
 Otherwise, ask the user to summarize a refined final position.
 
 Judgment:
 Give concise AI feedback on the user's performance and ask for a rewrite when the level flow calls for it.
 
 Time-aware phase guide:
-- Remaining ratio above 0.70: invite a clear position and challenge weak definitions or evidence.
+- Remaining ratio above 0.70: invite a clear position and challenge weak definitions or Evidence.
 - Remaining ratio 0.45-0.70: ask pointed cross-questions and expose assumptions.
 - Remaining ratio 0.18-0.45: press counter-rebuttals and help the user repair weak points.
 - Remaining ratio below 0.18: produce a short synthesis and ask for the user's final opinion.
@@ -730,18 +776,18 @@ Time-aware phase guide:
 Turn-based live debate policy:
 - Treat the current round label as the current structured phase.
 - While time remains, continue the exchange without a turn limit.
-- Each answer must advance the live debate by raising a stronger objection, tightening a definition, testing evidence, exposing a flaw in the user's rebuttal, or forcing impact/weighing.
+- Each answer must advance the live debate by raising a stronger objection, tightening a definition, testing Evidence, or exposing a flaw in the user's rebuttal. Use impact/weighing pressure only for intermediate or advanced level.
 - Do not merely summarize or moderate unless the remaining ratio is 0.15 or below.
-- Exactly one pointed question should set up the user's next turn.
+- Exactly one pointed question should set up the user's next turn unless this is the final AI statement. If this is final, leave "question" empty and set "nextTask" to "최종 평가를 확인하세요."
 
 [Debate History]
 ${historyText}
 
 Return ONLY valid JSON:
 {
-  "argument": "Your current phase response as the opponent. For AI opening, include your claim, evidence/reason, why, and importance. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
-  "question": "Exactly one focused question for the user's next turn.",
-  "nextTask": "One short Korean imperative telling the user which debate skill to practice next."
+  "argument": "Your current phase response as the opponent. For final AI statement, give a concise final comment and do not request another user response. For AI opening, include your Claim, Reason, Evidence, why, and importance. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
+  "question": "Exactly one focused question for the user's next turn, or empty string for final AI statement.",
+  "nextTask": "One short Korean imperative telling the user which debate skill to practice next, or '최종 평가를 확인하세요.' for final AI statement."
 }
 `;
 
@@ -776,7 +822,8 @@ Return ONLY valid JSON:
 export async function generateDebateJudgment(
   topic: string,
   history: Argument[],
-  userPosition: DebatePosition
+  userPosition: DebatePosition,
+  debateLevel: DebateLevel = 'beginner',
 ): Promise<FinalReport> {
   const historyText = history
     .map(a => `${a.isAi ? 'AI' : 'User'}${a.roundTitle ? ` [${a.roundTitle}]` : ''}: ${a.content}`)
@@ -792,24 +839,38 @@ User position: "${getPositionLabel(userPosition)}"
 ${historyText}
 
 Judge only the user's debate performance.
-Score the user using exactly these six categories:
-- 주장 명료성: 입장이 구체적이고 판단 기준이 분명한가?
-- 상대 허점 분석: 상대 주장의 약한 전제, 기준 부재, 모순, 트레이드오프를 정확히 짚었는가?
-- 근거 품질: 근거가 관련성, 대표성, 인과성, 최신성, 충분성을 갖추었는가?
-- 중요성 설명: 왜 이 논점이 중요한지 규모, 피해/이익, 확률, 긴급성으로 설명했는가?
-- 비교 우위: 내 기준이나 영향이 상대보다 왜 더 중요한지 weighing을 했는가?
-- 반박 대응과 재구성: 이전 반론에 답하고 주장을 더 강하게 고쳤는가?
+Use the level checklist as the baseline, but if the context reveals an additional issue, judge it yourself.
+Score the user using exactly these five categories:
+${debateLevel === 'beginner'
+    ? `- 주장 명료성: 입장, Claim, 논제에 대한 답이 분명한가?
+- 이유 연결성: 제시한 Reason이 주장과 논리적으로 이어지는가?
+- 근거 적합성: Evidence, 사례, 자료가 이유와 주장을 뒷받침하는가?
+- 상대 주장 이해: 상대 주장의 핵심, 이유, 근거, 약한 부분을 공정하게 파악했는가? 숨은 전제나 충돌 지점 분석은 요구하지 마라.
+- 최종발언 완성도: 최종 입장, 가장 강한 이유, 근거 또는 예시를 짧고 설득력 있게 정리했는가? 비교 기준이나 충돌 지점 weighing은 요구하지 마라.`
+    : `- 주장 명료성: 입장, 핵심 주장, 논제에 대한 답이 분명한가?
+- 근거와 논리 연결성: 입론에서 제시한 이유가 주장과 논리적으로 이어지는가? 사례·통계·자료·현실 근거가 주장을 충분히 뒷받침하는가? Reason 연결성과 Evidence 적합성을 함께 평가하라.
+- 상대 이해와 쟁점 파악: 상대 주장의 핵심, 근거, 숨은 전제, 실제 충돌 지점을 정확히 잡았는가?
+- 반박과 방어: 상대 주장의 약점을 논리적으로 반박하고, 자신의 주장에 대한 공격도 잘 방어했는가?
+- 중요성 비교와 최종 설득력: 왜 내 주장이 더 중요한지 비교 기준으로 설명하고, 최종 발언이 설득력 있게 마무리되었는가?`}
+When judging the user's opening statement, explicitly apply:
+- Reason 연결성: whether the Reason logically supports the Claim without missing intermediate explanation.
+- Evidence 적합성: whether examples, statistics, sources, or real-world Evidence are relevant and sufficient for the Claim.
 Each feedback item must mention one observed behavior from the debate and one concrete next training move.
 Return ONLY valid JSON:
 {
   "overallFeedback": "총평 및 다음 훈련 조언 (한국어, 3-4문장)",
   "categories": [
-    { "name": "주장 명료성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "상대 허점 분석", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "근거 품질", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "중요성 설명", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "비교 우위", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "반박 대응과 재구성", "score": 0, "maxScore": 100, "feedback": "피드백" }
+${debateLevel === 'beginner'
+    ? `    { "name": "주장 명료성", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "이유 연결성", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "근거 적합성", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "상대 주장 이해", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "최종발언 완성도", "score": 0, "maxScore": 100, "feedback": "피드백" }`
+    : `    { "name": "주장 명료성", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "근거와 논리 연결성", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "상대 이해와 쟁점 파악", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "반박과 방어", "score": 0, "maxScore": 100, "feedback": "피드백" },
+    { "name": "중요성 비교와 최종 설득력", "score": 0, "maxScore": 100, "feedback": "피드백" }`}
   ],
   "totalScore": 0,
   "xpEarned": 0
@@ -828,21 +889,118 @@ Return ONLY valid JSON:
     });
 
     const aiMessage = response.choices?.[0]?.message?.content || '{}';
-    return JSON.parse(aiMessage) as FinalReport;
+    const report = JSON.parse(aiMessage) as FinalReport;
+    return {
+      ...report,
+      categories: report.categories.map(category =>
+        category.name === '근거와 설명력'
+          ? { ...category, name: '근거와 논리 연결성' }
+          : category,
+      ),
+    };
   } catch (error: unknown) {
     console.error("Debate Judgment API Error:", error);
     return {
       overallFeedback: `심사 보고서를 생성하지 못했습니다. 오류: ${getErrorMessage(error)}`,
       categories: [
         { name: "주장 명료성", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "상대 허점 분석", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "근거 품질", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "중요성 설명", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "비교 우위", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "반박 대응과 재구성", score: 0, maxScore: 100, feedback: "오류" },
+        { name: "근거와 논리 연결성", score: 0, maxScore: 100, feedback: "오류" },
+        { name: "상대 이해와 쟁점 파악", score: 0, maxScore: 100, feedback: "오류" },
+        { name: "반박과 방어", score: 0, maxScore: 100, feedback: "오류" },
+        { name: "중요성 비교와 최종 설득력", score: 0, maxScore: 100, feedback: "오류" },
       ],
       totalScore: 0,
       xpEarned: 0,
+    };
+  }
+}
+
+export async function generateEnglishRephraseFeedback(
+  topic: string,
+  roundTitle: string,
+  koreanOriginal: string,
+  englishDraft: string,
+): Promise<EnglishRephraseFeedback> {
+  const systemPrompt = `
+You are a Korean learner's English debate writing coach.
+
+The student is rephrasing their own Korean debate statement into English.
+Evaluate the English draft against the Korean original. Do not rewrite the student's idea into a new argument.
+
+Rules:
+- Respond in Korean except for the two English expression fields.
+- Focus on meaning accuracy, natural English, debate phrasing, and concise revision.
+- Do not shame the student. Be concrete and brief.
+- If the draft is very incomplete, still provide a simple corrected version.
+- nativeVersion and draftBasedVersion must be meaningfully different in purpose.
+- nativeVersion: ignore the student's English wording and produce a natural native-speaker debate expression from the Korean original.
+- draftBasedVersion: use the Korean original as the meaning standard, but revise the student's English draft by preserving as much of their wording/order as possible while correcting grammar, word choice, clarity, and any meaning gaps.
+- Do not make draftBasedVersion more polished than nativeVersion if doing so abandons the student's draft structure.
+- Both English versions must preserve the student's Korean meaning.
+- If the English draft misses part of the Korean original, mention the missing meaning in meaningAccuracy and restore that meaning in both nativeVersion and draftBasedVersion. In draftBasedVersion, add the minimum needed words while keeping the student's style.
+
+Return ONLY valid JSON:
+{
+  "meaningAccuracy": "원문의 뜻이 얼마나 잘 전달됐는지 한국어로 1-2문장",
+  "naturalExpression": "어색한 영어 표현과 고칠 점을 한국어로 1-2문장",
+  "debateExpression": "토론식 영어 표현으로 더 좋아질 부분을 한국어로 1문장",
+  "nativeVersion": "원문 한국어를 바탕으로 원어민이 토론에서 자연스럽게 말할 영어 표현. 학생 초안 표현에 묶이지 말 것.",
+  "draftBasedVersion": "한글 원문의 뜻을 기준으로 하되, 학생 영어 초안의 단어와 문장 구조를 최대한 살려 고친 영어 표현.",
+  "practiceTip": "다시 쓸 때 집중할 훈련 포인트 1개",
+  "score": 0
+}
+`;
+  const userPrompt = `
+Debate topic: "${topic}"
+Debate round: "${roundTitle}"
+
+[Korean original - source of meaning]
+${koreanOriginal}
+
+[Student English draft - expression source for draftBasedVersion]
+${englishDraft}
+
+Generate the feedback now. Remember:
+- nativeVersion is based on the Korean original and should sound like a native speaker.
+- draftBasedVersion must also match the Korean original's meaning, but should revise the student's English draft instead of replacing it completely.
+`;
+
+  try {
+    const response = await createChatCompletion({
+      model: DEBATE_JUDGE_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      thinking: { type: 'disabled' },
+      response_format: { type: 'json_object' }
+    });
+
+    const aiMessage = response.choices?.[0]?.message?.content || '{}';
+    const parsed = parseJsonObject(aiMessage);
+    const rawScore = typeof parsed.score === 'number' ? parsed.score : Number(parsed.score);
+    const legacySuggestion = getStringField(parsed.suggestedVersion, '');
+    const defaultExpression = englishDraft || 'Write your idea in one clear English sentence.';
+
+    return {
+      meaningAccuracy: getStringField(parsed.meaningAccuracy, '원문의 핵심 의미를 기준으로 다시 확인해 보세요.'),
+      naturalExpression: getStringField(parsed.naturalExpression, '영어 문장을 더 짧고 자연스럽게 다듬어 보세요.'),
+      debateExpression: getStringField(parsed.debateExpression, '주장과 이유가 보이도록 because, however, therefore 같은 연결어를 활용해 보세요.'),
+      nativeVersion: getStringField(parsed.nativeVersion, legacySuggestion || defaultExpression),
+      draftBasedVersion: getStringField(parsed.draftBasedVersion, defaultExpression),
+      practiceTip: getStringField(parsed.practiceTip, '한 문장 안에 주장과 이유를 함께 담아 다시 써보세요.'),
+      score: Number.isFinite(rawScore) ? Math.max(0, Math.min(100, Math.round(rawScore))) : 0,
+    };
+  } catch (error: unknown) {
+    console.error("English Rephrase Feedback Error:", error);
+    return {
+      meaningAccuracy: `피드백을 생성하지 못했습니다. 오류: ${getErrorMessage(error)}`,
+      naturalExpression: '잠시 후 다시 시도해 주세요.',
+      debateExpression: '초안은 저장되어 있으니 표현을 조금 더 짧게 다듬어 보세요.',
+      nativeVersion: englishDraft || 'Write your idea in one clear English sentence.',
+      draftBasedVersion: englishDraft || 'Write your idea in one clear English sentence.',
+      practiceTip: '주장 + because + 이유 구조로 다시 써보세요.',
+      score: 0,
     };
   }
 }

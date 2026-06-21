@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, Circle, Clock, MessageCircle, Sparkles, Users } from 'lucide-react';
+import { AlertTriangle, BarChart2, CheckCircle2, Circle, Clock, Lightbulb, MessageCircle, Pause, Play, Sparkles, Target, Users } from 'lucide-react';
 import { BattleHeader } from './BattleHeader';
 import { ArgumentCard } from './ArgumentCard';
 import { ActionZone } from './ActionZone';
 import { ResultModal } from './ResultModal';
+import { EnglishRephrasePanel } from './EnglishRephrasePanel';
 import {
   generateDebateJudgment,
   generateDebateResponse,
@@ -16,7 +17,6 @@ import {
 import type { AIResponse } from '../lib/api';
 import {
   buildDebateIntro,
-  getDebateFocusLabel,
   getDebateLevelLabel,
   getDebateSteps,
   getDebateStepByTurn,
@@ -24,8 +24,8 @@ import {
   getPositionLabel,
   personaDebateStep,
 } from '../lib/debateEngine';
-import { saveDebateRecord } from '../lib/history';
-import type { AppUser, Argument, BattleConfig, BattleState, DebatePosition, DebateStep, FinalReport, Player } from '../types';
+import { saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
+import type { AppUser, Argument, BattleConfig, BattleState, DebateFocus, DebatePosition, DebateStep, EnglishRephraseEntry, FinalReport, Player } from '../types';
 
 interface ArenaProps {
   user: AppUser | null;
@@ -38,7 +38,6 @@ const fallbackConfig: BattleConfig = {
   gameMode: 'debate',
   userPosition: 'affirmative',
   debateLevel: 'beginner',
-  debateFocus: 'fact',
 };
 
 const roundtablePlayerInfo: Record<'socrates' | 'kant' | 'nietzsche', Player> = {
@@ -108,27 +107,224 @@ const getScaledStepDuration = (step: DebateStep | undefined, steps: DebateStep[]
   return Math.max(30, Math.round((baseDuration / baseTotal) * totalSeconds));
 };
 
+const getAiResponseRoundTitle = (step: DebateStep) => {
+  if (step.title.includes('입론')) return 'AI 입론';
+  if (step.title.includes('AI 교차질문 답변')) return 'AI 확인 · 교차질문';
+  if (step.title.includes('교차질문')) return 'AI 답변 · 교차질문';
+  if (step.title.includes('반박')) return 'AI 반론';
+  if (step.title.includes('중요성') || step.title.includes('최종') || step.title.includes('결론')) return 'AI 최종 발언';
+  return `AI 응답 · ${step.title}`;
+};
+
 type CoachItem = {
   label: string;
   met: boolean;
   hint: string;
 };
 
+type EvaluationItem = {
+  label: string;
+  description: string;
+};
+
+const openingEvaluationItems = [
+  {
+    label: 'Claim 명확성',
+    description: '내 입장이 논제에 직접 답하고, 한 문장으로 분명하게 정리되어 있는지 평가합니다.',
+  },
+  {
+    label: 'Reason 연결성',
+    description: '제시한 이유가 주장과 논리적으로 이어지는지, 중간 설명이 빠지지 않았는지 평가합니다.',
+  },
+  {
+    label: 'Evidence 적합성',
+    description: '사례·통계·자료·현실 근거가 주장을 충분히 뒷받침하는지 평가합니다.',
+  },
+];
+
+const crossQuestionEvaluationItems: EvaluationItem[] = [
+  {
+    label: '질문 초점성',
+    description: '상대 주장의 어느 부분, 이유, 근거를 확인하려는 질문인지 분명한지 평가합니다.',
+  },
+  {
+    label: '쟁점 연결성',
+    description: '질문이 논제의 핵심 쟁점과 연결되어 있고, 단순한 궁금증으로 흐르지 않는지 평가합니다.',
+  },
+  {
+    label: '답변 활용성',
+    description: '상대의 답변을 이후 반박이나 내 주장 강화에 활용할 수 있게 질문했는지 평가합니다.',
+  },
+];
+
+const crossQuestionAnswerEvaluationItems: EvaluationItem[] = [
+  {
+    label: '답변 직접성',
+    description: 'AI 질문의 핵심에 빗나가지 않고 직접 답했는지 평가합니다.',
+  },
+  {
+    label: '논리 보강성',
+    description: '내 주장과 이유, 근거를 연결해 부족했던 설명을 보강했는지 평가합니다.',
+  },
+  {
+    label: '방어 활용성',
+    description: '답변이 이후 반박이나 최종 설득에서 내 입장을 방어하는 데 활용될 수 있는지 평가합니다.',
+  },
+];
+
+type FocusTip = {
+  value: DebateFocus;
+  label: string;
+  headline: string;
+  questions: string[];
+  beginnerFrame: string;
+  intermediateFrame: string;
+};
+
+const focusTips: FocusTip[] = [
+  {
+    value: 'fact',
+    label: '사실확인형',
+    headline: '참인지, 충분히 입증되는지부터 좁혀보세요.',
+    questions: [
+      '핵심 사실 주장은 무엇인가?',
+      '그 사실을 확인할 자료, 사례, 기준은 무엇인가?',
+      '상관관계와 인과관계를 혼동하고 있지는 않은가?',
+    ],
+    beginnerFrame: '저는 이 논제를 ___라는 사실이 충분히 입증되는지의 문제로 보고, ___ 입장입니다.',
+    intermediateFrame: '핵심 질문은 “___가 실제로 사실인가?”이고, 확인 기준은 ___입니다.',
+  },
+  {
+    value: 'policy',
+    label: '정책형',
+    headline: '무엇을 해야 하는지, 실행 가능한 해법으로 끌고 가세요.',
+    questions: [
+      '누가 무엇을 해야 하는가?',
+      '비용, 부작용, 실행 가능성은 어떤가?',
+      '더 나은 대안과 비교했을 때 왜 이 선택이 나은가?',
+    ],
+    beginnerFrame: '저는 이 문제에서 ___를 해야 한다고 봅니다. 이유는 ___이고, 예상 효과는 ___입니다.',
+    intermediateFrame: '이 논제의 핵심은 “___를 해야 하는가?”이며, 판단 기준은 효과성과 부작용입니다.',
+  },
+  {
+    value: 'value',
+    label: '가치판단형',
+    headline: '무엇이 더 중요하고 정당한지 기준을 세워보세요.',
+    questions: [
+      '충돌하는 가치는 무엇인가?',
+      '공정, 자유, 안전, 권리 중 무엇을 우선해야 하는가?',
+      '그 기준을 비슷한 상황에도 일관되게 적용할 수 있는가?',
+    ],
+    beginnerFrame: '저는 이 논제가 ___와 ___ 중 무엇을 더 우선할지의 문제라고 보고, ___를 더 중시합니다.',
+    intermediateFrame: '핵심 질문은 “___가 ___보다 우선해야 하는가?”이고, 판단 기준은 정당성과 일관성입니다.',
+  },
+];
+
+const getFocusTip = (focus?: DebateFocus) =>
+  focusTips.find(item => item.value === focus) ?? focusTips[0];
+
+const shouldShowFocusTip = (step: DebateStep | undefined, level?: BattleConfig['debateLevel']) => {
+  if (!step) return false;
+  if (level === 'intermediate') return step.id === 'intermediate-definition-user';
+  return false;
+};
+
 const hasAny = (content: string, keywords: string[]) => keywords.some(keyword => content.includes(keyword));
+
+const getChecklistHint = (label: string): string => {
+  if (label.includes('대안 제시력')) return '상대 해결책보다 실행 가능하고 부작용이 적은 대안을 제시해 주세요.';
+  if (label.includes('비교우위 입증력')) return '상대 입장과 내 입장을 같은 기준으로 비교하고, 내 입장이 더 우월한 이유를 밝혀주세요.';
+  if (label.includes('내 주장의 중요성')) return '내 주장이 왜 중요하고 우선되어야 하는지 영향의 크기, 범위, 우선순위로 설명해 주세요.';
+  if (label.includes('쟁점 파악력')) return '승패를 가르는 핵심 질문이나 판단 지점을 한 문장으로 짚어보세요.';
+  if (label.includes('전제 분석력')) return '상대 주장이 성립하려면 반드시 참이어야 하는 숨은 전제를 드러내세요.';
+  if (label.includes('근거 검증력')) return '상대 근거의 신뢰성, 관련성, 충분성을 각각 구체적으로 검토해 주세요.';
+  if (label.includes('충돌 지점 파악')) return '내 주장과 상대 주장이 실제로 부딪히는 핵심 충돌 지점을 표시해 주세요.';
+  if (label.includes('상대 주장 점검')) return '앞 단계에서 확인한 핵심 쟁점, 핵심 전제, 근거 타당성을 반박의 출발점으로 삼아주세요.';
+  if (label.includes('비약') || label.includes('모순')) return '상대 결론이 이유나 근거에서 자연스럽게 이어지지 않는 부분을 정확히 짚어주세요.';
+  if (label.includes('허점')) return '상대 주장과 이유 사이에서 빠진 전제나 이어지지 않는 부분을 찾아보세요.';
+  if (label.includes('충분')) return '상대 근거가 주장 전체를 뒷받침하기에 충분한지, 범위나 사례가 부족하지 않은지 점검해 주세요.';
+  if (label.includes('찬성/반대') || label.includes('입장')) return '찬성 또는 반대 입장을 먼저 분명히 밝혀주세요.';
+  if (label.includes('주장')) return '주장(Claim)을 한 문장으로 압축해 주세요.';
+  if (label.includes('이유')) return '주장을 뒷받침하는 이유(Reason)를 “왜냐하면”으로 연결해 주세요.';
+  if (label.includes('근거')) return '이유에 맞는 근거(Evidence), 예시, 사실, 자료를 붙여 주세요.';
+  if (label.includes('전제')) return '이유와 주장을 이어주는 전제(warrant)가 합리적인지 보여주세요.';
+  if (label.includes('예시')) return '짧은 사례나 상황을 덧붙이면 주장이 더 선명해집니다.';
+  if (label.includes('질문')) return '상대 주장, 이유, 근거 중 하나를 짧고 확인 가능하게 물어보세요.';
+  if (label.includes('요약') || label.includes('정리') || label.includes('구조')) return '상대가 실제로 말한 주장, 이유, 근거를 공정하게 정리해 주세요.';
+  if (label.includes('왜곡') || label.includes('덧붙')) return '상대가 말하지 않은 내용을 추가하지 않았는지 확인해 주세요.';
+  if (label.includes('반박') || label.includes('약점') || label.includes('부족')) return '상대 주장의 어느 부분이 왜 부족한지 지목해 주세요.';
+  if (label.includes('유형')) return '전제/근거/인과/범위/대안/비교 반박 중 어떤 유형인지 표시해 주세요.';
+  if (label.includes('비교') || label.includes('중요') || label.includes('기준')) return '피해 크기, 영향 범위, 현실성, 가능성, 긴급성 같은 기준으로 비교해 주세요.';
+  if (label.includes('충돌') || label.includes('쟁점')) return '양측 주장이 실제로 부딪히는 승부처를 정리해 주세요.';
+  if (label.includes('새로운 주장')) return '최종 단계에서는 새 주장을 추가하지 말고 나온 쟁점을 정리해 주세요.';
+  return '이 체크 항목이 발언에 드러나도록 한 문장 더 보강해 주세요.';
+};
+
+const isChecklistMet = (label: string, content: string): boolean => {
+  if (label.includes('대안 제시력')) return hasAny(content, ['대안', '현실적', '실행', '부작용', '해결책', '방안']);
+  if (label.includes('비교우위 입증력')) return hasAny(content, ['비교', '우위', '우월', '상대', '더 설득', '더 타당']);
+  if (label.includes('내 주장의 중요성')) return hasAny(content, ['중요', '우선', '영향', '범위', '크기', '피해']);
+  if (label.includes('쟁점 파악력')) return hasAny(content, ['쟁점', '핵심', '승패', '판단', '문제']);
+  if (label.includes('전제 분석력')) return hasAny(content, ['전제', '가정', '성립', '깔고', '의존']);
+  if (label.includes('근거 검증력')) return hasAny(content, ['신뢰성', '관련성', '충분성', '근거', '자료', '검증']);
+  if (label.includes('충돌 지점 파악')) return hasAny(content, ['충돌', '부딪', '대립', '쟁점', '차이']);
+  if (label.includes('상대 주장 점검')) return hasAny(content, ['핵심 쟁점', '핵심 전제', '근거 타당', '상대 주장 점검', '점검', '전제', '근거']);
+  if (label.includes('비약') || label.includes('모순')) return hasAny(content, ['비약', '모순', '이어지지', '논리', '충돌', '전제', '결론']);
+  if (label.includes('허점')) return hasAny(content, ['허점', '빠진', '부족', '연결', '논리', '전제', '이어지']);
+  if (label.includes('충분')) return hasAny(content, ['충분', '부족', '근거', '자료', '사례', '대표', '뒷받침']);
+  if (label.includes('찬성/반대') || label.includes('입장')) return hasAny(content, ['찬성', '반대', '입장', '저는', '저희는']);
+  if (label.includes('주장')) return hasAny(content, ['주장', 'claim', '생각합니다', '찬성', '반대', '해야 합니다']);
+  if (label.includes('이유')) return hasAny(content, ['이유', 'reason', '왜냐', '때문', '따라서']);
+  if (label.includes('근거')) return hasAny(content, ['근거', 'evidence', '사실', '자료', '통계', '사례', '예시']);
+  if (label.includes('전제')) return hasAny(content, ['전제', 'warrant', '원칙', '이어', '연결']);
+  if (label.includes('예시')) return hasAny(content, ['예시', '예를 들어', '사례', '상황']);
+  if (label.includes('감정')) return !hasAny(content, ['그냥', '느낌', '싫어', '좋아', '짜증']) && hasAny(content, ['이유', '근거', '때문']);
+  if (label.includes('질문')) return content.includes('?') || hasAny(content, ['무엇', '왜', '어떻게', '묻', '질문']);
+  if (label.includes('직접 관련') || label.includes('핵심')) return hasAny(content, ['주장', '근거', '이유', '전제', '핵심', '쟁점']);
+  if (label.includes('구체')) return hasAny(content, ['구체', '근거', '예시', '사례', '자료', '어떤']);
+  if (label.includes('공격') || label.includes('감정적')) return !hasAny(content, ['말도 안', '무조건 틀', '바보', '감정']);
+  if (label.includes('요약') || label.includes('정리') || label.includes('구조')) return hasAny(content, ['상대', 'ai', '주장', '이유', '근거', '핵심']);
+  if (label.includes('왜곡') || label.includes('말하지 않은')) return !hasAny(content, ['아마', '속셈', '분명히 원한다']);
+  if (label.includes('반박') || label.includes('약점') || label.includes('부족')) return hasAny(content, ['하지만', '그러나', '반박', '약점', '부족', '한계', '문제']);
+  if (label.includes('유형')) return hasAny(content, ['전제', '근거', '인과', '범위', '대안', '비교']);
+  if (label.includes('교차질문')) return hasAny(content, ['질문', '답변', '확인', '교차']);
+  if (label.includes('비교') || label.includes('중요') || label.includes('기준')) return hasAny(content, ['더 중요', '비교', '기준', '영향', '범위', '현실성', '가능성', '긴급성', '우위']);
+  if (label.includes('충돌') || label.includes('쟁점')) return hasAny(content, ['충돌', '쟁점', '승부처', '핵심']);
+  if (label.includes('새로운 주장')) return !hasAny(content, ['새롭게', '또 다른', '추가로']);
+  if (label.includes('최종')) return hasAny(content, ['최종', '결론', '따라서', '찬성', '반대']);
+  return false;
+};
 
 const buildCoachChecklist = (step: DebateStep | undefined, latestUserArgument?: Argument): CoachItem[] => {
   if (!step) return [];
 
   const content = latestUserArgument?.content.replace(/\s+/g, ' ').toLowerCase() ?? '';
-  const roundId = step.roundId;
   const title = step.title;
 
   if (!latestUserArgument) {
+    if (step.checklist?.length) {
+      return step.checklist.map(label => ({
+        label,
+        met: false,
+        hint: getChecklistHint(label),
+      }));
+    }
+
     return [
       { label: '국면 이해', met: false, hint: `${title} 단계의 요구사항을 먼저 확인하세요.` },
       { label: '구조화', met: false, hint: '발언을 항목별로 나누면 AI 피드백이 더 정확해집니다.' },
     ];
   }
+
+  if (step.checklist?.length) {
+    return step.checklist.map(label => ({
+      label,
+      met: isChecklistMet(label, content),
+      hint: getChecklistHint(label),
+    }));
+  }
+
+  const roundId = step.roundId;
 
   if (step.id.includes('definition') || step.id.includes('framing')) {
     return [
@@ -198,7 +394,7 @@ const createInitialBattleState = (config: BattleConfig): BattleState => {
   const userPosition = config.userPosition ?? 'affirmative';
   const aiPosition = getOppositePosition(userPosition);
   const debateLevel = config.debateLevel ?? 'beginner';
-  const debateFocus = config.debateFocus ?? 'fact';
+  const debateFocus = config.debateFocus;
   const debateSteps = getDebateSteps(debateLevel);
   const isDebateMode = config.gameMode === 'debate';
   const isRoundtableMode = config.gameMode === 'roundtable';
@@ -241,7 +437,7 @@ const createInitialBattleState = (config: BattleConfig): BattleState => {
           : getPersonaName(config.personaId),
       avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${isRoundtableMode ? 'Roundtable' : 'Socrates'}`,
       level: 99,
-      rankBadge: isDebateMode ? `${getDebateLevelLabel(debateLevel)} · ${getDebateFocusLabel(debateFocus)}` : isRoundtableMode ? '라운드테이블' : '철학자',
+      rankBadge: isDebateMode ? getDebateLevelLabel(debateLevel) : isRoundtableMode ? '라운드테이블' : '철학자',
       score: 9999,
       streak: 100,
       isAi: config.gameMode !== 'pvp',
@@ -252,7 +448,7 @@ const createInitialBattleState = (config: BattleConfig): BattleState => {
             id: 'debate-intro',
             playerId: 'p2',
             isAi: true,
-            content: buildDebateIntro(config.topic, userPosition, debateLevel, debateFocus),
+            content: buildDebateIntro(config.topic, userPosition, debateLevel),
             timestamp: '시작',
             roundId: 'opening',
             roundTitle: '시작 질문',
@@ -322,6 +518,10 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
   const [stepTimer, setStepTimer] = useState({ stepId: 'free-discussion', elapsedSeconds: 0 });
   const [isPersonaPlayerTurn, setIsPersonaPlayerTurn] = useState(true);
+  const [isEnglishReplayMode, setIsEnglishReplayMode] = useState(false);
+  const [englishRephrases, setEnglishRephrases] = useState<EnglishRephraseEntry[]>([]);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isReportGenerating, setIsReportGenerating] = useState(false);
 
   const roundtablePlayers = useMemo<Player[]>(
     () => [battleState.playerA, roundtablePlayerInfo.socrates, roundtablePlayerInfo.kant, roundtablePlayerInfo.nietzsche],
@@ -346,8 +546,8 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     : undefined;
   const currentActionStep = battleState.gameMode === 'persona' ? personaDebateStep : activeDebateStep;
   const isPlayerTurn = battleState.gameMode === 'debate'
-    ? !isAiThinking
-    : isPersonaPlayerTurn && !isAiThinking;
+    ? !isAiThinking && !isPaused
+    : isPersonaPlayerTurn && !isAiThinking && !isPaused;
   const currentActionStepId = currentActionStep?.id ?? 'free-discussion';
   const stepElapsedSeconds = stepTimer.stepId === currentActionStepId ? stepTimer.elapsedSeconds : 0;
   const currentRecommendedSeconds = getScaledStepDuration(currentActionStep, debateStepList, battleState.timeLimit);
@@ -362,7 +562,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   }, [config, navigate]);
 
   useEffect(() => {
-    if (battleState.isFinished) return;
+    if (battleState.isFinished || isPaused) return;
 
     const interval = setInterval(() => {
       if (battleState.gameMode === 'debate') {
@@ -386,7 +586,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [battleState.gameMode, battleState.isFinished, currentActionStep, currentActionStepId, isPlayerTurn]);
+  }, [battleState.gameMode, battleState.isFinished, currentActionStep, currentActionStepId, isPaused, isPlayerTurn]);
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -446,11 +646,22 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       completedAt,
       arguments: finalState.arguments,
       report,
+      englishRephrases,
     });
+  }, [englishRephrases, user]);
+
+  const handleSaveEnglishRephrase = useCallback((entry: EnglishRephraseEntry) => {
+    setEnglishRephrases(prev => [
+      entry,
+      ...prev.filter(item => item.argumentId !== entry.argumentId),
+    ]);
+
+    if (!user || !savedRecordIdRef.current) return;
+    saveEnglishRephraseEntry(user.id, savedRecordIdRef.current, entry);
   }, [user]);
 
   useEffect(() => {
-    if (!battleState.isFinished || battleState.timeRemaining > 0 || showResultModal) return;
+    if (!battleState.isFinished || battleState.timeRemaining > 0 || showResultModal || finalReport || isEnglishReplayMode) return;
 
     const finishByTime = async () => {
       if (battleState.gameMode === 'persona' && battleState.personaId) {
@@ -471,6 +682,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           battleState.topic,
           battleState.arguments,
           battleState.userPosition ?? 'affirmative',
+          battleState.debateLevel,
         );
         persistDebateRecord(report, battleState);
         setFinalReport(report);
@@ -484,10 +696,34 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     };
 
     void finishByTime();
-  }, [battleState, persistDebateRecord, showResultModal]);
+  }, [battleState, finalReport, isEnglishReplayMode, persistDebateRecord, showResultModal]);
 
   if (!config) {
     return null;
+  }
+
+  if (isEnglishReplayMode) {
+    return (
+      <div className="app-container page-scroll">
+        <EnglishRephrasePanel
+          topic={battleState.topic}
+          arguments={battleState.arguments}
+          initialRephrases={englishRephrases}
+          onSaveRephrase={handleSaveEnglishRephrase}
+          onBackToReport={() => setShowResultModal(true)}
+          onExit={() => navigate('/')}
+        />
+        {showResultModal && (
+          <ResultModal
+            report={finalReport}
+            playerA={battleState.playerA}
+            playerB={battleState.playerB}
+            onClose={() => navigate('/')}
+            onStartEnglishReplay={() => setShowResultModal(false)}
+          />
+        )}
+      </div>
+    );
   }
 
   const submitDebateAction = async (content: string, activeStep: DebateStep) => {
@@ -508,12 +744,66 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     };
 
     const newArgs = [...battleState.arguments, newArg];
+    const completedStructuredDebate = newArgs.filter(argument => !argument.isAi).length >= debateStepList.length;
+
+    if (completedStructuredDebate) {
+      setBattleState(prev => ({
+        ...prev,
+        arguments: newArgs,
+      }));
+      setIsAiThinking(true);
+
+      const aiRes = await generateDebateResponse(
+        battleState.topic,
+        newArgs,
+        userPosition,
+        activeStep.roundId,
+        battleState.timeLimit,
+        sessionRemainingSeconds,
+        battleState.debateLevel,
+        battleState.debateFocus,
+      );
+      const aiArg: Argument = {
+        id: createArgumentId(),
+        playerId: battleState.playerB.id,
+        isAi: true,
+        content: aiRes.argument,
+        aiQuestion: aiRes.question,
+        nextTask: aiRes.nextTask,
+        timestamp: getTimestamp(),
+        roundId: activeStep.roundId,
+        roundTitle: 'AI 최종 발언',
+      };
+      const finalArgs = [...newArgs, aiArg];
+      const finalState: BattleState = {
+        ...battleState,
+        arguments: finalArgs,
+        isFinished: true,
+        timeRemaining: sessionRemainingSeconds,
+      };
+
+      setBattleState(finalState);
+      setIsAiThinking(false);
+      setIsReportGenerating(true);
+
+      const report = await generateDebateJudgment(
+        finalState.topic,
+        finalState.arguments,
+        finalState.userPosition ?? 'affirmative',
+        finalState.debateLevel,
+      );
+      persistDebateRecord(report, finalState);
+      setFinalReport(report);
+      setIsReportGenerating(false);
+      return;
+    }
+
     setBattleState(prev => ({
       ...prev,
       arguments: newArgs,
     }));
 
-    if (battleState.isFinished) return;
+    if (battleState.isFinished || isPaused) return;
 
     setIsAiThinking(true);
 
@@ -528,12 +818,6 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       battleState.debateFocus,
     );
 
-    const nextStep = getDebateStepByTurn(
-      battleState.timeLimit,
-      sessionRemainingSeconds,
-      newArgs.filter(argument => !argument.isAi).length,
-      battleState.debateLevel,
-    );
     const aiArg: Argument = {
       id: createArgumentId(),
       playerId: battleState.playerB.id,
@@ -543,7 +827,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       nextTask: aiRes.nextTask,
       timestamp: getTimestamp(),
       roundId: activeStep.roundId,
-      roundTitle: nextStep.title,
+      roundTitle: getAiResponseRoundTitle(activeStep),
     };
 
     setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, aiArg] }));
@@ -632,13 +916,60 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       debateStepList.find(step => step.roundId === latestUserArgument.roundId) ??
       currentActionStep
     : currentActionStep;
-  const coachChecklist = buildCoachChecklist(latestUserStep, latestUserArgument);
+  const checklistStep = battleState.gameMode === 'debate' ? currentActionStep : latestUserStep;
+  const checklistArgument = battleState.gameMode === 'debate'
+    ? latestUserStep?.id === currentActionStep?.id
+      ? latestUserArgument
+      : undefined
+    : latestUserArgument;
+  const coachChecklist = buildCoachChecklist(checklistStep, checklistArgument);
   const checklistScore = coachChecklist.length
     ? Math.round((coachChecklist.filter(item => item.met).length / coachChecklist.length) * 100)
     : 0;
+  const currentStageEvaluation = battleState.gameMode !== 'debate'
+    ? null
+    : currentActionStep?.title.includes('입론')
+      ? {
+          title: `${currentActionStep.title} 기준`,
+          items: openingEvaluationItems,
+        }
+      : currentActionStep?.title.includes('AI 교차질문 답변')
+        ? {
+            title: `${currentActionStep.title} 기준`,
+            items: crossQuestionAnswerEvaluationItems,
+          }
+        : currentActionStep?.title.includes('교차질문')
+          ? {
+              title: `${currentActionStep.title} 기준`,
+              items: crossQuestionEvaluationItems,
+            }
+          : null;
+  const checklistTitle = battleState.gameMode === 'debate'
+    ? `${checklistStep?.title ?? '현재 단계'} 체크`
+    : checklistArgument
+      ? `${checklistScore}% 반영`
+      : '대기 중';
   const activeStepIndex = activeDebateStep
     ? debateStepList.findIndex(step => step.id === activeDebateStep.id)
     : -1;
+  const selectedFocus = battleState.debateFocus ?? 'fact';
+  const activeFocusTip = getFocusTip(selectedFocus);
+  const showFocusTip = battleState.gameMode === 'debate' && shouldShowFocusTip(currentActionStep, battleState.debateLevel);
+  const showBeginnerOpeningGuide = battleState.gameMode === 'debate' && (battleState.debateLevel === 'beginner' || !battleState.debateLevel) && currentActionStep?.id === 'beginner-opening-user';
+  const focusFrame = battleState.debateLevel === 'intermediate'
+    ? activeFocusTip.intermediateFrame
+    : activeFocusTip.beginnerFrame;
+  const hasFinalAiStatement = battleState.arguments.some(argument =>
+    argument.isAi && argument.roundTitle === 'AI 최종 발언',
+  );
+  const showResultAnalysisButton =
+    battleState.gameMode === 'debate' &&
+    battleState.isFinished &&
+    hasFinalAiStatement &&
+    !showResultModal;
+  const handleDebateFocusChange = (debateFocus: DebateFocus) => {
+    setBattleState(prev => ({ ...prev, debateFocus }));
+  };
 
   return (
     <div className="app-container">
@@ -657,6 +988,27 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           ))}
         </div>
 
+        <div className="session-controls" aria-label="토론 진행 제어">
+          <button
+            type="button"
+            className="btn btn-secondary session-control-button"
+            onClick={() => setIsPaused(true)}
+            disabled={battleState.isFinished || isPaused}
+            title="잠시 멈춤"
+          >
+            <Pause size={16} /> 잠시 멈춤
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary session-control-button"
+            onClick={() => setIsPaused(false)}
+            disabled={battleState.isFinished || !isPaused}
+            title="진행"
+          >
+            <Play size={16} /> 진행
+          </button>
+        </div>
+
         <div className={`compact-timer ${currentOvertimeSeconds > 0 ? 'overtime' : currentRemainingSeconds <= 30 ? 'urgent' : ''}`}>
           <Clock size={16} />
           <strong>{currentOvertimeSeconds > 0 ? `+${formatDuration(currentOvertimeSeconds)}` : formatDuration(currentRemainingSeconds)}</strong>
@@ -665,6 +1017,8 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
               ? '종료'
               : isAiThinking
                 ? 'AI 응답 중'
+                : isPaused
+                  ? '일시정지'
                 : currentOvertimeSeconds > 0
                   ? `${currentActionStep?.title ?? '현재 단계'} 권장 시간 초과`
                   : `${currentActionStep?.title ?? '현재 단계'} 권장 시간`}
@@ -698,8 +1052,28 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 } : undefined}
                 isPlayerTurn={isPlayerTurn}
                 isAiThinking={isAiThinking}
+                isPaused={isPaused}
                 onSubmit={handleActionSubmit}
               />
+            )}
+
+            {showResultAnalysisButton && (
+              <div className="result-analysis-entry">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowResultModal(true)}
+                  disabled={!finalReport || isReportGenerating}
+                >
+                  <BarChart2 size={18} />
+                  {finalReport ? '결과 분석 보기' : '결과 분석 준비 중'}
+                </button>
+                <span>
+                  {finalReport
+                    ? '상대방의 최종 답변을 확인한 뒤 결과를 열어보세요.'
+                    : '최종 답변을 바탕으로 평가서를 준비하고 있습니다.'}
+                </span>
+              </div>
             )}
             <div ref={scrollAnchorRef} className="scroll-anchor" />
           </div>
@@ -714,6 +1088,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 <strong>{currentActionStep?.title ?? '자유 토론'}</strong>
               </div>
             </div>
+            {currentActionStep?.purpose && <p>{currentActionStep.purpose}</p>}
             <p>{currentActionStep?.instruction ?? '상대 발언을 읽고 답변, 질문, 보강 중 필요한 행동을 선택하세요.'}</p>
             {battleState.gameMode === 'debate' && currentActionStep && (
               <div className="time-summary">
@@ -732,6 +1107,72 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
               </div>
             )}
           </div>
+
+          {showFocusTip && (
+            <div className="coach-section focus-tip-section">
+              <div className="coach-title">
+                <Lightbulb size={18} />
+                <div>
+                  <span>생각할 거리</span>
+                  <strong>논제 초점 선택</strong>
+                </div>
+              </div>
+              <div className="focus-choice-list" role="group" aria-label="논제 초점 선택">
+                {focusTips.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={selectedFocus === option.value ? 'active' : ''}
+                    onClick={() => handleDebateFocusChange(option.value)}
+                  >
+                    <Target size={15} />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <div className="focus-tip-card">
+                <strong>{activeFocusTip.headline}</strong>
+                <ul>
+                  {activeFocusTip.questions.map(question => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+                <div className="focus-frame">
+                  <span>{battleState.debateLevel === 'intermediate' ? '용어정리 프레임' : '입론 프레임'}</span>
+                  <p>{focusFrame}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showBeginnerOpeningGuide && (
+            <div className="coach-section focus-tip-section">
+              <div className="coach-title">
+                <Lightbulb size={18} />
+                <div>
+                  <span>생각할 거리</span>
+                  <strong>주장 · 이유 · 근거</strong>
+                </div>
+              </div>
+              <div className="focus-tip-card" style={{ marginTop: '0.5rem' }}>
+                <strong>논리의 3요소를 갖춰보세요.</strong>
+                <ul style={{ marginTop: '0.5rem', marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <li>
+                    <strong>주장 (Claim):</strong> 발언자가 말하고자 하는 논제에 대한 의견 또는 해법<br/>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}>"그래서 결론이 뭔데?" (나의 핵심 입장)</span>
+                  </li>
+                  <li>
+                    <strong>이유 (Reason):</strong> 주장을 뒷받침하는 진술<br/>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}>"왜 그렇게 생각하는데?" (나의 뇌에서 나온 논리)</span>
+                  </li>
+                  <li>
+                    <strong>근거 (Evidence):</strong> 외부에서 얻을 수 있는 자료나 사실<br/>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}>"진짜라는 증거 있어?" (세상에 존재하는 객관적 팩트)</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
 
           {battleState.gameMode === 'debate' && (
             <div className="coach-section">
@@ -762,20 +1203,30 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             <div className="coach-title">
               <Sparkles size={18} />
               <div>
-                <span>발언 피드백</span>
-                <strong>{latestUserArgument ? `${checklistScore}% 반영` : '대기 중'}</strong>
+                <span>{currentStageEvaluation ? '평가 항목' : '체크 항목'}</span>
+                <strong>{currentStageEvaluation ? currentStageEvaluation.title : checklistTitle}</strong>
               </div>
             </div>
             <div className="checklist">
-              {coachChecklist.map(item => (
-                <div key={item.label} className={`check-item ${item.met ? 'met' : ''}`}>
-                  {item.met ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
-                  <div>
-                    <strong>{item.label}</strong>
-                    <span>{item.met ? '반영됨' : item.hint}</span>
-                  </div>
-                </div>
-              ))}
+              {currentStageEvaluation
+                ? currentStageEvaluation.items.map(item => (
+                    <div key={item.label} className="check-item">
+                      <Circle size={17} />
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span>{item.description}</span>
+                      </div>
+                    </div>
+                  ))
+                : coachChecklist.map(item => (
+                    <div key={item.label} className={`check-item ${item.met ? 'met' : ''}`}>
+                      {item.met ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span>{item.met ? '반영됨' : item.hint}</span>
+                      </div>
+                    </div>
+                  ))}
             </div>
           </div>
         </aside>
@@ -787,6 +1238,10 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           playerA={battleState.playerA}
           playerB={battleState.playerB}
           onClose={() => navigate('/')}
+          onStartEnglishReplay={() => {
+            setShowResultModal(false);
+            setIsEnglishReplayMode(true);
+          }}
         />
       )}
     </div>

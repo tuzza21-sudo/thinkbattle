@@ -1,4 +1,4 @@
-import type { DebateRecord } from '../types';
+import type { DebateRecord, EnglishRephraseEntry } from '../types';
 
 const HISTORY_KEY = 'thinkbattle.debateRecords';
 
@@ -23,4 +23,30 @@ export const saveDebateRecord = (record: DebateRecord) => {
   const records = readAllRecords();
   const withoutDuplicate = records.filter(item => item.id !== record.id);
   writeAllRecords([record, ...withoutDuplicate]);
+};
+
+export const saveEnglishRephraseEntry = (
+  userId: string,
+  recordId: string,
+  entry: EnglishRephraseEntry,
+): DebateRecord | undefined => {
+  const records = readAllRecords();
+  let updatedRecord: DebateRecord | undefined;
+
+  const updatedRecords = records.map(record => {
+    if (record.id !== recordId || record.userId !== userId) return record;
+
+    const existing = record.englishRephrases ?? [];
+    updatedRecord = {
+      ...record,
+      englishRephrases: [
+        entry,
+        ...existing.filter(item => item.argumentId !== entry.argumentId),
+      ],
+    };
+    return updatedRecord;
+  });
+
+  writeAllRecords(updatedRecords);
+  return updatedRecord;
 };

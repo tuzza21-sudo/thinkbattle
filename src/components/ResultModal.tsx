@@ -1,15 +1,16 @@
 import React from 'react';
 import type { FinalReport, Player } from '../types';
-import { Trophy, Star, ChevronRight, BarChart2, BookOpen } from 'lucide-react';
+import { Trophy, Star, ChevronRight, BarChart2, BookOpen, Languages } from 'lucide-react';
 
 interface ResultModalProps {
   report: FinalReport | null;
   playerA: Player;
   playerB: Player;
   onClose: () => void;
+  onStartEnglishReplay?: () => void;
 }
 
-export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playerB, onClose }) => {
+export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playerB, onClose, onStartEnglishReplay }) => {
   if (!report) {
     return (
       <div className="modal-overlay">
@@ -26,7 +27,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
       <div className="modal-content" style={{ padding: '2rem', maxWidth: '900px', width: '90%' }}>
         <div className="flex flex-col items-center mb-6">
           <Trophy size={48} color="var(--accent-amber)" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--accent-amber)', textShadow: '0 0 10px rgba(255,184,0,0.3)' }}>
+          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--accent-amber)' }}>
             최종 토론 평가서
           </h2>
           <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>{playerA.name} vs {playerB.name} 토론 완료</p>
@@ -38,7 +39,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
               <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
                 <BookOpen size={20} /> 총평 및 조언
               </h3>
-              <div className="card" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', lineHeight: 1.6, padding: '1.5rem' }}>
+              <div className="card" style={{ background: '#F8FAFC', border: '1px solid var(--border-color)', lineHeight: 1.6, padding: '1.5rem' }}>
                 {report.overallFeedback}
               </div>
             </div>
@@ -79,7 +80,12 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
           </div>
         </div>
 
-        <div className="flex justify-end mt-8">
+        <div className="flex justify-end mt-8" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+          {onStartEnglishReplay && (
+            <button className="btn btn-secondary" style={{ padding: '1rem 1.5rem', fontSize: '1rem' }} onClick={onStartEnglishReplay}>
+              <Languages size={22} /> 영어 리프레이징 하기
+            </button>
+          )}
           <button className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.2rem' }} onClick={onClose}>
             메인 화면으로 돌아가기 <ChevronRight size={24} />
           </button>

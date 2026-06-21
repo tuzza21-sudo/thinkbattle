@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Clock, Layers3, Scale, Target, X } from 'lucide-react';
-import type { BattleConfig, DebateFocus, DebateLevel, DebatePosition } from '../types';
+import { Clock, Layers3, Scale, X } from 'lucide-react';
+import type { BattleConfig, DebateLevel, DebatePosition } from '../types';
 
 interface CreateBattleModalProps {
   onClose: () => void;
@@ -12,7 +12,6 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
   const [timeLimit, setTimeLimit] = useState<number>(600);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
-  const [debateFocus, setDebateFocus] = useState<DebateFocus>('fact');
 
   const handleStart = () => {
     if (!topic.trim()) return;
@@ -22,7 +21,6 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
       gameMode: 'debate',
       userPosition,
       debateLevel,
-      debateFocus,
     });
   };
 
@@ -107,35 +105,6 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
                   onClick={() => setDebateLevel(option.value)}
                 >
                   <Layers3 size={17} />
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>논제 초점</label>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: 'fact' as DebateFocus, label: '사실확인형' },
-                { value: 'policy' as DebateFocus, label: '정책형' },
-                { value: 'value' as DebateFocus, label: '가치판단형' },
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="card flex items-center justify-center gap-2"
-                  style={{
-                    cursor: 'pointer',
-                    minHeight: '58px',
-                    padding: '0.8rem',
-                    border: debateFocus === option.value ? '2px solid var(--secondary)' : '1px solid var(--border-color)',
-                    color: debateFocus === option.value ? 'var(--secondary)' : 'var(--text-muted)',
-                    fontWeight: 900,
-                  }}
-                  onClick={() => setDebateFocus(option.value)}
-                >
-                  <Target size={17} />
                   {option.label}
                 </button>
               ))}

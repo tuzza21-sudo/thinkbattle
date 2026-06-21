@@ -14,9 +14,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, isOpponent = fal
   return (
     <div className={`card flex items-center gap-4 ${isOpponent ? 'flex-row-reverse' : ''}`} style={{ 
         width: '400px', 
-        border: `1px solid ${glowColor}`, 
+        border: `1px solid ${glowColor}`,
         boxShadow: shadowGlow,
-        background: 'linear-gradient(to bottom right, rgba(30, 41, 59, 0.9), rgba(11, 17, 32, 0.95))',
+        background: 'linear-gradient(to bottom right, #FFFFFF, #F8FAFC)',
         clipPath: isOpponent ? 'polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px)' : 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))'
     }}>
       <img 

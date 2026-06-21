@@ -16,6 +16,7 @@ interface ActionZoneProps {
   };
   isPlayerTurn: boolean;
   isAiThinking: boolean;
+  isPaused?: boolean;
   onSubmit: (content: string) => void;
 }
 
@@ -26,11 +27,11 @@ const formatTimer = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, onSubmit }) => {
+export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, isPaused = false, onSubmit }) => {
   const [content, setContent] = useState('');
 
   const handleSubmit = () => {
-    if (content.trim()) {
+    if (!isPaused && content.trim()) {
       onSubmit(content);
       setContent('');
     }
@@ -50,6 +51,8 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
           <span>
             {isPlayerTurn ? (
               <><Zap size={18} /> 내 차례</>
+            ) : isPaused ? (
+              <><Lock size={16} /> 일시정지 중입니다</>
             ) : isAiThinking ? (
               <><Lock size={16} /> 상대방이 생각 중입니다...</>
             ) : (
@@ -81,17 +84,17 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
         <div className="composer-row">
           <textarea
             className="input-textarea"
-            placeholder={isPlayerTurn ? currentRound?.inputPlaceholder ?? "주장에 대한 반박이나 질문을 입력하세요..." : isAiThinking ? "상대방이 답변을 준비 중입니다..." : "대기 중..."}
+            placeholder={isPaused ? "진행 버튼을 누르면 이어서 작성할 수 있습니다." : isPlayerTurn ? currentRound?.inputPlaceholder ?? "주장에 대한 반박이나 질문을 입력하세요..." : isAiThinking ? "상대방이 답변을 준비 중입니다..." : "대기 중..."}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={!isPlayerTurn || isAiThinking}
+            disabled={isPaused || !isPlayerTurn || isAiThinking}
             maxLength={1200}
           />
           <button 
             className="btn btn-primary send-button" 
             onClick={handleSubmit}
-            disabled={!isPlayerTurn || !content.trim()}
+            disabled={isPaused || !isPlayerTurn || !content.trim()}
             title="보내기"
           >
             <Send size={24} />
