@@ -39,41 +39,59 @@ const getHistoryArgumentStage = (record: DebateRecord, index: number) => {
 export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }) => {
   const navigate = useNavigate();
   const [records, setRecords] = useState<DebateRecord[]>([]);
-  const [selectedRecordId, setSelectedRecordId] = useState(records[0]?.id ?? '');
+  const [selectedRecordId, setSelectedRecordId] = useState('');
   const [isEnglishReplayMode, setIsEnglishReplayMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
   const selectedRecord: DebateRecord | undefined = records.find(record => record.id === selectedRecordId) ?? records[0];
 
   useEffect(() => {
-    const loadRecords = () => {
-      const nextRecords = user ? getDebateRecords(user.id) : [];
-      setRecords(nextRecords);
-      setSelectedRecordId(current => current || nextRecords[0]?.id || '');
+    let isMounted = true;
+    const loadRecords = async () => {
+      setLoading(true);
+      if (user) {
+        const nextRecords = await getDebateRecords(user.id);
+        if (isMounted) {
+          setRecords(nextRecords);
+          setSelectedRecordId(current => current || nextRecords[0]?.id || '');
+        }
+      } else {
+        if (isMounted) setRecords([]);
+      }
+      if (isMounted) setLoading(false);
     };
     loadRecords();
+    return () => { isMounted = false; };
   }, [user]);
 
-  const handleSaveEnglishRephrase = (record: DebateRecord, entry: EnglishRephraseEntry) => {
+  const handleSaveEnglishRephrase = async (record: DebateRecord, entry: EnglishRephraseEntry) => {
     if (!user) return;
 
-    const updatedRecord = saveEnglishRephraseEntry(user.id, record.id, entry);
+    const updatedRecord = await saveEnglishRephraseEntry(user.id, record.id, entry);
     if (!updatedRecord) return;
 
-    setRecords(prev => prev.map(item => item.id === updatedRecord.id ? updatedRecord : item));
+    setRecords(current => current.map(item => (item.id === record.id ? updatedRecord : item)));
   };
 
-  const handleDeleteRecord = (e: React.MouseEvent, recordId: string) => {
+  const handleDeleteRecord = async (e: React.MouseEvent, recordId: string) => {
     e.stopPropagation();
+    if (!user) return;
     if (window.confirm('이 토론 기록을 삭제하시겠습니까?')) {
-      if (user) {
-        deleteDebateRecord(user.id, recordId);
-        setRecords(prev => prev.filter(r => r.id !== recordId));
-        if (selectedRecordId === recordId) {
-          const remaining = records.filter(r => r.id !== recordId);
-          setSelectedRecordId(remaining.length > 0 ? remaining[0].id : '');
-        }
+      await deleteDebateRecord(user.id, recordId);
+      setRecords(current => current.filter(r => r.id !== recordId));
+      if (selectedRecordId === recordId) {
+        setSelectedRecordId('');
       }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="layout-container" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+        로딩 중...
+      </div>
+    );
+  }
 
   if (!user) {
     return (

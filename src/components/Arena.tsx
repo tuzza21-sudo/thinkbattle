@@ -435,10 +435,7 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
   };
 
   if (user) {
-    playerA = getPlayerFromStats(user.id, user.nickname);
-    if (isDebateMode) {
-      playerA.name = `${user.nickname} · ${getPositionLabel(userPosition)}`;
-    }
+    playerA.name = isDebateMode ? `${user.nickname} · ${getPositionLabel(userPosition)}` : user.nickname;
   }
 
   return {
@@ -556,6 +553,22 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const [isPaused, setIsPaused] = useState(false);
   const [isReportGenerating, setIsReportGenerating] = useState(false);
 
+  useEffect(() => {
+    if (user) {
+      getPlayerFromStats(user.id, user.nickname).then(player => {
+        setBattleState(prev => {
+          const newPlayer = { ...player };
+          if (prev.gameMode === 'debate') {
+            newPlayer.name = `${user.nickname} · ${getPositionLabel(prev.userPosition)}`;
+          } else {
+            newPlayer.name = user.nickname;
+          }
+          return { ...prev, playerA: newPlayer };
+        });
+      });
+    }
+  }, [user]);
+
   const roundtablePlayers = useMemo<Player[]>(
     () => [battleState.playerA, roundtablePlayerInfo.socrates, roundtablePlayerInfo.kant, roundtablePlayerInfo.nietzsche],
     [battleState.playerA],
@@ -658,29 +671,34 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     void openRoundtable();
   }, [battleState.arguments.length, battleState.gameMode, battleState.isFinished, battleState.timeLimit, battleState.timeRemaining, battleState.topic]);
 
-  const persistDebateRecord = useCallback((report: FinalReport, finalState: BattleState) => {
+  const persistDebateRecord = useCallback(async (report: FinalReport, finalState: BattleState) => {
     if (!user || savedRecordIdRef.current) return;
 
     const completedAt = new Date().toISOString();
     const recordId = `record_${finalState.id}_${Date.now()}`;
     savedRecordIdRef.current = recordId;
 
-    saveDebateRecord({
-      id: recordId,
-      userId: user.id,
-      topic: finalState.topic,
-      matchType: finalState.matchType,
-      gameMode: finalState.gameMode,
-      userPosition: finalState.userPosition,
-      aiPosition: finalState.aiPosition,
-      debateLevel: finalState.debateLevel,
-      debateFocus: finalState.debateFocus,
-      durationSeconds: finalState.timeLimit - finalState.timeRemaining,
-      completedAt,
-      arguments: finalState.arguments,
-      report,
-      englishRephrases,
-    });
+    try {
+      await saveDebateRecord({
+        id: recordId,
+        userId: user.id,
+        topic: finalState.topic,
+        matchType: finalState.matchType,
+        gameMode: finalState.gameMode,
+        userPosition: finalState.userPosition,
+        aiPosition: finalState.aiPosition,
+        debateLevel: finalState.debateLevel,
+        debateFocus: finalState.debateFocus,
+        durationSeconds: finalState.timeLimit - finalState.timeRemaining,
+        completedAt,
+        arguments: finalState.arguments,
+        report,
+        englishRephrases,
+      });
+    } catch (e) {
+      console.error(e);
+      savedRecordIdRef.current = null;
+    }
   }, [englishRephrases, user]);
 
   const handleSaveEnglishRephrase = useCallback((entry: EnglishRephraseEntry) => {

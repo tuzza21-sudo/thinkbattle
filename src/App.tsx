@@ -11,7 +11,8 @@ import type { AppUser } from './types';
 export type ThemeType = 'light' | 'dark';
 
 function App() {
-  const [user, setUser] = useState<AppUser | null>(() => getCurrentUser());
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   
   const [theme, setTheme] = useState<ThemeType>(() => {
@@ -24,14 +25,24 @@ function App() {
     localStorage.setItem('app-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    getCurrentUser()
+      .then(u => setUser(u))
+      .finally(() => setAuthLoading(false));
+  }, []);
+
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const handleLogout = () => {
-    signOut();
+  const handleLogout = async () => {
+    await signOut();
     setUser(null);
   };
+
+  if (authLoading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading...</div>;
+  }
 
   return (
     <>

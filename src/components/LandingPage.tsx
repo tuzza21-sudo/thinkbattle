@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
@@ -67,7 +67,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
 
-  const userStats = user ? calculateUserStats(user.id) : null;
+  const [userStats, setUserStats] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) {
+      calculateUserStats(user.id).then(stats => setUserStats(stats));
+    } else {
+      setUserStats(null);
+    }
+  }, [user]);
 
   // Helper to find selected battle across all data sources
   const findBattle = (id: string): FeaturedBattle | WeeklyIssue | null => {

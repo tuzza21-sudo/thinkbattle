@@ -15,19 +15,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
 
+  const [loading, setLoading] = useState(false);
   const isSignup = mode === 'signup';
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
+    setLoading(true);
 
     try {
       const user = isSignup
-        ? signUpWithEmail(email, password, nickname)
-        : signInWithEmail(email, password);
+        ? await signUpWithEmail(email, password, nickname)
+        : await signInWithEmail(email, password);
       onAuthenticated(user);
       onClose();
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : '인증에 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,8 +85,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
           <button className="btn btn-secondary" disabled>구글 로그인 준비 중</button>
         </div>
 
-        <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit}>
-          {isSignup ? '계정 만들기' : '로그인하기'}
+        <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
+          {loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기')}
         </button>
       </div>
     </div>

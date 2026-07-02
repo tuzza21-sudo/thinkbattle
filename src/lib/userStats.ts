@@ -8,8 +8,8 @@ export interface UserStats {
   rankBadge: string;
 }
 
-export const calculateUserStats = (userId: string): UserStats => {
-  const records = getDebateRecords(userId);
+export const calculateUserStats = async (userId: string): Promise<UserStats> => {
+  const records = await getDebateRecords(userId);
   const totalXp = records.reduce((sum, record) => sum + (record.report?.xpEarned || 0), 0);
 
   let level = 0;
@@ -54,8 +54,8 @@ export const calculateUserStats = (userId: string): UserStats => {
   };
 };
 
-export const getPlayerFromStats = (userId: string, nickname: string): Player => {
-  const stats = calculateUserStats(userId);
+export const getPlayerFromStats = async (userId: string, nickname: string): Promise<Player> => {
+  const stats = await calculateUserStats(userId);
   return {
     id: userId,
     name: nickname,
