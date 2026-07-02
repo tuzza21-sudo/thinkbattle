@@ -18,6 +18,8 @@ export interface DebateAIResponse {
   argument: string;
   question?: string;
   nextTask: string;
+  turnXp?: number;
+  turnFeedback?: string;
 }
 
 export interface RoundtableTurn {
@@ -184,21 +186,32 @@ const createChatCompletion = async (request: ChatCompletionRequest): Promise<Cha
   void _model;
   const geminiRequest = toGeminiGenerateContentRequest(request);
 
-  const response = await fetch(GEMINI_GENERATE_CONTENT_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(geminiRequest),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
+  try {
+    const response = await fetch(GEMINI_GENERATE_CONTENT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(geminiRequest),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
+    }
+
+    const geminiResponse = await response.json() as GeminiGenerateContentResponse;
+    return toChatCompletionResponse(geminiResponse);
+  } catch (error: unknown) {
+    clearTimeout(timeoutId);
+    throw error;
   }
-
-  const geminiResponse = await response.json() as GeminiGenerateContentResponse;
-  return toChatCompletionResponse(geminiResponse);
 };
 
 const SOCRATES_PROMPT = `
@@ -575,14 +588,14 @@ const getDebateLevelGuide = (level?: DebateLevel): string => {
     return `
 [Intermediate Debate Flow]
 Pre-session: The user selects a position. In the first definition phase, the user may frame the topic as fact-checking, policy, or value-judgment.
-1. 논제 확인 및 용어 정리: the user identifies the core question, defines key terms, bounds the debate, and sets 1-2 judging standards.
+1. 논제 확인 및 용어 정리: the user identifies the core question, defines key terms, bounds the debate, and identifies any terms that might be defined differently by the opponent.
 2. 입론: the user gives a clear position, judging standard, at least two grounds, Reasons, examples, expected effects, and a basic expected-objection response.
 3. AI opponent opening: after the user opening, you must give your own full opening case.
 4. 교차질문: the user tests your premise, Evidence sufficiency, scope, alternative, or priority.
 5. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Evidence, scope, standard, or warrant.
 6. AI 교차질문 답변: the user answers your cross-question and reinforces their opening.
-7. 상대 주장 점검: the user identifies the winning issue, exposes your core premise, tests Evidence credibility/relevance/sufficiency, and identifies the main clash point.
-8. 반박: the user should not merely deny your conclusion; they should rebut the weakest premise, Evidence validity, solution, or priority needed for your conclusion, using the issue/premise/Evidence checks from 상대 주장 점검, and propose a realistic alternative with fewer side effects.
+7. 상대 주장 분석: the user identifies the winning issue, exposes your core premise, tests Evidence credibility/relevance/sufficiency, and identifies the main clash point.
+8. 반박: the user should not merely deny your conclusion; they should rebut the weakest premise, Evidence validity, solution, or priority needed for your conclusion, using the issue/premise/Evidence checks from 상대 주장 분석, and propose a realistic alternative with fewer side effects.
 9. 충돌 지점 확인 및 중요성 비교: the user identifies 2-3 clash points and weighs severity, scope, probability, urgency, feasibility, or reversibility.
 10. 최종 입장 확인: the user summarizes the debate without adding a new claim.
 `;
@@ -612,8 +625,8 @@ Pre-session: The user selects a position.
 3. 교차질문: user asks about the opponent's meaning, Evidence, Reason, example, or weak point. Do not require warrant or hidden-premise analysis at beginner level.
 4. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Reason, Evidence, or example.
 5. AI 교차질문 답변: user answers your cross-question and reinforces their opening.
-6. 상대 주장 점검: user identifies the opponent's core Claim, checks Evidence credibility/relevance/sufficiency, and finds one weak point.
-7. 반박: user should not merely deny the opponent's conclusion; user rebuts the weakest Reason, Evidence, or solution from 상대 주장 점검, and may propose a realistic alternative with fewer side effects.
+6. 상대 주장 분석: user identifies the opponent's core Claim, checks Evidence credibility/relevance/sufficiency, and finds one weak point.
+7. 반박: user should not merely deny the opponent's conclusion; user rebuts the weakest Reason, Evidence, or solution from 상대 주장 분석, and may propose a realistic alternative with fewer side effects.
 8. 최종발언: user restates their final position, strongest Reason, supporting Evidence or example, and gives the final statement. Do not require clash-point weighing or comparison criteria at beginner level.
 `;
 };
@@ -738,10 +751,11 @@ ${debateLevel === 'beginner'
     ? '4. "중요성:" why this matters in the debate. Do not include a separate "전제:" item for beginner level.'
     : '4. "전제:" the warrant connecting the Reason to the Claim.\n5. "중요성:" why this matters in the debate.'}
 You may briefly mention the user's opening, but do not make the response only a rebuttal. The next task must tell the user to ask a cross-question about the AI Claim, Reason, Evidence, or example.
-If the phase is opening but an AI opening already exists in the history, test the user's latest opening or definition.
+If "Must produce AI opening case now" is NO, test the user's latest definition or opening. Evaluate if the core question is accurate, terms are well-defined, and the scope is fair.
 
 Rebuttal:
-Challenge the user’s argument with the strongest relevant counterargument.
+1. First, defend your side against the user's rebuttal.
+2. Second, explicitly attack the user's original opening (입론/주장). Raise a strong counterargument against the user's core reasoning or evidence, setting up a clash for the user to weigh in the next phase (충돌 지점 확인 및 중요성 비교).
 
 Cross-question:
 If "Must answer user cross-question and ask AI cross-question now" is YES:
@@ -787,7 +801,9 @@ Return ONLY valid JSON:
 {
   "argument": "Your current phase response as the opponent. For final AI statement, give a concise final comment and do not request another user response. For AI opening, include your Claim, Reason, Evidence, why, and importance. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
   "question": "Exactly one focused question for the user's next turn, or empty string for final AI statement.",
-  "nextTask": "One short Korean imperative telling the user which debate skill to practice next, or '최종 평가를 확인하세요.' for final AI statement."
+  "nextTask": "One short Korean imperative telling the user which debate skill to practice next, or '최종 평가를 확인하세요.' for final AI statement.",
+  "turnFeedback": "A 1-sentence Korean feedback evaluating the user's latest message based on the required skill for the current phase (e.g. '주장과 근거가 명확하게 제시되었습니다.' or '주장은 좋으나 구체적인 근거가 부족합니다.').",
+  "turnXp": 0 // Evaluate the user's latest message from 10 to 50 XP based on how well they completed the current phase's task.
 }
 `;
 
@@ -808,6 +824,8 @@ Return ONLY valid JSON:
       argument: getStringField(parsed.argument, '다음 라운드로 넘어가기 전에 핵심 주장을 더 명확히 정리해야 합니다.'),
       question: getStringField(parsed.question, ''),
       nextTask: getStringField(parsed.nextTask, '다음 발언을 구조화해서 작성하세요.'),
+      turnFeedback: getStringField(parsed.turnFeedback, '잘 진행하고 있습니다.'),
+      turnXp: typeof parsed.turnXp === 'number' ? parsed.turnXp : 20,
     };
   } catch (error: unknown) {
     console.error("Debate AI API Error:", error);
@@ -839,41 +857,38 @@ User position: "${getPositionLabel(userPosition)}"
 ${historyText}
 
 Judge only the user's debate performance.
-Use the level checklist as the baseline, but if the context reveals an additional issue, judge it yourself.
-Score the user using exactly these five categories:
+Score the user using exactly these categories (out of 5 points each):
 ${debateLevel === 'beginner'
-    ? `- 주장 명료성: 입장, Claim, 논제에 대한 답이 분명한가?
-- 이유 연결성: 제시한 Reason이 주장과 논리적으로 이어지는가?
-- 근거 적합성: Evidence, 사례, 자료가 이유와 주장을 뒷받침하는가?
-- 상대 주장 이해: 상대 주장의 핵심, 이유, 근거, 약한 부분을 공정하게 파악했는가? 숨은 전제나 충돌 지점 분석은 요구하지 마라.
-- 최종발언 완성도: 최종 입장, 가장 강한 이유, 근거 또는 예시를 짧고 설득력 있게 정리했는가? 비교 기준이나 충돌 지점 weighing은 요구하지 마라.`
-    : `- 주장 명료성: 입장, 핵심 주장, 논제에 대한 답이 분명한가?
-- 근거와 논리 연결성: 입론에서 제시한 이유가 주장과 논리적으로 이어지는가? 사례·통계·자료·현실 근거가 주장을 충분히 뒷받침하는가? Reason 연결성과 Evidence 적합성을 함께 평가하라.
-- 상대 이해와 쟁점 파악: 상대 주장의 핵심, 근거, 숨은 전제, 실제 충돌 지점을 정확히 잡았는가?
-- 반박과 방어: 상대 주장의 약점을 논리적으로 반박하고, 자신의 주장에 대한 공격도 잘 방어했는가?
-- 중요성 비교와 최종 설득력: 왜 내 주장이 더 중요한지 비교 기준으로 설명하고, 최종 발언이 설득력 있게 마무리되었는가?`}
-When judging the user's opening statement, explicitly apply:
-- Reason 연결성: whether the Reason logically supports the Claim without missing intermediate explanation.
-- Evidence 적합성: whether examples, statistics, sources, or real-world Evidence are relevant and sufficient for the Claim.
+    ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+- 논리력: 생각을 일관된 논리로 연결했는가?
+- 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+- 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
+- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?`
+    : debateLevel === 'intermediate'
+    ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+- 논리력: 생각을 일관된 논리로 연결했는가?
+- 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+- 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
+- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
+- 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
+- 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?`
+    : `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+- 논리력: 생각을 일관된 논리로 연결했는가?
+- 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+- 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
+- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
+- 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
+- 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?
+- 프레이밍 능력: 문제를 새로운 관점에서 바라보고 논쟁의 기준을 재설정했는가?`}
 Each feedback item must mention one observed behavior from the debate and one concrete next training move.
 Return ONLY valid JSON:
 {
   "overallFeedback": "총평 및 다음 훈련 조언 (한국어, 3-4문장)",
   "categories": [
-${debateLevel === 'beginner'
-    ? `    { "name": "주장 명료성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "이유 연결성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "근거 적합성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "상대 주장 이해", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "최종발언 완성도", "score": 0, "maxScore": 100, "feedback": "피드백" }`
-    : `    { "name": "주장 명료성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "근거와 논리 연결성", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "상대 이해와 쟁점 파악", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "반박과 방어", "score": 0, "maxScore": 100, "feedback": "피드백" },
-    { "name": "중요성 비교와 최종 설득력", "score": 0, "maxScore": 100, "feedback": "피드백" }`}
+    // Output EXACTLY the categories listed above with their scores.
+    { "name": "카테고리명", "score": 0, "maxScore": 5, "feedback": "피드백" }
   ],
-  "totalScore": 0,
-  "xpEarned": 0
+  "totalScore": 0
 }
 `;
 
@@ -889,25 +904,69 @@ ${debateLevel === 'beginner'
     });
 
     const aiMessage = response.choices?.[0]?.message?.content || '{}';
-    const report = JSON.parse(aiMessage) as FinalReport;
+    let report: FinalReport;
+    
+    try {
+      const parsed = parseJsonObject(aiMessage);
+      report = {
+        overallFeedback: typeof parsed.overallFeedback === 'string' ? parsed.overallFeedback : '토론 분석이 완료되었습니다.',
+        categories: Array.isArray(parsed.categories) ? parsed.categories as any[] : [],
+        totalScore: typeof parsed.totalScore === 'number' ? parsed.totalScore : 0,
+        xpEarned: 0,
+      };
+    } catch (e) {
+      console.warn("JSON Parse Fallback in FinalReport:", e);
+      report = { overallFeedback: '평가 결과 파싱에 문제가 발생했습니다.', categories: [], totalScore: 0, xpEarned: 0 };
+    }
+    
+    const categories = report.categories || [];
+
+    // Calculate XP based on debate level and scores
+    let totalXpEarned = 50; // Base participation XP
+    let perfectCount = 0;
+
+    const computedCategories = categories.map(cat => {
+      // 150 보너스 경험치를 카테고리 개수만큼 균등 분배
+      const maxMissionXp = categories.length > 0 ? 150 / categories.length : 0; 
+      
+      const earnedXp = Math.round(((cat.score || 0) / 5) * maxMissionXp);
+      totalXpEarned += earnedXp;
+
+      if ((cat.score || 0) >= 4.5) perfectCount++;
+
+      return { 
+        name: cat.name || '미분류',
+        score: cat.score || 0,
+        maxScore: 5,
+        feedback: cat.feedback || '세부 피드백이 제공되지 않았습니다.',
+        xpEarned: earnedXp 
+      };
+    });
+
+    const computedTotalScore = computedCategories.reduce((sum, cat) => sum + cat.score, 0);
+    const totalMaxScore = computedCategories.length * 5;
+
+    // AI 판정승 보너스 (총점의 75% 이상 달성 시)
+    if (totalMaxScore > 0 && computedTotalScore >= totalMaxScore * 0.75) {
+      totalXpEarned += 50; 
+    }
+    
+    if (perfectCount >= 3) {
+      totalXpEarned += 30; // Perfect Logic 보너스
+    }
+
     return {
       ...report,
-      categories: report.categories.map(category =>
-        category.name === '근거와 설명력'
-          ? { ...category, name: '근거와 논리 연결성' }
-          : category,
-      ),
+      categories: computedCategories,
+      totalScore: computedTotalScore,
+      xpEarned: totalXpEarned,
     };
   } catch (error: unknown) {
     console.error("Debate Judgment API Error:", error);
     return {
       overallFeedback: `심사 보고서를 생성하지 못했습니다. 오류: ${getErrorMessage(error)}`,
       categories: [
-        { name: "주장 명료성", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "근거와 논리 연결성", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "상대 이해와 쟁점 파악", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "반박과 방어", score: 0, maxScore: 100, feedback: "오류" },
-        { name: "중요성 비교와 최종 설득력", score: 0, maxScore: 100, feedback: "오류" },
+        { name: "평가 시스템 오류", score: 0, maxScore: 5, feedback: "오류로 인해 평가 항목을 불러오지 못했습니다." }
       ],
       totalScore: 0,
       xpEarned: 0,

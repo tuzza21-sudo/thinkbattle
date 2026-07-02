@@ -50,3 +50,9 @@ export const saveEnglishRephraseEntry = (
   writeAllRecords(updatedRecords);
   return updatedRecord;
 };
+
+export const deleteDebateRecord = (userId: string, recordId: string) => {
+  const records = readAllRecords();
+  writeAllRecords(records.filter(record => !(record.id === recordId && record.userId === userId)));
+};
+

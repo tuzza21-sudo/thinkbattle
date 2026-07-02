@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages } from 'lucide-react';
-import { getDebateRecords, saveEnglishRephraseEntry } from '../lib/history';
+import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages, Trash2 } from 'lucide-react';
+import { getDebateRecords, saveEnglishRephraseEntry, deleteDebateRecord } from '../lib/history';
 import { EnglishRephrasePanel } from './EnglishRephrasePanel';
 import type { AppUser, DebateRecord, EnglishRephraseEntry } from '../types';
 
@@ -59,6 +59,20 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
     if (!updatedRecord) return;
 
     setRecords(prev => prev.map(item => item.id === updatedRecord.id ? updatedRecord : item));
+  };
+
+  const handleDeleteRecord = (e: React.MouseEvent, recordId: string) => {
+    e.stopPropagation();
+    if (window.confirm('이 토론 기록을 삭제하시겠습니까?')) {
+      if (user) {
+        deleteDebateRecord(user.id, recordId);
+        setRecords(prev => prev.filter(r => r.id !== recordId));
+        if (selectedRecordId === recordId) {
+          const remaining = records.filter(r => r.id !== recordId);
+          setSelectedRecordId(remaining.length > 0 ? remaining[0].id : '');
+        }
+      }
+    }
   };
 
   if (!user) {
@@ -125,7 +139,17 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
               >
                 <div className="flex justify-between items-start gap-3">
                   <span className="badge badge-amber">{record.matchType}</span>
-                  <span className="history-score">{record.report.totalScore}/100</span>
+                  <div className="flex items-center gap-2">
+                    <span className="history-score">{record.report.totalScore}/{record.report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100}</span>
+                    <button 
+                      className="btn" 
+                      style={{ padding: '0.2rem', background: 'transparent', color: 'var(--text-muted)', border: 'none' }}
+                      onClick={(e) => handleDeleteRecord(e, record.id)}
+                      title="기록 삭제"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
                 <h3>{record.topic}</h3>
                 <div className="history-meta">
@@ -146,7 +170,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                   <h2>{selectedRecord.topic}</h2>
                 </div>
                 <div className="report-score">
-                  {selectedRecord.report.totalScore}<span>/100</span>
+                  {selectedRecord.report.totalScore}<span>/{selectedRecord.report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100}</span>
                 </div>
               </div>
 

@@ -42,22 +42,29 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, is
           {argument.content}
         </div>
 
-        {(argument.aiQuestion || argument.aiLesson || argument.nextTask) && (
+        {(argument.aiQuestion || argument.aiLesson || argument.turnFeedback) && (
           <div className="argument-insight">
+            {argument.turnFeedback && (
+              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-amber)', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <div className="insight-title" style={{ color: 'var(--accent-amber)', margin: 0 }}>
+                    <AlertCircle size={18} /> 실시간 미션 평가
+                  </div>
+                  {argument.turnXp !== undefined && (
+                    <div style={{ background: 'var(--accent-amber)', color: 'var(--bg-primary)', padding: '0.15rem 0.6rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.85rem' }}>
+                      +{argument.turnXp} XP
+                    </div>
+                  )}
+                </div>
+                <div style={{ color: 'var(--text-light)', fontSize: '0.95rem' }}>{argument.turnFeedback}</div>
+              </div>
+            )}
             {argument.aiQuestion && (
               <div>
                 <div className="insight-title coral">
-                  <AlertCircle size={18} /> 날카로운 역질문
+                  <AlertCircle size={18} /> 상대측 교차질문
                 </div>
                 <div className="insight-copy">{argument.aiQuestion}</div>
-              </div>
-            )}
-            {argument.nextTask && (
-              <div>
-                <div className="insight-title amber">
-                  <AlertCircle size={18} /> 다음 과제
-                </div>
-                <div className="insight-copy">{argument.nextTask}</div>
               </div>
             )}
 

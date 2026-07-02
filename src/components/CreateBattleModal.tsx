@@ -84,11 +84,10 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>토론 수준</label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 { value: 'beginner' as DebateLevel, label: '초급' },
                 { value: 'intermediate' as DebateLevel, label: '중급' },
-                { value: 'advanced' as DebateLevel, label: '고급' },
               ].map(option => (
                 <button
                   key={option.value}

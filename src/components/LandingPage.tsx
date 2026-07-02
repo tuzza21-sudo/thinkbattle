@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { CreateBattleModal } from './CreateBattleModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
+import { calculateUserStats } from '../lib/userStats';
 import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, WeeklyIssue } from '../types';
 
 interface LandingPageProps {
@@ -66,6 +67,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
 
+  const userStats = user ? calculateUserStats(user.id) : null;
+
   // Helper to find selected battle across all data sources
   const findBattle = (id: string): FeaturedBattle | WeeklyIssue | null => {
     const weekly = weeklyIssues.find(w => w.id === id);
@@ -81,6 +84,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const currentWeeklyIssue = weeklyIssues[0]; // Assume first is current
 
   const activeCategoryData = categorizedTopics.find(c => c.category === activeCategory) || categorizedTopics[0];
+
+  const displayRankings = React.useMemo(() => {
+    if (!user || !userStats) return weeklyRankings;
+
+    let badgeColor = 'var(--secondary)';
+    if (userStats.league === '고급' || userStats.league === '마스터') badgeColor = 'var(--primary)';
+    else if (userStats.league === '중급') badgeColor = 'var(--accent-amber)';
+
+    const merged = [
+      ...weeklyRankings.filter(r => r.nickname !== user.nickname),
+      {
+        id: user.id,
+        rank: 0,
+        nickname: user.nickname,
+        xp: userStats.xp,
+        badge: userStats.league,
+        badgeColor,
+        isCurrentUser: true
+      }
+    ];
+
+    merged.sort((a, b) => b.xp - a.xp);
+    merged.forEach((item, index) => {
+      item.rank = index + 1;
+    });
+
+    return merged.slice(0, 5);
+  }, [user, userStats]);
 
   const handleStartBattle = (config: BattleConfig, position: DebatePosition = userPosition) => {
     navigate('/battle/new', {
@@ -113,61 +144,69 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const selectedAccent = selectedBattle ? accentStyles[selectedBattle.accent] : null;
 
   return (
-    <div className="app-container page-scroll" style={{ padding: '2rem 2rem 5rem 2rem' }}>
-      <header className="flex justify-between items-center" style={{ marginBottom: '3.5rem', gap: '1rem', rowGap: '1.25rem', flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: '2.5rem', color: 'var(--primary)', margin: 0, textTransform: 'uppercase', letterSpacing: '-0.5px' }}>
-            ThinkBattle
+    <div className="app-container page-scroll" style={{ paddingBottom: '5rem' }}>
+      <header style={{ marginBottom: '3.5rem' }}>
+        <div className="flex justify-between items-center" style={{ gap: '1rem', rowGap: '1.25rem', flexWrap: 'wrap' }}>
+          <h1 style={{ fontSize: '2.5rem', color: 'var(--primary)', margin: 0, letterSpacing: '-0.5px' }}>
+            생각근육 ThinkFit
           </h1>
-          <p style={{ color: 'var(--text-muted)', margin: '0.5rem 0 0 0', fontWeight: 600 }}>
-            정통 디베이트 사고력 훈련 플랫폼
-          </p>
-        </div>
 
-        <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-          <button className="icon-button" onClick={toggleTheme} aria-label="테마 변경" title="테마 변경" style={{ color: 'var(--text-muted)' }}>
-            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-          <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-          <div className="flex items-center gap-3">
-            <div style={{ background: 'rgba(217, 119, 6, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
-              <Shield size={24} color="var(--accent-amber)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>MY LEAGUE</div>
-              <div style={{ fontSize: '1.1rem', color: 'var(--accent-amber)', fontWeight: 900 }}>중급 리그</div>
-            </div>
-          </div>
-          <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-          <div className="flex items-center gap-3">
-            <div style={{ background: 'rgba(37, 99, 235, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(37, 99, 235, 0.2)' }}>
-              <Zap size={24} color="var(--primary)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>경험치 XP</div>
-              <div style={{ fontSize: '1.1rem', color: 'var(--text-light)', fontWeight: 900 }}>4,250 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Top 12%</span></div>
-            </div>
-          </div>
-          <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-          {user ? (
-            <div className="flex items-center gap-3">
-              <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
-                <FileText size={18} /> 기록
-              </button>
-              <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>USER</div>
-                <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900 }}>{user.nickname}</div>
-              </div>
-              <button className="icon-button" onClick={onLogout} aria-label="로그아웃" title="로그아웃" style={{ color: 'var(--text-muted)' }}>
-                <LogOut size={18} />
-              </button>
-            </div>
-          ) : (
-            <button className="btn btn-secondary" style={{ padding: '0.8rem 1.2rem' }} onClick={onLoginRequest}>
-              <LogIn size={18} /> 로그인
+          <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+            <button className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }} onClick={() => navigate('/about')}>
+              <BookOpen size={16} /> 서비스 소개
             </button>
-          )}
+            <button className="icon-button" onClick={toggleTheme} aria-label="테마 변경" title="테마 변경" style={{ color: 'var(--text-muted)' }}>
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
+            {userStats && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div style={{ background: 'rgba(217, 119, 6, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
+                    <Shield size={24} color="var(--accent-amber)" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>MY LEAGUE</div>
+                    <div style={{ fontSize: '1.1rem', color: 'var(--accent-amber)', fontWeight: 900 }}>{userStats.league} 리그</div>
+                  </div>
+                </div>
+                <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
+                <div className="flex items-center gap-3">
+                  <div style={{ background: 'rgba(37, 99, 235, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(37, 99, 235, 0.2)' }}>
+                    <Zap size={24} color="var(--primary)" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>경험치 XP</div>
+                    <div style={{ fontSize: '1.1rem', color: 'var(--text-light)', fontWeight: 900 }}>{userStats.xp.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Lv.{userStats.level}</span></div>
+                  </div>
+                </div>
+                <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
+              </>
+            )}
+            {user ? (
+              <div className="flex items-center gap-3">
+                <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
+                  <FileText size={18} /> 기록
+                </button>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>USER</div>
+                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900 }}>{user.nickname}</div>
+                </div>
+                <button className="icon-button" onClick={onLogout} aria-label="로그아웃" title="로그아웃" style={{ color: 'var(--text-muted)' }}>
+                  <LogOut size={18} />
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary" style={{ padding: '0.8rem 1.2rem' }} onClick={onLoginRequest}>
+                <LogIn size={18} /> 로그인
+              </button>
+            )}
+          </div>
         </div>
+        <p style={{ color: 'var(--text-light)', margin: '1.8rem 0 0 0', fontWeight: 800, fontSize: '1.35rem', maxWidth: '700px', lineHeight: 1.5, letterSpacing: '-0.3px' }}>
+          AI가 생각을 대신하는 시대,<br/>
+          <span style={{ color: 'var(--primary)' }}>ThinkFit</span>은 생각에도 꾸준한 운동이 필요하다고 믿습니다.
+        </p>
       </header>
 
       <main style={{ paddingBottom: '3rem', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
@@ -196,7 +235,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               <div className="flex justify-between items-start relative z-10" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div className="flex items-center gap-3">
                   <div className="badge" style={{ background: 'var(--primary)', color: '#fff', border: 'none', fontWeight: 800, padding: '0.5rem 1rem', fontSize: '1rem' }}>
-                    <Sparkles size={18} style={{ marginRight: '6px', display: 'inline' }} /> 이번 주 핵심 논쟁
+                    <Sparkles size={18} style={{ marginRight: '6px', display: 'inline' }} /> 최신 핵심 이슈
                   </div>
                   <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 600 }}>{currentWeeklyIssue.issueDate}</span>
                 </div>
@@ -349,30 +388,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 overflow: 'hidden',
               }}
             >
-              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: selectedAccent.soft }}>
-                <div className="flex justify-between items-start" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap' }}>
-                  <div>
+              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: selectedAccent.soft, position: 'relative' }}>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setSelectedBattleId(null)}
+                  aria-label="상세 배경 설명 닫기"
+                  title="닫기"
+                  style={{ position: 'absolute', top: '1rem', right: '1rem', color: 'var(--text-muted)', padding: '0.2rem' }}
+                >
+                  <X size={16} />
+                </button>
+                <div className="flex justify-between items-end" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap', paddingRight: '0.5rem' }}>
+                  <div style={{ flex: 1, minWidth: '280px' }}>
                     <div className="badge" style={{ background: 'var(--bg-card)', color: selectedAccent.color, border: `1px solid ${selectedAccent.color}`, marginBottom: '0.8rem' }}>
                       토론 전 브리핑
                     </div>
-                    <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.35, color: 'var(--text-light)' }}>{selectedBattle.topic}</h2>
+                    <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.35, color: 'var(--text-light)', paddingRight: '1.5rem' }}>{selectedBattle.topic}</h2>
                   </div>
-                  <div className="flex items-center gap-3" style={{ rowGap: '0.75rem', flexWrap: 'wrap', alignSelf: 'center' }}>
+                  <div className="flex justify-end" style={{ alignSelf: 'flex-end' }}>
                     <button
                       className="btn btn-primary"
-                      style={{ padding: '1rem 1.5rem', background: selectedAccent.color, borderColor: selectedAccent.color }}
+                      style={{ 
+                        padding: '0.9rem 1.6rem', 
+                        fontSize: '1.1rem', 
+                        fontWeight: 800,
+                        background: selectedAccent.color, 
+                        borderColor: selectedAccent.color, 
+                        color: '#fff',
+                        boxShadow: `0 4px 12px ${selectedAccent.soft}`
+                      }}
                       onClick={() => handleStartBattle(selectedBattle.config)}
                     >
-                      <Swords size={20} /> 토론 시작
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => setSelectedBattleId(null)}
-                      aria-label="상세 배경 설명 닫기"
-                      title="닫기"
-                    >
-                      <X size={18} />
+                      토론 참여하기 <ChevronRight size={20} />
                     </button>
                   </div>
                 </div>
@@ -460,11 +508,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Layers3 size={18} color="var(--primary)" /> 토론 수준
                     </h3>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         { value: 'beginner' as DebateLevel, label: '초급' },
                         { value: 'intermediate' as DebateLevel, label: '중급' },
-                        { value: 'advanced' as DebateLevel, label: '고급' },
                       ].map(option => (
                         <button
                           key={option.value}
@@ -519,6 +566,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                       ))}
                     </ol>
                   </section>
+
                 </aside>
               </div>
             </section>
@@ -530,7 +578,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           {/* Popular Topics */}
           <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <h3 className="flex items-center gap-2" style={{ fontSize: '1.2rem', margin: '0 0 1.5rem 0', color: 'var(--secondary)' }}>
-              <Flame size={20} /> 실시간 인기 토론 주제
+              <Flame size={20} /> 이번 주 화제의 토론
             </h3>
             <div className="flex flex-col gap-4">
               {popularTopics.map((topic, index) => (
@@ -564,14 +612,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               <Trophy size={20} /> 금주 토론자 랭킹
             </h3>
             <div className="flex flex-col gap-3">
-              {weeklyRankings.map((u, index) => (
+              {displayRankings.map((u, index) => (
                 <div 
                   key={u.id} 
                   className="flex items-center gap-3 card" 
                   style={{ 
                     padding: '1rem', 
-                    background: index === 0 ? 'var(--accent-amber-light)' : 'var(--bg-elevated)',
-                    border: index === 0 ? '1px solid var(--accent-amber)' : '1px solid var(--border-color)',
+                    background: index === 0 ? 'var(--accent-amber-light)' : (u as any).isCurrentUser ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-elevated)',
+                    border: index === 0 ? '1px solid var(--accent-amber)' : (u as any).isCurrentUser ? '1px solid var(--primary)' : '1px solid var(--border-color)',
                     boxShadow: index === 0 ? '0 2px 4px var(--accent-amber-light)' : 'none'
                   }}
                 >

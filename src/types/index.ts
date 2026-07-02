@@ -70,6 +70,8 @@ export type Argument = {
   // AI-specific parsed fields (from the prompt)
   aiQuestion?: string;
   aiLesson?: string;
+  turnXp?: number;
+  turnFeedback?: string;
 };
 
 export type ScoreCategory = {
@@ -77,6 +79,7 @@ export type ScoreCategory = {
   score: number;
   maxScore: number;
   feedback: string;
+  xpEarned?: number;
 };
 
 export type BattleState = {

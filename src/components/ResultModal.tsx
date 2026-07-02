@@ -48,13 +48,18 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
               <div className="flex items-center gap-3">
                 <Star size={32} color="var(--accent-amber)" />
                 <div>
-                  <div style={{ fontWeight: 700, color: 'var(--accent-amber)', fontSize: '1.1rem' }}>획득 경험치</div>
-                  <div style={{ fontSize: '1.5rem', color: 'var(--text-light)', fontWeight: 900, fontFamily: 'var(--font-game)' }}>+ {report.xpEarned} XP</div>
+                  <div style={{ fontWeight: 700, color: 'var(--accent-amber)', fontSize: '1.1rem' }}>총 획득 경험치</div>
+                  <div style={{ fontSize: '2rem', color: 'var(--text-light)', fontWeight: 900, fontFamily: 'var(--font-game)' }}>+ {report.xpEarned} <span style={{fontSize: '1rem'}}>XP</span></div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                    기본 참여 50 + 미션 보상 {report.categories.reduce((acc, cat) => acc + (cat.xpEarned || 0), 0)}
+                    {report.totalScore >= 75 ? ' + 판정승 50' : ''}
+                    {report.categories.filter(c => c.score >= 90).length >= 3 ? ' + 퍼펙트 보너스 30' : ''}
+                  </div>
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontWeight: 700, color: 'var(--text-muted)' }}>종합 점수</div>
-                <div style={{ fontSize: '2.5rem', color: 'var(--primary)', fontWeight: 900, fontFamily: 'var(--font-game)', lineHeight: 1 }}>{report.totalScore}<span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>/100</span></div>
+                <div style={{ fontSize: '2.5rem', color: 'var(--primary)', fontWeight: 900, fontFamily: 'var(--font-game)', lineHeight: 1 }}>{report.totalScore}<span style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>/{report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100}</span></div>
               </div>
             </div>
           </div>
@@ -67,7 +72,19 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
               {report.categories.map((cat, idx) => (
                 <div key={idx} className="card" style={{ padding: '1.2rem' }}>
                   <div className="flex justify-between items-center mb-3">
-                    <span style={{ fontWeight: 800, color: 'var(--text-light)', fontSize: '1.1rem' }}>{cat.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--text-light)', fontSize: '1.1rem' }}>{cat.name}</span>
+                      {cat.xpEarned !== undefined && (
+                        <span style={{ 
+                          fontSize: '0.8rem', 
+                          color: 'var(--bg-primary)', 
+                          background: 'var(--accent-amber)', 
+                          padding: '0.15rem 0.5rem', 
+                          borderRadius: '12px',
+                          fontWeight: 800
+                        }}>+{cat.xpEarned} XP</span>
+                      )}
+                    </div>
                     <span style={{ fontWeight: 900, color: 'var(--primary)', fontFamily: 'var(--font-game)', fontSize: '1.2rem' }}>{cat.score}<span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>/{cat.maxScore}</span></span>
                   </div>
                   <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', position: 'relative', marginBottom: '1rem' }}>
