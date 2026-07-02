@@ -33,6 +33,9 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: normalizedEmail,
     password,
+    options: {
+      data: { nickname: trimmedNickname },
+    },
   });
 
   if (authError) {
@@ -46,22 +49,19 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     throw new Error('회원가입에 실패했습니다.');
   }
 
+  // DB 트리거(handle_new_user)가 프로필을 자동 생성하므로 조회만 수행
+  // 트리거 실행 시간을 고려하여 짧은 대기 후 조회
+  await new Promise(resolve => setTimeout(resolve, 500));
+
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .insert([
-      {
-        id: authData.user.id,
-        email: normalizedEmail,
-        nickname: trimmedNickname,
-        provider: 'email'
-      }
-    ])
-    .select()
+    .select('*')
+    .eq('id', authData.user.id)
     .single();
 
   if (profileError || !profile) {
-    console.error('Profile creation error:', profileError);
-    throw new Error(`프로필 생성에 실패했습니다: ${profileError?.message || '알 수 없는 에러'}`);
+    console.error('Profile fetch error:', profileError);
+    throw new Error('프로필 생성을 확인할 수 없습니다. 다시 로그인해 주세요.');
   }
 
   return {
