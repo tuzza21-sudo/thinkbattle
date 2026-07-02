@@ -61,7 +61,7 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
 
   if (profileError || !profile) {
     console.error('Profile creation error:', profileError);
-    throw new Error('프로필 생성에 실패했습니다.');
+    throw new Error(`프로필 생성에 실패했습니다: ${profileError?.message || '알 수 없는 에러'}`);
   }
 
   return {
@@ -85,14 +85,14 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('*')
     .eq('id', authData.user.id)
     .single();
 
-  if (!profile) {
-    throw new Error('사용자 프로필을 찾을 수 없습니다.');
+  if (profileError || !profile) {
+    throw new Error(`사용자 프로필을 찾을 수 없습니다: ${profileError?.message || '알 수 없는 에러'}`);
   }
 
   return {
