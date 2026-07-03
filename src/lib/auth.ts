@@ -2,24 +2,32 @@ import { supabase } from './supabase';
 import type { AppUser } from '../types';
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return null;
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
 
-  if (!profile) return null;
+    if (profileError || !profile) {
+      console.warn('getCurrentUser profile error:', profileError);
+      return null;
+    }
 
-  return {
-    id: user.id,
-    email: profile.email,
-    nickname: profile.nickname,
-    provider: profile.provider,
-    createdAt: profile.created_at,
-  };
+    return {
+      id: user.id,
+      email: profile.email,
+      nickname: profile.nickname,
+      provider: profile.provider,
+      createdAt: profile.created_at,
+    };
+  } catch (e) {
+    console.error('Failed to get current user:', e);
+    return null;
+  }
 };
 
 export const signUpWithEmail = async (email: string, password: string, nickname: string): Promise<AppUser> => {

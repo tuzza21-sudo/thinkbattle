@@ -21,6 +21,10 @@ function App() {
   useEffect(() => {
     getCurrentUser()
       .then(u => setUser(u))
+      .catch(err => {
+        console.error('Auth initialization error:', err);
+        setUser(null);
+      })
       .finally(() => setAuthLoading(false));
   }, []);
 
