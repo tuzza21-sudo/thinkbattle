@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Brain, Zap, Target } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 const SkillBox = ({ title, desc, color }: { title: string, desc: string, color: string }) => (
   <div style={{ background: 'var(--bg-secondary)', padding: '1.2rem', borderRadius: '8px', border: `1px solid ${color}40`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
@@ -27,49 +27,48 @@ export const AboutPage: React.FC = () => {
         <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
           <h3 style={{ fontSize: '1.8rem', color: 'var(--text-light)', margin: '1rem 0 1.5rem 0', textAlign: 'center' }}>우리의 미션</h3>
           
-          <div className="card flex items-start gap-5" style={{ padding: '2rem', borderLeft: '4px solid var(--primary)' }}>
-            <div style={{ background: 'rgba(37, 99, 235, 0.1)', padding: '1.2rem', borderRadius: '50%', flexShrink: 0 }}>
-              <Brain size={32} color="var(--primary)" />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem' }}>
-                1. AI 시대 사고력 특화 훈련
-              </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontSize: '1.05rem' }}>
-                <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>AI가 답을 대신해 주는 시대, 중요한 것은 답을 얻는 능력이 아니라 답을 판단하는 능력입니다.</strong>
-                ThinkFit은 AI와 함께 토론하고 질문하며, AI에 의존하지 않는 논리적 사고력과 비판적 사고력을 체계적으로 훈련합니다.
-              </p>
-            </div>
+          <div className="card" style={{ padding: '2rem', borderLeft: '4px solid var(--primary)' }}>
+            <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ background: 'var(--primary)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0 }}>1</span>
+              AI 시대 사고력 특화 훈련
+            </h4>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontSize: '1.05rem' }}>
+              <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>AI가 답을 대신하는 시대, 중요한 것은 답을 얻는 능력이 아니라 답을 판단하는 능력입니다.</strong>
+              ThinkFit은 실전 디베이트 프로세스를 기반으로 논리력, 질문력, 반박력, 설득력을 체계적으로 훈련하여 AI 시대에 필요한 사고력을 길러줍니다.
+            </p>
           </div>
 
-          <div className="card flex items-start gap-5" style={{ padding: '2rem', borderLeft: '4px solid var(--accent-amber)' }}>
-            <div style={{ background: 'rgba(217, 119, 6, 0.1)', padding: '1.2rem', borderRadius: '50%', flexShrink: 0 }}>
-              <Zap size={32} color="var(--accent-amber)" />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem' }}>
-                2. 몸을 단련하듯 사고력을 단련하다
-              </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontSize: '1.05rem' }}>
-                <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>사고력도 근육처럼 훈련할수록 강해집니다.</strong>
-                ThinkFit은 실전 디베이트 프로세스를 기반으로 주장, 질문, 반박, 분석을 반복하며 순발력 있는 논리적 사고와 실전 사고력을 체계적으로 성장시키는 사고력 피트니스를 제공합니다.
-              </p>
-            </div>
+          <div className="card" style={{ padding: '2rem', borderLeft: '4px solid var(--accent-amber)' }}>
+            <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ background: 'var(--accent-amber)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0 }}>2</span>
+              몸을 단련하듯 사고력을 단련하다
+            </h4>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontSize: '1.05rem' }}>
+              <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>근육이 반복 훈련으로 성장하듯, 사고력도 훈련을 통해 성장합니다.</strong>
+              짧은 영상과 AI의 즉각적인 답변에 익숙해질수록 스스로 생각하는 시간은 줄어듭니다. ThinkFit은 주장하고, 질문하고, 반박하고, 설득하는 실전 훈련을 통해 자신만의 논리와 사고력을 키우는 사고력 피트니스를 제공합니다.
+            </p>
           </div>
 
-          <div className="card flex items-start gap-5" style={{ padding: '2rem', borderLeft: '4px solid #10b981' }}>
-            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1.2rem', borderRadius: '50%', flexShrink: 0 }}>
-              <Target size={32} color="#10b981" />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem' }}>
-                3. 레벨 & 경험치로 성장하는 사고력
-              </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontSize: '1.05rem' }}>
-                <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>사고력도 성장 과정을 확인할 수 있어야 합니다.</strong>
-                토론 미션을 수행할 때마다 경험치(XP)와 레벨을 획득하고, 논리력·근거력·질문력·반박력 등 핵심 사고력을 AI가 분석하여 성장 과정을 시각적으로 확인할 수 있습니다. 레벨이 올라갈수록 더욱 높은 수준의 사고력 훈련에 도전할 수 있습니다.
-              </p>
-            </div>
+          <div className="card" style={{ padding: '2rem', borderLeft: '4px solid #10b981' }}>
+            <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ background: '#10b981', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0 }}>3</span>
+              레벨과 경험치로 성장하는 사고력
+            </h4>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontSize: '1.05rem' }}>
+              <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>사고력도 성장 과정을 확인할 수 있어야 합니다.</strong>
+              토론 미션을 수행할 때마다 경험치(XP)와 레벨을 획득하고, AI가 논리력 · 근거력 · 질문력 · 이해력 · 반박력을 분석하여 성장 과정을 시각적으로 제공합니다. 레벨이 높아질수록 더욱 깊이 있는 사고력 훈련에 도전할 수 있습니다.
+            </p>
+          </div>
+
+          <div className="card" style={{ padding: '2rem', borderLeft: '4px solid #8b5cf6' }}>
+            <h4 style={{ fontSize: '1.3rem', color: 'var(--text-light)', marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{ background: '#8b5cf6', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0 }}>4</span>
+              세상을 읽고, 세계와 소통하다
+            </h4>
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontSize: '1.05rem' }}>
+              <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>생각은 세상을 향해야 하고, 표현은 세계를 향해야 합니다.</strong>
+              ThinkFit은 매주 업데이트되는 최신 사회·경제·AI 이슈를 바탕으로 사고력을 훈련하고, 영어 리프레이징을 통해 자신의 생각을 더욱 자연스럽고 설득력 있게 표현하는 능력을 함께 키워줍니다.
+            </p>
           </div>
         </section>
 
