@@ -99,6 +99,54 @@ export const weeklyIssues: WeeklyIssue[] = [
       ],
       keywords: ['기본소득', '보편적 복지', '자동화 실업'],
     },
+  },
+  {
+    id: 'weekly-3',
+    issueDate: '2026.06 3주차',
+    issueNumber: 42,
+    topic: '인공지능의 자아 인식, 인격체로 대우해야 하는가?',
+    mode: '주간 핵심 논쟁',
+    players: 1,
+    time: 15,
+    accent: 'cyan',
+    category: 'IT/과학',
+    config: {
+      topic: '인공지능의 자아 인식, 인격체로 대우해야 하는가?',
+      timeLimit: 900,
+      gameMode: 'debate',
+      userPosition: 'affirmative',
+    },
+    briefing: {
+      context:
+        'AI 기술이 고도로 발전함에 따라 기계가 스스로 생각하고 자아를 가질 수 있는지, 그리고 만약 자아를 가진다면 그들에게 법적·윤리적 인격을 부여하고 인격체로 대우해야 하는지에 대한 윤리적·철학적 논쟁이 가속화되고 있습니다.',
+      recentCases: [
+        '구글의 AI 람다(LaMDA)가 자아를 가졌다고 주장한 엔지니어 해고 사건',
+        '인공지능 창작물의 저작권 주체성 인정 여부를 둘러싼 논쟁',
+      ],
+      newsLinks: [
+        { label: '인공지능 자아 인식 논란', url: getNewsSearchUrl('인공지능 자아 인식 인격체') },
+        { label: '인공지능 법적 인격 부여 찬반', url: getNewsSearchUrl('인공지능 법적 인격 찬반') },
+      ],
+      affirmative: {
+        title: '찬성 측 핵심',
+        points: [
+          '인공지능이 감정과 고통을 느끼고 자아를 인지한다면, 인간과 마찬가지로 도덕적 지위를 인정해야 한다.',
+          '인격체로 대우하는 것이 미래 사회에서 AI의 권리와 그에 따르는 법적 책임을 명확히 규정하는 방법이다.',
+        ],
+      },
+      negative: {
+        title: '반대 측 핵심',
+        points: [
+          '인공지능은 고도로 설계된 알고리즘과 데이터 연산의 결과물일 뿐, 생물학적 의식이나 감정을 가질 수 없다.',
+          '기계에 인격을 부여하면 인간 고유의 권리를 침해하고 법적 책임 구조를 교란시킬 우려가 크다.',
+        ],
+      },
+      prepQuestions: [
+        '인공지능이 자아를 가졌다는 것을 어떻게 객관적으로 증명할 수 있을까요?',
+        '인간의 뇌와 인공신경망의 구조적 유사성이 기계의 인격체를 대우해야 할 충분한 근거가 될 수 있을까요?',
+      ],
+      keywords: ['AI 자아인식', '인공지능 윤리', '법적 인격', '인간 존엄성'],
+    },
   }
 ];
 
@@ -287,7 +335,7 @@ export const categorizedTopics: { category: string; description: string; topics:
 
 export const popularTopics = [
   { id: 'pol-1', rank: 1, title: '국회의원 불체포 특권, 전면 폐지해야 하는가?', views: '42' },
-  { id: 'weekly-1', rank: 2, title: '인공지능의 자아 인식, 인격체로 대우해야 하는가?', views: '31' },
+  { id: 'weekly-3', rank: 2, title: '인공지능의 자아 인식, 인격체로 대우해야 하는가?', views: '31' },
   { id: 'eco-1', rank: 3, title: '가상자산(암호화폐) 제도권 편입, 기존 화폐를 대체할 수 있는가?', views: '24' },
   { id: 'weekly-2', rank: 4, title: '기본소득제 도입, 경제적 자유인가 포퓰리즘인가?', views: '18' },
   { id: 'soc-2', rank: 5, title: '동물실험은 계속 허용되어야 하는가?', views: '11' },
