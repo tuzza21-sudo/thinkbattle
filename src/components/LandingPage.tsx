@@ -156,7 +156,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       <header style={{ marginBottom: '3.5rem' }}>
         <div className="flex justify-between items-center" style={{ gap: '1rem', rowGap: '1.25rem', flexWrap: 'wrap' }}>
           <h1 style={{ fontSize: '2.5rem', color: 'var(--primary)', margin: 0, letterSpacing: '-0.5px' }}>
-            생각근육 ThinkFit
+            ThinkFit
           </h1>
 
           <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>

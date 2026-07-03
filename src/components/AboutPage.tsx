@@ -74,7 +74,7 @@ export const AboutPage: React.FC = () => {
 
         <section style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '3rem' }}>
           <div style={{ textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.8rem', color: 'var(--text-light)', margin: '0 0 0.5rem 0' }}>씽크배틀: 논리적 사고의 진화</h3>
+            <h3 style={{ fontSize: '1.8rem', color: 'var(--text-light)', margin: '0 0 0.5rem 0' }}>ThinkFit: 논리적 사고의 진화</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>초급에서 고급으로 나아가며, 8가지 핵심 논리 역량을 날카로운 무기로 진화시킵니다.</p>
           </div>
 
