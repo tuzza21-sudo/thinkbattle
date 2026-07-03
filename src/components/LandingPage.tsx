@@ -23,9 +23,7 @@ import {
   Flame,
   Trophy,
   Eye,
-  Medal,
-  Moon,
-  Sun
+  Medal
 } from 'lucide-react';
 import { CreateBattleModal } from './CreateBattleModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
@@ -36,8 +34,6 @@ interface LandingPageProps {
   user: AppUser | null;
   onLoginRequest: () => void;
   onLogout: () => void;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
 }
 
 const accentStyles = {
@@ -58,7 +54,7 @@ const accentStyles = {
   },
 };
 
-export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, theme, toggleTheme }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -100,25 +96,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
     if (userStats.league === '고급' || userStats.league === '마스터') badgeColor = 'var(--primary)';
     else if (userStats.league === '중급') badgeColor = 'var(--accent-amber)';
 
-    const merged = [
-      ...weeklyRankings.filter(r => r.nickname !== user.nickname),
-      {
-        id: user.id,
-        rank: 0,
-        nickname: user.nickname,
-        xp: userStats.xp,
-        badge: userStats.league,
-        badgeColor,
-        isCurrentUser: true
-      }
-    ];
-
-    merged.sort((a, b) => b.xp - a.xp);
-    merged.forEach((item, index) => {
-      item.rank = index + 1;
-    });
-
-    return merged.slice(0, 5);
+    const userRank = {
+      id: user.id,
+      rank: 3, // Dummy ranking middle
+      nickname: user.nickname || '나',
+      xp: userStats.totalXp,
+      badge: userStats.league,
+      badgeColor,
+    };
+    return [weeklyRankings[0], weeklyRankings[1], userRank, weeklyRankings[2], weeklyRankings[3]];
   }, [user, userStats]);
 
   const handleStartBattle = (config: BattleConfig, position: DebatePosition = userPosition) => {
@@ -162,9 +148,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <button className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }} onClick={() => navigate('/about')}>
               <BookOpen size={16} /> 서비스 소개
-            </button>
-            <button className="icon-button" onClick={toggleTheme} aria-label="테마 변경" title="테마 변경" style={{ color: 'var(--text-muted)' }}>
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
             {userStats && (

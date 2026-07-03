@@ -8,32 +8,21 @@ import { AboutPage } from './components/AboutPage';
 import { getCurrentUser, signOut } from './lib/auth';
 import type { AppUser } from './types';
 
-export type ThemeType = 'light' | 'dark';
-
 function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  
-  const [theme, setTheme] = useState<ThemeType>(() => {
-    const saved = localStorage.getItem('app-theme');
-    return (saved === 'dark' || saved === 'light') ? saved : 'light';
-  });
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('app-theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('app-theme', 'dark');
+  }, []);
 
   useEffect(() => {
     getCurrentUser()
       .then(u => setUser(u))
       .finally(() => setAuthLoading(false));
   }, []);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
 
   const handleLogout = async () => {
     await signOut();
@@ -54,8 +43,6 @@ function App() {
               user={user}
               onLoginRequest={() => setShowAuthModal(true)}
               onLogout={handleLogout}
-              theme={theme}
-              toggleTheme={toggleTheme}
             />
           )}
         />
