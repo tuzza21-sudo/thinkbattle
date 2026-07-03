@@ -5,7 +5,7 @@ import { ChevronLeft } from 'lucide-react';
 const SkillBox = ({ title, desc, color }: { title: string, desc: string, color: string }) => (
   <div style={{ background: 'var(--bg-secondary)', padding: '1.2rem', borderRadius: '8px', border: `1px solid ${color}40`, boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
     <div style={{ fontWeight: 800, color: color, marginBottom: '0.4rem', fontSize: '1.1rem' }}>{title}</div>
-    <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{desc}</div>
+    <div style={{ fontSize: '0.95rem', color: 'var(--text-muted)', lineHeight: 1.65 }}>{desc}</div>
   </div>
 );
 
@@ -130,7 +130,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 🌍 글로벌 리더 · 사회혁신가
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 국제 이슈와 사회 문제에 관심을 가지고, 더 나은 사회를 위한 리더십과 설득력, 공론장에서의 사고력을 기르고 싶은 분
               </p>
             </div>
@@ -139,7 +139,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 🎓 수험생 · 학생
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 논술, 면접, 수행평가, 토론대회 등에서 필요한 논리적 사고력과 설득력을 키우고 싶은 분
               </p>
             </div>
@@ -148,7 +148,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 💼 취업 준비생
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 AI 면접, PT 면접, 토론 면접, 자기소개에서 논리적으로 말하고 설득하는 능력을 기르고 싶은 분
               </p>
             </div>
@@ -157,7 +157,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 👨‍💼 직장인 · 리더
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 회의, 보고, 발표, 협상 등에서 생각을 명확하게 전달하고 설득력을 높이고 싶은 분
               </p>
             </div>
@@ -166,7 +166,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 🧑‍🏫 강사 · 교사 · 학부모
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 학생들의 논리력, 질문력, 비판적 사고력을 체계적으로 지도하고 싶은 분
               </p>
             </div>
@@ -175,7 +175,7 @@ export const AboutPage: React.FC = () => {
               <h4 style={{ fontSize: '1.2rem', color: 'var(--text-light)', marginBottom: '0.6rem' }}>
                 🤖 AI 시대를 준비하는 모든 사람
               </h4>
-              <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0, fontSize: '0.95rem' }}>
+              <p style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, fontSize: '0.95rem' }}>
                 AI의 답을 그대로 받아들이기보다, 스스로 생각하고 판단하는 사고력을 기르고 싶은 모든 분
               </p>
             </div>

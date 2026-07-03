@@ -194,7 +194,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             )}
           </div>
         </div>
-        <p style={{ color: 'var(--text-light)', margin: '1.8rem 0 0 0', fontWeight: 800, fontSize: '1.35rem', maxWidth: '700px', lineHeight: 1.5, letterSpacing: '-0.3px' }}>
+        <p style={{ color: 'var(--text-light)', margin: '1.8rem 0 0 0', fontWeight: 800, fontSize: '1.35rem', maxWidth: '700px', lineHeight: 1.65, letterSpacing: '-0.3px' }}>
           AI가 생각을 대신하는 시대,<br/>
           <span style={{ color: 'var(--primary)' }}>ThinkFit</span>은 생각에도 꾸준한 운동이 필요하다고 믿습니다.
         </p>
@@ -352,7 +352,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </div>
                   </div>
                   <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', lineHeight: 1.45, color: 'var(--text-light)' }}>{battle.topic}</h4>
-                  <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.55, marginBottom: '1rem', flex: 1 }}>
+                  <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1rem', flex: 1 }}>
                     {battle.briefing.context.substring(0, 80)}...
                   </p>
                   <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600 }}>
@@ -449,7 +449,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                           <h4 style={{ marginBottom: '0.75rem', color: side.title.includes('찬성') || side.title.includes('허용') ? 'var(--accent-amber)' : 'var(--primary)' }}>
                             {side.title}
                           </h4>
-                          <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingLeft: '1.1rem', color: 'var(--text-main)', lineHeight: 1.55 }}>
+                          <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingLeft: '1.1rem', color: 'var(--text-main)', lineHeight: 1.65 }}>
                             {side.points.map(point => (
                               <li key={point}>{point}</li>
                             ))}
@@ -490,7 +490,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         </button>
                       ))}
                     </div>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.85rem', lineHeight: 1.55 }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.85rem', lineHeight: 1.65 }}>
                       선택한 입장으로 AI가 반대편을 맡아 정식 토론을 시작합니다.
                     </p>
                   </section>
@@ -551,7 +551,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Sparkles size={18} color="var(--secondary)" /> 토론 전 질문
                     </h3>
-                    <ol style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingLeft: '1.2rem', color: 'var(--text-main)', lineHeight: 1.55 }}>
+                    <ol style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', paddingLeft: '1.2rem', color: 'var(--text-main)', lineHeight: 1.65 }}>
                       {selectedBattle.briefing.prepQuestions.map(question => (
                         <li key={question}>{question}</li>
                       ))}
@@ -679,7 +679,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>제 {issue.issueNumber}호</span>
                       </div>
                       <h3 style={{ fontSize: '1.2rem', margin: '0 0 0.5rem 0', color: 'var(--text-light)' }}>{issue.topic}</h3>
-                      <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {issue.briefing.context}
                       </p>
                     </div>
