@@ -38,7 +38,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '이 이유를 뒷받침하는 확실한 근거는 ___입니다.',
     ],
     recommendedDurationSeconds: 150,
-    inputPlaceholder: '이유(Reason): ...\n근거(Evidence): ...\n예시: ...',
+    inputPlaceholder: '내 입장과 그 이유를 자유롭게 써보세요.',
   },
   {
     id: 'beginner-cross-question-user',
@@ -65,7 +65,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '그 주장은 어떤 경우에도 적용되나요?',
     ],
     recommendedDurationSeconds: 90,
-    inputPlaceholder: '확인할 주장: ...\n확인할 근거/이유: ...\n질문 1: ...\n질문 2: ...\n나중 반박에 쓸 지점: ...',
+    inputPlaceholder: '상대 주장에서 궁금하거나 약해 보이는 부분을 질문해보세요.',
   },
   {
     id: 'beginner-cross-question-answer-user',
@@ -95,7 +95,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '이 점은 제 주장인 ___와 연결됩니다.',
     ],
     recommendedDurationSeconds: 80,
-    inputPlaceholder: 'AI 질문의 핵심: ...\n내 답변: ...\n이유/근거: ...\n내 주장과의 연결: ...',
+    inputPlaceholder: 'AI의 질문에 답하고, 내 주장을 보강해보세요.',
   },
   {
     id: 'beginner-opponent-summary-user',
@@ -120,7 +120,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '제가 보기에 약한 부분은 ___입니다.',
     ],
     recommendedDurationSeconds: 90,
-    inputPlaceholder: '상대 주장: ...\n상대 이유/근거: ...\n근거 검증: 신뢰성/관련성/충분성 ...\n약한 부분: ...',
+    inputPlaceholder: '상대 주장의 핵심과 약한 부분을 정리해보세요.',
   },
   {
     id: 'beginner-rebuttal-user',
@@ -150,7 +150,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '따라서 상대 주장은 ___라는 점에서 약합니다.',
     ],
     recommendedDurationSeconds: 120,
-    inputPlaceholder: '상대 주장 분석에서 찾은 약한 부분: ...\n약한 이유/근거/해결책: ...\n논리적 비약/모순: ...\n대안 제시: 현실성/부작용 ...\n내 반박: ...',
+    inputPlaceholder: '상대 주장의 허점을 지적하고 반박해보세요.',
   },
   {
     id: 'beginner-weighing-user',
@@ -177,7 +177,7 @@ export const beginnerDebateSteps: DebateStep[] = [
       '따라서 최종적으로 ___ 입장이 더 설득력 있습니다.',
     ],
     recommendedDurationSeconds: 120,
-    inputPlaceholder: '최종 입장: ...\n가장 강한 이유: ...\n근거/예시: ...\n최종 발언: ...',
+    inputPlaceholder: '최종 입장을 정리하고 마무리 발언을 써보세요.',
   },
 ];
 
@@ -222,7 +222,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '예상 반론은 ___이지만, ___라고 답할 수 있습니다.',
     ],
     recommendedDurationSeconds: 200,
-    inputPlaceholder: '핵심 용어 정의: ...\n논의할 범위와 제외할 범위: ...\n논제의 핵심 질문: ...\n상대와 다를 수 있는 용어: ...\n판단 기준: ...\n근거 1 + 이유/예시/효과: ...\n근거 2 + 이유/예시/효과: ...\n예상 반론 대응: ...',
+    inputPlaceholder: '용어 정의와 판단 기준을 세우고, 근거를 들어 입론해보세요.',
   },
   {
     id: 'intermediate-cross-question-user',
@@ -252,7 +252,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       'A와 B가 충돌할 때 무엇을 우선해야 합니까?',
     ],
     recommendedDurationSeconds: 70,
-    inputPlaceholder: '묻고 싶은 전제/근거/범위/대안: ...\n질문: ...\n이 답변을 나중에 어떻게 반박에 쓸지: ...',
+    inputPlaceholder: '상대 주장의 전제나 근거에 대해 질문해보세요.',
   },
   {
     id: 'intermediate-cross-question-answer-user',
@@ -282,7 +282,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '다만 ___라는 한계는 있지만, ___ 때문에 제 입장은 유지됩니다.',
     ],
     recommendedDurationSeconds: 80,
-    inputPlaceholder: 'AI 질문의 쟁점: ...\n내 답변: ...\n판단 기준과 연결: ...\n근거의 범위/한계: ...\n이후 반박 활용 지점: ...',
+    inputPlaceholder: 'AI의 질문에 답하고, 내 논리를 보강해보세요.',
   },
   {
     id: 'intermediate-opponent-summary-user',
@@ -310,7 +310,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '내 주장과 충돌하는 지점은 ___입니다.',
     ],
     recommendedDurationSeconds: 90,
-    inputPlaceholder: '상대 주장: ...\n핵심 쟁점: ...\n핵심 전제: ...\n근거 검증: 신뢰성/관련성/충분성 ...\n충돌 지점: ...',
+    inputPlaceholder: '상대 주장의 핵심 쟁점과 약점을 분석해보세요.',
   },
   {
     id: 'intermediate-rebuttal-user',
@@ -341,7 +341,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '따라서 상대 주장은 ___라는 점에서 약화됩니다.',
     ],
     recommendedDurationSeconds: 100,
-    inputPlaceholder: '상대 주장 분석에서 찾은 핵심 쟁점: ...\n핵심 전제/근거 타당성: ...\n약한 해결책/우선순위: ...\n논리적 비약/모순: ...\n대안 제시: 현실성/부작용 ...\n내 반박: ...',
+    inputPlaceholder: '상대 논증의 비약이나 모순을 지적하고 반박해보세요.',
   },
   {
     id: 'intermediate-clash-weighing-user',
@@ -370,7 +370,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '그 이유는 피해 심각성/영향 범위/발생 가능성/긴급성/회복 가능성 측면에서 ___이기 때문입니다.',
     ],
     recommendedDurationSeconds: 100,
-    inputPlaceholder: '충돌 지점 1~3개: ...\n각 지점 판단: ...\n비교 기준: 심각성/범위/가능성/긴급성/회복 가능성\n내 쪽이 더 중요한 이유: ...',
+    inputPlaceholder: '양측이 부딪히는 핵심 지점과 내 쪽이 더 중요한 이유를 써보세요.',
   },
   {
     id: 'intermediate-closing-user',
@@ -401,7 +401,7 @@ export const intermediateDebateSteps: DebateStep[] = [
       '따라서 최종적으로 ___에 찬성/반대합니다.',
     ],
     recommendedDurationSeconds: 70,
-    inputPlaceholder: '논제 핵심: ...\n충돌 지점 요약: ...\n상대 한계: ...\n내 우위: ...\n최종 입장: ...',
+    inputPlaceholder: '토론을 정리하고 최종 입장을 밝혀보세요.',
   },
 ];
 
