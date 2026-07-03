@@ -67,7 +67,9 @@ export const AboutPage: React.FC = () => {
             </h4>
             <p style={{ color: 'var(--text-muted)', lineHeight: 1.7, margin: 0, fontSize: '1.05rem' }}>
               <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.5rem', fontSize: '1.1rem' }}>생각은 세상을 향해야 하고, 표현은 세계를 향해야 합니다.</strong>
-              ThinkFit은 매주 업데이트되는 최신 사회·경제·AI 이슈를 바탕으로 사고력을 훈련하고, 영어 리프레이징을 통해 자신의 생각을 더욱 자연스럽고 설득력 있게 표현하는 능력을 함께 키워줍니다.
+              ThinkFit은 매주 업데이트되는 최신 사회·경제·AI 이슈를 통해 세상을 읽고 사고하는 힘을 기릅니다.
+              <br /><br />
+              또한 내가 직접 작성한 주장과 생각을 AI와 함께 영어로 리프레이징하며, 남의 영어를 암기하는 것이 아니라 자신의 생각을 영어로 표현하는 능력을 키워 글로벌 커뮤니케이션 역량까지 함께 성장시킵니다.
             </p>
           </div>
         </section>
