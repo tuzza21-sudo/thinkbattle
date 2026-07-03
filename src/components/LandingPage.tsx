@@ -100,7 +100,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       id: user.id,
       rank: 3, // Dummy ranking middle
       nickname: user.nickname || '나',
-      xp: userStats.totalXp,
+      xp: userStats.xp,
       badge: userStats.league,
       badgeColor,
     };
