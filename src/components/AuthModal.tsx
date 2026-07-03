@@ -12,14 +12,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
 
   const [loading, setLoading] = useState(false);
   const isSignup = mode === 'signup';
 
+  const handleModeChange = (newMode: 'login' | 'signup') => {
+    setMode(newMode);
+    setError('');
+    setPassword('');
+    setConfirmPassword('');
+    setNickname('');
+  };
+
   const handleSubmit = async () => {
     setError('');
+
+    if (isSignup) {
+      if (!nickname.trim()) {
+        setError('닉네임을 입력해 주세요.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('비밀번호는 최소 6자리 이상이어야 합니다.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -53,10 +78,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
         </div>
 
         <div className="segmented-control">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>
+          <button className={mode === 'login' ? 'active' : ''} onClick={() => handleModeChange('login')}>
             <LogIn size={16} /> 로그인
           </button>
-          <button className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>
+          <button className={mode === 'signup' ? 'active' : ''} onClick={() => handleModeChange('signup')}>
             <UserPlus size={16} /> 가입
           </button>
         </div>
@@ -76,6 +101,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
             <span>비밀번호</span>
             <input value={password} onChange={event => setPassword(event.target.value)} placeholder="비밀번호" type="password" />
           </label>
+          {isSignup && (
+            <label className="form-field">
+              <span>비밀번호 확인</span>
+              <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="비밀번호 확인" type="password" />
+            </label>
+          )}
         </div>
 
         {error && <div className="form-error">{error}</div>}
