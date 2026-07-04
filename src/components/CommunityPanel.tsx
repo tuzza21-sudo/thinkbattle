@@ -386,7 +386,7 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
 
             <input
               type="text"
-              placeholder="핵심 근거를 한 줄로 요약해주세요"
+              placeholder="커뮤니티 의견은 한 줄로 작성해주세요"
               value={formKeyReason}
               onChange={e => setFormKeyReason(e.target.value)}
               maxLength={60}
@@ -398,7 +398,7 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
               }}
             />
             <textarea
-              placeholder="상세 의견을 작성해주세요..."
+              placeholder="주장을 뒷받침하는 이유 또는 근거를 작성해주세요"
               value={formContent}
               onChange={e => setFormContent(e.target.value)}
               rows={3}
