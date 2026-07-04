@@ -98,6 +98,51 @@ export const ensureSampleData = async () => {
   }
 };
 
+// ── Migrate localStorage to DB ───────────────────────────────────────────────
+
+const migrateLocalStorageToDB = async () => {
+  try {
+    const rawOpinions = localStorage.getItem('thinkbattle_community_opinions');
+    if (!rawOpinions) return;
+    
+    const localOpinions: CommunityOpinion[] = JSON.parse(rawOpinions);
+    // Filter out our original hardcoded sample opinions using a simple heuritic
+    // Our old sample opinions had IDs like 'sample-w1-1'
+    const userOpinions = localOpinions.filter(o => !o.id.startsWith('sample-'));
+    
+    if (userOpinions.length > 0) {
+      console.log(`Migrating ${userOpinions.length} user opinions from localStorage to DB...`);
+      
+      const rowsToInsert = userOpinions.map(op => ({
+        topic_id: op.topicId,
+        user_id: op.userId,
+        nickname: op.nickname,
+        position: op.position,
+        key_reason: op.keyReason,
+        content: op.content,
+        likes: op.likes || 0,
+        created_at: op.createdAt || new Date().toISOString(),
+        is_blocked: op.isBlocked || false,
+        block_reason: op.blockReason || null,
+      }));
+
+      const { error } = await supabase.from('community_opinions').insert(rowsToInsert);
+      
+      if (!error) {
+        console.log('Successfully migrated localStorage opinions to DB.');
+      } else {
+        console.error('Migration failed:', error);
+      }
+    }
+    
+    // Clear the storage so we don't migrate again
+    localStorage.removeItem('thinkbattle_community_opinions');
+    localStorage.removeItem('thinkbattle_community_likes');
+  } catch (err) {
+    console.error('Error during localStorage migration:', err);
+  }
+};
+
 // ── Public Async API ─────────────────────────────────────────────────────────
 
 export const getOpinions = async (topicId: string): Promise<CommunityOpinion[]> => {
@@ -259,3 +304,4 @@ export const autoSeedTopicOpinions = async (topicId: string, topicTitle: string,
 
 // Run once on module load
 ensureSampleData();
+migrateLocalStorageToDB();
