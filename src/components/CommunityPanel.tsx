@@ -45,7 +45,6 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
   // Form state
   const [showForm, setShowForm] = useState(false);
   const [formPosition, setFormPosition] = useState<'affirmative' | 'negative'>('affirmative');
-  const [formKeyReason, setFormKeyReason] = useState('');
   const [formContent, setFormContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -115,8 +114,8 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
       onLoginRequest();
       return;
     }
-    if (!formKeyReason.trim() || !formContent.trim()) {
-      setSubmitError('핵심 근거와 상세 의견을 모두 작성해주세요.');
+    if (!formContent.trim()) {
+      setSubmitError('의견을 작성해주세요.');
       return;
     }
 
@@ -125,15 +124,17 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
     setSubmitSuccess(false);
 
     try {
+      const keyReasonInput = formContent.trim().substring(0, 50);
+
       // AI moderation
-      const modResult = await moderateComment(formContent, formKeyReason, topicTitle);
+      const modResult = await moderateComment(formContent, keyReasonInput, topicTitle);
       
       const newOpinion = await addOpinion({
         topicId,
         userId: user.id,
         nickname: user.nickname,
         position: formPosition,
-        keyReason: formKeyReason.trim(),
+        keyReason: keyReasonInput,
         content: formContent.trim(),
       });
 
@@ -150,7 +151,6 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
       }
 
       // Allowed - save normally
-      setFormKeyReason('');
       setFormContent('');
       setSubmitSuccess(true);
       setShowForm(false);
@@ -384,24 +384,11 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
               </button>
             </div>
 
-            <input
-              type="text"
-              placeholder="커뮤니티 의견은 한 줄로 작성해주세요"
-              value={formKeyReason}
-              onChange={e => setFormKeyReason(e.target.value)}
-              maxLength={60}
-              style={{
-                width: '100%', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)', background: 'var(--bg-card)',
-                color: 'var(--text-light)', fontSize: '0.95rem', marginBottom: '0.6rem',
-                fontFamily: 'var(--font-sans)',
-              }}
-            />
             <textarea
-              placeholder="주장을 뒷받침하는 이유 또는 근거를 작성해주세요"
+              placeholder="본인만의 의견(이유 or 근거)를 써주세요"
               value={formContent}
               onChange={e => setFormContent(e.target.value)}
-              rows={3}
+              rows={4}
               style={{
                 width: '100%', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-color)', background: 'var(--bg-card)',
@@ -510,25 +497,25 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
                       </span>
                     </div>
 
-                    {/* Key reason tag */}
+                    {/* Content */}
                     <div style={{
-                      padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-sm)',
+                      margin: '0 0 0.8rem 0',
+                      padding: '0.8rem 1rem',
+                      borderRadius: 'var(--radius-sm)',
                       background: isAffirmative ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
                       border: `1px solid ${isAffirmative ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
-                      fontSize: '0.88rem', fontWeight: 700,
-                      color: isAffirmative ? '#059669' : '#DC2626',
-                      marginBottom: '0.5rem', lineHeight: 1.5,
                     }}>
-                      💡 {opinion.keyReason}
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.95rem',
+                        lineHeight: 1.7,
+                        color: isAffirmative ? '#059669' : '#DC2626',
+                        fontWeight: 500,
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        {opinion.content}
+                      </p>
                     </div>
-
-                    {/* Content */}
-                    <p style={{
-                      margin: '0 0 0.6rem 0', fontSize: '0.9rem', lineHeight: 1.7,
-                      color: 'var(--text-main)',
-                    }}>
-                      {opinion.content}
-                    </p>
 
                     {/* Actions */}
                     <div className="flex items-center gap-3">
