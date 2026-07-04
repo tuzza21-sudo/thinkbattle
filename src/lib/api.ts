@@ -1198,3 +1198,159 @@ Return ONLY valid JSON:
     };
   }
 }
+
+// ── AI Comment Moderation ────────────────────────────────────────────────────
+
+export interface ModerationResult {
+  isAllowed: boolean;
+  reason?: string;
+}
+
+const BLOCKED_PATTERNS = [
+  /시[0-9ㅂ발빨빠]/, /ㅅㅂ/, /ㅂㅅ/, /ㅆㅂ/, /ㄲㅈ/,
+  /병[신싄]/, /미친[년놈]/, /지[랄럴]/, /꺼[져저]/,
+  /느[금그][마]/, /ㅈㄹ/, /ㄱㅅㄲ/, /ㅁㅊ/,
+];
+
+const preFilterCheck = (content: string): ModerationResult | null => {
+  const normalized = content.replace(/\s/g, '').toLowerCase();
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(normalized)) {
+      return { isAllowed: false, reason: '부적절한 표현이 포함되어 있습니다.' };
+    }
+  }
+  if (content.trim().length < 5) {
+    return { isAllowed: false, reason: '의견은 5자 이상 작성해주세요.' };
+  }
+  return null;
+};
+
+export async function moderateComment(
+  content: string,
+  keyReason: string,
+  topicContext: string,
+): Promise<ModerationResult> {
+  // Stage 1: regex pre-filter
+  const preResult = preFilterCheck(content);
+  if (preResult) return preResult;
+
+  const preResultReason = preFilterCheck(keyReason);
+  if (preResultReason) return preResultReason;
+
+  // Stage 2: AI moderation via Gemini
+  const systemPrompt = `
+You are a Korean community comment moderator for a debate platform.
+
+Debate topic context: "${topicContext}"
+
+Evaluate the following user-submitted comment for appropriateness.
+The comment consists of a "keyReason" (핵심 근거, 1-line summary) and "content" (상세 의견).
+
+BLOCK the comment if it contains ANY of these:
+1. Profanity, slurs, hate speech, or discriminatory language
+2. Personal attacks, cyberbullying, or threats
+3. Spam, advertising, or promotional content
+4. Completely irrelevant content unrelated to the debate topic
+5. Personally identifiable information (phone numbers, addresses, real full names of non-public figures)
+6. Inflammatory rhetoric without any logical basis
+
+ALLOW the comment if:
+- It expresses a position (for or against) with at least a basic reason
+- Even if the opinion is strongly worded, it has substantive content
+- Even if you disagree with the opinion, it contributes to the debate
+
+Return ONLY valid JSON:
+{
+  "isAllowed": true or false,
+  "reason": "If blocked, explain in Korean why in one sentence. If allowed, empty string."
+}
+`;
+
+  try {
+    const response = await createChatCompletion({
+      model: GEMINI_FLASH_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `핵심 근거: ${keyReason}\n상세 의견: ${content}` },
+      ],
+      thinking: { type: 'disabled' },
+      response_format: { type: 'json_object' },
+    });
+
+    const aiMessage = response.choices?.[0]?.message?.content || '{}';
+    const parsed = parseJsonObject(aiMessage);
+
+    return {
+      isAllowed: parsed.isAllowed !== false,
+      reason: typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason : undefined,
+    };
+  } catch (error: unknown) {
+    console.error('Moderation API Error:', error);
+    // On API failure, allow the comment (don't block legitimate users due to API issues)
+    return { isAllowed: true };
+  }
+}
+
+// ── AI Fake Community Opinions Generator ─────────────────────────────────────
+
+export interface GeneratedOpinion {
+  nickname: string;
+  position: 'affirmative' | 'negative';
+  keyReason: string;
+  content: string;
+  likes: number;
+}
+
+export async function generateCommunityOpinions(
+  topicTitle: string,
+  count: number
+): Promise<GeneratedOpinion[]> {
+  const systemPrompt = `
+You are an AI generating realistic Korean community comments for a debate platform.
+
+Debate topic: "${topicTitle}"
+
+Generate exactly ${count} realistic comments from different fictional users.
+Make sure the opinions are a mix of 'affirmative' (찬성) and 'negative' (반대).
+The tone should be natural, varied (some formal, some casual but polite), and reflecting real human perspectives.
+Avoid sounding like an AI. Keep the 'keyReason' under 40 characters and 'content' between 1-3 sentences.
+Assign a natural sounding Korean nickname (without spaces, e.g., '현실주의자', '코딩매니아', '경제학도') for each comment.
+Assign a random but realistic number of likes between 0 and 25.
+
+Return ONLY valid JSON in this exact format:
+{
+  "opinions": [
+    {
+      "nickname": "string",
+      "position": "affirmative or negative",
+      "keyReason": "string",
+      "content": "string",
+      "likes": number
+    }
+  ]
+}
+`;
+
+  try {
+    const response = await createChatCompletion({
+      model: GEMINI_FLASH_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Please generate ${count} opinions for the topic: ${topicTitle}` },
+      ],
+      thinking: { type: 'disabled' },
+      response_format: { type: 'json_object' },
+    });
+
+    const aiMessage = response.choices?.[0]?.message?.content || '{}';
+    const parsed = parseJsonObject(aiMessage);
+
+    if (Array.isArray(parsed.opinions)) {
+      return parsed.opinions;
+    }
+    return [];
+  } catch (error: unknown) {
+    console.error('generateCommunityOpinions API Error:', error);
+    return [];
+  }
+}

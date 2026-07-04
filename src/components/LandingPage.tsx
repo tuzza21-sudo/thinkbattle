@@ -9,6 +9,7 @@ import {
   Layers3,
   LogIn,
   LogOut,
+  MessageSquare,
   Newspaper,
   Scale,
   Shield,
@@ -26,9 +27,11 @@ import {
   Medal
 } from 'lucide-react';
 import { CreateBattleModal } from './CreateBattleModal';
+import { CommunityPanel } from './CommunityPanel';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
 import { calculateUserStats } from '../lib/userStats';
-import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, WeeklyIssue } from '../types';
+import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
+import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, TopicOpinionStats, WeeklyIssue } from '../types';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -61,6 +64,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
+  const [communityTopicId, setCommunityTopicId] = useState<string | null>(null);
+  const [communityTopicTitle, setCommunityTopicTitle] = useState('');
+  const [opinionStatsCache, setOpinionStatsCache] = useState<Record<string, TopicOpinionStats>>({});
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
 
   const [userStats, setUserStats] = useState<any>(null);
@@ -72,6 +78,42 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       setUserStats(null);
     }
   }, [user]);
+
+  // Load opinion stats for all topics
+  useEffect(() => {
+    const fetchStats = async () => {
+      const allTopics = [
+        ...weeklyIssues.map(w => ({ id: w.id, topic: w.topic })),
+        ...categorizedTopics.flatMap(c => c.topics.map(t => ({ id: t.id, topic: t.topic }))),
+      ];
+      
+      const statsList = await Promise.all(allTopics.map(t => getOpinionStats(t.id)));
+      
+      const stats: Record<string, TopicOpinionStats> = {};
+      statsList.forEach((stat, i) => {
+        stats[stat.topicId] = stat;
+        
+        // Auto-seed if less than 5 opinions
+        if (stat.totalOpinions < 5) {
+          const needed = 5 - stat.totalOpinions;
+          autoSeedTopicOpinions(allTopics[i].id, allTopics[i].topic, needed).then(() => {
+            // Re-fetch this specific topic's stats after seeding completes
+            getOpinionStats(allTopics[i].id).then(newStat => {
+              setOpinionStatsCache(prev => ({ ...prev, [newStat.topicId]: newStat }));
+            });
+          });
+        }
+      });
+      setOpinionStatsCache(stats);
+    };
+    
+    fetchStats();
+  }, [communityTopicId]); // refresh when community panel closes
+
+  const openCommunity = (topicId: string, topicTitle: string) => {
+    setCommunityTopicId(topicId);
+    setCommunityTopicTitle(topicTitle);
+  };
 
   // Helper to find selected battle across all data sources
   const findBattle = (id: string): FeaturedBattle | WeeklyIssue | null => {
@@ -253,13 +295,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   <span className="flex items-center gap-1.5"><Users size={16} /> {currentWeeklyIssue.players}명 참여</span>
                   <span className="flex items-center gap-1.5"><Clock size={16} /> 예상 소요시간 {currentWeeklyIssue.time}분</span>
                 </div>
-                <button 
-                  className="btn btn-primary" 
-                  style={{ padding: '0.8rem 1.5rem', fontSize: '1.05rem', background: 'var(--primary)', borderColor: 'var(--primary)', color: '#fff' }}
-                  onClick={() => handleOpenBriefing(currentWeeklyIssue.id)}
-                >
-                  토론 참여하기 <ChevronRight size={20} />
-                </button>
+                <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
+                  <button
+                    className="community-btn-mini"
+                    style={{ padding: '0.55rem 1rem', fontSize: '0.9rem' }}
+                    onClick={() => openCommunity(currentWeeklyIssue.id, currentWeeklyIssue.topic)}
+                  >
+                    <MessageSquare size={16} />
+                    커뮤니티
+                    {opinionStatsCache[currentWeeklyIssue.id] && opinionStatsCache[currentWeeklyIssue.id].totalOpinions > 0 && (
+                      <span className="count-badge">
+                        <span className="count-aff">{opinionStatsCache[currentWeeklyIssue.id].affirmativeCount}</span>
+                        <span style={{ color: 'var(--text-muted)', margin: '0 2px' }}>/</span>
+                        <span className="count-neg">{opinionStatsCache[currentWeeklyIssue.id].negativeCount}</span>
+                      </span>
+                    )}
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '0.8rem 1.5rem', fontSize: '1.05rem', background: 'var(--primary)', borderColor: 'var(--primary)', color: '#fff' }}
+                    onClick={() => handleOpenBriefing(currentWeeklyIssue.id)}
+                  >
+                    토론 참여하기 <ChevronRight size={20} />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -358,8 +417,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600 }}>
                     <Users size={14} /> {battle.players}명 참여 가능
                   </div>
-                  <div className="badge" style={{ marginTop: 'auto', width: 'fit-content', background: isSelected ? accent.color : 'var(--bg-secondary)', color: isSelected ? '#FFF' : 'var(--text-muted)', border: 'none' }}>
-                    {isSelected ? '선택됨' : '상세 보기'}
+                  <div className="flex items-center gap-2" style={{ marginTop: 'auto' }}>
+                    <div className="badge" style={{ width: 'fit-content', background: isSelected ? accent.color : 'var(--bg-secondary)', color: isSelected ? '#FFF' : 'var(--text-muted)', border: 'none' }}>
+                      {isSelected ? '선택됨' : '상세 보기'}
+                    </div>
+                    <button
+                      className="community-btn-mini"
+                      onClick={(e) => { e.stopPropagation(); openCommunity(battle.id, battle.topic); }}
+                    >
+                      <MessageSquare size={13} />
+                      {opinionStatsCache[battle.id] && opinionStatsCache[battle.id].totalOpinions > 0 ? (
+                        <span className="count-badge">
+                          <span className="count-aff">{opinionStatsCache[battle.id].affirmativeCount}</span>
+                          <span style={{ color: 'var(--text-muted)', margin: '0 1px' }}>/</span>
+                          <span className="count-neg">{opinionStatsCache[battle.id].negativeCount}</span>
+                        </span>
+                      ) : '의견'}
+                    </button>
                   </div>
                 </article>
               );
@@ -397,7 +471,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </div>
                     <h2 style={{ margin: 0, fontSize: '1.7rem', lineHeight: 1.35, color: 'var(--text-light)', paddingRight: '1.5rem' }}>{selectedBattle.topic}</h2>
                   </div>
-                  <div className="flex justify-end" style={{ alignSelf: 'flex-end' }}>
+                  <div className="flex items-center gap-3" style={{ alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+                    <button
+                      className="community-btn-mini"
+                      style={{ padding: '0.6rem 1.1rem', fontSize: '0.9rem' }}
+                      onClick={() => openCommunity(selectedBattle.id, selectedBattle.topic)}
+                    >
+                      <MessageSquare size={16} />
+                      토론 커뮤니티
+                      {opinionStatsCache[selectedBattle.id] && opinionStatsCache[selectedBattle.id].totalOpinions > 0 && (
+                        <span className="count-badge">
+                          <span className="count-aff">{opinionStatsCache[selectedBattle.id].affirmativeCount}</span>
+                          <span style={{ color: 'var(--text-muted)', margin: '0 2px' }}>/</span>
+                          <span className="count-neg">{opinionStatsCache[selectedBattle.id].negativeCount}</span>
+                        </span>
+                      )}
+                    </button>
                     <button
                       className="btn btn-primary"
                       style={{ 
@@ -697,6 +786,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       )}
 
       {showCreateModal && <CreateBattleModal onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} />}
+
+      <CommunityPanel
+        topicId={communityTopicId || ''}
+        topicTitle={communityTopicTitle}
+        isOpen={!!communityTopicId}
+        onClose={() => setCommunityTopicId(null)}
+        user={user}
+        onLoginRequest={onLoginRequest}
+      />
     </div>
   );
 };

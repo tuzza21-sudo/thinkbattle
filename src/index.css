@@ -1932,3 +1932,84 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Community Panel ──────────────────────────────────────────────────────── */
+
+.community-opinion-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.community-opinion-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.community-like-btn:not(:disabled):hover {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #EF4444 !important;
+}
+
+.community-filter-btn:hover {
+  background: rgba(37, 99, 235, 0.04) !important;
+}
+
+.community-btn-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.community-btn-mini:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(37, 99, 235, 0.05);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
+}
+.community-btn-mini .count-badge {
+  font-weight: 800;
+  font-size: 0.75rem;
+}
+.community-btn-mini .count-aff {
+  color: #10B981;
+}
+.community-btn-mini .count-neg {
+  color: #EF4444;
+}
+
+.community-panel-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.community-panel-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.community-panel-modal::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (max-width: 640px) {
+  .community-panel-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+}
+

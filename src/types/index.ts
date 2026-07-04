@@ -177,3 +177,24 @@ export type WeeklyIssue = FeaturedBattle & {
   issueDate: string;
   issueNumber: number;
 };
+
+export type CommunityOpinion = {
+  id: string;
+  topicId: string;
+  userId: string;
+  nickname: string;
+  position: 'affirmative' | 'negative';
+  keyReason: string;
+  content: string;
+  createdAt: string;
+  likes: number;
+  isBlocked: boolean;
+  blockReason?: string;
+};
+
+export type TopicOpinionStats = {
+  topicId: string;
+  totalOpinions: number;
+  affirmativeCount: number;
+  negativeCount: number;
+};
