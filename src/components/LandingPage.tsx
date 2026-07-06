@@ -233,7 +233,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     USER <Edit2 size={12} style={{ opacity: 0.7 }} />
                   </div>
-                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900 }}>
                     {user.nickname}
                   </div>
                 </div>
