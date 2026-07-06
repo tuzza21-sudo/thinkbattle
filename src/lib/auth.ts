@@ -14,7 +14,41 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
 
     if (profileError || !profile) {
       console.warn('getCurrentUser profile error:', profileError);
-      return null;
+      
+      // Fallback: 카카오/구글 로그인 등으로 auth.users는 생성되었으나 public.users 프로필이 없을 경우 자동 생성
+      const nickname = user.user_metadata?.nickname || 
+                       user.user_metadata?.name || 
+                       user.user_metadata?.full_name || 
+                       user.email?.split('@')[0] || 
+                       '사용자';
+      const email = user.email || '';
+      const provider = (user.app_metadata?.provider as 'email' | 'kakao' | 'google') || 'kakao';
+
+      console.log('Attempting to create missing profile for OAuth user:', { id: user.id, email, nickname, provider });
+
+      const { data: newProfile, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email,
+          nickname,
+          provider,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Failed to self-heal user profile:', insertError);
+        return null;
+      }
+
+      return {
+        id: newProfile.id,
+        email: newProfile.email,
+        nickname: newProfile.nickname,
+        provider: newProfile.provider,
+        createdAt: newProfile.created_at,
+      };
     }
 
     return {
@@ -29,6 +63,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
     return null;
   }
 };
+
 
 export const signUpWithEmail = async (email: string, password: string, nickname: string): Promise<AppUser> => {
   const normalizedEmail = email.trim().toLowerCase();
@@ -115,3 +150,17 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 export const signOut = async () => {
   await supabase.auth.signOut();
 };
+
+export const signInWithKakao = async (): Promise<void> => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+

@@ -130,14 +130,18 @@ const migrateLocalStorageToDB = async () => {
       
       if (!error) {
         console.log('Successfully migrated localStorage opinions to DB.');
+        // Clear the storage so we don't migrate again
+        localStorage.removeItem('thinkbattle_community_opinions');
+        localStorage.removeItem('thinkbattle_community_likes');
       } else {
         console.error('Migration failed:', error);
+        // Do NOT remove from localStorage so they can try again once DB is fixed
       }
+    } else {
+      // No valid user opinions found, safe to clear
+      localStorage.removeItem('thinkbattle_community_opinions');
+      localStorage.removeItem('thinkbattle_community_likes');
     }
-    
-    // Clear the storage so we don't migrate again
-    localStorage.removeItem('thinkbattle_community_opinions');
-    localStorage.removeItem('thinkbattle_community_likes');
   } catch (err) {
     console.error('Error during localStorage migration:', err);
   }

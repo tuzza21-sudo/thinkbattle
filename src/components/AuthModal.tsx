@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, X } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail } from '../lib/auth';
+import { signInWithEmail, signUpWithEmail, signInWithKakao } from '../lib/auth';
 import type { AppUser } from '../types';
 
 interface AuthModalProps {
@@ -25,6 +25,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
     setPassword('');
     setConfirmPassword('');
     setNickname('');
+  };
+
+  const handleKakaoLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInWithKakao();
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : '카카오 로그인에 실패했습니다.');
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -112,7 +123,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
         {error && <div className="form-error">{error}</div>}
 
         <div className="social-login-row">
-          <button className="btn btn-secondary" disabled>카카오 로그인 준비 중</button>
+          <button 
+            className="btn btn-secondary flex items-center justify-center gap-2" 
+            onClick={handleKakaoLogin}
+            disabled={loading}
+            style={{ 
+              backgroundColor: '#FEE500', 
+              color: '#191919', 
+              border: 'none',
+              fontWeight: 'bold' 
+            }}
+          >
+            카카오 로그인
+          </button>
           <button className="btn btn-secondary" disabled>구글 로그인 준비 중</button>
         </div>
 
