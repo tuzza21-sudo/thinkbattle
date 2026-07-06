@@ -177,6 +177,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
 
         {error && <div className="form-error">{error}</div>}
 
+        <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
+          {loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기')}
+        </button>
+
+        <div className="divider-row" style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+          <span style={{ padding: '0 0.75rem' }}>또는</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+        </div>
+
         <div className="social-login-row">
           <button 
             className="btn btn-secondary" 
@@ -219,10 +229,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
             <span>구글 로그인</span>
           </button>
         </div>
-
-        <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
-          {loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기')}
-        </button>
       </div>
     </div>
   );
