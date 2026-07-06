@@ -24,10 +24,12 @@ import {
   Flame,
   Trophy,
   Eye,
-  Medal
+  Medal,
+  Edit2
 } from 'lucide-react';
 import { CreateBattleModal } from './CreateBattleModal';
 import { CommunityPanel } from './CommunityPanel';
+import { ProfileModal } from './ProfileModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
 import { calculateUserStats } from '../lib/userStats';
 import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
@@ -37,6 +39,7 @@ interface LandingPageProps {
   user: AppUser | null;
   onLoginRequest: () => void;
   onLogout: () => void;
+  onUserUpdate: (updatedUser: AppUser) => void;
 }
 
 const accentStyles = {
@@ -57,10 +60,11 @@ const accentStyles = {
   },
 };
 
-export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
@@ -221,9 +225,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
                   <FileText size={18} /> 기록
                 </button>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>USER</div>
-                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900 }}>{user.nickname}</div>
+                <div 
+                  onClick={() => setShowProfileModal(true)}
+                  style={{ cursor: 'pointer' }}
+                  title="닉네임 변경"
+                >
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    USER <Edit2 size={12} style={{ opacity: 0.7 }} />
+                  </div>
+                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                    {user.nickname}
+                  </div>
                 </div>
                 <button className="icon-button" onClick={onLogout} aria-label="로그아웃" title="로그아웃" style={{ color: 'var(--text-muted)' }}>
                   <LogOut size={18} />
@@ -786,6 +798,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       )}
 
       {showCreateModal && <CreateBattleModal onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} />}
+
+      {showProfileModal && user && (
+        <ProfileModal 
+          user={user} 
+          onClose={() => setShowProfileModal(false)} 
+          onProfileUpdated={onUserUpdate} 
+        />
+      )}
 
       <CommunityPanel
         topicId={communityTopicId || ''}

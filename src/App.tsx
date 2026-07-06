@@ -47,6 +47,7 @@ function App() {
               user={user}
               onLoginRequest={() => setShowAuthModal(true)}
               onLogout={handleLogout}
+              onUserUpdate={setUser}
             />
           )}
         />
