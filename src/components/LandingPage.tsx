@@ -136,21 +136,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const activeCategoryData = categorizedTopics.find(c => c.category === activeCategory) || categorizedTopics[0];
 
   const displayRankings = React.useMemo(() => {
-    if (!user || !userStats) return weeklyRankings;
+    let userRank: any = null;
+    if (user && userStats) {
+      let badgeColor = 'var(--secondary)';
+      if (userStats.league === '고급' || userStats.league === '마스터') badgeColor = 'var(--primary)';
+      else if (userStats.league === '중급') badgeColor = 'var(--accent-amber)';
 
-    let badgeColor = 'var(--secondary)';
-    if (userStats.league === '고급' || userStats.league === '마스터') badgeColor = 'var(--primary)';
-    else if (userStats.league === '중급') badgeColor = 'var(--accent-amber)';
+      userRank = {
+        id: user.id,
+        nickname: user.nickname || '나',
+        xp: userStats.xp,
+        badge: userStats.league,
+        badgeColor,
+      };
+    }
 
-    const userRank = {
-      id: user.id,
-      rank: 3, // Dummy ranking middle
-      nickname: user.nickname || '나',
-      xp: userStats.xp,
-      badge: userStats.league,
-      badgeColor,
-    };
-    return [weeklyRankings[0], weeklyRankings[1], userRank, weeklyRankings[2], weeklyRankings[3]];
+    // 1. mock 랭킹과 로그인한 유저 결합
+    const allParticipants = [...weeklyRankings];
+    if (userRank) {
+      allParticipants.push(userRank);
+    }
+
+    // 2. XP 기준으로 내림차순 정렬
+    allParticipants.sort((a, b) => b.xp - a.xp);
+
+    // 3. 실제 순위(rank) 매기기
+    const rankedParticipants = allParticipants.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    }));
+
+    // 4. 상위 5위 추출
+    const top5 = rankedParticipants.slice(0, 5);
+    const userIndex = userRank ? rankedParticipants.findIndex(p => p.id === userRank.id) : -1;
+
+    // 5. 로그인한 유저가 상위 5위 안에 없다면, 상위 5위 + 본인 순위를 맨 아래에 추가
+    if (userRank && userIndex >= 5) {
+      return [...top5, rankedParticipants[userIndex]];
+    }
+
+    return top5;
   }, [user, userStats]);
 
   const handleStartBattle = (config: BattleConfig, position: DebatePosition = userPosition) => {
@@ -704,41 +729,52 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               <Trophy size={20} /> 금주 토론자 랭킹
             </h3>
             <div className="flex flex-col gap-3">
-              {displayRankings.map((u, index) => (
-                <div 
-                  key={u.id} 
-                  className="flex items-center gap-3 card" 
-                  style={{ 
-                    padding: '1rem', 
-                    background: index === 0 ? 'var(--accent-amber-light)' : (u as any).isCurrentUser ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-elevated)',
-                    border: index === 0 ? '1px solid var(--accent-amber)' : (u as any).isCurrentUser ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                    boxShadow: index === 0 ? '0 2px 4px var(--accent-amber-light)' : 'none'
-                  }}
-                >
-                  <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--secondary)' }}>{u.nickname.charAt(0)}</span>
-                    {index < 3 && (
-                      <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--bg-card)', borderRadius: '50%', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-                        <Medal size={16} color={index === 0 ? '#F59E0B' : index === 1 ? '#94A3B8' : '#B45309'} />
+              {displayRankings.map((u, index) => {
+                const showDivider = index > 0 && u.rank > 5 && displayRankings[index - 1].rank <= 5;
+                return (
+                  <React.Fragment key={u.id}>
+                    {showDivider && (
+                      <div className="flex items-center justify-center py-1 gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, margin: '0.2rem 0' }}>
+                        <div style={{ flex: 1, height: '0.5px', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}></div>
+                        <span>내 현재 랭킹</span>
+                        <div style={{ flex: 1, height: '0.5px', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}></div>
                       </div>
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span style={{ fontWeight: 700, color: 'var(--text-light)', fontSize: '1rem' }}>{u.nickname}</span>
-                      <span className="badge" style={{ background: 'transparent', color: u.badgeColor, border: `1px solid ${u.badgeColor}`, padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>
-                        {u.badge}
-                      </span>
+                    <div 
+                      className="flex items-center gap-3 card" 
+                      style={{ 
+                        padding: '1rem', 
+                        background: index === 0 ? 'var(--accent-amber-light)' : (user && u.id === user.id) ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-elevated)',
+                        border: index === 0 ? '1px solid var(--accent-amber)' : (user && u.id === user.id) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        boxShadow: index === 0 ? '0 2px 4px var(--accent-amber-light)' : 'none'
+                      }}
+                    >
+                      <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--secondary)' }}>{u.nickname.charAt(0)}</span>
+                        {u.rank <= 3 && (
+                          <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--bg-card)', borderRadius: '50%', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+                            <Medal size={16} color={u.rank === 1 ? '#F59E0B' : u.rank === 2 ? '#94A3B8' : '#B45309'} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span style={{ fontWeight: 700, color: 'var(--text-light)', fontSize: '1rem' }}>{u.nickname}</span>
+                          <span className="badge" style={{ background: 'transparent', color: u.badgeColor, border: `1px solid ${u.badgeColor}`, padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>
+                            {u.badge}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          {u.xp.toLocaleString()} XP
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: u.rank === 1 ? 'var(--accent-amber)' : 'var(--text-muted)', opacity: u.rank === 1 ? 1 : 0.6 }}>
+                        #{u.rank}
+                      </div>
                     </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                      {u.xp.toLocaleString()} XP
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: index === 0 ? 'var(--accent-amber)' : 'var(--text-muted)', opacity: index === 0 ? 1 : 0.6 }}>
-                    #{u.rank}
-                  </div>
-                </div>
-              ))}
+                  </React.Fragment>
+                );
+              })}
             </div>
           </section>
         </aside>
