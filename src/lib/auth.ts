@@ -69,8 +69,17 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
   const normalizedEmail = email.trim().toLowerCase();
   const trimmedNickname = nickname.trim();
 
-  if (!normalizedEmail || !password || !trimmedNickname) {
-    throw new Error('이메일, 비밀번호, 닉네임을 모두 입력해 주세요.');
+  // 닉네임 중복 확인
+  const { data: existingUsers, error: checkError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('nickname', trimmedNickname)
+    .limit(1);
+
+  if (checkError) {
+    console.error('Nickname check error during signup:', checkError);
+  } else if (existingUsers && existingUsers.length > 0) {
+    throw new Error('이미 사용 중인 닉네임입니다.');
   }
 
   const { data: authData, error: authError } = await supabase.auth.signUp({

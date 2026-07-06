@@ -33,6 +33,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
     setLoading(true);
 
     try {
+      // 닉네임 중복 확인 (본인 제외)
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('nickname', trimmedNickname)
+        .neq('id', user.id)
+        .limit(1);
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existingUsers && existingUsers.length > 0) {
+        setError('이미 사용 중인 닉네임입니다.');
+        setLoading(false);
+        return;
+      }
+
       const { error: updateError } = await supabase
         .from('users')
         .update({ nickname: trimmedNickname })
