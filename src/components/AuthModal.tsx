@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, X } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail, signInWithKakao } from '../lib/auth';
+import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle } from '../lib/auth';
 import type { AppUser } from '../types';
 
 interface AuthModalProps {
@@ -34,6 +34,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
       await signInWithKakao();
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : '카카오 로그인에 실패했습니다.');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : '구글 로그인에 실패했습니다.');
       setLoading(false);
     }
   };
@@ -136,7 +147,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
           >
             카카오 로그인
           </button>
-          <button className="btn btn-secondary" disabled>구글 로그인 준비 중</button>
+          <button 
+            className="btn btn-secondary flex items-center justify-center gap-2" 
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            style={{ 
+              backgroundColor: '#FFFFFF', 
+              color: '#374151', 
+              border: '1px solid #D1D5DB',
+              fontWeight: 'bold' 
+            }}
+          >
+            구글 로그인
+          </button>
         </div>
 
         <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
