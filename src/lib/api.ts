@@ -1,8 +1,7 @@
 import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, PersonaId } from '../types';
 import { getDebateFocusLabel, getDebateLevelLabel, getPositionLabel } from './debateEngine';
 
-const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
-const GEMINI_GENERATE_CONTENT_URL = `/api/gemini/v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`;
+const GEMINI_FLASH_MODEL = 'gemini-3.1-flash-lite';
 const PERSONA_MODEL = GEMINI_FLASH_MODEL;
 const DEBATE_OPPONENT_MODEL = GEMINI_FLASH_MODEL;
 const DEBATE_JUDGE_MODEL = GEMINI_FLASH_MODEL;
@@ -180,38 +179,63 @@ const toChatCompletionResponse = (response: GeminiGenerateContentResponse): Chat
 };
 
 const createChatCompletion = async (request: ChatCompletionRequest): Promise<ChatCompletionResponse> => {
-  const { thinking: _thinking, reasoning_effort: _reasoningEffort, model: _model } = request;
+  const { thinking: _thinking, reasoning_effort: _reasoningEffort, model: requestedModel } = request;
   void _thinking;
   void _reasoningEffort;
-  void _model;
   const geminiRequest = toGeminiGenerateContentRequest(request);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+  // We try models in priority order. If requestedModel is provided and valid, we try it first.
+  const baseModels = [
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-1.5-flash',
+    'gemini-2.5-flash'
+  ];
 
-  try {
-    const response = await fetch(GEMINI_GENERATE_CONTENT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(geminiRequest),
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
+  const modelsToTry = [...new Set([requestedModel, ...baseModels])].filter(Boolean) as string[];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
+  let lastError: unknown = null;
+
+  for (const modelName of modelsToTry) {
+    const url = `/api/gemini/v1beta/models/${modelName}:generateContent`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(geminiRequest),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Gemini model ${modelName} failed with status ${response.status}. trying fallback...`, errorText.slice(0, 200));
+        
+        // If it's a 404 (model not found) or 400 (bad request due to model availability / invalid name), try next
+        if (response.status === 404 || response.status === 400 || response.status === 503) {
+          lastError = new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
+          continue;
+        }
+        throw new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
+      }
+
+      const geminiResponse = await response.json() as GeminiGenerateContentResponse;
+      return toChatCompletionResponse(geminiResponse);
+    } catch (error: unknown) {
+      clearTimeout(timeoutId);
+      console.warn(`Failed to call model ${modelName}:`, error);
+      lastError = error;
+      continue;
     }
-
-    const geminiResponse = await response.json() as GeminiGenerateContentResponse;
-    return toChatCompletionResponse(geminiResponse);
-  } catch (error: unknown) {
-    clearTimeout(timeoutId);
-    throw error;
   }
+
+  throw lastError || new Error('All Gemini models failed to respond.');
 };
 
 const SOCRATES_PROMPT = `
@@ -857,29 +881,50 @@ User position: "${getPositionLabel(userPosition)}"
 ${historyText}
 
 Judge only the user's debate performance.
-Score the user using exactly these categories (out of 5 points each):
+Score the user using exactly these categories (out of 5 points each).
+IMPORTANT: For each category, focus on the specified debate phase(s) marked with "→ 평가 근거". Base your score and feedback primarily on the user's performance in those phases.
 ${debateLevel === 'beginner'
     ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+  → 평가 근거: [상대 주장 분석] 단계에서 상대 주장·이유·근거를 정확히 파악했는지 평가
 - 논리력: 생각을 일관된 논리로 연결했는가?
+  → 평가 근거: [입론] 단계에서 주장-이유-근거의 연결이 일관되고, [최종발언]에서 논리적으로 마무리했는지 평가
 - 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+  → 평가 근거: [입론] 단계에서 제시한 근거의 구체성·신뢰성, [반박] 단계에서 근거를 활용한 공격력 평가
 - 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
-- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?`
+  → 평가 근거: [교차질문] 단계에서 상대 약점을 겨냥한 질문의 날카로움과 전략성 평가
+- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
+  → 평가 근거: [반박] 단계에서 상대 논리의 비약·모순 지적 능력, [AI 교차질문 답변] 단계에서 방어력 평가`
     : debateLevel === 'intermediate'
     ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+  → 평가 근거: [상대 주장 분석] 단계에서 핵심 쟁점·전제·근거를 분리하여 파악했는지 평가
 - 논리력: 생각을 일관된 논리로 연결했는가?
+  → 평가 근거: [입론] 단계에서 용어 정의→판단 기준→주장→이유→근거의 구조적 연결, [최종 입장 확인]에서 일관된 마무리 평가
 - 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+  → 평가 근거: [입론] 단계에서 근거 2개 이상의 독립성·구체성, [반박] 단계에서 근거 활용한 공격력 평가
 - 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
+  → 평가 근거: [교차질문] 단계에서 전제·근거·범위·대안·우선순위를 겨냥한 질문의 전략성 평가
 - 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
+  → 평가 근거: [반박] 단계에서 핵심 쟁점·전제를 바탕으로 한 논리적 공격력, [AI 교차질문 답변] 단계에서 방어·보강 능력 평가
 - 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
-- 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?`
-    : `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
-- 논리력: 생각을 일관된 논리로 연결했는가?
-- 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
-- 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
-- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
-- 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
+  → 평가 근거: [상대 주장 분석] 단계에서 상대 주장이 의존하는 핵심 전제를 드러냈는지, [교차질문] 단계에서 숨겨진 가정을 질문으로 끌어냈는지 평가
 - 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?
-- 프레이밍 능력: 문제를 새로운 관점에서 바라보고 논쟁의 기준을 재설정했는가?`}
+  → 평가 근거: [충돌 지점 확인 및 중요성 비교] 단계에서 피해 심각성·영향 범위·발생 가능성·긴급성·회복 가능성 등 비교 기준을 활용하여 내 주장의 우위를 설득력 있게 제시했는지 평가`
+    : `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
+  → 평가 근거: [쟁점 및 비교 기준] 단계에서 양측 입론의 핵심 쟁점을 정리했는지, [반박] 단계에서 상대 주장을 정확히 인용하여 공격했는지 평가
+- 논리력: 생각을 일관된 논리로 연결했는가?
+  → 평가 근거: [입론] 단계에서 Claim-Reason-Evidence-Warrant 구조의 완성도, [최종 변론]에서 일관된 마무리 평가
+- 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
+  → 평가 근거: [입론] 단계에서 근거의 한계까지 고려한 깊이, [증거 검증] 단계에서 상대 근거의 대표성·인과성·최신성·충분성 검증 능력 평가
+- 질문력: 핵심을 꿰뚫는 질문으로 논의를 깊게 만들었는가?
+  → 평가 근거: [증거 검증] 단계에서 상대 근거를 검증하는 질문의 정밀함과 대체 해석 제시 능력 평가
+- 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
+  → 평가 근거: [반박] 단계에서 논증의 비약·모순 지적력, [재반박] 단계에서 상대 최강 반론에 대한 방어력 평가
+- 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
+  → 평가 근거: [논제 설계] 단계에서 핵심 용어와 판단 기준의 공정성, [쟁점 및 비교 기준] 단계에서 상대 논리가 의존하는 숨겨진 전제 발견 능력 평가
+- 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?
+  → 평가 근거: [쟁점 및 비교 기준] 단계에서 비교 기준의 명확성, [재반박] 단계에서 남는 쟁점의 우선순위 재정리 능력 평가
+- 프레이밍 능력: 문제를 새로운 관점에서 바라보고 논쟁의 기준을 재설정했는가?
+  → 평가 근거: [논제 설계] 단계에서 논제 초점·승패 기준 설계의 독창성과 전략성 평가`}
 Each feedback item must mention one observed behavior from the debate and one concrete next training move.
 Return ONLY valid JSON:
 {
