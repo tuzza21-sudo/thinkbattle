@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/gemini/:path*",
+      "destination": "/api/gemini/[...path]"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
