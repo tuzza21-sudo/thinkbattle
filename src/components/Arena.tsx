@@ -804,50 +804,74 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       }));
       setIsAiThinking(true);
 
-      const aiRes = await generateDebateResponse(
-        battleState.topic,
-        newArgs,
-        userPosition,
-        activeStep.roundId,
-        battleState.timeLimit,
-        sessionRemainingSeconds,
-        battleState.debateLevel,
-        battleState.debateFocus,
-      );
-      const aiArg: Argument = {
-        id: createArgumentId(),
-        playerId: battleState.playerB.id,
-        isAi: true,
-        content: aiRes.argument,
-        aiQuestion: undefined,
-        nextTask: '최종 평가를 확인하세요.',
-        turnXp: aiRes.turnXp,
-        turnFeedback: aiRes.turnFeedback,
-        timestamp: getTimestamp(),
-        roundId: activeStep.roundId,
-        roundTitle: 'AI 최종 발언',
-      };
-      const finalArgs = [...newArgs, aiArg];
-      const finalState: BattleState = {
-        ...battleState,
-        arguments: finalArgs,
-        isFinished: true,
-        timeRemaining: sessionRemainingSeconds,
-      };
+      try {
+        const aiRes = await generateDebateResponse(
+          battleState.topic,
+          newArgs,
+          userPosition,
+          activeStep.roundId,
+          battleState.timeLimit,
+          sessionRemainingSeconds,
+          battleState.debateLevel,
+          battleState.debateFocus,
+        );
+        const aiArg: Argument = {
+          id: createArgumentId(),
+          playerId: battleState.playerB.id,
+          isAi: true,
+          content: aiRes.argument,
+          aiQuestion: undefined,
+          nextTask: '최종 평가를 확인하세요.',
+          turnXp: aiRes.turnXp,
+          turnFeedback: aiRes.turnFeedback,
+          timestamp: getTimestamp(),
+          roundId: activeStep.roundId,
+          roundTitle: 'AI 최종 발언',
+        };
+        const finalArgs = [...newArgs, aiArg];
+        const finalState: BattleState = {
+          ...battleState,
+          arguments: finalArgs,
+          isFinished: true,
+          timeRemaining: sessionRemainingSeconds,
+        };
 
-      setBattleState(finalState);
-      setIsAiThinking(false);
-      setIsReportGenerating(true);
+        setBattleState(finalState);
+        setIsAiThinking(false);
+        setIsReportGenerating(true);
 
-      const report = await generateDebateJudgment(
-        finalState.topic,
-        finalState.arguments,
-        finalState.userPosition ?? 'affirmative',
-        finalState.debateLevel,
-      );
-      persistDebateRecord(report, finalState);
-      setFinalReport(report);
-      setIsReportGenerating(false);
+        const report = await generateDebateJudgment(
+          finalState.topic,
+          finalState.arguments,
+          finalState.userPosition ?? 'affirmative',
+          finalState.debateLevel,
+        );
+        persistDebateRecord(report, finalState);
+        setFinalReport(report);
+        setIsReportGenerating(false);
+      } catch (error) {
+        console.error('Debate completion error:', error);
+        // API 에러 발생 시에도 토론을 마무리하고 기록 저장
+        const fallbackState: BattleState = {
+          ...battleState,
+          arguments: newArgs,
+          isFinished: true,
+          timeRemaining: sessionRemainingSeconds,
+        };
+        setBattleState(fallbackState);
+        setIsAiThinking(false);
+        setIsReportGenerating(true);
+
+        const fallbackReport: FinalReport = {
+          overallFeedback: 'AI 평가 서버에 일시적 문제가 발생하여 자동 채점이 불가합니다. 토론 내용은 기록에 저장됩니다.',
+          categories: [],
+          totalScore: 0,
+          xpEarned: 50, // 기본 참여 XP는 보장
+        };
+        persistDebateRecord(fallbackReport, fallbackState);
+        setFinalReport(fallbackReport);
+        setIsReportGenerating(false);
+      }
       return;
     }
 
@@ -860,35 +884,51 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
 
     setIsAiThinking(true);
 
-    const aiRes = await generateDebateResponse(
-      battleState.topic,
-      newArgs,
-      userPosition,
-      activeStep.roundId,
-      battleState.timeLimit,
-      sessionRemainingSeconds,
-      battleState.debateLevel,
-      battleState.debateFocus,
-    );
+    try {
+      const aiRes = await generateDebateResponse(
+        battleState.topic,
+        newArgs,
+        userPosition,
+        activeStep.roundId,
+        battleState.timeLimit,
+        sessionRemainingSeconds,
+        battleState.debateLevel,
+        battleState.debateFocus,
+      );
 
-    const nextStep = debateStepList[newArgs.filter(argument => !argument.isAi).length];
-    const isNextStepAnsweringAi = nextStep?.id.includes('cross-question-answer');
+      const nextStep = debateStepList[newArgs.filter(argument => !argument.isAi).length];
+      const isNextStepAnsweringAi = nextStep?.id.includes('cross-question-answer');
 
-    const aiArg: Argument = {
-      id: createArgumentId(),
-      playerId: battleState.playerB.id,
-      isAi: true,
-      content: aiRes.argument,
-      aiQuestion: isNextStepAnsweringAi ? aiRes.question : undefined,
-      nextTask: nextStep ? nextStep.instruction : '최종 평가를 확인하세요.',
-      turnXp: aiRes.turnXp,
-      turnFeedback: aiRes.turnFeedback,
-      timestamp: getTimestamp(),
-      roundId: activeStep.roundId,
-      roundTitle: getAiResponseRoundTitle(activeStep),
-    };
+      const aiArg: Argument = {
+        id: createArgumentId(),
+        playerId: battleState.playerB.id,
+        isAi: true,
+        content: aiRes.argument,
+        aiQuestion: isNextStepAnsweringAi ? aiRes.question : undefined,
+        nextTask: nextStep ? nextStep.instruction : '최종 평가를 확인하세요.',
+        turnXp: aiRes.turnXp,
+        turnFeedback: aiRes.turnFeedback,
+        timestamp: getTimestamp(),
+        roundId: activeStep.roundId,
+        roundTitle: getAiResponseRoundTitle(activeStep),
+      };
 
-    setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, aiArg] }));
+      setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, aiArg] }));
+    } catch (error) {
+      console.error('Debate turn AI error:', error);
+      // AI 응답 실패 시 에러 메시지를 AI 발언으로 삽입하여 토론 계속 진행 가능하게
+      const errorArg: Argument = {
+        id: createArgumentId(),
+        playerId: battleState.playerB.id,
+        isAi: true,
+        content: 'AI 응답을 생성하지 못했습니다. 다음 단계로 진행해 주세요.',
+        nextTask: '이전 발언을 보강하여 다시 작성하거나, 다음 단계로 진행하세요.',
+        timestamp: getTimestamp(),
+        roundId: activeStep.roundId,
+        roundTitle: getAiResponseRoundTitle(activeStep),
+      };
+      setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, errorArg] }));
+    }
     setIsAiThinking(false);
   };
 
