@@ -3,6 +3,18 @@ export const config = {
 };
 
 export default async function handler(req: Request) {
+  // OPTIONS Preflight 요청 처리 (CORS 대응)
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, x-goog-api-key, Authorization',
+      },
+    });
+  }
+
   const url = new URL(req.url);
   
   // 클라이언트가 /api/gemini/... 로 요청한 것을 https://generativelanguage.googleapis.com/... 로 변환
