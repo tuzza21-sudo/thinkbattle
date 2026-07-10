@@ -16,10 +16,22 @@ export default async function handler(req: Request) {
   }
 
   const url = new URL(req.url);
-  
-  // 클라이언트가 /api/gemini/... 로 요청한 것을 https://generativelanguage.googleapis.com/... 로 변환
-  const targetPath = url.pathname.replace(/^\/api\/gemini/, '');
-  const targetUrl = new URL(targetPath + url.search, 'https://generativelanguage.googleapis.com');
+
+  // Vercel 리라이트 시 캡처된 경로가 ?path= 쿼리 파라미터로 전달됨
+  // 예: /api/gemini/v1beta/models/gemini-3.1-flash-lite:generateContent
+  //   → ?path=v1beta/models/gemini-3.1-flash-lite:generateContent
+  const capturedPath = url.searchParams.get('path');
+  const targetPath = capturedPath
+    ? `/${capturedPath}`
+    : url.pathname.replace(/^\/api\/gemini/, '');
+
+  // 구글 API 대상 URL 생성 (Vercel이 주입한 path 파라미터는 제외)
+  const targetUrl = new URL(targetPath, 'https://generativelanguage.googleapis.com');
+  url.searchParams.forEach((value, key) => {
+    if (key !== 'path') {
+      targetUrl.searchParams.set(key, value);
+    }
+  });
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
   if (apiKey) {
