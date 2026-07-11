@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { FinalReport, Player } from '../types';
-import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown } from 'lucide-react';
+import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2 } from 'lucide-react';
 
 interface ResultModalProps {
   report: FinalReport | null;
   playerA: Player;
   playerB: Player;
+  debateArguments?: import('../types').Argument[];
   onClose: () => void;
   onStartEnglishReplay?: () => void;
 }
@@ -28,7 +29,7 @@ const getBarColor = (score: number, maxScore: number) => {
 };
 
 const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: number; feedback: string; xpEarned?: number }; index: number; animReady: boolean }> = ({ cat, index, animReady }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const pct = (cat.score / cat.maxScore) * 100;
   const barColor = getBarColor(cat.score, cat.maxScore);
 
@@ -69,7 +70,7 @@ const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: num
   );
 };
 
-export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playerB, onClose, onStartEnglishReplay }) => {
+export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playerB, debateArguments, onClose, onStartEnglishReplay }) => {
   const [animReady, setAnimReady] = useState(false);
 
   useEffect(() => {
@@ -178,10 +179,51 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
               </div>
             </div>
           </section>
+
+          {/* Debate History */}
+          {debateArguments && debateArguments.length > 0 && (
+            <section className="report-section" style={{ marginTop: '2rem' }}>
+              <h3 className="report-section-title">
+                <MessageSquareText size={18} /> 토론 발언 기록
+              </h3>
+              <div className="history-transcript" style={{ marginTop: '1rem', background: 'var(--surface-darker)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                {debateArguments.map((argument, index) => {
+                  return (
+                    <div key={argument.id} className={argument.isAi ? 'ai' : 'user'} style={{ marginBottom: '1.5rem' }}>
+                      <strong style={{ color: argument.isAi ? 'var(--accent-coral)' : 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
+                        {argument.isAi ? 'AI' : playerA.name}
+                      </strong>
+                      {argument.roundTitle && (
+                        <em style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                          {argument.roundTitle}
+                        </em>
+                      )}
+                      <span style={{ display: 'block', lineHeight: '1.6', color: 'var(--text-color)' }}>
+                        {argument.content}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* --- Footer Actions --- */}
         <div className="report-footer">
+          <button 
+            className="btn btn-secondary report-footer-btn" 
+            onClick={() => {
+              const shareText = `[ThinkFit 사고력 피트니스]\n내 논리력 점수는 ${report.totalScore} / ${totalMax}점!\n지금 바로 내 논리력을 테스트해보세요.\n${window.location.origin}`;
+              if (navigator.share) {
+                navigator.share({ title: 'ThinkFit 토론 결과', text: shareText, url: window.location.origin }).catch(console.error);
+              } else {
+                navigator.clipboard.writeText(shareText).then(() => alert('결과가 클립보드에 복사되었습니다.')).catch(console.error);
+              }
+            }}
+          >
+            <Share2 size={20} /> 결과 공유
+          </button>
           {onStartEnglishReplay && (
             <button className="btn btn-secondary report-footer-btn" onClick={onStartEnglishReplay}>
               <Languages size={20} /> 영어 리프레이징

@@ -769,6 +769,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             report={finalReport}
             playerA={battleState.playerA}
             playerB={battleState.playerB}
+            debateArguments={battleState.arguments}
             onClose={() => navigate('/')}
             onStartEnglishReplay={() => setShowResultModal(false)}
           />
@@ -1337,6 +1338,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           report={finalReport}
           playerA={battleState.playerA}
           playerB={battleState.playerB}
+          debateArguments={battleState.arguments}
           onClose={() => navigate('/')}
           onStartEnglishReplay={() => {
             setShowResultModal(false);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages, Trash2 } from 'lucide-react';
+import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages, Trash2, Share2 } from 'lucide-react';
 import { getDebateRecords, saveEnglishRephraseEntry, deleteDebateRecord } from '../lib/history';
 import { EnglishRephrasePanel } from './EnglishRephrasePanel';
 import type { AppUser, DebateRecord, EnglishRephraseEntry } from '../types';
@@ -82,6 +82,24 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
       if (selectedRecordId === recordId) {
         setSelectedRecordId('');
       }
+    }
+  };
+
+  const handleShare = (record: DebateRecord) => {
+    const score = record.report.totalScore;
+    const maxScore = record.report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100;
+    const shareText = `[ThinkFit 사고력 피트니스]\n주제: ${record.topic}\n내 논리력 점수는 ${score} / ${maxScore}점!\n지금 바로 내 논리력을 테스트해보세요.\n${window.location.origin}`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: 'ThinkFit 토론 결과',
+        text: shareText,
+        url: window.location.origin,
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(shareText)
+        .then(() => alert('결과가 클립보드에 복사되었습니다. 카카오톡이나 SNS에 공유해보세요!'))
+        .catch(console.error);
     }
   };
 
@@ -186,6 +204,9 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                     최종 보고서
                   </span>
                   <h2>{selectedRecord.topic}</h2>
+                  <button className="btn btn-secondary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} onClick={() => handleShare(selectedRecord)}>
+                    <Share2 size={14} style={{ marginRight: '0.3rem' }} /> 결과 공유하기
+                  </button>
                 </div>
                 <div className="report-score">
                   {selectedRecord.report.totalScore}<span>/{selectedRecord.report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100}</span>
