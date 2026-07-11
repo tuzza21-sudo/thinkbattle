@@ -187,7 +187,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
                 <MessageSquareText size={18} /> 토론 발언 기록
               </h3>
               <div className="history-transcript" style={{ marginTop: '1rem', background: 'var(--surface-darker)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                {debateArguments.map((argument, index) => {
+                {debateArguments.map((argument) => {
                   return (
                     <div key={argument.id} className={argument.isAi ? 'ai' : 'user'} style={{ marginBottom: '1.5rem' }}>
                       <strong style={{ color: argument.isAi ? 'var(--accent-coral)' : 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
