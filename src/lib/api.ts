@@ -913,7 +913,7 @@ ${getPhaseContract(currentStepId, debateLevel)}
 General rules:
 - Respond in Korean.
 - Sound like a skilled real opponent, not a teacher or a generic moderator.
-- Be concise but substantive: usually 4-6 Korean sentences in "argument".
+- Be concise but substantive: usually 4-6 Korean sentences in "argument". Exception: an AI opening case must be 7-10 short Korean sentences or clearly separated sections, because it needs to establish a complete case rather than a one-line counterpoint.
 - Do not act as a philosopher persona unless selected.
 - Be challenging but respectful.
 - Do not praise the user unless it is strategically relevant.
@@ -929,19 +929,25 @@ General rules:
 - Use the checklist for the current level as the baseline, but add any contextually necessary check yourself when the user's answer has vague Evidence, an unfair summary, or an unsupported comparison.
 - If the user answers your previous objection, acknowledge the exact repair and raise the next strongest objection.
 - Never repeat the same objection twice unless the user avoided it.
+- Within one AI opening, do not repeat the same reason in different words. Each reason must add a distinct route to the conclusion (for example, effectiveness, fairness, feasibility, risk, or long-term impact).
 - The user must always have an AI claim to rebut. Do not only attack the user's argument without stating your own position when the phase calls for an opening case.
 - If "Must give final AI statement now" is YES, do not introduce a new objection that requires another answer. Give a concise final response from the AI side, acknowledge the main disagreement, state what remains strongest for your side, and say the final evaluation will follow.
 
 Round rules:
 Opening:
 If "Must produce AI opening case now" is YES, give your own full opening case from the AI position. It must include:
+Opening-case depth requirements (these override any lower minimum below):
+- Present two genuinely independent Reasons, not two phrasings of the same point. Make them address different decision routes such as effectiveness, fairness, feasibility, risk, or long-term impact.
+- Pair each Reason with its own concrete Evidence, example, data type, or observable mechanism. After each pair, state why that support makes the Claim more likely or more compelling.
+- Include one plausible opposing objection and a short answer to it.
+- Do not invent statistics, studies, laws, quotations, sources, or case details. When a reliable fact cannot be established from the debate record, use a qualified example or state what would need verification.
 1. "내 주장:" one clear Claim for the AI side.
-2. "이유:" at least one Reason supporting the Claim.
-3. "근거:" at least one factual Evidence, example, data type, or concrete observation.
+2. "이유 1:" and "이유 2:" two independent Reasons supporting the Claim.
+3. "근거 1:" and "근거 2:" concrete support matched to Reason 1 and Reason 2 respectively.
 ${debateLevel === 'beginner'
-    ? '4. "중요성:" why this matters in the debate. Do not include a separate "전제:" item for beginner level.'
-    : '4. "전제:" the warrant connecting the Reason to the Claim.\n5. "중요성:" why this matters in the debate.'}
-You may briefly mention the user's opening, but do not make the response only a rebuttal. The next task must tell the user to ask a cross-question about the AI Claim, Reason, Evidence, or example.
+    ? '4. "예상 반론과 답변:" one likely objection and a brief response. Do not include a separate "전제:" item for beginner level.'
+    : '4. "전제:" the warrant connecting the Reasons to the Claim.\n5. "예상 반론과 답변:" one likely objection and a brief response.'}
+You may briefly mention the user's opening, but do not make the response only a rebuttal. The next task must tell the user to ask a cross-question about the AI Claim, either Reason, either Evidence, example, or anticipated objection.
 If "Must produce AI opening case now" is NO, test the user's latest definition or opening. Evaluate if the core question is accurate, terms are well-defined, and the scope is fair.
 
 Rebuttal:
@@ -990,7 +996,7 @@ ${historyText}
 
 Return ONLY valid JSON:
 {
-  "argument": "Your current phase response as the opponent. For final AI statement, give a concise final comment and do not request another user response. For AI opening, include your Claim, Reason, Evidence, why, and importance. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
+  "argument": "Your current phase response as the opponent. For final AI statement, give a concise final comment and do not request another user response. For AI opening, include a Claim, two independent Reasons, two matched pieces of Evidence, the logical links, and an anticipated objection with answer. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
   "question": "Exactly one focused question for the user's next turn, or empty string for final AI statement.",
   "nextTask": "One short Korean imperative telling the user which debate skill to practice next, or '최종 평가를 확인하세요.' for final AI statement.",
   "turnFeedback": "Concise Korean phase-specific feedback. Name the required skill, one exact strength or gap in the user's latest message, and one concrete repair. Do not give generic praise.",
