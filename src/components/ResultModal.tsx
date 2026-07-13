@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { FinalReport, Player } from '../types';
-import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2, BookOpen } from 'lucide-react';
-import { downloadReportImage, isKakaoShareConfigured, shareReportToKakao } from '../lib/reportShare';
+import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2, BookOpen, FileDown, ImageDown } from 'lucide-react';
+import { downloadSocialSummaryImage, isKakaoShareConfigured, shareReportToKakao } from '../lib/reportShare';
 
 interface ResultModalProps {
   report: FinalReport | null;
@@ -134,6 +134,31 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
     }
   };
 
+  const handleDownloadPdf = () => {
+    const previousTitle = document.title;
+    document.title = `ThinkFit 토론 보고서 - ${topic}`;
+    window.print();
+    window.setTimeout(() => {
+      document.title = previousTitle;
+    }, 0);
+  };
+
+  const handleDownloadSocialSummary = async () => {
+    try {
+      await downloadSocialSummaryImage({
+        topic,
+        overallFeedback: report.overallFeedback,
+        score: report.totalScore,
+        maxScore: totalMax,
+        grade: grade.label,
+        categories: report.categories,
+      });
+    } catch (error) {
+      console.error('SNS summary image error:', error);
+      alert('SNS 요약 이미지를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  };
+
   return (
     <div className="modal-overlay">
       <div className="report-modal">
@@ -242,26 +267,21 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
 
           {/* Debate History */}
           {debateArguments && debateArguments.length > 0 && (
-            <section className="report-section" style={{ marginTop: '2rem' }}>
+            <section className="report-section report-transcript-section" style={{ marginTop: '2rem' }}>
               <h3 className="report-section-title">
-                <MessageSquareText size={18} /> 토론 발언 기록
+                <MessageSquareText size={18} /> 토론 수행 내역
               </h3>
-              <div className="history-transcript" style={{ marginTop: '1rem', background: 'var(--surface-darker)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+              <p className="report-transcript-description">각 단계에서 작성한 내 발언과 이에 대한 AI 상대방의 답변입니다.</p>
+              <div className="history-transcript report-transcript">
                 {debateArguments.map((argument) => {
                   return (
-                    <div key={argument.id} className={argument.isAi ? 'ai' : 'user'} style={{ marginBottom: '1.5rem' }}>
-                      <strong style={{ color: argument.isAi ? 'var(--accent-coral)' : 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
-                        {argument.isAi ? 'AI' : playerA.name}
-                      </strong>
-                      {argument.roundTitle && (
-                        <em style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                          {argument.roundTitle}
-                        </em>
-                      )}
-                      <span style={{ display: 'block', lineHeight: '1.6', color: 'var(--text-color)' }}>
-                        {argument.content}
-                      </span>
-                    </div>
+                    <article key={argument.id} className={`report-transcript-entry ${argument.isAi ? 'ai' : 'user'}`}>
+                      <div className="report-transcript-meta">
+                        <strong>{argument.isAi ? 'AI 상대방' : `${playerA.name} · 내 발언`}</strong>
+                        <em>{argument.roundTitle ?? (argument.isAi ? 'AI 답변' : '내 발언')}</em>
+                      </div>
+                      <p className="report-transcript-content">{argument.content}</p>
+                    </article>
                   );
                 })}
               </div>
@@ -277,8 +297,11 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
           <button className="btn btn-secondary report-footer-btn" onClick={() => void handleKakaoShare()} disabled={isSharing || !isKakaoShareConfigured()} title={!isKakaoShareConfigured() ? '카카오 JavaScript 키 설정 후 사용할 수 있습니다.' : undefined}>
             카카오톡
           </button>
-          <button className="btn btn-secondary report-footer-btn" onClick={() => void downloadReportImage({ topic, score: report.totalScore, maxScore: totalMax, grade: grade.label })}>
-            인스타용 이미지
+          <button className="btn btn-secondary report-footer-btn" onClick={handleDownloadPdf}>
+            <FileDown size={20} /> PDF로 저장
+          </button>
+          <button className="btn btn-secondary report-footer-btn" onClick={() => void handleDownloadSocialSummary()}>
+            <ImageDown size={20} /> SNS 요약 이미지
           </button>
           {onStartEnglishReplay && (
             <button className="btn btn-secondary report-footer-btn" onClick={onStartEnglishReplay}>

@@ -28,8 +28,6 @@ export const SharedReportPage: React.FC = () => {
   }
 
   const totalMax = record.report.categories.reduce((sum, category) => sum + (category.maxScore || 5), 0) || 1;
-  const userArguments = record.arguments.filter(argument => !argument.isAi);
-
   return (
     <main className="app-container page-scroll shared-report-page">
       <article className="shared-report-sheet">
@@ -88,12 +86,15 @@ export const SharedReportPage: React.FC = () => {
 
         <section className="report-panel">
           <h2><FileText size={19} /> 실제 수행 내역</h2>
-          <p style={{ color: 'var(--text-muted)', marginTop: 0 }}>사용자가 각 국면에서 작성한 발언입니다.</p>
-          <div className="history-transcript">
-            {userArguments.map(argument => (
-              <article key={argument.id} className="user">
-                <strong>{argument.roundTitle ?? '발언'}</strong>
-                <span>{argument.content}</span>
+          <p className="report-transcript-description">각 단계에서 작성한 내 발언과 AI 상대방의 답변을 순서대로 확인할 수 있습니다.</p>
+          <div className="history-transcript report-transcript">
+            {record.arguments.map(argument => (
+              <article key={argument.id} className={`report-transcript-entry ${argument.isAi ? 'ai' : 'user'}`}>
+                <div className="report-transcript-meta">
+                  <strong>{argument.isAi ? 'AI 상대방' : '내 발언'}</strong>
+                  <em>{argument.roundTitle ?? (argument.isAi ? 'AI 답변' : '내 발언')}</em>
+                </div>
+                <p className="report-transcript-content">{argument.content}</p>
               </article>
             ))}
           </div>
