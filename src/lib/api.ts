@@ -50,6 +50,7 @@ type ChatCompletionRequest = {
   model: string;
   messages: ChatMessage[];
   response_format?: { type: 'json_object' };
+  response_schema?: Record<string, unknown>;
   reasoning_effort?: 'high' | 'max';
   thinking?: { type: 'enabled' | 'disabled' };
 };
@@ -78,6 +79,8 @@ type GeminiGenerateContentRequest = {
   contents: GeminiContent[];
   generationConfig?: {
     responseMimeType?: 'application/json';
+    responseJsonSchema?: Record<string, unknown>;
+    maxOutputTokens?: number;
   };
 };
 
@@ -93,9 +96,37 @@ const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 
 const parseJsonObject = (raw: string): Record<string, unknown> => {
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  const jsonString = jsonMatch ? jsonMatch[0] : '{}';
-  return JSON.parse(jsonString) as Record<string, unknown>;
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+
+  try {
+    return JSON.parse(cleaned) as Record<string, unknown>;
+  } catch {
+    // Some providers still wrap JSON with a short explanation. Extract exactly
+    // one balanced object instead of using a greedy regex that can include text.
+    const start = cleaned.indexOf('{');
+    if (start < 0) throw new Error('Model response did not contain a JSON object.');
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < cleaned.length; index += 1) {
+      const character = cleaned[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === '{') depth += 1;
+      else if (character === '}') {
+        depth -= 1;
+        if (depth === 0) return JSON.parse(cleaned.slice(start, index + 1)) as Record<string, unknown>;
+      }
+    }
+
+    throw new Error('Model JSON response was incomplete.');
+  }
 };
 
 const getStringField = (value: unknown, fallback: string) =>
@@ -164,7 +195,13 @@ const toGeminiGenerateContentRequest = (request: ChatCompletionRequest): GeminiG
       ? contents
       : [{ role: 'user', parts: [{ text: 'Generate the requested response now.' }] }],
     ...(request.response_format?.type === 'json_object'
-      ? { generationConfig: { responseMimeType: 'application/json' } }
+      ? {
+          generationConfig: {
+            responseMimeType: 'application/json',
+            ...(request.response_schema ? { responseJsonSchema: request.response_schema } : {}),
+            maxOutputTokens: 8192,
+          },
+        }
       : {}),
   };
 };
@@ -974,7 +1011,7 @@ Return ONLY valid JSON:
         { role: 'system', content: systemPrompt }
       ],
       thinking: { type: 'disabled' },
-      response_format: { type: 'json_object' }
+      response_format: { type: 'json_object' },
     });
 
     const aiMessage = response.choices?.[0]?.message?.content || '{}';
@@ -998,11 +1035,64 @@ Return ONLY valid JSON:
   }
 }
 
+const FINAL_REPORT_RESPONSE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    overallFeedback: { type: 'string' },
+    categories: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          score: { type: 'number' },
+          maxScore: { type: 'number' },
+          feedback: { type: 'string' },
+        },
+        required: ['name', 'score', 'maxScore', 'feedback'],
+      },
+    },
+    phaseCoaching: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          phase: { type: 'string' },
+          observed: { type: 'string' },
+          strength: { type: 'string' },
+          improvement: { type: 'string' },
+          nextAction: { type: 'string' },
+        },
+        required: ['phase', 'observed', 'strength', 'improvement', 'nextAction'],
+      },
+    },
+    totalScore: { type: 'number' },
+  },
+  required: ['overallFeedback', 'categories', 'phaseCoaching', 'totalScore'],
+};
+
+const parseFinalReport = (raw: string): FinalReport => {
+  const parsed = parseJsonObject(raw);
+  const categories = Array.isArray(parsed.categories) ? parsed.categories as any[] : [];
+  if (categories.length === 0) {
+    throw new Error('Model response did not include any score categories.');
+  }
+
+  return {
+    overallFeedback: getStringField(parsed.overallFeedback, '토론 분석이 완료되었습니다.'),
+    categories,
+    phaseCoaching: getPhaseCoaching(parsed.phaseCoaching),
+    totalScore: typeof parsed.totalScore === 'number' ? parsed.totalScore : 0,
+    xpEarned: 0,
+  };
+};
+
 export async function generateDebateJudgment(
   topic: string,
   history: Argument[],
   userPosition: DebatePosition,
   debateLevel: DebateLevel = 'beginner',
+  retryAttempt = 0,
 ): Promise<FinalReport> {
   const historyText = history
     .map(a => `${a.isAi ? 'AI' : 'User'}${a.roundTitle ? ` [${a.roundTitle}]` : ''}: ${a.content}`)
@@ -1085,7 +1175,8 @@ Return ONLY valid JSON:
       ],
       reasoning_effort: 'high',
       thinking: { type: 'enabled' },
-      response_format: { type: 'json_object' }
+      response_format: { type: 'json_object' },
+      response_schema: FINAL_REPORT_RESPONSE_SCHEMA,
     });
 
     const aiMessage = response.choices?.[0]?.message?.content || '{}';
@@ -1093,6 +1184,9 @@ Return ONLY valid JSON:
     
     try {
       const parsed = parseJsonObject(aiMessage);
+      // Reject syntactically valid but empty reports as well. They are not
+      // useful to a user and should follow the same fallback path.
+      parseFinalReport(aiMessage);
       report = {
         overallFeedback: typeof parsed.overallFeedback === 'string' ? parsed.overallFeedback : '토론 분석이 완료되었습니다.',
         categories: Array.isArray(parsed.categories) ? parsed.categories as any[] : [],
@@ -1102,6 +1196,9 @@ Return ONLY valid JSON:
       };
     } catch (e) {
       console.warn("JSON Parse Fallback in FinalReport:", e);
+      if (retryAttempt === 0) {
+        return generateDebateJudgment(topic, history, userPosition, debateLevel, 1);
+      }
       report = { overallFeedback: '평가 결과 파싱에 문제가 발생했습니다.', categories: [], totalScore: 0, xpEarned: 0 };
     }
     
