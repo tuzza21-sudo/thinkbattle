@@ -31,9 +31,9 @@ export const SharedReportPage: React.FC = () => {
   const userArguments = record.arguments.filter(argument => !argument.isAi);
 
   return (
-    <main className="app-container page-scroll" style={{ padding: '2rem 1rem 4rem' }}>
-      <article style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gap: '1rem' }}>
-        <header className="report-hero" style={{ borderRadius: '20px', overflow: 'hidden', padding: '2.25rem 1.5rem' }}>
+    <main className="app-container page-scroll shared-report-page">
+      <article className="shared-report-sheet">
+        <header className="report-hero shared-report-hero">
           <div className="report-hero-bg" />
           <div className="report-hero-content" style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center', color: 'var(--primary)' }}>

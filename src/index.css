@@ -1352,7 +1352,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
   width: 92%;
-  max-width: 560px;
+  max-width: 860px;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -2042,6 +2042,35 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.6;
 }
 
+/* Public reports use a document-like, A4-inspired reading width on desktop. */
+.shared-report-page {
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.shared-report-sheet {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.shared-report-hero {
+  border-radius: 20px;
+  padding: 2.75rem 3rem;
+}
+
+.shared-report-sheet .report-panel {
+  padding: 1.5rem 1.75rem;
+}
+
+.shared-report-sheet .report-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  font-size: 1.2rem;
+}
+
 .history-category {
   border-top: 1px solid var(--border-color);
   padding-top: 0.75rem;
@@ -2404,6 +2433,22 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 900px) {
   .app-container {
     padding: 0.75rem;
+  }
+
+  .report-modal {
+    max-width: 680px;
+  }
+
+  .shared-report-page {
+    padding: 1rem 0.75rem 3rem;
+  }
+
+  .shared-report-hero {
+    padding: 2rem 1.25rem;
+  }
+
+  .shared-report-sheet .report-panel {
+    padding: 1.15rem;
   }
 
   .session-strip {
