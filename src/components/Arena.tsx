@@ -675,7 +675,11 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     if (!user || savedRecordIdRef.current) return;
 
     const completedAt = new Date().toISOString();
-    const recordId = `record_${finalState.id}_${Date.now()}`;
+    // `debate_records.id` is a UUID in Supabase.  The previous `record_...`
+    // value is rejected by Postgres before the record (and its XP) can be
+    // stored, so use a database-compatible identifier on both localhost and
+    // the deployed site.
+    const recordId = crypto.randomUUID();
     savedRecordIdRef.current = recordId;
 
     try {

@@ -32,8 +32,6 @@ export const getDebateRecords = async (userId: string): Promise<DebateRecord[]> 
 };
 
 export const saveDebateRecord = async (record: DebateRecord) => {
-  const isWinner = record.report?.totalScore ? record.report.totalScore >= 80 : false;
-  
   const { error } = await supabase
     .from('debate_records')
     .insert([
@@ -51,7 +49,6 @@ export const saveDebateRecord = async (record: DebateRecord) => {
           report: record.report,
           englishRephrases: record.englishRephrases || []
         },
-        is_winner: isWinner,
         created_at: record.completedAt
       }
     ]);
