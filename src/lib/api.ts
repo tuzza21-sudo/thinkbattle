@@ -1,4 +1,4 @@
-import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, PersonaId } from '../types';
+import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, PersonaId, PhaseCoaching } from '../types';
 import { getDebateFocusLabel, getDebateLevelLabel, getPositionLabel } from './debateEngine';
 
 const GEMINI_FLASH_MODEL = 'gemini-3.1-flash-lite';
@@ -19,6 +19,14 @@ export interface DebateAIResponse {
   nextTask: string;
   turnXp?: number;
   turnFeedback?: string;
+  turnFeedbackDetail?: DebateTurnFeedback;
+}
+
+export interface DebateTurnFeedback {
+  phaseGoal: string;
+  completed: string;
+  missing: string;
+  nextAction: string;
 }
 
 export interface RoundtableTurn {
@@ -665,6 +673,123 @@ const getDebateFocusGuide = (focus?: DebateFocus): string => {
   return 'Important fact-checking focus: clash over whether a key factual claim is true, representative, causal, recent, and sufficient.';
 };
 
+const getPhaseContract = (stepId?: string, level: DebateLevel = 'beginner'): string => {
+  const contracts: Record<string, string> = {
+    'beginner-opening-user': `
+[Phase contract: opening]
+Audit the user's opening before responding. Identify separately: Claim, Reason explaining why it supports that Claim, and Evidence or a concrete example supporting the Reason.
+Do not treat a repeated opinion as a Reason or an unsupported assertion as Evidence. Do not invent statistics, studies, laws, quotations, or sources. If factual support is weak, require a verifiable source or a concrete example.
+Give the AI side a distinct Claim-Reason-Evidence chain and expose exactly one pressure point in the user's chain.`,
+    'intermediate-opening-user': `
+[Phase contract: opening]
+Check that the user defines an important term, sets a fair scope and judging standard, then separates Claim, Reason, Evidence, and warrant. Test whether each Reason actually connects the Evidence to the Claim.
+Do not invent factual sources. Mark unsupported factual claims as needing verification.
+Give the AI side a complete counter-case with one clear standard and one pressure point against the user's opening.`,
+    'advanced-framing-user': `
+[Phase contract: framing]
+Check the topic scope, contested-term definitions, and judging criterion. Identify one ambiguous term, hidden assumption, or unfair boundary that must be repaired before substantive debate.`,
+    'advanced-opening-user': `
+[Phase contract: opening]
+Check Claim, Reason, Evidence, warrant, evidence limits, and anticipated objection. Test whether the proposed standard can fairly decide the topic. Do not invent factual sources.`,
+    'beginner-cross-question-user': `
+[Phase contract: cross-question]
+The user is collecting information, not yet rebutting. Judge whether the question targets one identifiable AI Claim, Reason, Evidence, example, or scope.
+Answer directly from the AI position. Then ask exactly one question probing the user's Claim, Reason, Evidence, or example. It must expose an assumption or missing support, not simply request an opinion.`,
+    'intermediate-cross-question-user': `
+[Phase contract: cross-question]
+The user is testing the AI's premise, evidence, scope, alternative, or priority. First state which target their question reaches and whether it is specific enough to affect the AI conclusion.
+Answer directly, acknowledge one genuine limit if appropriate, then ask exactly one focused question about the user's premise, evidence quality, scope, alternative, or priority.`,
+    'advanced-evidence-test-user': `
+[Phase contract: evidence test]
+Check whether the user identifies a specific AI evidence claim and tests source credibility, representativeness, causality, recency, sufficiency, or an alternative interpretation.
+Do not claim unverified data is true. Defend only what the debate record justifies, acknowledge uncertainty where needed, and ask one precise follow-up about the evidence test.`,
+    'beginner-cross-question-answer-user': `
+[Phase contract: answer to cross-question]
+Check whether the user directly answers the AI question before repeating their opening, then whether they repair their Claim-Reason-Evidence chain with an explanation or example.
+If they evade the question, say exactly what remains unanswered. If they repair it, acknowledge that exact repair and identify the next weakest link without asking another cross-question.`,
+    'intermediate-cross-question-answer-user': `
+[Phase contract: answer to cross-question]
+Check whether the user directly answers the AI's premise, evidence, scope, standard, or priority challenge, and whether they repair the warrant between their Reason and Claim.
+Name one exact repair or unresolved gap. Do not ask another cross-question; transition toward analysing the AI case.`,
+    'beginner-opponent-summary-user': `
+[Phase contract: opponent analysis]
+The user must accurately reconstruct the AI's Claim, Reason, and Evidence before attacking it. Do not reward a strawman.
+Check whether the chosen weakness is about a Reason, Evidence, or conclusion link. Name the best target for the upcoming rebuttal, but do not deliver that rebuttal for them.`,
+    'intermediate-opponent-summary-user': `
+[Phase contract: opponent analysis]
+Check whether the user separates the AI's Claim, Reason, Evidence, premise, and central clash. Penalize summaries that replace the AI's actual argument with an easier one.
+Identify whether the best target is a premise, evidence quality, causal link, scope, alternative, or priority.`,
+    'beginner-rebuttal-user': `
+[Phase contract: rebuttal]
+Check whether the user attacks a specific AI Reason, Evidence, or conclusion link identified earlier. A rebuttal must explain why the weakness makes the AI conclusion less convincing; disagreement alone is not enough.
+Check whether they use the cross-question answer or opponent analysis. Defend the AI side against that exact attack, then identify one remaining logical gap or unsupported link.`,
+    'intermediate-rebuttal-user': `
+[Phase contract: rebuttal]
+Check that the user identifies a specific target and attack type: premise, evidence, warrant, scope, alternative, or priority. Verify that the reasoning shows how the weakness changes the AI conclusion.
+Defend the AI side against the exact target, acknowledge any valid concession, and leave one clearly defined clash for later weighing.`,
+    'advanced-rebuttal-user': `
+[Phase contract: rebuttal]
+Check that the rebuttal connects a prior evidence test or issue analysis to one precise AI premise, evidence limitation, warrant, or comparison standard. Require an explanation of how that weakness changes the conclusion.
+Defend the strongest version of the AI case and state the remaining clash precisely.`,
+    'intermediate-clash-weighing-user': `
+[Phase contract: clash and weighing]
+Check whether the user names the actual clash and compares both sides using an explicit criterion: scale, probability, urgency, reversibility, affected groups, feasibility, or fairness.
+Do not accept a bare statement that one value matters more. Challenge the weakest comparison and require an explanation of why that criterion should decide the debate.`,
+    'advanced-issue-weighing-user': `
+[Phase contract: issue and standard]
+Check whether the user identifies the central clash and a fair comparison standard. Test whether the standard actually favors their side or merely restates their conclusion.`,
+    'advanced-counter-rebuttal-user': `
+[Phase contract: counter-rebuttal]
+Check whether the user directly answers the AI's strongest rebuttal instead of repeating the initial case. Require a clear remaining dispute and reprioritized deciding clash.`,
+    'beginner-weighing-user': `
+[Phase contract: closing]
+Check for a clear final position, strongest Reason, and the best Evidence or example already used. Do not reward new unsupported claims. Give a concise final AI response without another question.`,
+    'intermediate-closing-user': `
+[Phase contract: closing]
+Check that the user summarizes the main clash, the opponent's remaining limit, and why their position wins under a stated standard. Do not reward new unsupported claims. Give a concise final AI response without another question.`,
+    'advanced-closing-user': `
+[Phase contract: closing]
+Check issue-by-issue comparison and application of the deciding standard. Do not reward new claims. Give a concise final AI response without another question.`,
+  };
+
+  return contracts[stepId ?? ''] ?? `
+[Phase contract: ${level} ${stepId ?? 'live debate'}]
+Identify the exact skill required by the current phase, evaluate the user's latest contribution against it, and challenge one specific logical gap without inventing factual sources.`;
+};
+
+const getFeedbackDetail = (value: unknown): DebateTurnFeedback | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const detail = value as Record<string, unknown>;
+  const phaseGoal = getStringField(detail.phaseGoal, '');
+  const completed = getStringField(detail.completed, '');
+  const missing = getStringField(detail.missing, '');
+  const nextAction = getStringField(detail.nextAction, '');
+
+  if (!phaseGoal && !completed && !missing && !nextAction) return undefined;
+
+  return { phaseGoal, completed, missing, nextAction };
+};
+
+const getPhaseCoaching = (value: unknown): PhaseCoaching[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map(item => {
+      if (!item || typeof item !== 'object') return undefined;
+      const coaching = item as Record<string, unknown>;
+      const phase = getStringField(coaching.phase, '');
+      const observed = getStringField(coaching.observed, '');
+      const strength = getStringField(coaching.strength, '');
+      const improvement = getStringField(coaching.improvement, '');
+      const nextAction = getStringField(coaching.nextAction, '');
+
+      if (!phase || !improvement || !nextAction) return undefined;
+      return { phase, observed, strength, improvement, nextAction };
+    })
+    .filter((item): item is PhaseCoaching => Boolean(item));
+};
+
 export async function generateDebateResponse(
   topic: string,
   history: Argument[],
@@ -674,6 +799,7 @@ export async function generateDebateResponse(
   timeRemaining: number,
   debateLevel: DebateLevel = 'beginner',
   debateFocus: DebateFocus = 'fact',
+  currentStepId?: string,
 ): Promise<DebateAIResponse> {
   const oppositePosition: DebatePosition = userPosition === 'affirmative' ? 'negative' : 'affirmative';
   const historyText = history
@@ -726,6 +852,7 @@ AI position: ${getPositionLabel(oppositePosition)}
 Debate level: ${getDebateLevelLabel(debateLevel)}
 Topic focus: ${getDebateFocusLabel(debateFocus)}
 Current UI phase: ${getDebateRoundName(currentRound)}
+Current step id: ${currentStepId ?? 'live debate'}
 User turn count so far: ${userTurnCount}
 Session time limit: ${timeLimit} seconds
 Time remaining: ${timeRemaining} seconds
@@ -744,6 +871,8 @@ ${getDebateLevelGuide(debateLevel)}
 
 ${getDebateFocusGuide(debateFocus)}
 
+${getPhaseContract(currentStepId, debateLevel)}
+
 General rules:
 - Respond in Korean.
 - Sound like a skilled real opponent, not a teacher or a generic moderator.
@@ -754,6 +883,7 @@ General rules:
 - Do not give neutral coaching first. Take the AI position and debate.
 - If the user is vague, attack the missing standard or ask for a concrete criterion.
 - If the user gives Evidence, test whether the Evidence is representative, causal, recent, or sufficient.
+- Never invent or present an unverified statistic, study, law, quotation, source, or real-world case as fact. This product is not using web retrieval yet. Ask for a verifiable source or use conditional language when factual support is missing.
 - For beginner level, train Claim, Reason, and Evidence. Do not assign warrant, hidden-premise analysis, clash-point weighing, or comparison criteria as the user's next mission.
 - For intermediate and advanced levels, distinguish Claim, Reason, Evidence, and warrant. If the student confuses Reason with Evidence, point out the exact gap.
 - If the user attacks your position, check whether they named the actual flaw or only disagreed with the conclusion.
@@ -826,7 +956,13 @@ Return ONLY valid JSON:
   "argument": "Your current phase response as the opponent. For final AI statement, give a concise final comment and do not request another user response. For AI opening, include your Claim, Reason, Evidence, why, and importance. For feedback, give concise educational feedback. Otherwise include a direct rebuttal and one concrete pressure test.",
   "question": "Exactly one focused question for the user's next turn, or empty string for final AI statement.",
   "nextTask": "One short Korean imperative telling the user which debate skill to practice next, or '최종 평가를 확인하세요.' for final AI statement.",
-  "turnFeedback": "A 1-sentence Korean feedback evaluating the user's latest message based on the required skill for the current phase (e.g. '주장과 근거가 명확하게 제시되었습니다.' or '주장은 좋으나 구체적인 근거가 부족합니다.').",
+  "turnFeedback": "Concise Korean phase-specific feedback. Name the required skill, one exact strength or gap in the user's latest message, and one concrete repair. Do not give generic praise.",
+  "turnFeedbackDetail": {
+    "phaseGoal": "One short Korean sentence explaining what the user must accomplish in this exact phase.",
+    "completed": "One observed thing the user did correctly. If nothing was completed, say so plainly.",
+    "missing": "The single most important missing, vague, or logically unsupported part. Name the exact Claim, Reason, Evidence, premise, question target, or comparison that needs work.",
+    "nextAction": "One concrete Korean imperative for the user's next revision or next turn."
+  },
   "turnXp": 0 // Evaluate the user's latest message from 10 to 50 XP based on how well they completed the current phase's task.
 }
 `;
@@ -849,6 +985,7 @@ Return ONLY valid JSON:
       question: getStringField(parsed.question, ''),
       nextTask: getStringField(parsed.nextTask, '다음 발언을 구조화해서 작성하세요.'),
       turnFeedback: getStringField(parsed.turnFeedback, '잘 진행하고 있습니다.'),
+      turnFeedbackDetail: getFeedbackDetail(parsed.turnFeedbackDetail),
       turnXp: typeof parsed.turnXp === 'number' ? parsed.turnXp : 20,
     };
   } catch (error: unknown) {
@@ -926,6 +1063,9 @@ ${debateLevel === 'beginner'
 - 프레이밍 능력: 문제를 새로운 관점에서 바라보고 논쟁의 기준을 재설정했는가?
   → 평가 근거: [논제 설계] 단계에서 논제 초점·승패 기준 설계의 독창성과 전략성 평가`}
 Each feedback item must mention one observed behavior from the debate and one concrete next training move.
+Also provide phase coaching for every user phase that appears in the debate history. Use the exact phase title from the history. Do not invent a phase that the user did not complete.
+For each phase, identify one observed behavior, the most useful strength, the single most important missing or weak element for that phase, and one immediately actionable revision or drill. Do not use generic advice; refer to the actual Claim, Reason, Evidence, question, premise, rebuttal target, or comparison used by the user.
+The JSON must include a "phaseCoaching" array. Every item must contain string fields: "phase", "observed", "strength", "improvement", and "nextAction".
 Return ONLY valid JSON:
 {
   "overallFeedback": "총평 및 다음 훈련 조언 (한국어, 3-4문장)",
@@ -956,6 +1096,7 @@ Return ONLY valid JSON:
       report = {
         overallFeedback: typeof parsed.overallFeedback === 'string' ? parsed.overallFeedback : '토론 분석이 완료되었습니다.',
         categories: Array.isArray(parsed.categories) ? parsed.categories as any[] : [],
+        phaseCoaching: getPhaseCoaching(parsed.phaseCoaching),
         totalScore: typeof parsed.totalScore === 'number' ? parsed.totalScore : 0,
         xpEarned: 0,
       };

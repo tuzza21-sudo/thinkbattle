@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import type { FinalReport, Player } from '../types';
-import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2 } from 'lucide-react';
+import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2, BookOpen } from 'lucide-react';
+import { downloadReportImage, isKakaoShareConfigured, shareReportToKakao } from '../lib/reportShare';
 
 interface ResultModalProps {
   report: FinalReport | null;
+  topic: string;
   playerA: Player;
   playerB: Player;
   debateArguments?: import('../types').Argument[];
   onClose: () => void;
   onStartEnglishReplay?: () => void;
+  onShareReport?: () => Promise<string>;
 }
 
 const getScoreGrade = (score: number, maxScore: number) => {
@@ -70,8 +73,9 @@ const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: num
   );
 };
 
-export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playerB, debateArguments, onClose, onStartEnglishReplay }) => {
+export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA, playerB, debateArguments, onClose, onStartEnglishReplay, onShareReport }) => {
   const [animReady, setAnimReady] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setAnimReady(true), 100);
@@ -94,6 +98,41 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
   const totalPct = Math.round((report.totalScore / totalMax) * 100);
   const grade = getScoreGrade(report.totalScore, totalMax);
   const missionXp = report.categories.reduce((acc, cat) => acc + (cat.xpEarned || 0), 0);
+
+  const getShareUrl = async () => {
+    setIsSharing(true);
+    try {
+      return onShareReport ? await onShareReport() : window.location.origin;
+    } catch (error) {
+      console.error('Report share error:', error);
+      alert('공유 링크를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      return undefined;
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const url = await getShareUrl();
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    alert('로그인 없이 볼 수 있는 공개 보고서 링크를 복사했습니다.');
+  };
+
+  const handleKakaoShare = async () => {
+    const url = await getShareUrl();
+    if (!url) return;
+    try {
+      await shareReportToKakao({
+        title: 'ThinkFit 토론 결과',
+        description: `${playerA.name}의 논리력 점수: ${report.totalScore} / ${totalMax}`,
+        url,
+      });
+    } catch (error) {
+      console.error('Kakao share error:', error);
+      alert('카카오톡 공유 설정을 확인해 주세요.');
+    }
+  };
 
   return (
     <div className="modal-overlay">
@@ -159,6 +198,27 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
             </div>
           </section>
 
+          {report.phaseCoaching && report.phaseCoaching.length > 0 && (
+            <section className="report-section">
+              <h3 className="report-section-title">
+                <BookOpen size={18} /> 국면별 보완 코칭
+              </h3>
+              <div className="report-categories-list">
+                {report.phaseCoaching.map((coaching, index) => (
+                  <article key={`${coaching.phase}-${index}`} className="report-category-card" style={{ padding: '1rem' }}>
+                    <strong className="report-cat-name">{coaching.phase}</strong>
+                    <div style={{ display: 'grid', gap: '0.6rem', marginTop: '0.8rem', lineHeight: 1.55, fontSize: '0.92rem' }}>
+                      <div><strong style={{ color: 'var(--text-muted)' }}>관찰</strong><br />{coaching.observed}</div>
+                      <div><strong style={{ color: 'var(--secondary)' }}>잘한 점</strong><br />{coaching.strength}</div>
+                      <div><strong style={{ color: 'var(--accent-amber)' }}>보완할 점</strong><br />{coaching.improvement}</div>
+                      <div><strong style={{ color: 'var(--primary)' }}>다음 훈련</strong><br />{coaching.nextAction}</div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* XP Breakdown */}
           <section className="report-xp-section">
             <div className="report-xp-card">
@@ -211,18 +271,14 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, playerA, playe
 
         {/* --- Footer Actions --- */}
         <div className="report-footer">
-          <button 
-            className="btn btn-secondary report-footer-btn" 
-            onClick={() => {
-              const shareText = `[ThinkFit 사고력 피트니스]\n내 논리력 점수는 ${report.totalScore} / ${totalMax}점!\n지금 바로 내 논리력을 테스트해보세요.\n${window.location.origin}`;
-              if (navigator.share) {
-                navigator.share({ title: 'ThinkFit 토론 결과', text: shareText, url: window.location.origin }).catch(console.error);
-              } else {
-                navigator.clipboard.writeText(shareText).then(() => alert('결과가 클립보드에 복사되었습니다.')).catch(console.error);
-              }
-            }}
-          >
-            <Share2 size={20} /> 결과 공유
+          <button className="btn btn-secondary report-footer-btn" onClick={() => void handleCopyLink()} disabled={isSharing}>
+            <Share2 size={20} /> 링크 복사
+          </button>
+          <button className="btn btn-secondary report-footer-btn" onClick={() => void handleKakaoShare()} disabled={isSharing || !isKakaoShareConfigured()} title={!isKakaoShareConfigured() ? '카카오 JavaScript 키 설정 후 사용할 수 있습니다.' : undefined}>
+            카카오톡
+          </button>
+          <button className="btn btn-secondary report-footer-btn" onClick={() => void downloadReportImage({ topic, score: report.totalScore, maxScore: totalMax, grade: grade.label })}>
+            인스타용 이미지
           </button>
           {onStartEnglishReplay && (
             <button className="btn btn-secondary report-footer-btn" onClick={onStartEnglishReplay}>

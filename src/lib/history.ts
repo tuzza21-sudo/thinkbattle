@@ -1,6 +1,24 @@
 import { supabase } from './supabase';
 import type { DebateRecord, EnglishRephraseEntry } from '../types';
 
+const mapDebateRecord = (row: any): DebateRecord => ({
+  id: row.id,
+  shareId: row.share_id ?? undefined,
+  userId: row.user_id ?? '',
+  topic: row.topic,
+  matchType: row.game_mode === 'debate' ? '정식 토론' : '친선전',
+  gameMode: row.game_mode,
+  userPosition: row.user_position,
+  aiPosition: row.user_position === 'affirmative' ? 'negative' : 'affirmative',
+  debateLevel: row.debate_level,
+  debateFocus: row.debate_focus,
+  durationSeconds: row.time_limit || 0,
+  completedAt: row.created_at,
+  arguments: row.arguments || [],
+  report: row.final_report?.report || row.final_report,
+  englishRephrases: row.final_report?.englishRephrases || [],
+});
+
 export const getDebateRecords = async (userId: string): Promise<DebateRecord[]> => {
   const { data, error } = await supabase
     .from('debate_records')
@@ -13,22 +31,36 @@ export const getDebateRecords = async (userId: string): Promise<DebateRecord[]> 
     return [];
   }
 
-  return data.map((row: any) => ({
-    id: row.id,
-    userId: row.user_id,
-    topic: row.topic,
-    matchType: row.game_mode === 'debate' ? '정식 토론' : '친선전',
-    gameMode: row.game_mode,
-    userPosition: row.user_position,
-    aiPosition: row.user_position === 'affirmative' ? 'negative' : 'affirmative',
-    debateLevel: row.debate_level,
-    debateFocus: row.debate_focus,
-    durationSeconds: row.time_limit || 0,
-    completedAt: row.created_at,
-    arguments: row.arguments || [],
-    report: row.final_report?.report || row.final_report,
-    englishRephrases: row.final_report?.englishRephrases || [],
-  }));
+  return data.map(mapDebateRecord);
+};
+
+export const createReportShareLink = async (userId: string, recordId: string, existingShareId?: string): Promise<string> => {
+  const shareId = existingShareId ?? crypto.randomUUID();
+  const { data, error } = await supabase
+    .from('debate_records')
+    .update({ share_id: shareId })
+    .eq('id', recordId)
+    .eq('user_id', userId)
+    .select('share_id')
+    .single();
+
+  if (error || !data?.share_id) {
+    console.error('Failed to create report share link:', error);
+    throw error ?? new Error('공유 링크를 만들지 못했습니다.');
+  }
+
+  return `${window.location.origin}/report/${data.share_id}`;
+};
+
+export const getSharedDebateRecord = async (shareId: string): Promise<DebateRecord | undefined> => {
+  const { data, error } = await supabase.rpc('get_shared_debate_record', { p_share_id: shareId });
+
+  if (error || !data) {
+    console.error('Failed to load shared debate record:', error);
+    return undefined;
+  }
+
+  return mapDebateRecord(data);
 };
 
 export const saveDebateRecord = async (record: DebateRecord) => {
@@ -99,6 +131,7 @@ export const saveEnglishRephraseEntry = async (
   // Return formatted record
   return {
     id: currentRecord.id,
+    shareId: currentRecord.share_id ?? undefined,
     userId: currentRecord.user_id,
     topic: currentRecord.topic,
     matchType: currentRecord.game_mode === 'debate' ? '정식 토론' : '친선전',

@@ -57,6 +57,14 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, is
                   )}
                 </div>
                 <div style={{ color: 'var(--text-light)', fontSize: '0.95rem' }}>{argument.turnFeedback}</div>
+                {argument.turnFeedbackDetail && (
+                  <div style={{ display: 'grid', gap: '0.45rem', marginTop: '0.75rem', fontSize: '0.88rem', lineHeight: 1.55 }}>
+                    <div><strong style={{ color: 'var(--primary)' }}>이번 단계 목표</strong><br />{argument.turnFeedbackDetail.phaseGoal}</div>
+                    <div><strong style={{ color: 'var(--secondary)' }}>잘한 점</strong><br />{argument.turnFeedbackDetail.completed}</div>
+                    <div><strong style={{ color: 'var(--accent-amber)' }}>보완할 점</strong><br />{argument.turnFeedbackDetail.missing}</div>
+                    <div><strong>다음 행동</strong><br />{argument.turnFeedbackDetail.nextAction}</div>
+                  </div>
+                )}
               </div>
             )}
             {argument.aiQuestion && (

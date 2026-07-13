@@ -24,7 +24,7 @@ import {
   getPositionLabel,
   personaDebateStep,
 } from '../lib/debateEngine';
-import { saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
+import { createReportShareLink, saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
 import { getPlayerFromStats } from '../lib/userStats';
 import type { AppUser, Argument, BattleConfig, BattleState, DebateFocus, DebatePosition, DebateStep, EnglishRephraseEntry, FinalReport, Player } from '../types';
 
@@ -715,6 +715,14 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     saveEnglishRephraseEntry(user.id, savedRecordIdRef.current, entry);
   }, [user]);
 
+  const handleShareReport = useCallback(async () => {
+    if (!user || !savedRecordIdRef.current) {
+      throw new Error('토론 기록 저장이 완료된 뒤 공유할 수 있습니다.');
+    }
+
+    return createReportShareLink(user.id, savedRecordIdRef.current);
+  }, [user]);
+
   useEffect(() => {
     if (!battleState.isFinished || battleState.timeRemaining > 0 || showResultModal || finalReport || isEnglishReplayMode) return;
 
@@ -771,11 +779,13 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         {showResultModal && (
           <ResultModal
             report={finalReport}
+            topic={battleState.topic}
             playerA={battleState.playerA}
             playerB={battleState.playerB}
             debateArguments={battleState.arguments}
             onClose={() => navigate('/')}
             onStartEnglishReplay={() => setShowResultModal(false)}
+            onShareReport={handleShareReport}
           />
         )}
       </div>
@@ -819,6 +829,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           sessionRemainingSeconds,
           battleState.debateLevel,
           battleState.debateFocus,
+          activeStep.id,
         );
         const aiArg: Argument = {
           id: createArgumentId(),
@@ -829,6 +840,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           nextTask: '최종 평가를 확인하세요.',
           turnXp: aiRes.turnXp,
           turnFeedback: aiRes.turnFeedback,
+          turnFeedbackDetail: aiRes.turnFeedbackDetail,
           timestamp: getTimestamp(),
           roundId: activeStep.roundId,
           roundTitle: 'AI 최종 발언',
@@ -899,6 +911,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         sessionRemainingSeconds,
         battleState.debateLevel,
         battleState.debateFocus,
+        activeStep.id,
       );
 
       const nextStep = debateStepList[newArgs.filter(argument => !argument.isAi).length];
@@ -913,6 +926,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         nextTask: nextStep ? nextStep.instruction : '최종 평가를 확인하세요.',
         turnXp: aiRes.turnXp,
         turnFeedback: aiRes.turnFeedback,
+        turnFeedbackDetail: aiRes.turnFeedbackDetail,
         timestamp: getTimestamp(),
         roundId: activeStep.roundId,
         roundTitle: getAiResponseRoundTitle(activeStep),
@@ -1340,6 +1354,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
       {showResultModal && (
         <ResultModal
           report={finalReport}
+          topic={battleState.topic}
           playerA={battleState.playerA}
           playerB={battleState.playerB}
           debateArguments={battleState.arguments}
@@ -1348,6 +1363,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             setShowResultModal(false);
             setIsEnglishReplayMode(true);
           }}
+          onShareReport={handleShareReport}
         />
       )}
     </div>

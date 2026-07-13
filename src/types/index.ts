@@ -72,6 +72,12 @@ export type Argument = {
   aiLesson?: string;
   turnXp?: number;
   turnFeedback?: string;
+  turnFeedbackDetail?: {
+    phaseGoal: string;
+    completed: string;
+    missing: string;
+    nextAction: string;
+  };
 };
 
 export type ScoreCategory = {
@@ -103,8 +109,17 @@ export type BattleState = {
 export type FinalReport = {
   overallFeedback: string;
   categories: ScoreCategory[];
+  phaseCoaching?: PhaseCoaching[];
   totalScore: number;
   xpEarned: number;
+};
+
+export type PhaseCoaching = {
+  phase: string;
+  observed: string;
+  strength: string;
+  improvement: string;
+  nextAction: string;
 };
 
 export type EnglishRephraseFeedback = {
@@ -126,6 +141,7 @@ export type EnglishRephraseEntry = {
 
 export type DebateRecord = {
   id: string;
+  shareId?: string;
   userId: string;
   topic: string;
   matchType: string;

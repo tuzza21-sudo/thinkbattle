@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BarChart2, BookOpen, Clock, FileText, Languages, Trash2, Share2 } from 'lucide-react';
-import { getDebateRecords, saveEnglishRephraseEntry, deleteDebateRecord } from '../lib/history';
+import { createReportShareLink, getDebateRecords, saveEnglishRephraseEntry, deleteDebateRecord } from '../lib/history';
 import { EnglishRephrasePanel } from './EnglishRephrasePanel';
 import type { AppUser, DebateRecord, EnglishRephraseEntry } from '../types';
 
@@ -85,21 +85,15 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
     }
   };
 
-  const handleShare = (record: DebateRecord) => {
-    const score = record.report.totalScore;
-    const maxScore = record.report.categories.reduce((acc, cat) => acc + (cat.maxScore || 100), 0) || 100;
-    const shareText = `[ThinkFit 사고력 피트니스]\n주제: ${record.topic}\n내 논리력 점수는 ${score} / ${maxScore}점!\n지금 바로 내 논리력을 테스트해보세요.\n${window.location.origin}`;
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'ThinkFit 토론 결과',
-        text: shareText,
-        url: window.location.origin,
-      }).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(shareText)
-        .then(() => alert('결과가 클립보드에 복사되었습니다. 카카오톡이나 SNS에 공유해보세요!'))
-        .catch(console.error);
+  const handleShare = async (record: DebateRecord) => {
+    if (!user) return;
+    try {
+      const url = await createReportShareLink(user.id, record.id, record.shareId);
+      await navigator.clipboard.writeText(url);
+      alert('로그인 없이 볼 수 있는 공개 보고서 링크를 복사했습니다.');
+    } catch (error) {
+      console.error('Report share error:', error);
+      alert('공유 링크를 만들지 못했습니다. Supabase 공유 SQL이 적용되었는지 확인해 주세요.');
     }
   };
 
@@ -204,7 +198,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                     최종 보고서
                   </span>
                   <h2>{selectedRecord.topic}</h2>
-                  <button className="btn btn-secondary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} onClick={() => handleShare(selectedRecord)}>
+                  <button className="btn btn-secondary" style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} onClick={() => void handleShare(selectedRecord)}>
                     <Share2 size={14} style={{ marginRight: '0.3rem' }} /> 결과 공유하기
                   </button>
                 </div>
@@ -232,6 +226,23 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                   ))}
                 </div>
               </div>
+
+              {selectedRecord.report.phaseCoaching && selectedRecord.report.phaseCoaching.length > 0 && (
+                <div className="report-panel">
+                  <h3><BookOpen size={18} /> 국면별 보완 코칭</h3>
+                  <div className="flex flex-col gap-3">
+                    {selectedRecord.report.phaseCoaching.map((coaching, index) => (
+                      <div key={`${coaching.phase}-${index}`} className="history-category">
+                        <strong>{coaching.phase}</strong>
+                        <p><b>관찰:</b> {coaching.observed}</p>
+                        <p><b>잘한 점:</b> {coaching.strength}</p>
+                        <p><b>보완할 점:</b> {coaching.improvement}</p>
+                        <p><b>다음 훈련:</b> {coaching.nextAction}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="report-panel">
                 <h3><FileText size={18} /> 발언 기록</h3>
