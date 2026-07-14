@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import { LandingPage } from './components/LandingPage';
 import { Arena } from './components/Arena';
 import { AuthModal } from './components/AuthModal';
 import { HistoryPage } from './components/HistoryPage';
 import { AboutPage } from './components/AboutPage';
 import { SharedReportPage } from './components/SharedReportPage';
+import { ArgumentLibraryPage } from './components/ArgumentLibraryPage';
 import { getCurrentUser, signOut } from './lib/auth';
 import type { AppUser } from './types';
 
@@ -52,9 +53,10 @@ function App() {
             />
           )}
         />
-        <Route path="/battle/new" element={<Arena user={user} onLoginRequest={() => setShowAuthModal(true)} />} />
+        <Route path="/battle/new" element={user ? <Arena user={user} onLoginRequest={() => setShowAuthModal(true)} /> : <Navigate to="/" replace />} />
         <Route path="/history" element={<HistoryPage user={user} onLoginRequest={() => setShowAuthModal(true)} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
+        <Route path="/argument-library" element={<ArgumentLibraryPage />} />
         <Route path="/about" element={<AboutPage />} />
       </Routes>
 

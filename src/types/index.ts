@@ -214,3 +214,14 @@ export type TopicOpinionStats = {
   affirmativeCount: number;
   negativeCount: number;
 };
+
+export type PublicArgument = {
+  id: string;
+  topic: string;
+  position: DebatePosition;
+  claim: string;
+  reason: string;
+  evidence: string;
+  anonymousName: string;
+  createdAt: string;
+};

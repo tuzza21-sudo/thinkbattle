@@ -179,6 +179,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   }, [user, userStats]);
 
   const handleStartBattle = (config: BattleConfig, position: DebatePosition = userPosition) => {
+    if (!user) {
+      onLoginRequest();
+      return;
+    }
     navigate('/battle/new', {
       state: {
         ...config,
@@ -367,7 +371,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             <button
               className="btn btn-secondary"
               style={{ padding: '0.8rem 1.2rem', fontSize: '0.95rem' }}
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => user ? setShowCreateModal(true) : onLoginRequest()}
             >
               <Swords size={18} /> 직접 개설
             </button>

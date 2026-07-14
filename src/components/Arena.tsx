@@ -25,6 +25,7 @@ import {
   personaDebateStep,
 } from '../lib/debateEngine';
 import { createReportShareLink, saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
+import { publishArgument, unpublishArgument } from '../lib/argumentLibrary';
 import { getPlayerFromStats } from '../lib/userStats';
 import type { AppUser, Argument, BattleConfig, BattleState, DebateFocus, DebatePosition, DebateStep, EnglishRephraseEntry, FinalReport, Player } from '../types';
 
@@ -723,6 +724,21 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     return createReportShareLink(user.id, savedRecordIdRef.current);
   }, [user]);
 
+  const handleSetArgumentPublic = useCallback(async (isPublic: boolean) => {
+    if (!user || !savedRecordIdRef.current) throw new Error('토론 기록 저장이 완료된 뒤 공개할 수 있습니다.');
+    if (isPublic) {
+      await publishArgument({
+        recordId: savedRecordIdRef.current,
+        userId: user.id,
+        topic: battleState.topic,
+        position: battleState.userPosition ?? 'affirmative',
+        argumentsList: battleState.arguments,
+      });
+      return;
+    }
+    await unpublishArgument(savedRecordIdRef.current, user.id);
+  }, [battleState.arguments, battleState.topic, battleState.userPosition, user]);
+
   useEffect(() => {
     if (!battleState.isFinished || battleState.timeRemaining > 0 || showResultModal || finalReport || isEnglishReplayMode) return;
 
@@ -786,6 +802,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             onClose={() => navigate('/')}
             onStartEnglishReplay={() => setShowResultModal(false)}
             onShareReport={handleShareReport}
+            onSetArgumentPublic={user ? handleSetArgumentPublic : undefined}
           />
         )}
       </div>
@@ -1364,6 +1381,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             setIsEnglishReplayMode(true);
           }}
           onShareReport={handleShareReport}
+          onSetArgumentPublic={user ? handleSetArgumentPublic : undefined}
         />
       )}
     </div>

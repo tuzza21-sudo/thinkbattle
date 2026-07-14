@@ -12,6 +12,7 @@ interface ResultModalProps {
   onClose: () => void;
   onStartEnglishReplay?: () => void;
   onShareReport?: () => Promise<string>;
+  onSetArgumentPublic?: (isPublic: boolean) => Promise<void>;
 }
 
 const getScoreGrade = (score: number, maxScore: number) => {
@@ -73,9 +74,11 @@ const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: num
   );
 };
 
-export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA, playerB, debateArguments, onClose, onStartEnglishReplay, onShareReport }) => {
+export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA, playerB, debateArguments, onClose, onStartEnglishReplay, onShareReport, onSetArgumentPublic }) => {
   const [animReady, setAnimReady] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isArgumentPublic, setIsArgumentPublic] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setAnimReady(true), 100);
@@ -156,6 +159,20 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
     } catch (error) {
       console.error('SNS summary image error:', error);
       alert('SNS 요약 이미지를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  };
+
+  const handleArgumentVisibility = async (nextValue: boolean) => {
+    if (!onSetArgumentPublic) return;
+    setIsPublishing(true);
+    try {
+      await onSetArgumentPublic(nextValue);
+      setIsArgumentPublic(nextValue);
+    } catch (error) {
+      console.error('Argument publication error:', error);
+      alert('공개 설정을 저장하지 못했습니다. 데이터베이스 설정을 확인해 주세요.');
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -285,6 +302,16 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
                   );
                 })}
               </div>
+            </section>
+          )}
+          {onSetArgumentPublic && (
+            <section className="report-section" style={{ marginTop: '1rem' }}>
+              <h3 className="report-section-title"><Share2 size={18} /> 익명 논증 아카이브</h3>
+              <p className="report-transcript-description">입론의 주장·이유·근거만 익명으로 공개됩니다. 원문 발언과 이름은 공개되지 않으며, 언제든 공개를 철회할 수 있습니다.</p>
+              <button className={`btn ${isArgumentPublic ? 'btn-secondary' : 'btn-primary'}`} disabled={isPublishing} onClick={() => void handleArgumentVisibility(!isArgumentPublic)}>
+                {isPublishing ? '저장 중...' : isArgumentPublic ? '공개 철회' : '익명으로 공개하기'}
+              </button>
+              <a href="/argument-library" style={{ marginLeft: '0.9rem', color: 'var(--primary)', fontWeight: 800 }}>공개 논증 둘러보기</a>
             </section>
           )}
         </div>
