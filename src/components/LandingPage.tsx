@@ -33,7 +33,9 @@ import { ProfileModal } from './ProfileModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
 import { calculateUserStats } from '../lib/userStats';
 import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
-import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, TopicOpinionStats, WeeklyIssue } from '../types';
+import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, OrganizationTopic, TopicOpinionStats, WeeklyIssue } from '../types';
+import { SUPER_ADMIN_EMAIL } from '../lib/superAdmin';
+import { getMyOrganizationTopics } from '../lib/admin';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -72,6 +74,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [communityTopicTitle, setCommunityTopicTitle] = useState('');
   const [opinionStatsCache, setOpinionStatsCache] = useState<Record<string, TopicOpinionStats>>({});
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
+  const [organizationTopics, setOrganizationTopics] = useState<OrganizationTopic[]>([]);
 
   const [userStats, setUserStats] = useState<any>(null);
 
@@ -81,6 +84,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
     } else {
       setUserStats(null);
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setOrganizationTopics([]); return; }
+    getMyOrganizationTopics().then(setOrganizationTopics);
   }, [user]);
 
   // Load opinion stats for all topics
@@ -251,6 +259,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             )}
             {user ? (
               <div className="flex items-center gap-3">
+                {user.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
+                  <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/super-admin')}>
+                    <Shield size={18} /> 슈퍼 관리
+                  </button>
+                )}
+                {user.email.toLowerCase() === SUPER_ADMIN_EMAIL && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/admin')}>
+                  <Shield size={18} /> 기관 관리
+                </button>}
                 <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
                   <FileText size={18} /> 기록
                 </button>
@@ -837,7 +853,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
       )}
 
-      {showCreateModal && <CreateBattleModal onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} />}
+      {showCreateModal && <CreateBattleModal onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} organizationTopics={organizationTopics} />}
 
       {showProfileModal && user && (
         <ProfileModal 

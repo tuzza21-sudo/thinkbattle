@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Clock, Layers3, Scale, X } from 'lucide-react';
-import type { BattleConfig, DebateLevel, DebatePosition } from '../types';
+import type { BattleConfig, DebateLevel, DebatePosition, OrganizationTopic } from '../types';
 
 interface CreateBattleModalProps {
   onClose: () => void;
   onStart: (config: BattleConfig) => void;
+  organizationTopics?: OrganizationTopic[];
 }
 
-export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, onStart }) => {
+export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, onStart, organizationTopics = [] }) => {
   const [topic, setTopic] = useState('');
   const [timeLimit, setTimeLimit] = useState<number>(600);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
@@ -136,6 +137,10 @@ export const CreateBattleModal: React.FC<CreateBattleModalProps> = ({ onClose, o
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>토론 주제</label>
+            {organizationTopics.length > 0 && <select className="input-field" style={{ width: '100%', marginBottom: '1rem' }} value="" onChange={event => { const selected = organizationTopics.find(item => item.id === event.target.value); if (selected) setTopic(selected.title); }}>
+              <option value="">기관 지정 주제를 선택하세요</option>
+              {organizationTopics.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+            </select>}
             <input
               type="text"
               className="input-textarea"

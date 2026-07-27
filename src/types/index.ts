@@ -80,6 +80,82 @@ export type Argument = {
   };
 };
 
+export type OrganizationRole = 'owner' | 'admin' | 'coach';
+
+export type OrganizationSummary = {
+  id: string;
+  name: string;
+  role: OrganizationRole;
+};
+
+export type OrganizationUser = {
+  id: string;
+  nickname: string;
+  email: string;
+};
+
+export type OrganizationTopic = {
+  id: string;
+  title: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type OrganizationStudentRecord = {
+  id: string;
+  topic: string;
+  debateLevel: string;
+  completedAt: string;
+  totalScore: number;
+};
+
+export type AdminStudent = {
+  id: string;
+  nickname: string;
+  email: string;
+  groups: string[];
+  debateCount: number;
+  averageScore: number;
+  lastActivity: string | null;
+  levelCounts: Record<string, number>;
+};
+
+export type AdminGroup = {
+  id: string;
+  name: string;
+  studentCount: number;
+  debateCount: number;
+  averageScore: number;
+};
+
+export type AdminDashboard = {
+  organization: OrganizationSummary;
+  students: AdminStudent[];
+  groups: AdminGroup[];
+  categoryAverages: Record<string, number>;
+};
+
+export type SuperAdminRecord = {
+  id: string;
+  topic: string;
+  userId: string;
+  nickname: string;
+  email: string;
+  debateLevel: DebateLevel;
+  completedAt: string;
+  totalScore: number;
+  report: FinalReport;
+  arguments: Argument[];
+};
+
+export type SuperAdminDashboard = {
+  totalUsers: number;
+  totalRecords: number;
+  activeUsers: number;
+  records: SuperAdminRecord[];
+};
+
 export type ScoreCategory = {
   name: string; // e.g., "Claim 명확성", "Reason 연결성", "Evidence 적합성"
   score: number;

@@ -7,6 +7,9 @@ import { HistoryPage } from './components/HistoryPage';
 import { AboutPage } from './components/AboutPage';
 import { SharedReportPage } from './components/SharedReportPage';
 import { ArgumentLibraryPage } from './components/ArgumentLibraryPage';
+import { AdminDashboard } from './components/AdminDashboard';
+import { SuperAdminDashboard } from './components/SuperAdminDashboard';
+import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
 import { getCurrentUser, signOut } from './lib/auth';
 import type { AppUser } from './types';
 
@@ -58,6 +61,8 @@ function App() {
         <Route path="/report/:shareId" element={<SharedReportPage />} />
         <Route path="/argument-library" element={<ArgumentLibraryPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/" replace />} />
+        <Route path="/super-admin" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <SuperAdminDashboard /> : <Navigate to="/" replace />} />
       </Routes>
 
       {showAuthModal && (

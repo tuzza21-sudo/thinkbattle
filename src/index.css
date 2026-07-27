@@ -2042,6 +2042,139 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.6;
 }
 
+/* Institution administration: keep controls visually consistent with the dark app shell. */
+.admin-shell {
+  --admin-surface: rgba(15, 23, 42, 0.9);
+  --admin-control: rgba(11, 18, 32, 0.92);
+  --admin-control-border: rgba(71, 85, 105, 0.82);
+}
+
+.admin-shell .card {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.78), var(--admin-surface));
+  border-color: rgba(71, 85, 105, 0.48);
+}
+
+.admin-shell input.input-field,
+.admin-shell select.input-field,
+.admin-shell textarea.input-textarea {
+  box-sizing: border-box;
+  min-height: 46px;
+  color: var(--text-light);
+  background: var(--admin-control);
+  border: 1px solid var(--admin-control-border);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.admin-shell select.input-field {
+  min-width: 210px;
+  padding: 0 .9rem;
+  color-scheme: dark;
+}
+
+.admin-shell textarea.input-textarea {
+  padding: .8rem .9rem;
+  line-height: 1.55;
+}
+
+.admin-shell input.input-field:focus,
+.admin-shell select.input-field:focus,
+.admin-shell textarea.input-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.admin-shell input::placeholder,
+.admin-shell textarea::placeholder { color: #94a3b8; opacity: 1; }
+
+.admin-shell aside.card {
+  padding: .65rem;
+  align-self: start;
+  position: sticky;
+  top: 1rem;
+}
+
+.admin-shell aside.card .btn { min-height: 44px; padding: .7rem .8rem; }
+
+@media (max-width: 720px) {
+  .admin-shell > div[style*='grid-template-columns'] { grid-template-columns: 1fr !important; }
+  .admin-shell aside.card { position: static; display: flex; overflow-x: auto; gap: .35rem; }
+  .admin-shell aside.card .btn { flex: 0 0 auto; margin-bottom: 0 !important; }
+  .admin-shell select.input-field { width: 100%; min-width: 0; }
+}
+
+.admin-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.admin-header h1, .admin-content h2 { margin: 0; line-height: 1.25; }
+.admin-header-actions { display: flex; align-items: center; gap: .55rem; }
+.admin-eyebrow { margin: .9rem 0 .25rem; color: var(--primary); font-size: .9rem; font-weight: 800; letter-spacing: .02em; }
+.admin-workspace { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 1.25rem; align-items: stretch; }
+.admin-sidebar {
+  padding: .7rem;
+  align-self: stretch !important;
+  min-height: 620px;
+}
+.admin-sidebar .btn {
+  min-height: 46px;
+  margin-bottom: .35rem;
+  color: var(--text-muted);
+  background: transparent !important;
+  border: 1px solid transparent;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: none;
+}
+.admin-sidebar .btn:hover {
+  color: var(--text-light);
+  background: rgba(148, 163, 184, .08) !important;
+  border-color: rgba(148, 163, 184, .15);
+  transform: none;
+}
+.admin-sidebar .btn.active {
+  color: #dbeafe;
+  background: linear-gradient(90deg, rgba(37, 99, 235, .28), rgba(37, 99, 235, .08)) !important;
+  border-color: rgba(96, 165, 250, .38);
+  box-shadow: inset 3px 0 0 var(--primary), 0 6px 18px rgba(15, 23, 42, .18);
+}
+.admin-content { min-width: 0; }
+.admin-content h2 { margin-bottom: .65rem; }
+.admin-lead { margin: 0 0 1.35rem; color: var(--text-muted); line-height: 1.65; }
+.admin-panel { padding: 1.35rem; margin-bottom: 1rem; }
+.admin-label { display: block; margin-bottom: .55rem; color: var(--text-muted); font-weight: 750; font-size: .9rem; }
+.admin-label em { font-style: normal; color: #94a3b8; font-weight: 500; }
+.admin-inline-form { display: flex; gap: .8rem; align-items: center; }
+.admin-inline-form .input-field { flex: 1; padding: 0 .95rem; font-family: inherit; }
+.admin-card-grid, .admin-metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .85rem; }
+.admin-card-grid .admin-panel { margin-bottom: 0; }
+.admin-card-grid small, .admin-metric-grid small, .admin-user-list small, .admin-student-row small, .admin-history-modal small { display: block; margin-top: .4rem; color: var(--text-muted); line-height: 1.5; }
+.admin-metric-grid strong { display: block; margin-top: .45rem; font-size: 1.7rem; }
+.admin-student-controls { display: grid; grid-template-columns: minmax(190px, .8fr) minmax(260px, 1.2fr); gap: 1rem; align-items: end; }
+.admin-student-controls .input-field { width: 100%; padding: 0 .95rem; font-family: inherit; }
+.admin-search { display: flex; align-items: center; gap: .55rem; padding-left: .85rem; background: var(--admin-control); border: 1px solid var(--admin-control-border); border-radius: 10px; }
+.admin-search:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .18); }
+.admin-search .input-field { border: 0; box-shadow: none; background: transparent; }
+.admin-search .input-field:focus { box-shadow: none; }
+.admin-user-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); gap: .65rem; max-height: 330px; overflow-y: auto; margin-top: 1.2rem; padding-right: .25rem; }
+.admin-user-list .btn { min-height: 66px; justify-content: flex-start; text-align: left; }
+.admin-student-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .95rem 0; border-bottom: 1px solid var(--border); line-height: 1.55; }
+.admin-student-row .btn { margin-left: .45rem; padding: .35rem .6rem; }
+.admin-topic-form { display: grid; gap: .65rem; }
+.admin-topic-form .input-field { padding: 0 .95rem; font-family: inherit; }
+.admin-topic-form .input-textarea { font-family: inherit; min-height: 105px; }
+.admin-history-modal { max-width: 620px; padding: 1.6rem; }
+.admin-history-modal > .icon-button { float: right; }
+.admin-history-modal h2 { margin: .2rem 0 1.2rem; padding-right: 2.5rem; }
+.admin-history-modal article { padding: .9rem 0; border-bottom: 1px solid var(--border); }
+
+@media (max-width: 720px) {
+  .admin-workspace { grid-template-columns: 1fr; }
+  .admin-sidebar { position: static !important; display: flex; min-height: 0; gap: .35rem; overflow-x: auto; }
+  .admin-sidebar .btn { flex: 0 0 auto; margin-bottom: 0; }
+  .admin-student-controls { grid-template-columns: 1fr; }
+  .admin-inline-form { align-items: stretch; flex-direction: column; }
+  .admin-student-row { align-items: flex-start; flex-direction: column; }
+}
+
 /* Public reports use a document-like, A4-inspired reading width on desktop. */
 .shared-report-page {
   padding: 2.5rem 1.5rem 4rem;
