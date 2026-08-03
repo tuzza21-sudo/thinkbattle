@@ -77,6 +77,7 @@ export type LiveDebateLobbyParticipant = {
   nickname: string;
   position?: DebatePosition;
   role?: DebateParticipantRole;
+  isAi: boolean;
   isReady: boolean;
   joinedAt: string;
 };

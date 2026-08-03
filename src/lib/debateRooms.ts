@@ -138,6 +138,7 @@ const mapParticipant = (row: Record<string, unknown>): LiveDebateLobbyParticipan
   role: ['debater', 'opening', 'rebuttal', 'closing', 'moderator'].includes(String(row.role))
     ? row.role as DebateParticipantRole
     : undefined,
+  isAi: Boolean(row.is_ai),
   isReady: Boolean(row.is_ready),
   joinedAt: String(row.joined_at || new Date().toISOString()),
 });
@@ -209,6 +210,30 @@ export const claimLobbySeat = async (
   if (data === false) throw new Error('다른 참가자가 방금 이 역할을 선택했습니다. 다른 자리를 골라 주세요.');
 };
 
+export const addLiveDebateAiParticipant = async (
+  roomId: string,
+  position: DebatePosition,
+  role: DebateParticipantRole,
+) => {
+  const { data, error } = await supabase.rpc('add_live_debate_ai_participant', {
+    target_room_id: roomId,
+    selected_position: position,
+    selected_role: role,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('AI를 배정할 빈 역할이 없습니다.');
+  return String(data);
+};
+
+export const removeLiveDebateAiParticipant = async (roomId: string, aiUserId: string) => {
+  const { data, error } = await supabase.rpc('remove_live_debate_ai_participant', {
+    target_room_id: roomId,
+    ai_user_id: aiUserId,
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error('AI 참가자를 제거하지 못했습니다.');
+};
+
 export const setLobbyReady = async (roomId: string, isReady: boolean) => {
   const { error } = await supabase
     .from('live_debate_room_participants')
@@ -274,6 +299,19 @@ export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebat
     created_at: argument.createdAt,
   });
   if (error) throw new Error(`토론 발언을 저장하지 못했습니다: ${error.message}`);
+};
+
+export const saveLiveDebateAiArgument = async (roomId: string, argument: LiveDebateArgument) => {
+  const { data, error } = await supabase.rpc('save_live_debate_ai_argument', {
+    target_room_id: roomId,
+    ai_user_id: argument.senderId,
+    argument_id: argument.id,
+    argument_content: argument.content,
+    argument_phase_id: argument.phaseId || null,
+    argument_phase_label: argument.phaseLabel || null,
+  });
+  if (error) throw new Error(`AI 발언을 저장하지 못했습니다: ${error.message}`);
+  return data !== false;
 };
 
 export const saveLiveDebateEvaluation = async (roomId: string, evaluation: LiveDebateEvaluation) => {

@@ -154,7 +154,28 @@ export const CreateBattleModal = ({
 
           {battleMode === 'pvp' && (
             <section className="setup-section">
-              <div className="setup-section-title"><span>{liveOnly ? '2' : '3'}</span><strong>토론 인원</strong></div>
+              <div className="setup-section-title"><span>{liveOnly ? '2' : '3'}</span><strong>진행 방식</strong></div>
+              <div className="setup-choice-grid two">
+                <button type="button" className={`setup-choice ${voiceEnabled ? 'selected' : ''}`} onClick={() => setVoiceEnabled(true)} aria-pressed={voiceEnabled}>
+                  <Volume2 size={22} />
+                  <strong>음성 토론</strong>
+                  <small>LiveKit 실시간 음성·마이크 전사</small>
+                  {voiceEnabled && <Check className="setup-check" size={16} />}
+                </button>
+                <button type="button" className={`setup-choice ${!voiceEnabled ? 'selected' : ''}`} onClick={() => setVoiceEnabled(false)} aria-pressed={!voiceEnabled}>
+                  <Users size={22} />
+                  <strong>텍스트 토론</strong>
+                  <small>LiveKit 없이 실시간 글로 진행</small>
+                  {!voiceEnabled && <Check className="setup-check" size={16} />}
+                </button>
+              </div>
+              <small className="setup-helper">음성 토론을 선택한 방에서만 LiveKit 사용량이 발생합니다.</small>
+            </section>
+          )}
+
+          {battleMode === 'pvp' && (
+            <section className="setup-section">
+              <div className="setup-section-title"><span>{liveOnly ? '3' : '4'}</span><strong>토론 인원</strong></div>
               <div className="setup-choice-grid three">
                 {teamOptions.map(option => (
                   <button key={option.value} type="button" className={`setup-choice ${teamSize === option.value ? 'selected' : ''}`} onClick={() => setTeamSize(option.value)}>
@@ -168,16 +189,11 @@ export const CreateBattleModal = ({
                 <span><strong>진행자 입장 허용</strong><small>팀 정원과 별도로 1명이 관찰·진행할 수 있어요.</small></span>
                 <i>{allowModerator ? '허용' : '미허용'}</i>
               </button>
-              <button type="button" className={`moderator-toggle ${voiceEnabled ? 'selected' : ''}`} onClick={() => setVoiceEnabled(value => !value)} aria-pressed={voiceEnabled}>
-                <Volume2 size={20} />
-                <span><strong>LiveKit 음성 토론</strong><small>켜면 실시간 음성과 마이크 전사를 사용합니다. 끄면 텍스트 토론으로 진행합니다.</small></span>
-                <i>{voiceEnabled ? '음성 켜짐' : '텍스트 전용'}</i>
-              </button>
             </section>
           )}
 
           <section className="setup-section">
-            <div className="setup-section-title"><span>{liveOnly ? '3' : '4'}</span><strong>토론 시간</strong></div>
+            <div className="setup-section-title"><span>{battleMode === 'pvp' ? (liveOnly ? '4' : '5') : '4'}</span><strong>토론 시간</strong></div>
             <div className="setup-choice-grid three">
               {[600, 900, 1200].map(time => (
                 <button key={time} type="button" className={`setup-choice time ${timeLimit === time ? 'selected' : ''}`} onClick={() => setTimeLimit(time)}>

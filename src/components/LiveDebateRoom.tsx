@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   BookOpen,
+  Bot,
   Check,
   CheckCircle2,
   Clock,
@@ -36,8 +37,8 @@ import { supabase } from '../lib/supabase';
 import { transcribeDebateAudio } from '../lib/transcription';
 import { formatDebateMinutes } from '../lib/debateTiming';
 import { getLiveDebateCourse, type LiveDebatePhase } from '../lib/liveDebateCourse';
-import { generateLiveDebateEvaluation } from '../lib/api';
-import { getDebateRoom, getLiveDebateArguments, getLiveDebateEvaluation, getLobbyParticipants, saveLiveDebateArgument, saveLiveDebateEvaluation } from '../lib/debateRooms';
+import { generateLiveDebateAiTurn, generateLiveDebateEvaluation } from '../lib/api';
+import { getDebateRoom, getLiveDebateArguments, getLiveDebateEvaluation, getLobbyParticipants, saveLiveDebateAiArgument, saveLiveDebateArgument, saveLiveDebateEvaluation } from '../lib/debateRooms';
 import { saveDebateRecord } from '../lib/history';
 import type { AppUser, Argument, DebateLevel, DebateParticipantRole, DebatePosition, DebateTeamSize, LiveDebateArgument, LiveDebateEvaluation, Player } from '../types';
 
@@ -73,6 +74,15 @@ type LivePacket =
     };
 
 type ConnectionView = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+
+type LiveParticipantView = {
+  id: string;
+  name: string;
+  isSpeaking: boolean;
+  position: DebatePosition;
+  role: DebateParticipantRole;
+  isAi: boolean;
+};
 
 const LIVE_DATA_TOPIC = 'thinkbattle.debate';
 const MAX_RECORDING_SECONDS = 180;
@@ -180,10 +190,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const evaluationRequestedRef = useRef(false);
   const savedEvaluationRef = useRef(false);
+  const lobbyRosterRef = useRef<LiveParticipantView[]>([]);
+  const aiPhasesRequestedRef = useRef(new Set<string>());
 
   const [connection, setConnection] = useState<ConnectionView>('connecting');
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [participants, setParticipants] = useState<{ id: string; name: string; isSpeaking: boolean; position: DebatePosition; role: DebateParticipantRole }[]>([]);
+  const [participants, setParticipants] = useState<LiveParticipantView[]>([]);
   const [argumentsList, setArgumentsList] = useState<LiveDebateArgument[]>([]);
   const [content, setContent] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -201,14 +213,37 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [topicDescription, setTopicDescription] = useState('');
+  const [isAiThinking, setIsAiThinking] = useState(false);
+
+  const mergeWithLobbyRoster = useCallback((liveParticipants: LiveParticipantView[]) => {
+    const liveById = new Map(liveParticipants.map(participant => [participant.id, participant]));
+    const rosterIds = new Set(lobbyRosterRef.current.map(participant => participant.id));
+    return [
+      ...lobbyRosterRef.current.map(participant => liveById.get(participant.id) ?? participant),
+      ...liveParticipants.filter(participant => !rosterIds.has(participant.id)),
+    ];
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void getDebateRoom(roomId).then(room => {
-      if (!cancelled && room) setTopicDescription(room.topicDescription);
+    void Promise.all([getDebateRoom(roomId), getLobbyParticipants(roomId)]).then(([room, lobbyParticipants]) => {
+      if (cancelled) return;
+      if (room) setTopicDescription(room.topicDescription);
+      const roster = lobbyParticipants
+        .filter(participant => participant.userId !== user?.id && participant.role && (participant.role === 'moderator' || participant.position))
+        .map<LiveParticipantView>(participant => ({
+          id: participant.userId,
+          name: participant.nickname,
+          isSpeaking: false,
+          position: participant.position === 'negative' ? 'negative' : 'affirmative',
+          role: participant.role as DebateParticipantRole,
+          isAi: participant.isAi,
+        }));
+      lobbyRosterRef.current = roster;
+      setParticipants(previous => mergeWithLobbyRoster(previous));
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [roomId]);
+  }, [mergeWithLobbyRoster, roomId, user?.id]);
 
   const addArguments = useCallback((incoming: LiveDebateArgument[]) => {
     setArgumentsList(previous => {
@@ -302,18 +337,6 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       },
     });
     textChannelRef.current = channel;
-    void getLobbyParticipants(roomId).then(lobbyParticipants => {
-      if (cancelled) return;
-      setParticipants(lobbyParticipants
-        .filter(participant => participant.userId !== user.id && participant.role && (participant.role === 'moderator' || participant.position))
-        .map(participant => ({
-          id: participant.userId,
-          name: participant.nickname,
-          isSpeaking: false,
-          position: participant.position === 'negative' ? 'negative' as const : 'affirmative' as const,
-          role: participant.role as DebateParticipantRole,
-        })));
-    }).catch(() => undefined);
     const refreshStoredArguments = () => {
       void getLiveDebateArguments(roomId).then(addArguments).catch(() => undefined);
     };
@@ -339,10 +362,9 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           role: item.role && ['debater', 'opening', 'rebuttal', 'closing', 'moderator'].includes(item.role)
             ? item.role
             : 'debater' as const,
+          isAi: false,
         }));
-      const expectedRemoteDebaters = teamSize * 2 - (myRole === 'moderator' ? 0 : 1);
-      const presentRemoteDebaters = nextParticipants.filter(participant => participant.role !== 'moderator').length;
-      if (presentRemoteDebaters >= expectedRemoteDebaters) setParticipants(nextParticipants);
+      setParticipants(mergeWithLobbyRoster(nextParticipants));
     };
 
     channel
@@ -392,7 +414,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       void channel.untrack();
       void supabase.removeChannel(channel);
     };
-  }, [addArguments, handleLivePacket, myPosition, myRole, roomId, teamSize, user, voiceEnabled]);
+  }, [addArguments, handleLivePacket, mergeWithLobbyRoster, myPosition, myRole, roomId, user, voiceEnabled]);
 
   useEffect(() => {
     if (!user || !roomId || !voiceEnabled) return;
@@ -405,7 +427,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     roomRef.current = room;
 
     const refreshParticipants = () => {
-      setParticipants([...room.remoteParticipants.values()].map(participant => {
+      const liveParticipants = [...room.remoteParticipants.values()].map<LiveParticipantView>(participant => {
         let metadata: { position?: DebatePosition; role?: DebateParticipantRole } = {};
         try { metadata = JSON.parse(participant.metadata || '{}') as typeof metadata; } catch { /* ignore malformed metadata */ }
         return {
@@ -414,8 +436,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           isSpeaking: participant.isSpeaking,
           position: metadata.position === 'negative' ? 'negative' : 'affirmative',
           role: ['debater', 'opening', 'rebuttal', 'closing', 'moderator'].includes(metadata.role || '') ? metadata.role as DebateParticipantRole : 'debater',
+          isAi: false,
         };
-      }));
+      });
+      setParticipants(mergeWithLobbyRoster(liveParticipants));
     };
 
     const handleTrackSubscribed = (track: RemoteTrack) => {
@@ -549,7 +573,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       void room.disconnect();
       if (roomRef.current === room) roomRef.current = null;
     };
-  }, [addArguments, allowModerator, handleLivePacket, myPosition, myRole, publishPacket, roomId, teamSize, user, voiceEnabled]);
+  }, [addArguments, allowModerator, handleLivePacket, mergeWithLobbyRoster, myPosition, myRole, publishPacket, roomId, teamSize, user, voiceEnabled]);
 
   useEffect(() => {
     if (Number.isFinite(startedAtMs)) {
@@ -627,10 +651,6 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     const room = roomRef.current;
     if (!room || room.state !== ConnectionState.Connected) {
       setSpeechError('LiveKit 연결이 완료된 뒤 마이크를 사용할 수 있습니다.');
-      return;
-    }
-    if (!allDebatersConnected) {
-      setSpeechError(`대기실 참가자들이 토론방에 연결되는 중입니다. (${connectedDebaterCount}/${requiredDebaterCount})`);
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -768,7 +788,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   };
 
   const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
-  const phaseTimings = getLiveDebateCourse(timeLimit, debateLevel);
+  const phaseTimings = useMemo(() => getLiveDebateCourse(timeLimit, debateLevel), [debateLevel, timeLimit]);
   const activePhaseIndex = phaseTimings.findIndex((_, index) => (
     elapsedSeconds < phaseTimings.slice(0, index + 1).reduce((total, phase) => total + phase.seconds, 0)
   ));
@@ -782,10 +802,14 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       position: myPosition,
       role: myRole,
       isLocal: true,
+      isAi: false,
     },
     ...participants.map(participant => ({ ...participant, isLocal: false })),
   ].filter(participant => participant.role === currentOwnerRole);
   const currentStageOwner = stageOwners.find(participant => participant.position === currentPhase.position);
+  const currentStageOwnerId = currentStageOwner?.id;
+  const currentStageOwnerName = currentStageOwner?.name;
+  const currentStageOwnerIsAi = currentStageOwner?.isAi === true;
   const targetStageOwner = currentPhase.targetPosition
     ? stageOwners.find(participant => participant.position === currentPhase.targetPosition)
     : undefined;
@@ -798,16 +822,78 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const requiredDebaterCount = teamSize * 2;
   const connectedDebaterCount = (myRole === 'moderator' ? 0 : 1)
     + participants.filter(participant => participant.role !== 'moderator').length;
-  const allDebatersConnected = connectedDebaterCount >= requiredDebaterCount;
   const composerDisabled = !isRoomReady
-    || !allDebatersConnected
     || sessionFinished
     || (myRole !== 'moderator' && !isMyStage);
-  const connectedParticipantIds = [user?.id || '', ...participants.map(participant => participant.id)].filter(Boolean);
+  const connectedParticipantIds = [
+    user?.id || '',
+    ...participants.filter(participant => !participant.isAi).map(participant => participant.id),
+  ].filter(Boolean);
   const evaluationLeaderId = connectedParticipantIds.includes(hostId)
     ? hostId
     : [...connectedParticipantIds].sort()[0];
   const isEvaluationLeader = !!user && user.id === evaluationLeaderId;
+
+  useEffect(() => {
+    if (!user || user.id !== hostId || connection !== 'connected' || sessionFinished || !currentStageOwnerIsAi || !currentStageOwnerId) return;
+    const requestKey = `${currentPhase.id}:${currentStageOwnerId}`;
+    if (argumentsRef.current.some(argument => argument.phaseId === currentPhase.id && argument.senderId === currentStageOwnerId)) {
+      aiPhasesRequestedRef.current.add(requestKey);
+      return;
+    }
+    if (aiPhasesRequestedRef.current.has(requestKey)) return;
+    aiPhasesRequestedRef.current.add(requestKey);
+    setIsAiThinking(true);
+
+    const timer = window.setTimeout(() => {
+      void generateLiveDebateAiTurn({
+        topic,
+        description: topicDescription,
+        level: debateLevel,
+        position: currentPhase.position,
+        role: currentOwnerRole,
+        phaseLabel: currentPhase.label,
+        phasePurpose: currentPhase.purpose,
+        phaseInstruction: currentPhase.instruction,
+        phaseTasks: currentPhase.tasks,
+        transcript: argumentsRef.current,
+      }).then(async generatedContent => {
+        const argument: LiveDebateArgument = {
+          id: createMessageId(),
+          senderId: currentStageOwnerId,
+          senderName: currentStageOwnerName || 'AI 토론자',
+          content: generatedContent,
+          createdAt: new Date().toISOString(),
+          source: 'text',
+          phaseId: currentPhase.id,
+          phaseLabel: currentPhase.label,
+        };
+        const saved = await saveLiveDebateAiArgument(roomId, argument);
+        if (!saved) return;
+        await publishPacket({ version: 1, type: 'argument', argument });
+        addArguments([argument]);
+      }).catch(error => {
+        setSpeechError(error instanceof Error ? error.message : 'AI 토론자의 발언을 생성하지 못했습니다.');
+      }).finally(() => setIsAiThinking(false));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [
+    addArguments,
+    connection,
+    currentOwnerRole,
+    currentPhase,
+    currentStageOwnerId,
+    currentStageOwnerIsAi,
+    currentStageOwnerName,
+    debateLevel,
+    hostId,
+    publishPacket,
+    roomId,
+    sessionFinished,
+    topic,
+    topicDescription,
+    user,
+  ]);
 
   const runEvaluation = useCallback(async () => {
     if (!user || evaluationRequestedRef.current) return;
@@ -863,14 +949,14 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const displayArguments = useMemo(() => argumentsList.map<Argument>(argument => ({
     id: argument.id,
     playerId: argument.senderId,
-    isAi: argument.senderId !== user?.id,
+    isAi: participants.some(participant => participant.id === argument.senderId && participant.isAi),
     content: argument.content,
     timestamp: new Date(argument.createdAt).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     }),
     roundTitle: argument.phaseLabel || (argument.source === 'voice' ? '음성 전사' : '텍스트 발언'),
-  })), [argumentsList, user?.id]);
+  })), [argumentsList, participants]);
 
   useEffect(() => {
     if (!evaluation || !user || savedEvaluationRef.current) return;
@@ -909,10 +995,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       name: `${name} · ${participantRole === 'moderator' ? '진행자' : `${getPositionLabel(participantPosition)} · ${getRoleLabel(participantRole)}`}`,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(argument.playerId)}`,
       level: 1,
-      rankBadge: isLocal ? '나' : '상대방',
+      rankBadge: isLocal ? '나' : remoteParticipant?.isAi ? 'AI 팀원' : '참가자',
       score: 0,
       streak: 0,
-      isAi: false,
+      isAi: remoteParticipant?.isAi ?? false,
     };
   };
 
@@ -967,12 +1053,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           </div>
           {participants.length ? participants.map(participant => (
             <div key={participant.id} className={`compact-player user ${!sessionFinished && participant.role === currentOwnerRole && participant.position === currentPhase.position ? 'responsible' : ''}`}>
-              <UserRound size={30} />
+              {participant.isAi ? <Bot size={30} /> : <UserRound size={30} />}
               <div>
                 <strong>{participant.name}</strong>
                 <span>{participant.role === 'moderator' ? '진행자' : `${getPositionLabel(participant.position)} · ${getRoleLabel(participant.role)}`}</span>
               </div>
-              {participant.isSpeaking ? <em>발언 중</em> : !sessionFinished && participant.role === currentOwnerRole && participant.position === currentPhase.position && <em>현재 담당</em>}
+              {participant.isSpeaking ? <em>발언 중</em> : !sessionFinished && participant.role === currentOwnerRole && participant.position === currentPhase.position && <em>{participant.isAi && isAiThinking ? 'AI 작성 중' : '현재 담당'}</em>}
             </div>
           )) : (
             <div className="compact-player">
@@ -983,9 +1069,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
 
         <div className={`live-connection-chip ${connection}`}>
           {voiceEnabled ? <Volume2 size={16} /> : <Radio size={16} />}
-          <span>{isRoomReady && !allDebatersConnected
-            ? `참가자 연결 중 ${connectedDebaterCount}/${requiredDebaterCount}`
-            : `${voiceEnabled ? 'LiveKit' : '텍스트 채널'} ${getConnectionLabel(connection)}`}</span>
+          <span>{voiceEnabled ? 'LiveKit' : '텍스트 채널'} {getConnectionLabel(connection)}</span>
         </div>
 
         <div className={`compact-timer ${remainingSeconds <= 60 ? 'urgent' : ''}`}>
@@ -1038,14 +1122,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             {displayArguments.length === 0 && (
               <div className="live-room-empty">
                 {voiceEnabled ? <Mic size={28} /> : <Radio size={28} />}
-                <strong>{allDebatersConnected
-                  ? `${currentPhase.label} 담당자가 발언할 차례입니다.`
-                  : `대기실 참가자를 토론방에 연결하고 있습니다. (${connectedDebaterCount}/${requiredDebaterCount})`}</strong>
-                <span>{allDebatersConnected
-                  ? voiceEnabled
-                    ? '말하는 동안 상대방에게 음성이 전달되고, 중지하면 Gemini 전사문이 양쪽 화면에 등록됩니다.'
-                    : '텍스트 발언은 Supabase 실시간 채널로 모든 참가자에게 전달되며 LiveKit 사용량에 포함되지 않습니다.'
-                  : '대기실에서 준비를 마친 참가자는 자동으로 이 화면에 연결됩니다.'}</span>
+                <strong>{isAiThinking && currentStageOwnerIsAi ? `${currentStageOwnerName || 'AI 토론자'}가 발언을 준비하고 있습니다.` : `${currentPhase.label} 담당자가 발언할 차례입니다.`}</strong>
+                <span>{voiceEnabled
+                  ? '말하는 동안 상대방에게 음성이 전달되고, 중지하면 Gemini 전사문이 양쪽 화면에 등록됩니다.'
+                  : '텍스트 발언은 Supabase 실시간 채널로 모든 참가자에게 전달되며 LiveKit 사용량에 포함되지 않습니다.'}</span>
               </div>
             )}
 
@@ -1053,15 +1133,15 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
               <ArgumentCard key={argument.id} argument={argument} player={getPlayer(argument)} />
             ))}
 
-            <div className={`input-zone ${isRoomReady && allDebatersConnected && (isMyStage || myRole === 'moderator') ? 'my-turn' : ''}`}>
+            <div className={`input-zone ${isRoomReady && (isMyStage || myRole === 'moderator') ? 'my-turn' : ''}`}>
               <div className="input-container">
                 <div className="composer-head">
                   <span>
                     <Radio size={17} />
-                    {!allDebatersConnected
-                      ? `참가자 연결 중 ${connectedDebaterCount}/${requiredDebaterCount}`
-                      : isMyStage || myRole === 'moderator'
-                        ? `내 발언 · ${currentPhase.label}`
+                    {isMyStage || myRole === 'moderator'
+                      ? `내 발언 · ${currentPhase.label}`
+                      : isAiThinking && currentStageOwnerIsAi
+                        ? `${currentStageOwnerName || 'AI 토론자'} 발언 생성 중`
                         : `${currentPhase.label} 진행 중`}
                   </span>
                   <small>{content.length}/1200</small>
@@ -1072,11 +1152,9 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                     value={content}
                     maxLength={1200}
                     disabled={composerDisabled}
-                    placeholder={!allDebatersConnected
-                      ? '대기실 참가자가 모두 연결되면 바로 발언할 수 있습니다.'
-                      : isMyStage || myRole === 'moderator'
-                        ? currentPhase.inputPlaceholder
-                        : `${getPositionLabel(currentPhase.position)}팀 담당자의 발언을 기다려 주세요.`}
+                    placeholder={isMyStage || myRole === 'moderator'
+                      ? currentPhase.inputPlaceholder
+                      : `${getPositionLabel(currentPhase.position)}팀 담당자의 발언을 기다려 주세요.`}
                     onChange={event => setContent(event.target.value)}
                     onKeyDown={event => {
                       if (event.key === 'Enter' && !event.shiftKey) {
@@ -1174,7 +1252,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             <h2>{voiceEnabled ? <Volume2 size={18} /> : <Radio size={18} />} 현재 상태</h2>
             <dl className="live-room-status-list">
               <div><dt>연결 방식</dt><dd>{voiceEnabled ? `LiveKit ${getConnectionLabel(connection)}` : `텍스트 채널 ${getConnectionLabel(connection)}`}</dd></div>
-              <div><dt>토론자 연결</dt><dd>{connectedDebaterCount} / {requiredDebaterCount}명</dd></div>
+              <div><dt>대기실 확정 명단</dt><dd>{connectedDebaterCount} / {requiredDebaterCount}명</dd></div>
               <div><dt>현재 단계</dt><dd>{currentPhase.label} · {formatDebateMinutes(currentPhase.seconds)}</dd></div>
               {voiceEnabled && <div><dt>내 마이크</dt><dd>{isSpeaking ? '송출 중' : '꺼짐'}</dd></div>}
               <div><dt>음성 모드</dt><dd>{voiceEnabled ? '사용 · 녹음 저장 안 함' : '사용 안 함 · LiveKit 미연결'}</dd></div>

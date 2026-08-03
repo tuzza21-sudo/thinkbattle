@@ -1166,6 +1166,70 @@ type LiveEvaluationArgumentInput = {
   phaseLabel?: string;
 };
 
+type LiveAiTurnInput = {
+  topic: string;
+  description?: string;
+  level: DebateLevel;
+  position: DebatePosition;
+  role: DebateParticipantRole;
+  phaseLabel: string;
+  phasePurpose?: string;
+  phaseInstruction: string;
+  phaseTasks: string[];
+  transcript: Array<Pick<LiveEvaluationArgumentInput, 'senderName' | 'content' | 'phaseLabel'>>;
+};
+
+export async function generateLiveDebateAiTurn(input: LiveAiTurnInput): Promise<string> {
+  const positionLabel = input.position === 'affirmative' ? '찬성' : '반대';
+  const roleLabel: Record<DebateParticipantRole, string> = {
+    debater: '토론자', opening: '입론 담당', rebuttal: '질의·반론 담당', closing: '최종 변론 담당', moderator: '진행자',
+  };
+  const transcript = input.transcript.slice(-30).map(item => (
+    `${item.senderName}${item.phaseLabel ? ` [${item.phaseLabel}]` : ''}: ${item.content}`
+  )).join('\n');
+  const prompt = `You are one AI member inside a live Korean team debate.
+
+Topic: ${input.topic}
+Topic background: ${input.description || '(배경 설명 없음)'}
+Difficulty: ${getDebateLevelLabel(input.level)}
+Your side: ${positionLabel}
+Your assigned role: ${roleLabel[input.role]}
+Current phase: ${input.phaseLabel}
+Phase purpose: ${input.phasePurpose || '(별도 목적 없음)'}
+Phase instruction: ${input.phaseInstruction}
+Required tasks: ${input.phaseTasks.join(' / ') || '(단계 지시에 따름)'}
+
+[Debate transcript]
+${transcript || '(아직 발언 없음)'}
+
+Speak only for the ${positionLabel} side and complete only the current phase. Do not act as a coach, judge, or moderator.
+- Opening: give a clear claim, distinct reasons, and concrete support without inventing statistics, studies, laws, or quotations.
+- Cross-question: ask focused questions aimed at the opposing side's actual prior argument.
+- Cross-question answer: directly answer the latest opposing question before defending your side.
+- Analysis/rebuttal/weighing: refer to the actual transcript and attack or compare the central clash; never fabricate what an opponent said.
+- Closing: summarize the strongest surviving case without introducing a new major argument.
+- Beginner language must be accessible. Intermediate language may identify warrants, assumptions, and impact comparison.
+- Write concise but substantive Korean suitable for speaking aloud, normally 4-7 sentences.
+
+Return only JSON: {"argument":"AI participant's Korean speech"}`;
+
+  const response = await createChatCompletion({
+    model: DEBATE_OPPONENT_MODEL,
+    messages: [{ role: 'system', content: prompt }],
+    thinking: { type: 'disabled' },
+    response_format: { type: 'json_object' },
+    response_schema: {
+      type: 'object',
+      properties: { argument: { type: 'string' } },
+      required: ['argument'],
+    },
+  });
+  const parsed = parseJsonObject(response.choices?.[0]?.message?.content || '{}');
+  const argument = getStringField(parsed.argument, '').trim();
+  if (!argument) throw new Error('AI 토론자가 발언을 생성하지 못했습니다.');
+  return argument.slice(0, 1200);
+}
+
 export async function generateLiveDebateEvaluation(
   topic: string,
   participants: LiveEvaluationParticipantInput[],

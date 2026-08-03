@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  Bot,
   BookOpen,
   Check,
   Clock,
@@ -13,17 +14,20 @@ import {
   Play,
   ShieldCheck,
   Swords,
+  Trash2,
   UserRound,
   Users,
   Volume2,
 } from 'lucide-react';
 import {
+  addLiveDebateAiParticipant,
   claimLobbySeat,
   chooseLobbyTeam,
   enterDebateLobby,
   getDebateRoom,
   getLobbyParticipants,
   leaveDebateLobby,
+  removeLiveDebateAiParticipant,
   setLobbyReady,
   startDebateFromLobby,
   subscribeToDebateLobby,
@@ -127,9 +131,11 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   const teamSelectionComplete = affirmativeMembers.length === room?.teamSize && negativeMembers.length === room?.teamSize;
   const filledRequiredSeats = participants.filter(participant => participant.role !== 'moderator' && participant.position && participant.role).length;
   const allSeatsFilled = filledRequiredSeats === requiredSeatCount;
-  const everyoneReady = participants.length >= requiredSeatCount && participants.every(participant => (
-    !!participant.role && (participant.role === 'moderator' || !!participant.position) && participant.isReady
-  ));
+  const requiredDebaters = participants.filter(participant => participant.role !== 'moderator' && participant.position && participant.role);
+  const moderator = participants.find(participant => participant.role === 'moderator');
+  const everyoneReady = requiredDebaters.length === requiredSeatCount
+    && requiredDebaters.every(participant => participant.isReady)
+    && (!moderator || moderator.isReady);
   const canStart = allSeatsFilled && everyoneReady;
   const isHost = !!user && room?.hostId === user.id;
 
@@ -175,6 +181,34 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
       await refresh();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : '팀을 선택하지 못했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const addAi = async (position: DebatePosition, role: DebateParticipantRole) => {
+    if (!isHost || actionLoading || room?.status !== 'open') return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await addLiveDebateAiParticipant(roomId, position, role);
+      await refresh();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'AI 참가자를 배정하지 못했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const removeAi = async (aiUserId: string) => {
+    if (!isHost || actionLoading || room?.status !== 'open') return;
+    setActionLoading(true);
+    setError(null);
+    try {
+      await removeLiveDebateAiParticipant(roomId, aiUserId);
+      await refresh();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'AI 참가자를 제거하지 못했습니다.');
     } finally {
       setActionLoading(false);
     }
@@ -241,36 +275,39 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
         <div><span>{position === 'affirmative' ? 'TEAM A' : 'TEAM B'}</span><h2>{getPositionLabel(position)}</h2></div>
         <div className="lobby-team-head-actions"><strong>{teamMembers.length}/{room.teamSize}명</strong><button className={`btn ${isMyTeam ? 'btn-primary' : 'btn-secondary'}`} disabled={actionLoading || me?.isReady || (teamIsFull && !isMyTeam)} onClick={() => void chooseTeam(position)}>{isMyTeam ? '선택됨' : '이 팀 선택'}</button></div>
       </header>
-      {!teamSelectionComplete ? (
-        <div className="lobby-team-member-list">
-          {Array.from({ length: room.teamSize }, (_, index) => {
-            const member = teamMembers[index];
-            return member
-              ? <div key={member.userId} className={member.userId === user.id ? 'mine' : ''}><UserRound size={21} /><span><strong>{member.nickname}</strong><small>{member.userId === user.id ? '나 · 팀 선택 완료' : '역할 협의 대기'}</small></span></div>
-              : <div key={`empty-${index}`} className="empty"><span>+</span><span><strong>빈 팀 자리</strong><small>참가자 선택 대기</small></span></div>;
-          })}
-        </div>
-      ) : (
-        <div className="lobby-seat-list">
-          {requiredRoles.map(role => {
+      <div className="lobby-team-member-list">
+        {Array.from({ length: room.teamSize }, (_, index) => {
+          const member = teamMembers[index];
+          return member
+            ? <div key={member.userId} className={member.userId === user.id ? 'mine' : ''}>{member.isAi ? <Bot size={21} /> : <UserRound size={21} />}<span><strong>{member.nickname}</strong><small>{member.isAi ? 'AI · 자동 준비' : member.userId === user.id ? '나 · 팀 선택 완료' : member.role ? roleDetails[member.role].label : '역할 협의 대기'}</small></span></div>
+            : <div key={`empty-${index}`} className="empty"><span>+</span><span><strong>빈 팀 자리</strong><small>{isHost ? '아래 역할에 AI를 배정할 수 있습니다.' : '참가자 선택 대기'}</small></span></div>;
+        })}
+      </div>
+      <div className="lobby-seat-list">
+        {requiredRoles.map(role => {
           const occupant = participants.find(participant => participant.position === position && participant.role === role);
           const isMine = occupant?.userId === user.id;
           return (
-            <button
+            <div
               key={`${position}-${role}`}
-              type="button"
               className={`lobby-seat ${occupant ? 'occupied' : ''} ${isMine ? 'mine' : ''}`}
-              onClick={() => !occupant && isMyTeam && void chooseSeat(position, role)}
-              disabled={!!occupant || actionLoading || me?.isReady || !isMyTeam}
             >
-              <span className="lobby-seat-icon">{occupant ? <UserRound size={23} /> : <span>+</span>}</span>
+              <span className="lobby-seat-icon">{occupant ? occupant.isAi ? <Bot size={23} /> : <UserRound size={23} /> : <span>+</span>}</span>
               <span><strong>{roleDetails[role].label}</strong><small>{occupant ? occupant.nickname : roleDetails[role].description}</small></span>
-              {occupant && <i className={occupant.isReady ? 'ready' : ''}>{occupant.isReady ? '준비 완료' : '선택 완료'}</i>}
-            </button>
+              {occupant ? (
+                occupant.isAi && isHost
+                  ? <button type="button" className="lobby-seat-action danger" disabled={actionLoading} onClick={() => void removeAi(occupant.userId)}><Trash2 size={14} /> AI 제거</button>
+                  : <i className={occupant.isReady ? 'ready' : ''}>{occupant.isReady ? '준비 완료' : '선택 완료'}</i>
+              ) : (
+                <span className="lobby-seat-actions">
+                  {isMyTeam && <button type="button" disabled={actionLoading || me?.isReady} onClick={() => void chooseSeat(position, role)}>내 역할 선택</button>}
+                  {isHost && !teamIsFull && <button type="button" disabled={actionLoading} onClick={() => void addAi(position, role)}><Bot size={14} /> AI 배정</button>}
+                </span>
+              )}
+            </div>
           );
-          })}
-        </div>
-      )}
+        })}
+      </div>
     </section>
     );
   };
@@ -320,7 +357,6 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
         <section className="lobby-moderator-section">
           <div><ShieldCheck size={22} /><span><strong>진행자</strong><small>선택 사항 · 팀 정원과 별도로 토론 순서와 시간을 진행합니다.</small></span></div>
           {(() => {
-            const moderator = participants.find(participant => participant.role === 'moderator');
             return moderator
               ? <div className="lobby-moderator-user"><UserRound size={20} /><strong>{moderator.nickname}</strong><span className={moderator.isReady ? 'ready' : ''}>{moderator.isReady ? '준비 완료' : '선택 완료'}</span></div>
               : <button className="btn btn-secondary" disabled={actionLoading || me?.isReady} onClick={() => void chooseSeat(null, 'moderator')}>진행자로 참여</button>;
@@ -331,7 +367,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
       <section className="lobby-bottom-grid">
         <div className="lobby-participants-card">
           <h3><Users size={18} /> 대기실 참가자</h3>
-          <div>{participants.map(participant => <span key={participant.userId} className={participant.isReady ? 'ready' : ''}><i />{participant.nickname}{participant.userId === user.id ? ' (나)' : ''}<small>{participant.role ? roleDetails[participant.role].label : '자리 선택 중'}</small></span>)}</div>
+          <div>{participants.map(participant => <span key={participant.userId} className={participant.isReady ? 'ready' : ''}><i />{participant.isAi ? 'AI · ' : ''}{participant.nickname}{participant.userId === user.id ? ' (나)' : ''}<small>{participant.role ? roleDetails[participant.role].label : '자리 선택 중'}</small></span>)}</div>
         </div>
         <div className="lobby-timing-card">
           <h3><Clock size={18} /> 자동 진행표</h3>
