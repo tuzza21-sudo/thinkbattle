@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS public.live_debate_rooms (
   host_id UUID NOT NULL,
   host_name TEXT NOT NULL DEFAULT '토론 개설자',
   topic TEXT NOT NULL CHECK (char_length(topic) BETWEEN 1 AND 120),
+  topic_description TEXT NOT NULL DEFAULT '',
+  debate_level TEXT NOT NULL DEFAULT 'beginner' CHECK (debate_level IN ('beginner', 'intermediate')),
+  voice_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   time_limit INTEGER NOT NULL CHECK (time_limit IN (600, 900, 1200)),
   team_size INTEGER NOT NULL CHECK (team_size BETWEEN 1 AND 3),
   allow_moderator BOOLEAN NOT NULL DEFAULT TRUE,
@@ -111,6 +114,17 @@ GRANT EXECUTE ON FUNCTION public.join_live_debate_room(TEXT) TO authenticated;
 
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS evaluation JSONB;
+ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS topic_description TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS debate_level TEXT NOT NULL DEFAULT 'beginner';
+ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS voice_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+DO $$
+BEGIN
+  ALTER TABLE public.live_debate_rooms
+    ADD CONSTRAINT live_debate_rooms_debate_level_check
+    CHECK (debate_level IN ('beginner', 'intermediate'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.live_debate_room_participants (
   room_id TEXT NOT NULL REFERENCES public.live_debate_rooms(room_id) ON DELETE CASCADE,
@@ -133,6 +147,23 @@ CREATE TABLE IF NOT EXISTS public.live_debate_participant_evaluations (
   PRIMARY KEY (room_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS public.live_debate_arguments (
+  id UUID PRIMARY KEY,
+  room_id TEXT NOT NULL REFERENCES public.live_debate_rooms(room_id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  sender_name TEXT NOT NULL DEFAULT '토론 참가자',
+  content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 1200),
+  source TEXT NOT NULL DEFAULT 'text' CHECK (source IN ('text', 'voice')),
+  phase_id TEXT,
+  phase_label TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_live_debate_arguments_room_time
+  ON public.live_debate_arguments(room_id, created_at);
+
+GRANT SELECT, INSERT ON public.live_debate_arguments TO authenticated;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_live_debate_unique_team_seat
   ON public.live_debate_room_participants(room_id, position, role)
   WHERE role IS NOT NULL AND role <> 'moderator';
@@ -142,6 +173,33 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_live_debate_unique_moderator
 
 ALTER TABLE public.live_debate_room_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_debate_participant_evaluations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.live_debate_arguments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Room participants can read live debate arguments" ON public.live_debate_arguments;
+DROP POLICY IF EXISTS "Room participants can create live debate arguments" ON public.live_debate_arguments;
+
+CREATE POLICY "Room participants can read live debate arguments"
+ON public.live_debate_arguments FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.live_debate_room_participants participant
+    WHERE participant.room_id = live_debate_arguments.room_id
+      AND participant.user_id = auth.uid()
+  )
+);
+
+CREATE POLICY "Room participants can create live debate arguments"
+ON public.live_debate_arguments FOR INSERT TO authenticated
+WITH CHECK (
+  user_id = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM public.live_debate_room_participants participant
+    JOIN public.live_debate_rooms room ON room.room_id = participant.room_id
+    WHERE participant.room_id = live_debate_arguments.room_id
+      AND participant.user_id = auth.uid()
+      AND room.status = 'in_progress'
+  )
+);
 
 DROP POLICY IF EXISTS "Users can read own live debate evaluation" ON public.live_debate_participant_evaluations;
 CREATE POLICY "Users can read own live debate evaluation"
@@ -440,6 +498,11 @@ END $$;
 DO $$
 BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.live_debate_room_participants;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.live_debate_arguments;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

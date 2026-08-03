@@ -1,4 +1,4 @@
-import type { DebateParticipantRole, DebatePosition, DebateRoomAudience, DebateTeamSize } from '../types';
+import type { DebateLevel, DebateParticipantRole, DebatePosition, DebateRoomAudience, DebateTeamSize } from '../types';
 
 export type LiveDebateLinkOptions = {
   roomId: string;
@@ -8,6 +8,8 @@ export type LiveDebateLinkOptions = {
   hostPosition: DebatePosition;
   teamSize?: DebateTeamSize;
   allowModerator?: boolean;
+  debateLevel?: DebateLevel;
+  voiceEnabled?: boolean;
   participantPosition?: DebatePosition;
   participantRole?: DebateParticipantRole;
   audience?: DebateRoomAudience;
@@ -31,6 +33,8 @@ export const buildLiveDebatePath = ({
   hostPosition,
   teamSize = 1,
   allowModerator = false,
+  debateLevel = 'beginner',
+  voiceEnabled = false,
   participantPosition,
   participantRole = 'debater',
   audience = 'public',
@@ -43,6 +47,8 @@ export const buildLiveDebatePath = ({
     position: hostPosition,
     team: String(teamSize),
     moderator: allowModerator ? '1' : '0',
+    level: debateLevel,
+    voice: voiceEnabled ? '1' : '0',
     myPosition: participantPosition || hostPosition,
     role: participantRole,
     audience,

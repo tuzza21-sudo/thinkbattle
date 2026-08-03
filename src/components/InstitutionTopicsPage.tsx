@@ -82,6 +82,9 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
     await createDebateRoom({
       roomId,
       topic: config.topic,
+      topicDescription: config.topicDescription ?? '',
+      debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
+      voiceEnabled: config.voiceEnabled ?? false,
       timeLimit: config.timeLimit,
       teamSize: config.teamSize ?? 1,
       allowModerator: config.allowModerator ?? true,

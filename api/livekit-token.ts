@@ -53,6 +53,25 @@ const getAuthenticatedUser = async (authorization: string) => {
   return response.json() as Promise<SupabaseAuthUser>;
 };
 
+const getVoiceEnabledRoom = async (authorization: string, roomName: string) => {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase 서버 환경변수가 설정되지 않았습니다.');
+
+  const response = await fetch(
+    `${supabaseUrl.replace(/\/$/, '')}/rest/v1/live_debate_rooms?room_id=eq.${encodeURIComponent(roomName)}&select=voice_enabled`,
+    {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: authorization,
+      },
+    },
+  );
+  if (!response.ok) throw new Error('토론방의 음성 설정을 확인하지 못했습니다.');
+  const rooms = await response.json() as { voice_enabled?: boolean }[];
+  return rooms[0]?.voice_enabled === true;
+};
+
 const handleWebRequest = async (req: Request) => {
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'POST 요청만 허용됩니다.' }, 405);
@@ -88,6 +107,9 @@ const handleWebRequest = async (req: Request) => {
     const roomName = body.roomName?.trim();
     if (!roomName || !/^debate-[a-zA-Z0-9_-]{8,80}$/.test(roomName)) {
       return jsonResponse({ error: '올바르지 않은 토론방입니다.' }, 400);
+    }
+    if (!await getVoiceEnabledRoom(authorization, roomName)) {
+      return jsonResponse({ error: '이 토론방은 LiveKit 음성 토론을 사용하지 않습니다.' }, 403);
     }
 
     const maxParticipants = Math.min(7, Math.max(2, Number(body.maxParticipants) || 2));

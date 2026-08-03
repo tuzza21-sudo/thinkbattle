@@ -36,6 +36,7 @@ export type DebateRoundId =
 
 export type BattleConfig = {
   topic: string;
+  topicDescription?: string;
   timeLimit: number;
   gameMode: GameMode;
   personaId?: PersonaId;
@@ -44,6 +45,7 @@ export type BattleConfig = {
   debateFocus?: DebateFocus;
   teamSize?: DebateTeamSize;
   allowModerator?: boolean;
+  voiceEnabled?: boolean;
   participantRole?: DebateParticipantRole;
   audience?: DebateRoomAudience;
   organizationId?: string;
@@ -55,6 +57,9 @@ export type LiveDebateRoomSummary = {
   hostId: string;
   hostName: string;
   topic: string;
+  topicDescription: string;
+  debateLevel: DebateLevel;
+  voiceEnabled: boolean;
   timeLimit: number;
   teamSize: DebateTeamSize;
   allowModerator: boolean;
@@ -74,6 +79,17 @@ export type LiveDebateLobbyParticipant = {
   role?: DebateParticipantRole;
   isReady: boolean;
   joinedAt: string;
+};
+
+export type LiveDebateArgument = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+  source: 'text' | 'voice';
+  phaseId?: string;
+  phaseLabel?: string;
 };
 
 export type LiveDebateEvaluationParticipant = {

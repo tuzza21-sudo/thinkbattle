@@ -1,10 +1,12 @@
 import { supabase } from './supabase';
 import type {
   AppUser,
+  DebateLevel,
   DebateParticipantRole,
   DebatePosition,
   DebateRoomAudience,
   DebateTeamSize,
+  LiveDebateArgument,
   LiveDebateLobbyParticipant,
   LiveDebateEvaluation,
   LiveDebateRoomSummary,
@@ -13,6 +15,9 @@ import type {
 type CreateRoomInput = {
   roomId: string;
   topic: string;
+  topicDescription: string;
+  debateLevel: DebateLevel;
+  voiceEnabled: boolean;
   timeLimit: number;
   teamSize: DebateTeamSize;
   allowModerator: boolean;
@@ -29,6 +34,9 @@ const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
   hostId: String(row.host_id),
   hostName: String(row.host_name || '토론 개설자'),
   topic: String(row.topic),
+  topicDescription: String(row.topic_description || ''),
+  debateLevel: row.debate_level === 'intermediate' ? 'intermediate' : 'beginner',
+  voiceEnabled: Boolean(row.voice_enabled),
   timeLimit: Number(row.time_limit) || 600,
   teamSize: ([1, 2, 3].includes(Number(row.team_size)) ? Number(row.team_size) : 1) as DebateTeamSize,
   allowModerator: Boolean(row.allow_moderator),
@@ -48,6 +56,9 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     hostId: user.id,
     hostName: user.nickname,
     topic: input.topic,
+    topicDescription: input.topicDescription,
+    debateLevel: input.debateLevel,
+    voiceEnabled: input.voiceEnabled,
     timeLimit: input.timeLimit,
     teamSize: input.teamSize,
     allowModerator: input.allowModerator,
@@ -63,6 +74,9 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     host_id: user.id,
     host_name: user.nickname,
     topic: input.topic,
+    topic_description: input.topicDescription,
+    debate_level: input.debateLevel,
+    voice_enabled: input.voiceEnabled,
     time_limit: input.timeLimit,
     team_size: input.teamSize,
     allow_moderator: input.allowModerator,
@@ -224,6 +238,42 @@ export const subscribeToDebateLobby = (roomId: string, onChange: () => void) => 
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_debate_rooms', filter: `room_id=eq.${roomId}` }, onChange)
     .subscribe();
   return () => { void supabase.removeChannel(channel); };
+};
+
+const mapLiveArgument = (row: Record<string, unknown>): LiveDebateArgument => ({
+  id: String(row.id),
+  senderId: String(row.user_id),
+  senderName: String(row.sender_name || '토론 참가자'),
+  content: String(row.content || ''),
+  createdAt: String(row.created_at || new Date().toISOString()),
+  source: row.source === 'voice' ? 'voice' : 'text',
+  phaseId: row.phase_id ? String(row.phase_id) : undefined,
+  phaseLabel: row.phase_label ? String(row.phase_label) : undefined,
+});
+
+export const getLiveDebateArguments = async (roomId: string): Promise<LiveDebateArgument[]> => {
+  const { data, error } = await supabase
+    .from('live_debate_arguments')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`토론 발언을 불러오지 못했습니다: ${error.message}`);
+  return (data ?? []).map(row => mapLiveArgument(row as Record<string, unknown>));
+};
+
+export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebateArgument) => {
+  const { error } = await supabase.from('live_debate_arguments').insert({
+    id: argument.id,
+    room_id: roomId,
+    user_id: argument.senderId,
+    sender_name: argument.senderName,
+    content: argument.content,
+    source: argument.source,
+    phase_id: argument.phaseId || null,
+    phase_label: argument.phaseLabel || null,
+    created_at: argument.createdAt,
+  });
+  if (error) throw new Error(`토론 발언을 저장하지 못했습니다: ${error.message}`);
 };
 
 export const saveLiveDebateEvaluation = async (roomId: string, evaluation: LiveDebateEvaluation) => {

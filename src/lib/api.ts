@@ -1163,12 +1163,14 @@ type LiveEvaluationArgumentInput = {
   content: string;
   createdAt: string;
   source: 'text' | 'voice';
+  phaseLabel?: string;
 };
 
 export async function generateLiveDebateEvaluation(
   topic: string,
   participants: LiveEvaluationParticipantInput[],
   transcript: LiveEvaluationArgumentInput[],
+  context?: { description?: string; level?: DebateLevel },
 ): Promise<LiveDebateEvaluation> {
   const participantById = new Map(participants.map(participant => [participant.userId, participant]));
   const roleLabels: Record<DebateParticipantRole, string> = {
@@ -1178,7 +1180,7 @@ export async function generateLiveDebateEvaluation(
     const participant = participantById.get(argument.senderId);
     const position = participant?.role === 'moderator' ? '진행자' : participant?.position === 'negative' ? '반대' : '찬성';
     const role = participant ? roleLabels[participant.role] : '역할 미상';
-    return `[${argument.createdAt}] ${argument.senderName} (${position}, ${role}, ${argument.source === 'voice' ? '음성 전사' : '텍스트'}): ${argument.content}`;
+    return `[${argument.createdAt}] ${argument.senderName} (${position}, ${role}, ${argument.phaseLabel || '단계 미상'}, ${argument.source === 'voice' ? '음성 전사' : '텍스트'}): ${argument.content}`;
   }).join('\n').slice(-40_000);
   const rosterText = participants.map(participant => (
     `- userId=${participant.userId} | ${participant.nickname} | ${participant.role === 'moderator' ? '중립' : participant.position === 'affirmative' ? '찬성' : '반대'} | ${roleLabels[participant.role]}`
@@ -1187,6 +1189,8 @@ export async function generateLiveDebateEvaluation(
   const prompt = `You are an impartial Korean debate judge and educational coach.
 
 Debate topic: "${topic}"
+Debate level: ${getDebateLevelLabel(context?.level)}
+Topic background: ${context?.description || '(별도 배경 설명 없음)'}
 
 [Participants]
 ${rosterText}

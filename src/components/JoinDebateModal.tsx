@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Clock, LoaderCircle, RefreshCw, Search, ShieldCheck, Users, X } from 'lucide-react';
+import { ArrowRight, Clock, Layers3, LoaderCircle, RefreshCw, Search, ShieldCheck, Users, Volume2, X } from 'lucide-react';
 import { listDebateRooms } from '../lib/debateRooms';
 import type { DebateRoomAudience, LiveDebateRoomSummary } from '../types';
 
@@ -38,7 +38,10 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
     return () => { cancelled = true; };
   }, [audience, organizationKey]);
 
-  const filteredRooms = useMemo(() => rooms.filter(room => room.topic.toLowerCase().includes(search.trim().toLowerCase())), [rooms, search]);
+  const filteredRooms = useMemo(() => rooms.filter(room => {
+    const query = search.trim().toLowerCase();
+    return room.topic.toLowerCase().includes(query) || room.topicDescription.toLowerCase().includes(query);
+  }), [rooms, search]);
 
   const enterLobby = async (room: LiveDebateRoomSummary) => {
     if (joiningRoomId) return;
@@ -75,10 +78,13 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
               <button key={room.id} type="button" className="debate-room-card" disabled={!!joiningRoomId} onClick={() => void enterLobby(room)}>
                 <div><span className="live-dot" /> 대기실 모집 중</div>
                 <strong>{room.topic}</strong>
+                {room.topicDescription && <p>{room.topicDescription.slice(0, 140)}{room.topicDescription.length > 140 ? '…' : ''}</p>}
                 <p>{room.hostName} 개설 · 현재 {room.participantCount}명 대기 · {new Date(room.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 <footer>
                   <span><Users size={14} /> {room.teamSize}:{room.teamSize}</span>
                   <span><Clock size={14} /> {room.timeLimit / 60}분</span>
+                  <span><Layers3 size={14} /> {room.debateLevel === 'intermediate' ? '중급' : '초급'}</span>
+                  <span><Volume2 size={14} /> {room.voiceEnabled ? '음성' : '텍스트'}</span>
                   {room.allowModerator && <span><ShieldCheck size={14} /> 진행자</span>}
                   {joiningRoomId === room.roomId ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />}
                 </footer>

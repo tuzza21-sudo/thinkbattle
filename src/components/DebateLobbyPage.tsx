@@ -2,17 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  BookOpen,
   Check,
   Clock,
   Copy,
   Crown,
   LoaderCircle,
   LogIn,
+  Layers3,
   Play,
   ShieldCheck,
   Swords,
   UserRound,
   Users,
+  Volume2,
 } from 'lucide-react';
 import {
   claimLobbySeat,
@@ -25,7 +28,8 @@ import {
   startDebateFromLobby,
   subscribeToDebateLobby,
 } from '../lib/debateRooms';
-import { formatDebateMinutes, getDebatePhaseTimings } from '../lib/debateTiming';
+import { formatDebateMinutes } from '../lib/debateTiming';
+import { getLiveDebateCourse } from '../lib/liveDebateCourse';
 import { buildLiveDebatePath } from '../lib/liveDebate';
 import type {
   AppUser,
@@ -139,6 +143,8 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
       hostPosition: 'affirmative',
       teamSize: room.teamSize,
       allowModerator: room.allowModerator,
+      debateLevel: room.debateLevel,
+      voiceEnabled: room.voiceEnabled,
       participantPosition: me.position ?? 'affirmative',
       participantRole: me.role,
       audience: room.audience,
@@ -280,12 +286,19 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
         <div>
           <span className="debate-modal-eyebrow">{room.audience === 'organization' ? `${room.organizationName || '기관'} 전용 대기실` : '공개 토론 대기실'}</span>
           <h1>{room.topic}</h1>
-          <div className="lobby-meta"><span><Users size={16} /> {room.teamSize}:{room.teamSize}</span><span><Clock size={16} /> {room.timeLimit / 60}분</span>{room.allowModerator && <span><ShieldCheck size={16} /> 진행자 선택 가능</span>}</div>
+          <div className="lobby-meta"><span><Users size={16} /> {room.teamSize}:{room.teamSize}</span><span><Clock size={16} /> {room.timeLimit / 60}분</span><span><Layers3 size={16} /> {room.debateLevel === 'intermediate' ? '중급' : '초급'}</span><span><Volume2 size={16} /> {room.voiceEnabled ? 'LiveKit 음성' : '텍스트 전용'}</span>{room.allowModerator && <span><ShieldCheck size={16} /> 진행자 선택 가능</span>}</div>
         </div>
         <div className="lobby-host"><Crown size={18} /><span><small>방장</small><strong>{room.hostName}</strong></span></div>
       </header>
 
       {error && <div className="live-room-alert error" role="alert">{error}</div>}
+
+      {room.topicDescription && (
+        <section className="lobby-progress-card">
+          <BookOpen size={22} />
+          <div><strong>토론 주제 상세 배경</strong><span>{room.topicDescription}</span></div>
+        </section>
+      )}
 
       <section className="lobby-stepper" aria-label="대기실 준비 단계">
         <div className={!teamSelectionComplete ? 'active' : 'complete'}><span>{teamSelectionComplete ? <Check size={16} /> : '1'}</span><strong>찬성·반대 팀 선택</strong><small>각 참가자가 먼저 입장을 선택합니다.</small></div>
@@ -322,7 +335,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
         </div>
         <div className="lobby-timing-card">
           <h3><Clock size={18} /> 자동 진행표</h3>
-          <div>{getDebatePhaseTimings(room.timeLimit).map(phase => <span key={phase.label}><strong>{phase.label}</strong><small>{formatDebateMinutes(phase.seconds)}</small></span>)}</div>
+          <div>{getLiveDebateCourse(room.timeLimit, room.debateLevel).map(phase => <span key={phase.id}><strong>{phase.label}</strong><small>{formatDebateMinutes(phase.seconds)}</small></span>)}</div>
         </div>
       </section>
 
