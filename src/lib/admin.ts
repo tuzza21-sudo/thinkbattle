@@ -63,8 +63,26 @@ export const getMyOrganizationTopics = async (): Promise<OrganizationTopic[]> =>
   return data as OrganizationTopic[];
 };
 
-export const createOrganizationTopic = async (organizationId: string, title: string, description: string) => {
-  const { error } = await supabase.rpc('create_organization_topic', { p_organization_id: organizationId, p_title: title.trim(), p_description: description.trim() });
+export const getMyMemberOrganizations = async (): Promise<OrganizationSummary[]> => {
+  const { data, error } = await supabase.rpc('get_my_member_organizations');
+  if (error || !Array.isArray(data)) return [];
+  return data as OrganizationSummary[];
+};
+
+export const createOrganizationTopic = async (
+  organizationId: string,
+  title: string,
+  description: string,
+  briefing?: OrganizationTopic['briefing'],
+  config?: OrganizationTopic['config'],
+) => {
+  const { error } = await supabase.rpc('create_organization_topic', {
+    p_organization_id: organizationId,
+    p_title: title.trim(),
+    p_description: description.trim(),
+    p_briefing: briefing ?? null,
+    p_config: config ?? null,
+  });
   if (error) throw error;
 };
 

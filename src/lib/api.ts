@@ -1,4 +1,4 @@
-import type { Argument, DebateFocus, DebateLevel, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, PersonaId, PhaseCoaching } from '../types';
+import type { Argument, DebateFocus, DebateLevel, DebateParticipantRole, DebatePosition, DebateRoundId, EnglishRephraseFeedback, FinalReport, LiveDebateEvaluation, OrganizationTopic, PersonaId, PhaseCoaching, TopicBriefing } from '../types';
 import { getDebateFocusLabel, getDebateLevelLabel, getPositionLabel } from './debateEngine';
 
 const GEMINI_FLASH_MODEL = 'gemini-3.1-flash-lite';
@@ -95,38 +95,74 @@ type GeminiGenerateContentResponse = {
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
 
+const sanitizeJsonString = (raw: string): string => {
+  // Remove trailing commas before ] or } which LLMs frequently produce.
+  // Only operate outside of quoted strings to avoid corrupting string values.
+  let result = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (inStr) {
+      result += ch;
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; result += ch; continue; }
+    if (ch === ',') {
+      // Look ahead past whitespace for ] or }
+      let j = i + 1;
+      while (j < raw.length && (raw[j] === ' ' || raw[j] === '\t' || raw[j] === '\n' || raw[j] === '\r')) j += 1;
+      if (j < raw.length && (raw[j] === ']' || raw[j] === '}')) {
+        // Skip this trailing comma
+        continue;
+      }
+    }
+    result += ch;
+  }
+  return result;
+};
+
 const parseJsonObject = (raw: string): Record<string, unknown> => {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
 
+  // First attempt: direct parse
   try {
     return JSON.parse(cleaned) as Record<string, unknown>;
-  } catch {
-    // Some providers still wrap JSON with a short explanation. Extract exactly
-    // one balanced object instead of using a greedy regex that can include text.
-    const start = cleaned.indexOf('{');
-    if (start < 0) throw new Error('Model response did not contain a JSON object.');
+  } catch { /* fallthrough */ }
 
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let index = start; index < cleaned.length; index += 1) {
-      const character = cleaned[index];
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (character === '\\') escaped = true;
-        else if (character === '"') inString = false;
-        continue;
-      }
-      if (character === '"') inString = true;
-      else if (character === '{') depth += 1;
-      else if (character === '}') {
-        depth -= 1;
-        if (depth === 0) return JSON.parse(cleaned.slice(start, index + 1)) as Record<string, unknown>;
-      }
+  // Second attempt: sanitize trailing commas and retry
+  const sanitized = sanitizeJsonString(cleaned);
+  try {
+    return JSON.parse(sanitized) as Record<string, unknown>;
+  } catch { /* fallthrough */ }
+
+  // Third attempt: extract balanced object from the raw text
+  const start = sanitized.indexOf('{');
+  if (start < 0) throw new Error('Model response did not contain a JSON object.');
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < sanitized.length; index += 1) {
+    const character = sanitized[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
     }
-
-    throw new Error('Model JSON response was incomplete.');
+    if (character === '"') inString = true;
+    else if (character === '{') depth += 1;
+    else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(sanitized.slice(start, index + 1)) as Record<string, unknown>;
+    }
   }
+
+  throw new Error('Model JSON response was incomplete.');
 };
 
 const getStringField = (value: unknown, fallback: string) =>
@@ -244,7 +280,7 @@ const createChatCompletion = async (request: ChatCompletionRequest): Promise<Cha
   for (const modelName of modelsToTry) {
     const url = `/api/gemini/v1beta/models/${modelName}:generateContent`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
 
     try {
       const response = await fetch(url, {
@@ -262,8 +298,8 @@ const createChatCompletion = async (request: ChatCompletionRequest): Promise<Cha
         const errorText = await response.text();
         console.warn(`Gemini model ${modelName} failed with status ${response.status}. trying fallback...`, errorText.slice(0, 200));
         
-        // If it's a 404 (model not found) or 400 (bad request due to model availability / invalid name), try next
-        if (response.status === 404 || response.status === 400 || response.status === 503) {
+        // If it's a 404 (model not found), 400 (bad request), 429 (rate limit), or 503 (unavailable), try next
+        if (response.status === 404 || response.status === 400 || response.status === 429 || response.status === 503) {
           lastError = new Error(`Gemini API ${response.status}: ${errorText.slice(0, 300)}`);
           continue;
         }
@@ -1077,9 +1113,146 @@ const FINAL_REPORT_RESPONSE_SCHEMA: Record<string, unknown> = {
   required: ['overallFeedback', 'categories', 'phaseCoaching', 'totalScore'],
 };
 
+const LIVE_DEBATE_EVALUATION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    winner: { type: 'string', enum: ['affirmative', 'negative', 'draw'] },
+    overallVerdict: { type: 'string' },
+    affirmativeFeedback: { type: 'string' },
+    negativeFeedback: { type: 'string' },
+    keyClashes: { type: 'array', items: { type: 'string' } },
+    participantReports: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          userId: { type: 'string' },
+          nickname: { type: 'string' },
+          overallFeedback: { type: 'string' },
+          categories: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                score: { type: 'number' },
+                maxScore: { type: 'number' },
+                feedback: { type: 'string' },
+              },
+              required: ['name', 'score', 'maxScore', 'feedback'],
+            },
+          },
+        },
+        required: ['userId', 'nickname', 'overallFeedback', 'categories'],
+      },
+    },
+  },
+  required: ['winner', 'overallVerdict', 'affirmativeFeedback', 'negativeFeedback', 'keyClashes', 'participantReports'],
+};
+
+type LiveEvaluationParticipantInput = {
+  userId: string;
+  nickname: string;
+  position: DebatePosition;
+  role: DebateParticipantRole;
+};
+
+type LiveEvaluationArgumentInput = {
+  senderId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+  source: 'text' | 'voice';
+};
+
+export async function generateLiveDebateEvaluation(
+  topic: string,
+  participants: LiveEvaluationParticipantInput[],
+  transcript: LiveEvaluationArgumentInput[],
+): Promise<LiveDebateEvaluation> {
+  const participantById = new Map(participants.map(participant => [participant.userId, participant]));
+  const roleLabels: Record<DebateParticipantRole, string> = {
+    debater: '토론자', opening: '입론 담당', rebuttal: '질의·반론 담당', closing: '최종 변론 담당', moderator: '진행자',
+  };
+  const transcriptText = transcript.slice(-80).map(argument => {
+    const participant = participantById.get(argument.senderId);
+    const position = participant?.role === 'moderator' ? '진행자' : participant?.position === 'negative' ? '반대' : '찬성';
+    const role = participant ? roleLabels[participant.role] : '역할 미상';
+    return `[${argument.createdAt}] ${argument.senderName} (${position}, ${role}, ${argument.source === 'voice' ? '음성 전사' : '텍스트'}): ${argument.content}`;
+  }).join('\n').slice(-40_000);
+  const rosterText = participants.map(participant => (
+    `- userId=${participant.userId} | ${participant.nickname} | ${participant.role === 'moderator' ? '중립' : participant.position === 'affirmative' ? '찬성' : '반대'} | ${roleLabels[participant.role]}`
+  )).join('\n');
+
+  const prompt = `You are an impartial Korean debate judge and educational coach.
+
+Debate topic: "${topic}"
+
+[Participants]
+${rosterText}
+
+[Full debate transcript]
+${transcriptText || '(기록된 발언 없음)'}
+
+Do not participate in the debate or invent evidence. Judge only observable statements in the transcript.
+First identify the central clashes and compare both teams on claim clarity, evidence quality, direct engagement with opposing arguments, and consistency.
+Then evaluate EVERY listed participant according to the role assigned to that participant. A participant must not be penalized for work assigned to another role.
+For each participant output exactly these five categories, each out of 5:
+1. 논증 명료성
+2. 근거 활용
+3. 상대 논점 대응
+4. 역할 수행도
+5. 개선 가능성 (a higher score means the participant demonstrated strong capacity to revise or deepen the argument)
+Each category feedback must cite one concrete observed statement or absence and give one actionable next move. Do not fabricate quotations.
+If the transcript is too sparse, score conservatively and say what could not be observed.
+Return only valid JSON matching the schema. Preserve every userId exactly.`;
+
+  const response = await createChatCompletion({
+    model: DEBATE_JUDGE_MODEL,
+    messages: [{ role: 'system', content: prompt }],
+    reasoning_effort: 'high',
+    thinking: { type: 'enabled' },
+    response_format: { type: 'json_object' },
+    response_schema: LIVE_DEBATE_EVALUATION_SCHEMA,
+  });
+  const parsed = parseJsonObject(response.choices?.[0]?.message?.content || '{}');
+  const rawReports = Array.isArray(parsed.participantReports) ? parsed.participantReports as Record<string, unknown>[] : [];
+  const reportsById = new Map(rawReports.map(report => [String(report.userId), report]));
+  const participantReports = participants.map(participant => {
+    const raw = reportsById.get(participant.userId);
+    const categories = Array.isArray(raw?.categories) ? raw.categories as FinalReport['categories'] : [];
+    const normalizedCategories = categories.slice(0, 5).map(category => ({
+      name: category.name || '평가 항목',
+      score: Math.min(5, Math.max(0, Number(category.score) || 0)),
+      maxScore: 5,
+      feedback: category.feedback || '관찰된 발언이 충분하지 않습니다.',
+    }));
+    const totalScore = normalizedCategories.reduce((total, category) => total + category.score, 0);
+    return {
+      ...participant,
+      report: {
+        overallFeedback: getStringField(raw?.overallFeedback, '개인 발언 분석이 완료되었습니다.'),
+        categories: normalizedCategories,
+        totalScore,
+        xpEarned: 50 + Math.round(totalScore * 4),
+      },
+    };
+  });
+
+  return {
+    winner: parsed.winner === 'affirmative' || parsed.winner === 'negative' ? parsed.winner : 'draw',
+    overallVerdict: getStringField(parsed.overallVerdict, '양 팀의 토론 분석이 완료되었습니다.'),
+    affirmativeFeedback: getStringField(parsed.affirmativeFeedback, '찬성팀 분석이 완료되었습니다.'),
+    negativeFeedback: getStringField(parsed.negativeFeedback, '반대팀 분석이 완료되었습니다.'),
+    keyClashes: Array.isArray(parsed.keyClashes) ? parsed.keyClashes.filter((item): item is string => typeof item === 'string').slice(0, 5) : [],
+    participantReports,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 const parseFinalReport = (raw: string): FinalReport => {
   const parsed = parseJsonObject(raw);
-  const categories = Array.isArray(parsed.categories) ? parsed.categories as any[] : [];
+  const categories = Array.isArray(parsed.categories) ? parsed.categories as FinalReport['categories'] : [];
   if (categories.length === 0) {
     throw new Error('Model response did not include any score categories.');
   }
@@ -1195,7 +1368,7 @@ Return ONLY valid JSON:
       parseFinalReport(aiMessage);
       report = {
         overallFeedback: typeof parsed.overallFeedback === 'string' ? parsed.overallFeedback : '토론 분석이 완료되었습니다.',
-        categories: Array.isArray(parsed.categories) ? parsed.categories as any[] : [],
+        categories: Array.isArray(parsed.categories) ? parsed.categories as FinalReport['categories'] : [],
         phaseCoaching: getPhaseCoaching(parsed.phaseCoaching),
         totalScore: typeof parsed.totalScore === 'number' ? parsed.totalScore : 0,
         xpEarned: 0,
@@ -1643,3 +1816,73 @@ Return ONLY valid JSON in this exact format:
     return [];
   }
 }
+
+export type GeneratedOrganizationTopic = Pick<OrganizationTopic, 'title' | 'description' | 'briefing' | 'config'>;
+
+export const generateOrganizationTopic = async (draft: string): Promise<GeneratedOrganizationTopic> => {
+  const response = await createChatCompletion({
+    model: GEMINI_FLASH_MODEL,
+    messages: [{
+      role: 'system',
+      content: `You create Korean classroom debate materials. The administrator provides a debate subject followed by optional institution-specific background/context. Treat that background as authoritative scope: reflect its examples, learning stage, constraints, and vocabulary in the result. Do not discard it or replace it with unrelated generic context. Return valid JSON only with title, description, briefing, config. briefing must contain context (2-4 Korean sentences that integrate the provided background), recentCases (exactly 3 concrete examples or factual considerations; do not invent dates/sources), newsSearchKeywords (exactly 3 short Korean search phrases a student could use to find real news articles about this topic; each phrase should be 2-5 words and specific enough to return relevant results), affirmative and negative (each with title and exactly 3 concise points), prepQuestions (exactly 3), keywords (3-6). config must contain timeLimit (600, 900, or 1200) and debateLevel (beginner, intermediate, or advanced). The title must be a yes/no debate proposition. Do not make up facts.`,
+    }, {
+      role: 'user',
+      content: draft,
+    }],
+    response_format: { type: 'json_object' },
+  });
+  const rawContent = response.choices?.[0]?.message?.content ?? '{}';
+  console.warn('[generateOrganizationTopic] Raw AI response:', rawContent.slice(0, 500));
+  const parsed = parseJsonObject(rawContent);
+  const rawBriefing = (parsed.briefing ?? parsed) as Record<string, unknown>;
+  const stringList = (value: unknown, fallback: string[]) => Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    : fallback;
+  const side = (value: unknown, fallbackTitle: string) => {
+    const item = (value ?? {}) as Record<string, unknown>;
+    return { title: getStringField(item.title, fallbackTitle), points: stringList(item.points, ['핵심 근거를 정리해 보세요.']) };
+  };
+  const briefing: TopicBriefing = {
+    context: getStringField(rawBriefing.context ?? rawBriefing.background, getStringField(parsed.description, draft)),
+    recentCases: stringList(rawBriefing.recentCases ?? rawBriefing.cases, ['기관이 제공한 사전 배경을 바탕으로 사실과 사례를 확인해 보세요.']),
+    newsLinks: (() => {
+      // Build real search URLs from AI-generated search keywords
+      const searchKeywords = stringList(rawBriefing.newsSearchKeywords ?? rawBriefing.searchKeywords, []);
+      // Also accept legacy newsLinks format from AI
+      const legacyLinks = Array.isArray(rawBriefing.newsLinks)
+        ? rawBriefing.newsLinks.filter((link): link is { label: string; url: string } => Boolean(link && typeof link === 'object' && typeof (link as Record<string, unknown>).label === 'string' && typeof (link as Record<string, unknown>).url === 'string'))
+        : [];
+      if (legacyLinks.length > 0) return legacyLinks;
+      // Generate Naver News search links from keywords
+      const generatedLinks = searchKeywords.slice(0, 3).map(keyword => ({
+        label: `📰 ${keyword}`,
+        url: `https://search.naver.com/search.naver?where=news&query=${encodeURIComponent(keyword)}`,
+      }));
+      // Fallback: use topic title if AI returned no keywords
+      if (generatedLinks.length === 0) {
+        const topicTitle = getStringField(parsed.title, draft);
+        const topicKeywords = stringList(rawBriefing.keywords, []);
+        generatedLinks.push({ label: `📰 ${topicTitle.slice(0, 20)} 뉴스`, url: `https://search.naver.com/search.naver?where=news&query=${encodeURIComponent(topicTitle)}` });
+        if (topicKeywords.length >= 2) {
+          generatedLinks.push({ label: `📰 ${topicKeywords.slice(0, 2).join(' ')} 기사`, url: `https://search.naver.com/search.naver?where=news&query=${encodeURIComponent(topicKeywords.slice(0, 2).join(' '))}` });
+        }
+      }
+      return generatedLinks;
+    })(),
+    affirmative: side(rawBriefing.affirmative ?? rawBriefing.pros, '찬성 측 핵심 논점'),
+    negative: side(rawBriefing.negative ?? rawBriefing.cons, '반대 측 핵심 논점'),
+    prepQuestions: stringList(rawBriefing.prepQuestions ?? rawBriefing.questions, ['내 주장을 뒷받침할 근거는 무엇인가?']),
+    keywords: stringList(rawBriefing.keywords, []),
+  };
+  return {
+    title: getStringField(parsed.title, draft),
+    description: getStringField(parsed.description, briefing.context),
+    briefing,
+    config: {
+      timeLimit: [600, 900, 1200].includes(Number((parsed.config as Record<string, unknown> | undefined)?.timeLimit))
+        ? Number((parsed.config as Record<string, unknown>).timeLimit) : 600,
+      debateLevel: ['beginner', 'intermediate', 'advanced'].includes(String((parsed.config as Record<string, unknown> | undefined)?.debateLevel))
+        ? String((parsed.config as Record<string, unknown>).debateLevel) as DebateLevel : 'beginner',
+    },
+  };
+};

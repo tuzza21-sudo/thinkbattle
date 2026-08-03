@@ -258,3 +258,52 @@ GRANT EXECUTE ON FUNCTION public.get_organization_student_records(UUID, UUID) TO
 
 -- 예시: INSERT INTO public.organizations (name) VALUES ('ThinkFit 시범 학원') RETURNING id;
 -- 이후 organization_memberships에 기관 UUID, 관리자 UUID, 'owner'를 넣어 초대합니다.
+
+-- 기관 전용 주제의 AI 브리핑과 권장 토론 설정. 기존 설치에도 안전하게 적용됩니다.
+ALTER TABLE public.organization_topics
+  ADD COLUMN IF NOT EXISTS briefing JSONB,
+  ADD COLUMN IF NOT EXISTS config JSONB;
+
+CREATE OR REPLACE FUNCTION public.get_my_member_organizations()
+RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', o.id, 'name', o.name, 'role', m.role) ORDER BY o.name), '[]'::jsonb)
+  FROM public.organization_memberships m JOIN public.organizations o ON o.id = m.organization_id
+  WHERE m.user_id = auth.uid();
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_organization_topics(p_organization_id UUID)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public STABLE AS $$
+BEGIN
+  IF NOT public.is_organization_staff(p_organization_id) THEN RAISE EXCEPTION 'not authorized'; END IF;
+  RETURN COALESCE((SELECT jsonb_agg(jsonb_build_object(
+    'id', id, 'organizationId', organization_id, 'title', title, 'description', description,
+    'briefing', briefing, 'config', config, 'isActive', is_active, 'createdAt', created_at
+  ) ORDER BY created_at DESC) FROM public.organization_topics WHERE organization_id = p_organization_id), '[]'::jsonb);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_my_organization_topics()
+RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public STABLE AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'id', t.id, 'organizationId', t.organization_id, 'organizationName', o.name,
+    'title', t.title, 'description', t.description, 'briefing', t.briefing, 'config', t.config,
+    'isActive', t.is_active, 'createdAt', t.created_at
+  ) ORDER BY t.created_at DESC), '[]'::jsonb)
+  FROM public.organization_topics t JOIN public.organizations o ON o.id = t.organization_id
+  WHERE t.is_active AND EXISTS (SELECT 1 FROM public.organization_memberships m WHERE m.organization_id = t.organization_id AND m.user_id = auth.uid());
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_organization_topic(
+  p_organization_id UUID, p_title TEXT, p_description TEXT DEFAULT '', p_briefing JSONB DEFAULT NULL, p_config JSONB DEFAULT NULL
+)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_organization_staff(p_organization_id) THEN RAISE EXCEPTION 'not authorized'; END IF;
+  IF length(trim(COALESCE(p_title, ''))) = 0 THEN RAISE EXCEPTION 'topic title is required'; END IF;
+  INSERT INTO public.organization_topics (organization_id, title, description, briefing, config)
+  VALUES (p_organization_id, trim(p_title), trim(COALESCE(p_description, '')), p_briefing, p_config);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_my_member_organizations() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_organization_topic(UUID, TEXT, TEXT, JSONB, JSONB) TO authenticated;

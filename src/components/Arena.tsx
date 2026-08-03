@@ -1187,6 +1187,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 isPlayerTurn={isPlayerTurn}
                 isAiThinking={isAiThinking}
                 isPaused={isPaused}
+                topic={battleState.topic}
                 onSubmit={handleActionSubmit}
               />
             )}

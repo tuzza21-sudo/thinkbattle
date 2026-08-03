@@ -21,6 +21,9 @@ export type AppUser = {
 export type PersonaId = 'socrates' | 'jeong_yakyong' | 'kant' | 'nietzsche';
 export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';
 export type DebatePosition = 'affirmative' | 'negative';
+export type DebateRoomAudience = 'public' | 'organization';
+export type DebateParticipantRole = 'debater' | 'opening' | 'rebuttal' | 'closing' | 'moderator';
+export type DebateTeamSize = 1 | 2 | 3;
 export type DebateLevel = 'beginner' | 'intermediate' | 'advanced';
 export type DebateFocus = 'fact' | 'policy' | 'value';
 export type DebateRoundId =
@@ -39,6 +42,56 @@ export type BattleConfig = {
   userPosition?: DebatePosition;
   debateLevel?: DebateLevel;
   debateFocus?: DebateFocus;
+  teamSize?: DebateTeamSize;
+  allowModerator?: boolean;
+  participantRole?: DebateParticipantRole;
+  audience?: DebateRoomAudience;
+  organizationId?: string;
+};
+
+export type LiveDebateRoomSummary = {
+  id: string;
+  roomId: string;
+  hostId: string;
+  hostName: string;
+  topic: string;
+  timeLimit: number;
+  teamSize: DebateTeamSize;
+  allowModerator: boolean;
+  audience: DebateRoomAudience;
+  organizationId?: string;
+  organizationName?: string;
+  status: 'open' | 'in_progress' | 'closed';
+  participantCount: number;
+  createdAt: string;
+  startedAt?: string;
+};
+
+export type LiveDebateLobbyParticipant = {
+  userId: string;
+  nickname: string;
+  position?: DebatePosition;
+  role?: DebateParticipantRole;
+  isReady: boolean;
+  joinedAt: string;
+};
+
+export type LiveDebateEvaluationParticipant = {
+  userId: string;
+  nickname: string;
+  position: DebatePosition;
+  role: DebateParticipantRole;
+  report: FinalReport;
+};
+
+export type LiveDebateEvaluation = {
+  winner: 'affirmative' | 'negative' | 'draw';
+  overallVerdict: string;
+  affirmativeFeedback: string;
+  negativeFeedback: string;
+  keyClashes: string[];
+  participantReports: LiveDebateEvaluationParticipant[];
+  generatedAt: string;
 };
 
 export type DebateStep = {
@@ -85,7 +138,7 @@ export type OrganizationRole = 'owner' | 'admin' | 'coach';
 export type OrganizationSummary = {
   id: string;
   name: string;
-  role: OrganizationRole;
+  role: OrganizationRole | 'student';
 };
 
 export type OrganizationUser = {
@@ -96,8 +149,12 @@ export type OrganizationUser = {
 
 export type OrganizationTopic = {
   id: string;
+  organizationId: string;
+  organizationName?: string;
   title: string;
   description: string;
+  briefing?: TopicBriefing;
+  config?: Partial<Pick<BattleConfig, 'timeLimit' | 'debateLevel' | 'debateFocus'>>;
   isActive: boolean;
   createdAt: string;
 };

@@ -28,14 +28,17 @@ import {
   Edit2
 } from 'lucide-react';
 import { CreateBattleModal } from './CreateBattleModal';
+import { JoinDebateModal } from './JoinDebateModal';
 import { CommunityPanel } from './CommunityPanel';
 import { ProfileModal } from './ProfileModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
 import { calculateUserStats } from '../lib/userStats';
 import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
-import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, OrganizationTopic, TopicOpinionStats, WeeklyIssue } from '../types';
+import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, LiveDebateRoomSummary, OrganizationSummary, OrganizationTopic, TopicOpinionStats, WeeklyIssue } from '../types';
 import { SUPER_ADMIN_EMAIL } from '../lib/superAdmin';
-import { getMyOrganizationTopics } from '../lib/admin';
+import { getMyMemberOrganizations, getMyOrganizationTopics } from '../lib/admin';
+import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
+import { createDebateRoom } from '../lib/debateRooms';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -65,6 +68,8 @@ const accentStyles = {
 export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLiveOnly, setCreateLiveOnly] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
@@ -75,6 +80,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [opinionStatsCache, setOpinionStatsCache] = useState<Record<string, TopicOpinionStats>>({});
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
   const [organizationTopics, setOrganizationTopics] = useState<OrganizationTopic[]>([]);
+  const [memberOrganizations, setMemberOrganizations] = useState<OrganizationSummary[]>([]);
 
   const [userStats, setUserStats] = useState<any>(null);
 
@@ -87,8 +93,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setOrganizationTopics([]); return; }
+    if (!user) { setOrganizationTopics([]); setMemberOrganizations([]); return; }
     getMyOrganizationTopics().then(setOrganizationTopics);
+    getMyMemberOrganizations().then(setMemberOrganizations);
   }, [user]);
 
   // Load opinion stats for all topics
@@ -186,11 +193,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
     return top5;
   }, [user, userStats]);
 
-  const handleStartBattle = (config: BattleConfig, position: DebatePosition = userPosition) => {
+  const handleStartBattle = async (config: BattleConfig, position: DebatePosition = userPosition) => {
     if (!user) {
       onLoginRequest();
       return;
     }
+
+    if (config.gameMode === 'pvp') {
+      const roomId = createLiveRoomId();
+      await createDebateRoom({
+        roomId,
+        topic: config.topic,
+        timeLimit: config.timeLimit,
+        teamSize: config.teamSize ?? 1,
+        allowModerator: config.allowModerator ?? false,
+        audience: config.audience ?? 'public',
+        organizationId: config.organizationId,
+        organizationName: memberOrganizations.find(org => org.id === config.organizationId)?.name,
+        hostPosition: config.userPosition ?? position,
+        hostRole: config.participantRole ?? 'debater',
+      }, user);
+      navigate(buildDebateLobbyPath(roomId));
+      return;
+    }
+
     navigate('/battle/new', {
       state: {
         ...config,
@@ -199,6 +225,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         debateLevel,
       },
     });
+  };
+
+  const handleJoinBattle = (room: LiveDebateRoomSummary) => {
+    if (!user) return onLoginRequest();
+    navigate(buildDebateLobbyPath(room.roomId));
   };
 
   const handleOpenBriefing = (battleId: string) => {
@@ -259,6 +290,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             )}
             {user ? (
               <div className="flex items-center gap-3">
+                {memberOrganizations.length > 0 && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/institution')}>
+                  <BookOpen size={18} /> {memberOrganizations[0].name}
+                </button>}
                 {user.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
                   <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/super-admin')}>
                     <Shield size={18} /> 슈퍼 관리
@@ -387,7 +421,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             <button
               className="btn btn-secondary"
               style={{ padding: '0.8rem 1.2rem', fontSize: '0.95rem' }}
-              onClick={() => user ? setShowCreateModal(true) : onLoginRequest()}
+              onClick={() => {
+                if (!user) return onLoginRequest();
+                setCreateLiveOnly(false);
+                setShowCreateModal(true);
+              }}
             >
               <Swords size={18} /> 직접 개설
             </button>
@@ -712,6 +750,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
         {/* Right Sidebar */}
         <aside style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+          <div className="debate-sidebar-actions">
+            <button className="btn btn-primary" onClick={() => {
+              if (!user) return onLoginRequest();
+              setCreateLiveOnly(true);
+              setShowCreateModal(true);
+            }}>
+              <Swords size={18} /> 토론 생성
+            </button>
+            <button className="btn btn-secondary" onClick={() => user ? setShowJoinModal(true) : onLoginRequest()}>
+              <LogIn size={18} /> 토론 참여
+            </button>
+          </div>
           {/* Popular Topics */}
           <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <h3 className="flex items-center gap-2" style={{ fontSize: '1.2rem', margin: '0 0 1.5rem 0', color: 'var(--secondary)' }}>
@@ -853,7 +903,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
       )}
 
-      {showCreateModal && <CreateBattleModal onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} organizationTopics={organizationTopics} />}
+      {showCreateModal && <CreateBattleModal liveOnly={createLiveOnly} onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} organizationTopics={organizationTopics} />}
+      {showJoinModal && <JoinDebateModal onClose={() => setShowJoinModal(false)} onJoin={handleJoinBattle} />}
 
       {showProfileModal && user && (
         <ProfileModal 
