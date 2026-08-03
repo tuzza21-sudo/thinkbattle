@@ -365,9 +365,18 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
               role: myRole,
             }),
           });
-          const payload = await response.json() as { token?: string; url?: string; error?: string };
+          const responseText = await response.text();
+          let payload: { token?: string; url?: string; error?: string } = {};
+          try {
+            payload = responseText ? JSON.parse(responseText) as typeof payload : {};
+          } catch {
+            if (!response.ok) {
+              throw new Error(`LiveKit 서버 함수 오류 (${response.status}). 잠시 후 다시 시도해 주세요.`);
+            }
+            throw new Error('LiveKit 서버가 올바르지 않은 응답을 반환했습니다.');
+          }
           if (!response.ok || !payload.token || !payload.url) {
-            throw new Error(payload.error || 'LiveKit 접속 정보를 받지 못했습니다.');
+            throw new Error(payload.error || `LiveKit 접속 정보를 받지 못했습니다. (${response.status})`);
           }
 
           await room.connect(payload.url, payload.token, { autoSubscribe: true });

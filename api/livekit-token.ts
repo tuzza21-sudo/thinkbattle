@@ -10,6 +10,19 @@ type SupabaseAuthUser = {
   };
 };
 
+type NodeRequest = {
+  method?: string;
+  url?: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+};
+
+type NodeResponse = {
+  statusCode: number;
+  setHeader: (name: string, value: string) => void;
+  end: (body?: Uint8Array | string) => void;
+};
+
 const jsonResponse = (body: unknown, status = 200) => new Response(
   JSON.stringify(body),
   {
@@ -40,7 +53,7 @@ const getAuthenticatedUser = async (authorization: string) => {
   return response.json() as Promise<SupabaseAuthUser>;
 };
 
-export default async function handler(req: Request) {
+const handleWebRequest = async (req: Request) => {
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'POST 요청만 허용됩니다.' }, 405);
   }
@@ -135,4 +148,50 @@ export default async function handler(req: Request) {
       error: error instanceof Error ? error.message : 'LiveKit 접속 토큰을 발급하지 못했습니다.',
     }, 500);
   }
+};
+
+const toWebRequest = (req: NodeRequest) => {
+  const headers = new Headers();
+  Object.entries(req.headers || {}).forEach(([key, value]) => {
+    if (Array.isArray(value)) value.forEach(item => headers.append(key, item));
+    else if (value !== undefined) headers.set(key, value);
+  });
+
+  const method = req.method || 'GET';
+  const protocol = headers.get('x-forwarded-proto') || 'https';
+  const host = headers.get('host') || 'localhost';
+  const requestUrl = req.url?.startsWith('http')
+    ? req.url
+    : `${protocol}://${host}${req.url || '/api/livekit-token'}`;
+  let body: string | Uint8Array | undefined;
+  if (method !== 'GET' && method !== 'HEAD' && req.body !== undefined && req.body !== null) {
+    body = typeof req.body === 'string' || req.body instanceof Uint8Array
+      ? req.body
+      : JSON.stringify(req.body);
+  }
+
+  return new Request(requestUrl, { method, headers, body });
+};
+
+function handler(req: Request): Promise<Response>;
+function handler(req: NodeRequest, res: NodeResponse): Promise<void>;
+async function handler(req: Request | NodeRequest, res?: NodeResponse): Promise<Response | void> {
+  try {
+    const webRequest = req instanceof Request ? req : toWebRequest(req);
+    const response = await handleWebRequest(webRequest);
+    if (!res) return response;
+
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.end(new Uint8Array(await response.arrayBuffer()));
+  } catch (error) {
+    console.error('LiveKit request adapter error:', error);
+    const response = jsonResponse({ error: 'LiveKit 서버 요청을 처리하지 못했습니다.' }, 500);
+    if (!res) return response;
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    res.end(new Uint8Array(await response.arrayBuffer()));
+  }
 }
+
+export default handler;
