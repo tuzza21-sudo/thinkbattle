@@ -107,7 +107,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
 
   useEffect(() => {
     const unsubscribe = subscribeToDebateLobby(roomId, () => void refresh());
-    const pollingId = window.setInterval(() => void refresh(), 2500);
+    const pollingId = window.setInterval(() => void refresh(), 750);
     return () => {
       unsubscribe();
       window.clearInterval(pollingId);

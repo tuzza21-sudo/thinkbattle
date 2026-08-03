@@ -94,13 +94,21 @@ export default async function handler(req: Request) {
     const roomService = new RoomServiceClient(livekitApiHost, livekitApiKey, livekitApiSecret);
     const existingRooms = await roomService.listRooms([roomName]);
     if (existingRooms.length === 0) {
-      await roomService.createRoom({
-        name: roomName,
-        maxParticipants,
-        emptyTimeout: 10 * 60,
-        departureTimeout: 5 * 60,
-        metadata: JSON.stringify({ app: 'thinkbattle', mode: 'pvp', maxParticipants }),
-      });
+      try {
+        await roomService.createRoom({
+          name: roomName,
+          maxParticipants,
+          emptyTimeout: 10 * 60,
+          departureTimeout: 5 * 60,
+          metadata: JSON.stringify({ app: 'thinkbattle', mode: 'pvp', maxParticipants }),
+        });
+      } catch (createError) {
+        // Every lobby member requests a token at nearly the same moment. One
+        // request can create the room between another request's list/create
+        // calls, so treat an already-created room as a successful outcome.
+        const roomsAfterConflict = await roomService.listRooms([roomName]);
+        if (roomsAfterConflict.length === 0) throw createError;
+      }
     }
 
     const accessToken = new AccessToken(livekitApiKey, livekitApiSecret, {

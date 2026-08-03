@@ -41,7 +41,7 @@ const createParticipantToken = async (identity) => {
 try {
   await roomService.createRoom({
     name: roomName,
-    maxParticipants: 2,
+    maxParticipants: 6,
     emptyTimeout: 60,
     departureTimeout: 20,
     metadata: JSON.stringify({ app: 'thinkbattle', purpose: 'smoke-test' }),
@@ -51,25 +51,21 @@ try {
   const [room] = await roomService.listRooms([roomName]);
   if (!room) throw new Error('생성한 테스트 방을 다시 조회하지 못했습니다.');
 
-  const [tokenA, tokenB] = await Promise.all([
-    createParticipantToken('codex-test-a'),
-    createParticipantToken('codex-test-b'),
-  ]);
+  const identities = Array.from({ length: 6 }, (_, index) => `codex-test-${index + 1}`);
+  const tokens = await Promise.all(identities.map(createParticipantToken));
   const verifier = new TokenVerifier(apiKey, apiSecret);
-  const [claimsA, claimsB, participants] = await Promise.all([
-    verifier.verify(tokenA),
-    verifier.verify(tokenB),
+  const [claims, participants] = await Promise.all([
+    Promise.all(tokens.map(token => verifier.verify(token))),
     roomService.listParticipants(roomName),
   ]);
 
-  const tokenAValid = claimsA.sub === 'codex-test-a'
-    && claimsA.video?.room === roomName
-    && claimsA.video?.roomJoin === true;
-  const tokenBValid = claimsB.sub === 'codex-test-b'
-    && claimsB.video?.room === roomName
-    && claimsB.video?.roomJoin === true;
+  const participantTokensValid = claims.every((claim, index) => (
+    claim.sub === identities[index]
+    && claim.video?.room === roomName
+    && claim.video?.roomJoin === true
+  ));
 
-  if (!tokenAValid || !tokenBValid) {
+  if (!participantTokensValid) {
     throw new Error('참가자 토큰의 서명 또는 방 권한 검증에 실패했습니다.');
   }
 
@@ -77,7 +73,7 @@ try {
     cloudConnection: 'ok',
     roomCreateAndRead: 'ok',
     maxParticipants: room.maxParticipants,
-    participantTokens: tokenAValid && tokenBValid ? 'ok' : 'failed',
+    participantTokens: participantTokensValid ? '6/6 ok' : 'failed',
     activeParticipants: participants.length,
   }, null, 2));
 } finally {

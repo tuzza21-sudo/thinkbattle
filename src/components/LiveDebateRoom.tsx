@@ -346,42 +346,53 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     const connect = async () => {
       setConnection('connecting');
       setConnectionError(null);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt += 1) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해 주세요.');
 
-        const response = await fetch('/api/livekit-token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            roomName: roomId,
-            maxParticipants: teamSize * 2 + (allowModerator ? 1 : 0),
-            position: myPosition,
-            role: myRole,
-          }),
-        });
-        const payload = await response.json() as { token?: string; url?: string; error?: string };
-        if (!response.ok || !payload.token || !payload.url) {
-          throw new Error(payload.error || 'LiveKit 접속 정보를 받지 못했습니다.');
-        }
+          const response = await fetch('/api/livekit-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              roomName: roomId,
+              maxParticipants: teamSize * 2 + (allowModerator ? 1 : 0),
+              position: myPosition,
+              role: myRole,
+            }),
+          });
+          const payload = await response.json() as { token?: string; url?: string; error?: string };
+          if (!response.ok || !payload.token || !payload.url) {
+            throw new Error(payload.error || 'LiveKit 접속 정보를 받지 못했습니다.');
+          }
 
-        await room.connect(payload.url, payload.token, { autoSubscribe: true });
-        if (cancelled) {
-          await room.disconnect();
+          await room.connect(payload.url, payload.token, { autoSubscribe: true });
+          if (cancelled) {
+            await room.disconnect();
+            return;
+          }
+          setConnection('connected');
+          setIsAudioBlocked(!room.canPlaybackAudio);
+          refreshParticipants();
           return;
+        } catch (error) {
+          lastError = error;
+          console.warn(`LiveKit connection attempt ${attempt + 1} failed:`, error);
+          await room.disconnect().catch(() => undefined);
+          if (attempt < 2 && !cancelled) {
+            await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+          }
         }
-        setConnection('connected');
-        setIsAudioBlocked(!room.canPlaybackAudio);
-        refreshParticipants();
-      } catch (error) {
-        if (cancelled) return;
-        console.error('LiveKit connection error:', error);
-        setConnection('error');
-        setConnectionError(error instanceof Error ? error.message : 'LiveKit 방에 연결하지 못했습니다.');
       }
+
+      if (cancelled) return;
+      console.error('LiveKit connection error:', lastError);
+      setConnection('error');
+      setConnectionError(lastError instanceof Error ? lastError.message : 'LiveKit 방에 연결하지 못했습니다.');
     };
 
     void connect();
@@ -477,8 +488,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       setSpeechError('LiveKit 연결이 완료된 뒤 마이크를 사용할 수 있습니다.');
       return;
     }
-    if (participants.length === 0) {
-      setSpeechError('다른 참가자가 입장한 뒤 발언해 주세요.');
+    if (!allDebatersConnected) {
+      setSpeechError(`대기실 참가자들이 토론방에 연결되는 중입니다. (${connectedDebaterCount}/${requiredDebaterCount})`);
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
@@ -636,7 +647,11 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const sessionFinished = forcedFinished || remainingSeconds === 0;
   const isMyStage = !sessionFinished && myRole === currentOwnerRole;
   const isRoomReady = connection === 'connected';
-  const composerDisabled = !isRoomReady || sessionFinished;
+  const requiredDebaterCount = teamSize * 2;
+  const connectedDebaterCount = (myRole === 'moderator' ? 0 : 1)
+    + participants.filter(participant => participant.role !== 'moderator').length;
+  const allDebatersConnected = connectedDebaterCount >= requiredDebaterCount;
+  const composerDisabled = !isRoomReady || !allDebatersConnected || sessionFinished;
   const connectedParticipantIds = [user?.id || '', ...participants.map(participant => participant.id)].filter(Boolean);
   const evaluationLeaderId = connectedParticipantIds.includes(hostId)
     ? hostId
@@ -806,14 +821,16 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             </div>
           )) : (
             <div className="compact-player">
-              <UserRound size={30} /><div><strong>참가자 대기 중</strong><span>초대 링크를 공유하세요</span></div>
+              <UserRound size={30} /><div><strong>토론방 연결 중</strong><span>대기실 참가자를 불러오고 있습니다</span></div>
             </div>
           )}
         </div>
 
         <div className={`live-connection-chip ${connection}`}>
           <Radio size={16} />
-          <span>{getConnectionLabel(connection)}</span>
+          <span>{isRoomReady && !allDebatersConnected
+            ? `참가자 연결 중 ${connectedDebaterCount}/${requiredDebaterCount}`
+            : getConnectionLabel(connection)}</span>
         </div>
 
         <div className={`compact-timer ${remainingSeconds <= 60 ? 'urgent' : ''}`}>
@@ -866,8 +883,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             {displayArguments.length === 0 && (
               <div className="live-room-empty">
                 <Mic size={28} />
-                <strong>{participants.length ? '마이크 버튼을 누르고 첫 발언을 시작하세요.' : '다른 참가자의 입장을 기다리고 있습니다.'}</strong>
-                <span>말하는 동안 상대방에게 음성이 전달되고, 중지하면 Gemini 전사문이 양쪽 화면에 등록됩니다.</span>
+                <strong>{allDebatersConnected
+                  ? '모든 토론자가 연결되었습니다. 첫 발언을 시작하세요.'
+                  : `대기실 참가자를 토론방에 연결하고 있습니다. (${connectedDebaterCount}/${requiredDebaterCount})`}</strong>
+                <span>{allDebatersConnected
+                  ? '말하는 동안 상대방에게 음성이 전달되고, 중지하면 Gemini 전사문이 양쪽 화면에 등록됩니다.'
+                  : '대기실에서 준비를 마친 참가자는 자동으로 이 화면에 연결됩니다.'}</span>
               </div>
             )}
 
@@ -875,12 +896,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
               <ArgumentCard key={argument.id} argument={argument} player={getPlayer(argument)} />
             ))}
 
-            <div className={`input-zone ${isRoomReady ? 'my-turn' : ''}`}>
+            <div className={`input-zone ${isRoomReady && allDebatersConnected ? 'my-turn' : ''}`}>
               <div className="input-container">
                 <div className="composer-head">
                   <span>
                     <Radio size={17} />
-                    {participants.length ? '내 발언' : '참가자 입장 대기 중'}
+                    {allDebatersConnected ? '내 발언' : `참가자 연결 중 ${connectedDebaterCount}/${requiredDebaterCount}`}
                   </span>
                   <small>{content.length}/1200</small>
                 </div>
@@ -890,9 +911,9 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                     value={content}
                     maxLength={1200}
                     disabled={composerDisabled}
-                    placeholder={participants.length
+                    placeholder={allDebatersConnected
                       ? '텍스트로 발언하거나 마이크 버튼을 누르고 말하세요.'
-                      : '상대방이 입장하기 전에도 텍스트를 준비할 수 있습니다.'}
+                      : '대기실 참가자가 모두 연결되면 바로 발언할 수 있습니다.'}
                     onChange={event => setContent(event.target.value)}
                     onKeyDown={event => {
                       if (event.key === 'Enter' && !event.shiftKey) {
@@ -905,7 +926,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                     type="button"
                     className={`btn microphone-button ${isSpeaking ? 'is-listening' : ''}`}
                     onClick={handleMicrophoneClick}
-                    disabled={composerDisabled || isTranscribing || participants.length === 0}
+                    disabled={composerDisabled || isTranscribing}
                     aria-pressed={isSpeaking}
                     title={isSpeaking ? '발언 종료 후 텍스트 변환' : '누르고 발언 시작'}
                   >
@@ -958,7 +979,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           <div className="coach-section">
             <h2><Users size={18} /> 이용 방법</h2>
             <ol>
-              <li>초대 링크를 상대방에게 보냅니다.</li>
+              <li>대기실에서 준비를 마친 참가자는 자동으로 연결됩니다.</li>
               <li>발언 시작을 누르면 상대방에게 음성이 전달됩니다.</li>
               <li>발언 종료를 누르면 음성이 Gemini로 전사됩니다.</li>
               <li>전사 결과는 양쪽 토론 기록에 자동 등록됩니다.</li>
@@ -968,7 +989,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             <h2><Radio size={18} /> 현재 상태</h2>
             <dl className="live-room-status-list">
               <div><dt>LiveKit</dt><dd>{getConnectionLabel(connection)}</dd></div>
-              <div><dt>참가 인원</dt><dd>{participants.length + 1} / {teamSize * 2 + (allowModerator ? 1 : 0)}명</dd></div>
+              <div><dt>토론자 연결</dt><dd>{connectedDebaterCount} / {requiredDebaterCount}명</dd></div>
               <div><dt>현재 단계</dt><dd>{currentPhase.label} · {formatDebateMinutes(currentPhase.seconds)}</dd></div>
               <div><dt>내 마이크</dt><dd>{isSpeaking ? '송출 중' : '꺼짐'}</dd></div>
               <div><dt>녹음 저장</dt><dd>저장 안 함</dd></div>
