@@ -1,5 +1,5 @@
 import { getDebateSteps } from './debateEngine';
-import type { DebateLevel, DebatePosition, DebateRoundId, DebateStep } from '../types';
+import type { DebateLevel, DebatePosition, DebateRoundId, DebateStep, LiveDebateArgument } from '../types';
 
 export type LiveDebatePhase = {
   id: string;
@@ -14,6 +14,18 @@ export type LiveDebatePhase = {
   checklist: string[];
   sentenceFrames: string[];
   inputPlaceholder: string;
+};
+
+export type LiveDebateArgumentTiming = {
+  recommendedSeconds: number;
+  elapsedSeconds: number;
+  overtimeSeconds: number;
+};
+
+export type LiveDebateProgress = {
+  completedPhaseCount: number;
+  activePhaseStartedAtMs: number;
+  argumentTimingById: Record<string, LiveDebateArgumentTiming>;
 };
 
 type PhaseTemplate = {
@@ -39,16 +51,26 @@ const getTemplates = (level: DebateLevel): PhaseTemplate[] => {
   const shared: PhaseTemplate[] = [
     { id: 'affirmative-opening', position: 'affirmative', stepId: `${prefix}-opening-user`, title: '입론' },
     { id: 'negative-opening', position: 'negative', stepId: `${prefix}-opening-user`, title: '입론' },
-    { id: 'affirmative-question', position: 'affirmative', targetPosition: 'negative', stepId: `${prefix}-cross-question-user`, title: '교차질문' },
-    { id: 'negative-answer', position: 'negative', targetPosition: 'affirmative', stepId: `${prefix}-cross-question-answer-user`, title: '교차질문 답변' },
-    { id: 'negative-question', position: 'negative', targetPosition: 'affirmative', stepId: `${prefix}-cross-question-user`, title: '교차질문' },
-    { id: 'affirmative-answer', position: 'affirmative', targetPosition: 'negative', stepId: `${prefix}-cross-question-answer-user`, title: '교차질문 답변' },
+    { id: 'affirmative-question', position: 'affirmative', targetPosition: 'negative', stepId: `${prefix}-cross-question-user`, title: level === 'intermediate' ? '교차질문' : '질문' },
+    { id: 'negative-answer', position: 'negative', targetPosition: 'affirmative', stepId: `${prefix}-cross-question-answer-user`, title: level === 'intermediate' ? '교차질문 답변' : '질문 답변' },
+    { id: 'negative-question', position: 'negative', targetPosition: 'affirmative', stepId: `${prefix}-cross-question-user`, title: level === 'intermediate' ? '교차질문' : '질문' },
+    { id: 'affirmative-answer', position: 'affirmative', targetPosition: 'negative', stepId: `${prefix}-cross-question-answer-user`, title: level === 'intermediate' ? '교차질문 답변' : '질문 답변' },
   ];
 
   if (level === 'intermediate') {
     shared.push(
-      { id: 'affirmative-analysis', position: 'affirmative', stepId: 'intermediate-opponent-summary-user', title: '상대 주장 분석' },
-      { id: 'negative-analysis', position: 'negative', stepId: 'intermediate-opponent-summary-user', title: '상대 주장 분석' },
+      {
+        id: 'affirmative-analysis',
+        position: 'affirmative',
+        stepId: 'intermediate-opponent-summary-user',
+        title: '상대 전제 분석',
+      },
+      {
+        id: 'negative-analysis',
+        position: 'negative',
+        stepId: 'intermediate-opponent-summary-user',
+        title: '상대 전제 분석',
+      },
     );
   }
 
@@ -69,13 +91,13 @@ const getTemplates = (level: DebateLevel): PhaseTemplate[] => {
       id: 'affirmative-closing',
       position: 'affirmative',
       stepId: level === 'intermediate' ? 'intermediate-closing-user' : 'beginner-weighing-user',
-      title: '최종발언',
+      title: level === 'intermediate' ? '최종 입장 확인' : '최종변론',
     },
     {
       id: 'negative-closing',
       position: 'negative',
       stepId: level === 'intermediate' ? 'intermediate-closing-user' : 'beginner-weighing-user',
-      title: '최종발언',
+      title: level === 'intermediate' ? '최종 입장 확인' : '최종변론',
     },
   );
   return shared;
@@ -122,4 +144,51 @@ export const getLiveDebateCourse = (
       inputPlaceholder: humanize(step.inputPlaceholder || `${template.title} 내용을 입력하세요.`),
     };
   });
+};
+
+/**
+ * A live phase is complete only after the assigned speaker's argument for that
+ * phase has been registered. Phase durations are recommendations, not cutoffs.
+ */
+export const getLiveDebateProgress = (
+  phases: LiveDebatePhase[],
+  argumentsList: LiveDebateArgument[],
+  startedAtMs: number,
+): LiveDebateProgress => {
+  const orderedArguments = [...argumentsList]
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const safeStartedAtMs = Number.isFinite(startedAtMs) ? startedAtMs : 0;
+  const argumentTimingById: Record<string, LiveDebateArgumentTiming> = {};
+  let argumentCursor = 0;
+  let phaseStartedAtMs = safeStartedAtMs;
+  let completedPhaseCount = 0;
+
+  for (const phase of phases) {
+    const relativeIndex = orderedArguments
+      .slice(argumentCursor)
+      .findIndex(argument => argument.phaseId === phase.id);
+    if (relativeIndex < 0) break;
+
+    const argumentIndex = argumentCursor + relativeIndex;
+    const argument = orderedArguments[argumentIndex];
+    const parsedCompletedAtMs = Date.parse(argument.createdAt);
+    const completedAtMs = Number.isFinite(parsedCompletedAtMs)
+      ? Math.max(phaseStartedAtMs, parsedCompletedAtMs)
+      : phaseStartedAtMs;
+    const elapsedSeconds = Math.max(0, Math.floor((completedAtMs - phaseStartedAtMs) / 1000));
+    argumentTimingById[argument.id] = {
+      recommendedSeconds: phase.seconds,
+      elapsedSeconds,
+      overtimeSeconds: Math.max(0, elapsedSeconds - phase.seconds),
+    };
+    completedPhaseCount += 1;
+    phaseStartedAtMs = completedAtMs;
+    argumentCursor = argumentIndex + 1;
+  }
+
+  return {
+    completedPhaseCount,
+    activePhaseStartedAtMs: phaseStartedAtMs,
+    argumentTimingById,
+  };
 };

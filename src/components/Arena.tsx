@@ -253,7 +253,7 @@ const getChecklistHint = (label: string): string => {
   if (label.includes('전제 분석력')) return '상대 주장이 성립하려면 반드시 참이어야 하는 숨은 전제를 드러내세요.';
   if (label.includes('근거 검증력')) return '상대 근거의 신뢰성, 관련성, 충분성을 각각 구체적으로 검토해 주세요.';
   if (label.includes('충돌 지점 파악')) return '내 주장과 상대 주장이 실제로 부딪히는 핵심 충돌 지점을 표시해 주세요.';
-  if (label.includes('상대 주장 분석')) return '앞 단계에서 확인한 핵심 쟁점, 핵심 전제, 근거 타당성을 반박의 출발점으로 삼아주세요.';
+  if (label.includes('상대 전제 분석')) return '상대 결론이 성립하려면 반드시 참이어야 하는 숨겨진 전제와 가정을 찾아보세요.';
   if (label.includes('핵심 논지 이해')) return '상대방의 핵심 주장을 정확하게 짚었는지 확인해 주세요.';
   if (label.includes('논리 구조 파악')) return '상대방의 주장과 이유, 근거를 명확하게 분리해서 파악해 주세요.';
   if (label.includes('상대 주장 요약력')) return '상대의 주장을 내 말로 다시 한번 정리해 주세요.';
@@ -289,7 +289,7 @@ const isChecklistMet = (label: string, content: string): boolean => {
   if (label.includes('전제 분석력')) return hasAny(content, ['전제', '가정', '성립', '깔고', '의존']);
   if (label.includes('근거 검증력')) return hasAny(content, ['신뢰성', '관련성', '충분성', '근거', '자료', '검증']);
   if (label.includes('충돌 지점 파악')) return hasAny(content, ['충돌', '부딪', '대립', '쟁점', '차이']);
-  if (label.includes('상대 주장 분석')) return hasAny(content, ['핵심 쟁점', '핵심 전제', '근거 타당', '상대 주장 분석', '점검', '전제', '근거']);
+  if (label.includes('상대 전제 분석')) return hasAny(content, ['핵심 전제', '숨겨진 전제', '가정', '성립', '의존', '예외']);
   if (label.includes('핵심 논지 이해')) return hasAny(content, ['논지', '핵심', '주장']);
   if (label.includes('논리 구조 파악')) return hasAny(content, ['이유', '근거', '구조', '분리', '전제', '주장']);
   if (label.includes('상대 주장 요약력')) return hasAny(content, ['정리', '요약', '제 생각', '이해']);
@@ -423,7 +423,7 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
   const isDebateMode = config.gameMode === 'debate';
   const isRoundtableMode = config.gameMode === 'roundtable';
 
-  let playerA: Player = {
+  const playerA: Player = {
     id: 'p1',
     name: isDebateMode ? `나 · ${getPositionLabel(userPosition)}` : '나',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
@@ -1247,7 +1247,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
               <Sparkles size={18} />
               <div>
                 {!(checklistStep?.title === '반박' && !currentStageEvaluation) && (
-                  <span>{currentStageEvaluation ? '평가 항목' : (checklistStep?.title === '상대 주장 분석' ? '상대 주장에 대한 논제파악력' : '체크 항목')}</span>
+                  <span>{currentStageEvaluation ? '평가 항목' : (checklistStep?.title === '상대 전제 분석' ? '상대 주장의 전제파악능력' : '체크 항목')}</span>
                 )}
                 <strong>{currentStageEvaluation ? currentStageEvaluation.title : (checklistStep?.title === '반박' ? '반박력 체크' : checklistTitle)}</strong>
               </div>

@@ -699,8 +699,8 @@ Pre-session: The user selects a position. In the first definition phase, the use
 4. 교차질문: the user tests your premise, Evidence sufficiency, scope, alternative, or priority.
 5. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Evidence, scope, standard, or warrant.
 6. AI 교차질문 답변: the user answers your cross-question and reinforces their opening.
-7. 상대 주장 분석: the user identifies the winning issue, exposes your core premise, tests Evidence credibility/relevance/sufficiency, and identifies the main clash point.
-8. 반박: the user should not merely deny your conclusion; they should rebut the weakest premise, Evidence validity, solution, or priority needed for your conclusion, using the issue/premise/Evidence checks from 상대 주장 분석, and propose a realistic alternative with fewer side effects.
+7. 상대 전제 분석: the user reconstructs your actual Claim and Reason, exposes the hidden premise or assumption required for your conclusion, and tests whether it is valid or has exceptions.
+8. 반박: the user should not merely deny your conclusion; they should rebut the weakest premise, Evidence validity, solution, or priority needed for your conclusion, using the premise identified in 상대 전제 분석, and propose a realistic alternative with fewer side effects.
 9. 충돌 지점 확인 및 중요성 비교: the user identifies 2-3 clash points and weighs severity, scope, probability, urgency, feasibility, or reversibility.
 10. 최종 입장 확인: the user summarizes the debate without adding a new claim.
 `;
@@ -730,9 +730,8 @@ Pre-session: The user selects a position.
 3. 교차질문: user asks about the opponent's meaning, Evidence, Reason, example, or weak point. Do not require warrant or hidden-premise analysis at beginner level.
 4. AI cross-question: after answering the user's cross-question, you must ask one focused cross-question about the user's opening Claim, Reason, Evidence, or example.
 5. AI 교차질문 답변: user answers your cross-question and reinforces their opening.
-6. 상대 주장 분석: user identifies the opponent's core Claim, checks Evidence credibility/relevance/sufficiency, and finds one weak point.
-7. 반박: user should not merely deny the opponent's conclusion; user rebuts the weakest Reason, Evidence, or solution from 상대 주장 분석, and may propose a realistic alternative with fewer side effects.
-8. 최종발언: user restates their final position, strongest Reason, supporting Evidence or example, and gives the final statement. Do not require clash-point weighing or comparison criteria at beginner level.
+6. 반박: user should not merely deny the opponent's conclusion; user uses the cross-question and answer to rebut the weakest Reason, Evidence, or solution, and may propose a realistic alternative with fewer side effects.
+7. 최종발언: user restates their final position, strongest Reason, supporting Evidence or example, and gives the final statement. Do not require hidden-premise analysis, clash-point weighing, or comparison criteria at beginner level.
 `;
 };
 
@@ -784,18 +783,14 @@ If they evade the question, say exactly what remains unanswered. If they repair 
 [Phase contract: answer to cross-question]
 Check whether the user directly answers the AI's premise, evidence, scope, standard, or priority challenge, and whether they repair the warrant between their Reason and Claim.
 Name one exact repair or unresolved gap. Do not ask another cross-question; transition toward analysing the AI case.`,
-    'beginner-opponent-summary-user': `
-[Phase contract: opponent analysis]
-The user must accurately reconstruct the AI's Claim, Reason, and Evidence before attacking it. Do not reward a strawman.
-Check whether the chosen weakness is about a Reason, Evidence, or conclusion link. Name the best target for the upcoming rebuttal, but do not deliver that rebuttal for them.`,
     'intermediate-opponent-summary-user': `
-[Phase contract: opponent analysis]
-Check whether the user separates the AI's Claim, Reason, Evidence, premise, and central clash. Penalize summaries that replace the AI's actual argument with an easier one.
-Identify whether the best target is a premise, evidence quality, causal link, scope, alternative, or priority.`,
+[Phase contract: opponent premise analysis]
+Check whether the user reconstructs the AI's actual Claim and Reason without creating a strawman, then states the hidden premise or assumption required for the conclusion to follow.
+Require the user to test whether that premise is true, generally applicable, or defeated by a concrete exception. Distinguish a genuine hidden premise from a mere disagreement or summary.`,
     'beginner-rebuttal-user': `
 [Phase contract: rebuttal]
 Check whether the user attacks a specific AI Reason, Evidence, or conclusion link identified earlier. A rebuttal must explain why the weakness makes the AI conclusion less convincing; disagreement alone is not enough.
-Check whether they use the cross-question answer or opponent analysis. Defend the AI side against that exact attack, then identify one remaining logical gap or unsupported link.`,
+Check whether they use the cross-question and answer. Defend the AI side against that exact attack, then identify one remaining logical gap or unsupported link.`,
     'intermediate-rebuttal-user': `
 [Phase contract: rebuttal]
 Check that the user identifies a specific target and attack type: premise, evidence, warrant, scope, alternative, or priority. Verify that the reasoning shows how the weakness changes the AI conclusion.
@@ -1236,6 +1231,24 @@ export async function generateLiveDebateEvaluation(
   transcript: LiveEvaluationArgumentInput[],
   context?: { description?: string; level?: DebateLevel },
 ): Promise<LiveDebateEvaluation> {
+  const evaluationCategoryNames = context?.level === 'intermediate'
+    ? ['논지파악력', '논리력', '근거력', '질문력', '반박력', '전제파악능력', '우선순위 판단력']
+    : ['논지파악력', '논리력', '근거력', '질문력', '반박력'];
+  const evaluationCategoryGuide = context?.level === 'intermediate'
+    ? `
+1. 논지파악력: 상대의 실제 주장과 이유를 왜곡 없이 이해했는가?
+2. 논리력: 자신의 주장·이유·근거를 일관되게 연결했는가?
+3. 근거력: 구체적이고 관련 있는 근거를 활용했는가?
+4. 질문력: 교차질문에서 상대의 전제·근거·범위·대안·우선순위를 정확히 겨냥했는가?
+5. 반박력: 확인한 약점이 상대 결론을 어떻게 약화하는지 설명했는가?
+6. 전제파악능력: [교차질문]에서 숨겨진 가정을 끌어내고, [상대 전제 분석]에서 결론에 필요한 전제·가정·적용 조건을 명시하여 타당성이나 예외를 검토했으며, [반박]에서 그 전제를 실제로 공격했는가?
+7. 우선순위 판단력: [충돌 지점·중요성 비교]에서 명확한 비교 기준으로 어느 쪽 근거가 더 중요한지 판단했는가?`
+    : `
+1. 논지파악력: 교차질문과 반박에서 상대의 핵심 주장·이유·근거를 정확히 다뤘는가?
+2. 논리력: 자신의 주장·이유·근거를 일관되게 연결했는가?
+3. 근거력: 구체적이고 관련 있는 근거를 활용했는가?
+4. 질문력: 상대의 의미·이유·근거·사례·약점을 명확하게 질문했는가?
+5. 반박력: 질문과 답변에서 확인한 약점을 근거로 상대 논리를 설득력 있게 반박했는가?`;
   const participantById = new Map(participants.map(participant => [participant.userId, participant]));
   const roleLabels: Record<DebateParticipantRole, string> = {
     debater: '토론자', opening: '입론 담당', rebuttal: '질의·반론 담당', closing: '최종 변론 담당', moderator: '진행자',
@@ -1265,14 +1278,11 @@ ${transcriptText || '(기록된 발언 없음)'}
 Do not participate in the debate or invent evidence. Judge only observable statements in the transcript.
 First identify the central clashes and compare both teams on claim clarity, evidence quality, direct engagement with opposing arguments, and consistency.
 Then evaluate EVERY listed participant according to the role assigned to that participant. A participant must not be penalized for work assigned to another role.
-For each participant output exactly these five categories, each out of 5:
-1. 논증 명료성
-2. 근거 활용
-3. 상대 논점 대응
-4. 역할 수행도
-5. 개선 가능성 (a higher score means the participant demonstrated strong capacity to revise or deepen the argument)
+For each participant output exactly these ${evaluationCategoryNames.length} categories, using the exact Korean category names and order below. Each category is out of 5:
+${evaluationCategoryGuide}
+For 전제파악능력, do not reward merely using the words "전제" or "가정". The participant must identify an unstated proposition required for the opponent's conclusion and test its validity, scope, or exception.
 Each category feedback must cite one concrete observed statement or absence and give one actionable next move. Do not fabricate quotations.
-If the transcript is too sparse, score conservatively and say what could not be observed.
+If a category belongs to a phase assigned to another team role, do not penalize the participant for not performing that phase; explain that it was not observable from their assigned role. If the participant was assigned the relevant phase but the transcript is too sparse, score conservatively and say what could not be observed.
 Return only valid JSON matching the schema. Preserve every userId exactly.`;
 
   const response = await createChatCompletion({
@@ -1289,12 +1299,16 @@ Return only valid JSON matching the schema. Preserve every userId exactly.`;
   const participantReports = participants.map(participant => {
     const raw = reportsById.get(participant.userId);
     const categories = Array.isArray(raw?.categories) ? raw.categories as FinalReport['categories'] : [];
-    const normalizedCategories = categories.slice(0, 5).map(category => ({
-      name: category.name || '평가 항목',
-      score: Math.min(5, Math.max(0, Number(category.score) || 0)),
+    const categoriesByName = new Map(categories.map(category => [category.name, category]));
+    const normalizedCategories = evaluationCategoryNames.map((name, index) => {
+      const category = categoriesByName.get(name) ?? categories[index];
+      return {
+      name,
+      score: Math.min(5, Math.max(0, Number(category?.score) || 0)),
       maxScore: 5,
-      feedback: category.feedback || '관찰된 발언이 충분하지 않습니다.',
-    }));
+      feedback: category?.feedback || '관찰된 발언이 충분하지 않습니다.',
+    };
+    });
     const totalScore = normalizedCategories.reduce((total, category) => total + category.score, 0);
     return {
       ...participant,
@@ -1359,7 +1373,7 @@ Score the user using exactly these categories (out of 5 points each).
 IMPORTANT: For each category, focus on the specified debate phase(s) marked with "→ 평가 근거". Base your score and feedback primarily on the user's performance in those phases.
 ${debateLevel === 'beginner'
     ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
-  → 평가 근거: [상대 주장 분석] 단계에서 상대 주장·이유·근거를 정확히 파악했는지 평가
+  → 평가 근거: [교차질문]에서 상대 주장의 핵심을 정확히 겨냥했는지, [반박]에서 상대 주장·이유·근거를 왜곡 없이 다뤘는지 평가
 - 논리력: 생각을 일관된 논리로 연결했는가?
   → 평가 근거: [입론] 단계에서 주장-이유-근거의 연결이 일관되고, [최종발언]에서 논리적으로 마무리했는지 평가
 - 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
@@ -1370,7 +1384,7 @@ ${debateLevel === 'beginner'
   → 평가 근거: [반박] 단계에서 상대 논리의 비약·모순 지적 능력, [AI 교차질문 답변] 단계에서 방어력 평가`
     : debateLevel === 'intermediate'
     ? `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?
-  → 평가 근거: [상대 주장 분석] 단계에서 핵심 쟁점·전제·근거를 분리하여 파악했는지 평가
+  → 평가 근거: [상대 전제 분석] 단계에서 상대의 실제 주장·이유와 숨겨진 전제를 구분하여 파악했는지 평가
 - 논리력: 생각을 일관된 논리로 연결했는가?
   → 평가 근거: [입론] 단계에서 용어 정의→판단 기준→주장→이유→근거의 구조적 연결, [최종 입장 확인]에서 일관된 마무리 평가
 - 근거력: 주장을 신뢰할 수 있는 증거로 뒷받침했는가?
@@ -1380,7 +1394,7 @@ ${debateLevel === 'beginner'
 - 반박력: 논리적 허점을 찾아 설득력 있게 대응했는가?
   → 평가 근거: [반박] 단계에서 핵심 쟁점·전제를 바탕으로 한 논리적 공격력, [AI 교차질문 답변] 단계에서 방어·보강 능력 평가
 - 전제파악능력: 숨겨진 가정과 전제를 발견했는가?
-  → 평가 근거: [상대 주장 분석] 단계에서 상대 주장이 의존하는 핵심 전제를 드러냈는지, [교차질문] 단계에서 숨겨진 가정을 질문으로 끌어냈는지 평가
+  → 평가 근거: [상대 전제 분석] 단계에서 상대 결론이 의존하는 숨겨진 전제를 드러내고 타당성·예외를 검토했는지, [교차질문] 단계에서 숨겨진 가정을 질문으로 끌어냈는지 평가
 - 우선순위 판단력: 여러 가치와 근거를 비교해 더 중요한 기준을 제시했는가?
   → 평가 근거: [충돌 지점 확인 및 중요성 비교] 단계에서 피해 심각성·영향 범위·발생 가능성·긴급성·회복 가능성 등 비교 기준을 활용하여 내 주장의 우위를 설득력 있게 제시했는지 평가`
     : `- 논지파악력: 상대의 핵심 주장을 정확히 이해했는가?

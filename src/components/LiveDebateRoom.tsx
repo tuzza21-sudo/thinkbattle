@@ -36,7 +36,7 @@ import { LiveDebateEvaluationModal } from './LiveDebateEvaluationModal';
 import { supabase } from '../lib/supabase';
 import { transcribeDebateAudio } from '../lib/transcription';
 import { formatDebateMinutes } from '../lib/debateTiming';
-import { getLiveDebateCourse, type LiveDebatePhase } from '../lib/liveDebateCourse';
+import { getLiveDebateCourse, getLiveDebateProgress, type LiveDebatePhase } from '../lib/liveDebateCourse';
 import { generateLiveDebateAiTurn, generateLiveDebateEvaluation } from '../lib/api';
 import { getDebateRoom, getLiveDebateArguments, getLiveDebateEvaluation, getLobbyParticipants, saveLiveDebateAiArgument, saveLiveDebateArgument, saveLiveDebateEvaluation } from '../lib/debateRooms';
 import { saveDebateRecord } from '../lib/history';
@@ -85,9 +85,15 @@ type LiveParticipantView = {
 };
 
 const LIVE_DATA_TOPIC = 'thinkbattle.debate';
-const MAX_RECORDING_SECONDS = 180;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+type PendingRecording = {
+  blob: Blob;
+  completedAt: string;
+  phaseId?: string;
+  phaseLabel?: string;
+};
 
 const createMessageId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -185,8 +191,9 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const transcriptionControllerRef = useRef<AbortController | null>(null);
-  const recordingTimeoutRef = useRef<number | null>(null);
   const discardRecordingRef = useRef(false);
+  const recordingPhaseRef = useRef<Pick<PendingRecording, 'phaseId' | 'phaseLabel'> | null>(null);
+  const recordingCompletedAtRef = useRef<string | null>(null);
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const evaluationRequestedRef = useRef(false);
   const savedEvaluationRef = useRef(false);
@@ -202,11 +209,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const [pendingRecording, setPendingRecording] = useState<Blob | null>(null);
+  const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
   const [isAudioBlocked, setIsAudioBlocked] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [sessionStartedAtMs] = useState(() => Number.isFinite(startedAtMs) ? startedAtMs : Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(() => Number.isFinite(startedAtMs)
-    ? Math.min(timeLimit, Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)))
+    ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
     : 0);
   const [forcedFinished, setForcedFinished] = useState(false);
   const [evaluation, setEvaluation] = useState<LiveDebateEvaluation | null>(null);
@@ -302,30 +310,40 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     );
   }, [voiceEnabled]);
 
-  const publishArgument = useCallback(async (text: string, source: LiveDebateArgument['source']) => {
+  const publishArgument = useCallback(async (
+    text: string,
+    source: LiveDebateArgument['source'],
+    completion?: Pick<PendingRecording, 'completedAt' | 'phaseId' | 'phaseLabel'>,
+  ) => {
     if (!user) return;
     const trimmed = text.trim().slice(0, 1200);
     if (!trimmed) return;
 
     const phases = getLiveDebateCourse(timeLimit, debateLevel);
-    const phase = phases.find((_, index) => (
-      elapsedSeconds < phases.slice(0, index + 1).reduce((total, item) => total + item.seconds, 0)
-    )) || phases[phases.length - 1];
+    const progress = getLiveDebateProgress(phases, argumentsRef.current, sessionStartedAtMs);
+    const phase = phases[Math.min(progress.completedPhaseCount, phases.length - 1)];
+    const isAssignedSpeaker = myRole !== 'moderator'
+      && myPosition === phase.position
+      && myRole === getPhaseOwnerRole(teamSize, phase);
+    const phaseId = isAssignedSpeaker ? completion?.phaseId || phase.id : undefined;
+    const phaseLabel = isAssignedSpeaker
+      ? completion?.phaseLabel || phase.label
+      : `진행자 발언 · ${phase.label}`;
     const argument: LiveDebateArgument = {
       id: createMessageId(),
       senderId: user.id,
       senderName: user.nickname,
       content: trimmed,
-      createdAt: new Date().toISOString(),
+      createdAt: completion?.completedAt || new Date().toISOString(),
       source,
-      phaseId: phase.id,
-      phaseLabel: phase.label,
+      phaseId,
+      phaseLabel,
     };
 
     if (!voiceEnabled) await saveLiveDebateArgument(roomId, argument);
     await publishPacket({ version: 1, type: 'argument', argument });
     addArguments([argument]);
-  }, [addArguments, debateLevel, elapsedSeconds, publishPacket, roomId, timeLimit, user, voiceEnabled]);
+  }, [addArguments, debateLevel, myPosition, myRole, publishPacket, roomId, sessionStartedAtMs, teamSize, timeLimit, user, voiceEnabled]);
 
   useEffect(() => {
     if (!user || !roomId || voiceEnabled) return;
@@ -562,7 +580,6 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       cancelled = true;
       discardRecordingRef.current = true;
       transcriptionControllerRef.current?.abort();
-      if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
       if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
       room.removeAllListeners();
       room.remoteParticipants.forEach(participant => {
@@ -578,13 +595,13 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   useEffect(() => {
     if (Number.isFinite(startedAtMs)) {
       const timerId = window.setInterval(() => {
-        setElapsedSeconds(Math.min(timeLimit, Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))));
+        setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)));
       }, 1000);
       return () => window.clearInterval(timerId);
     }
     if (connection !== 'connected' || participants.length === 0) return;
     const timerId = window.setInterval(() => {
-      setElapsedSeconds(previous => Math.min(timeLimit, previous + 1));
+      setElapsedSeconds(previous => previous + 1);
     }, 1000);
     return () => window.clearInterval(timerId);
   }, [connection, participants.length, startedAtMs, timeLimit]);
@@ -601,7 +618,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [argumentsList, isTranscribing]);
 
-  const runTranscription = async (recording: Blob) => {
+  const runTranscription = async (pending: PendingRecording) => {
     const controller = new AbortController();
     transcriptionControllerRef.current?.abort();
     transcriptionControllerRef.current = controller;
@@ -609,13 +626,13 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     setSpeechError(null);
 
     try {
-      const transcript = await transcribeDebateAudio(recording, {
+      const transcript = await transcribeDebateAudio(pending.blob, {
         topic,
         roundTitle: '사람 대 사람 토론 발언',
         roundInstruction: '발언을 정확히 전사하여 상대방에게 전달합니다.',
       }, controller.signal);
       if (controller.signal.aborted) return;
-      await publishArgument(transcript, 'voice');
+      await publishArgument(transcript, 'voice', pending);
       setPendingRecording(null);
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -630,10 +647,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
 
   const stopSpeaking = async (discard = false) => {
     discardRecordingRef.current = discard;
-    if (recordingTimeoutRef.current !== null) {
-      window.clearTimeout(recordingTimeoutRef.current);
-      recordingTimeoutRef.current = null;
-    }
+    recordingCompletedAtRef.current = new Date().toISOString();
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
     setIsSpeaking(false);
     try {
@@ -661,6 +675,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     setSpeechError(null);
     setPendingRecording(null);
     discardRecordingRef.current = false;
+    recordingCompletedAtRef.current = null;
     recordedChunksRef.current = [];
 
     try {
@@ -699,6 +714,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         mediaRecorderRef.current = null;
         if (discardRecordingRef.current) {
           recordedChunksRef.current = [];
+          recordingPhaseRef.current = null;
+          recordingCompletedAtRef.current = null;
           return;
         }
         const recording = new Blob(recordedChunksRef.current, {
@@ -709,16 +726,28 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           setSpeechError('녹음된 음성이 없습니다. 다시 시도해 주세요.');
           return;
         }
-        setPendingRecording(recording);
-        void runTranscription(recording);
+        const pending = {
+          blob: recording,
+          completedAt: recordingCompletedAtRef.current || new Date().toISOString(),
+          phaseId: recordingPhaseRef.current?.phaseId,
+          phaseLabel: recordingPhaseRef.current?.phaseLabel,
+        } satisfies PendingRecording;
+        recordingPhaseRef.current = null;
+        recordingCompletedAtRef.current = null;
+        setPendingRecording(pending);
+        void runTranscription(pending);
       };
 
+      const phases = getLiveDebateCourse(timeLimit, debateLevel);
+      const progress = getLiveDebateProgress(phases, argumentsRef.current, sessionStartedAtMs);
+      const recordingPhase = phases[Math.min(progress.completedPhaseCount, phases.length - 1)];
+      recordingPhaseRef.current = {
+        phaseId: recordingPhase.id,
+        phaseLabel: recordingPhase.label,
+      };
       recorder.start(1000);
       setRecordingSeconds(0);
       setIsSpeaking(true);
-      recordingTimeoutRef.current = window.setTimeout(() => {
-        void stopSpeaking();
-      }, MAX_RECORDING_SECONDS * 1000);
     } catch (error) {
       await room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
       const errorName = error instanceof DOMException ? error.name : '';
@@ -787,13 +816,19 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     }
   };
 
-  const remainingSeconds = Math.max(0, timeLimit - elapsedSeconds);
   const phaseTimings = useMemo(() => getLiveDebateCourse(timeLimit, debateLevel), [debateLevel, timeLimit]);
-  const activePhaseIndex = phaseTimings.findIndex((_, index) => (
-    elapsedSeconds < phaseTimings.slice(0, index + 1).reduce((total, phase) => total + phase.seconds, 0)
-  ));
-  const currentPhaseIndex = activePhaseIndex >= 0 ? activePhaseIndex : phaseTimings.length - 1;
+  const debateProgress = useMemo(
+    () => getLiveDebateProgress(phaseTimings, argumentsList, sessionStartedAtMs),
+    [argumentsList, phaseTimings, sessionStartedAtMs],
+  );
+  const currentPhaseIndex = Math.min(debateProgress.completedPhaseCount, phaseTimings.length - 1);
   const currentPhase = phaseTimings[currentPhaseIndex] || phaseTimings[phaseTimings.length - 1];
+  const currentPhaseElapsedSeconds = Math.max(
+    0,
+    Math.floor(((sessionStartedAtMs + elapsedSeconds * 1000) - debateProgress.activePhaseStartedAtMs) / 1000),
+  );
+  const currentPhaseRemainingSeconds = Math.max(0, currentPhase.seconds - currentPhaseElapsedSeconds);
+  const currentPhaseOvertimeSeconds = Math.max(0, currentPhaseElapsedSeconds - currentPhase.seconds);
   const currentOwnerRole = getPhaseOwnerRole(teamSize, currentPhase);
   const stageOwners = [
     {
@@ -813,7 +848,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const targetStageOwner = currentPhase.targetPosition
     ? stageOwners.find(participant => participant.position === currentPhase.targetPosition)
     : undefined;
-  const sessionFinished = forcedFinished || remainingSeconds === 0;
+  const sessionFinished = forcedFinished || debateProgress.completedPhaseCount >= phaseTimings.length;
   const isMyStage = !sessionFinished
     && myRole !== 'moderator'
     && myPosition === currentPhase.position
@@ -947,6 +982,16 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   }, [evaluation, roomId, sessionFinished]);
 
   const displayArguments = useMemo(() => argumentsList.map<Argument>(argument => ({
+    ...(() => {
+      const timing = debateProgress.argumentTimingById[argument.id];
+      const phase = phaseTimings.find(item => item.id === argument.phaseId);
+      return {
+        roundId: phase?.roundId,
+        recommendedDurationSeconds: timing?.recommendedSeconds,
+        elapsedSeconds: timing?.elapsedSeconds,
+        overtimeSeconds: timing?.overtimeSeconds,
+      };
+    })(),
     id: argument.id,
     playerId: argument.senderId,
     isAi: participants.some(participant => participant.id === argument.senderId && participant.isAi),
@@ -956,7 +1001,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       minute: '2-digit',
     }),
     roundTitle: argument.phaseLabel || (argument.source === 'voice' ? '음성 전사' : '텍스트 발언'),
-  })), [argumentsList, participants]);
+  })), [argumentsList, debateProgress.argumentTimingById, participants, phaseTimings]);
 
   useEffect(() => {
     if (!evaluation || !user || savedEvaluationRef.current) return;
@@ -973,7 +1018,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       aiPosition: personal.position === 'affirmative' ? 'negative' : 'affirmative',
       debateLevel,
       debateFocus: 'fact',
-      durationSeconds: Math.min(timeLimit, elapsedSeconds),
+      durationSeconds: elapsedSeconds,
       completedAt: evaluation.generatedAt,
       arguments: displayArguments,
       report: personal.report,
@@ -1072,10 +1117,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           <span>{voiceEnabled ? 'LiveKit' : '텍스트 채널'} {getConnectionLabel(connection)}</span>
         </div>
 
-        <div className={`compact-timer ${remainingSeconds <= 60 ? 'urgent' : ''}`}>
+        <div className={`compact-timer ${currentPhaseOvertimeSeconds > 0 ? 'overtime' : currentPhaseRemainingSeconds <= 30 ? 'urgent' : ''}`}>
           <Clock size={16} />
-          <strong>{formatTimer(remainingSeconds)}</strong>
-          <span>{sessionFinished ? '토론 시간 종료' : `${currentPhase.label} · 남은 시간`}</span>
+          <strong>{currentPhaseOvertimeSeconds > 0 ? `+${formatTimer(currentPhaseOvertimeSeconds)}` : formatTimer(currentPhaseRemainingSeconds)}</strong>
+          <span>{sessionFinished ? '토론 종료' : currentPhaseOvertimeSeconds > 0 ? `${currentPhase.label} · 권장 시간 초과` : `${currentPhase.label} · 권장 시간`}</span>
         </div>
       </section>
 
@@ -1240,10 +1285,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             <h2><CheckCircle2 size={18} /> {debateLevel === 'intermediate' ? '중급' : '초급'} 토론 순서</h2>
             <div className="phase-list">
               {phaseTimings.map((phase, index) => (
-                <div key={phase.id} className={`phase-item ${index === currentPhaseIndex ? 'active' : ''}`}>
-                  {index < currentPhaseIndex ? <CheckCircle2 size={15} /> : <Radio size={15} />}
+                <div key={phase.id} className={`phase-item ${!sessionFinished && index === currentPhaseIndex ? 'active' : ''}`}>
+                  {index < debateProgress.completedPhaseCount ? <CheckCircle2 size={15} /> : <Radio size={15} />}
                   <span>{phase.label}</span>
-                  <small>{formatDebateMinutes(phase.seconds)}</small>
+                  <small>{formatDebateMinutes(phase.seconds)} 권장</small>
                 </div>
               ))}
             </div>
@@ -1253,7 +1298,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             <dl className="live-room-status-list">
               <div><dt>연결 방식</dt><dd>{voiceEnabled ? `LiveKit ${getConnectionLabel(connection)}` : `텍스트 채널 ${getConnectionLabel(connection)}`}</dd></div>
               <div><dt>대기실 확정 명단</dt><dd>{connectedDebaterCount} / {requiredDebaterCount}명</dd></div>
-              <div><dt>현재 단계</dt><dd>{currentPhase.label} · {formatDebateMinutes(currentPhase.seconds)}</dd></div>
+              <div><dt>현재 단계</dt><dd>{currentPhase.label} · {formatDebateMinutes(currentPhase.seconds)} 권장{currentPhaseOvertimeSeconds > 0 ? ` · ${formatTimer(currentPhaseOvertimeSeconds)} 초과` : ''}</dd></div>
               {voiceEnabled && <div><dt>내 마이크</dt><dd>{isSpeaking ? '송출 중' : '꺼짐'}</dd></div>}
               <div><dt>음성 모드</dt><dd>{voiceEnabled ? '사용 · 녹음 저장 안 함' : '사용 안 함 · LiveKit 미연결'}</dd></div>
             </dl>
