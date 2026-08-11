@@ -60,7 +60,6 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [acceptedVoiceNotice, setAcceptedVoiceNotice] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -215,10 +214,6 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
 
   const toggleReady = async () => {
     if ((!me?.position && me?.role !== 'moderator') || actionLoading || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned))) return;
-    if (room?.voiceEnabled && !me?.isReady && !acceptedVoiceNotice) {
-      setError('음성 전달 및 자동 전사 안내를 확인해 주세요.');
-      return;
-    }
     setActionLoading(true);
     setError(null);
     try {
@@ -398,8 +393,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
           <strong>{me?.role === 'moderator' ? '진행자' : me?.position ? `${getPositionLabel(me.position)} · ${room.teamSize === 1 ? '전 단계 담당' : requiredStages.filter(stage => me.phaseIds.includes(stage.id)).map(stage => stage.label).join(' · ') || '단계 선택 전'}` : '아직 팀을 선택하지 않았습니다.'}</strong>
           <span>{me?.isReady ? '준비를 취소하면 담당 단계를 다시 조정할 수 있습니다.' : allStagesAssigned ? '모든 단계가 배정되었습니다. 준비 완료를 눌러 주세요.' : '팀원과 협의해 모든 단계의 담당을 먼저 정해 주세요.'}</span>
         </div>
-        {room.voiceEnabled && !me?.isReady && <label className="voice-data-consent compact"><input type="checkbox" checked={acceptedVoiceNotice} onChange={event => setAcceptedVoiceNotice(event.target.checked)} /><span>실시간 음성 전달과 Gemini 자동 전사 방식을 확인했습니다. <a href="/privacy" target="_blank" rel="noreferrer">자세히</a></span></label>}
-        <button className={`btn ${me?.isReady ? 'btn-secondary' : 'btn-primary'}`} disabled={(!me?.position && me?.role !== 'moderator') || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned)) || (room.voiceEnabled && !me?.isReady && !acceptedVoiceNotice) || actionLoading} onClick={() => void toggleReady()}>{me?.isReady ? '준비 취소' : '준비 완료'}</button>
+        <button className={`btn ${me?.isReady ? 'btn-secondary' : 'btn-primary'}`} disabled={(!me?.position && me?.role !== 'moderator') || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned)) || actionLoading} onClick={() => void toggleReady()}>{me?.isReady ? '준비 취소' : '준비 완료'}</button>
         {isHost && <button className="btn btn-primary lobby-start-button" disabled={!canStart || actionLoading} onClick={() => void startDebate()}><Play size={18} fill="currentColor" /> 토론 시작하기</button>}
       </footer>
     </main>

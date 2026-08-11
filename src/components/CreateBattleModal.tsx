@@ -59,7 +59,6 @@ export const CreateBattleModal = ({
   const [teamSize, setTeamSize] = useState<DebateTeamSize>(1);
   const [allowModerator, setAllowModerator] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const [acceptedVoiceNotice, setAcceptedVoiceNotice] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const phases = useMemo(() => battleMode === 'pvp'
@@ -77,10 +76,6 @@ export const CreateBattleModal = ({
     if (!topic.trim() || isSubmitting) return;
     if (!topicDescription.trim()) {
       setSubmitError(isEnglish ? 'A new motion requires background information for participants.' : '새 주제에는 참가자가 읽을 상세 배경 설명이 필요합니다.');
-      return;
-    }
-    if (battleMode === 'pvp' && voiceEnabled && !acceptedVoiceNotice) {
-      setSubmitError(isEnglish ? 'Please confirm the voice and transcription notice.' : '음성 전달 및 자동 전사 안내를 확인해 주세요.');
       return;
     }
     setIsSubmitting(true);
@@ -218,15 +213,14 @@ export const CreateBattleModal = ({
                   <small>{isEnglish ? 'Live audio with speech transcription' : 'LiveKit 실시간 음성·마이크 전사'}</small>
                   {voiceEnabled && <Check className="setup-check" size={16} />}
                 </button>
-                <button type="button" className={`setup-choice ${!voiceEnabled ? 'selected' : ''}`} onClick={() => { setVoiceEnabled(false); setAcceptedVoiceNotice(false); }} aria-pressed={!voiceEnabled}>
+                <button type="button" className={`setup-choice ${!voiceEnabled ? 'selected' : ''}`} onClick={() => setVoiceEnabled(false)} aria-pressed={!voiceEnabled}>
                   <Users size={22} />
                   <strong>{isEnglish ? 'Text debate' : '텍스트 토론'}</strong>
                   <small>{isEnglish ? 'Real-time written debate' : 'LiveKit 없이 실시간 글로 진행'}</small>
                   {!voiceEnabled && <Check className="setup-check" size={16} />}
                 </button>
               </div>
-              <small className="setup-helper">{isEnglish ? 'LiveKit usage applies only to voice rooms.' : '음성 토론을 선택한 방에서만 LiveKit 사용량이 발생합니다.'}</small>
-              {voiceEnabled && <label className="voice-data-consent"><input type="checkbox" checked={acceptedVoiceNotice} onChange={event => setAcceptedVoiceNotice(event.target.checked)} /><span>{isEnglish ? <>I understand that live audio is delivered through LiveKit and speech is sent to Gemini for transcription. <a href="/privacy" target="_blank" rel="noreferrer">Details</a></> : <>음성이 LiveKit으로 실시간 전달되고 발언 내용이 Gemini를 통해 자동 전사됨을 확인했습니다. <a href="/privacy" target="_blank" rel="noreferrer">자세히</a></>}</span></label>}
+              <small className="setup-helper">{isEnglish ? 'Voice rooms use LiveKit and automatically transcribe each speech.' : '음성 토론은 LiveKit으로 진행되며 발언 내용은 자동 전사됩니다.'}</small>
             </section>
           )}
 

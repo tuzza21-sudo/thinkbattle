@@ -135,10 +135,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay auth-modal-overlay">
       <div className="modal-content auth-modal">
-        <div className="flex justify-between items-center">
-          <div>
+        <div className="auth-modal-header">
+          <div className="auth-modal-heading">
             <h2 style={{ color: 'var(--primary)', fontSize: '1.6rem', margin: 0 }}>
               {isEnglish ? (isSignup ? 'Create account' : 'Log in') : (isSignup ? '회원가입' : '로그인')}
             </h2>
@@ -151,7 +151,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
           </button>
         </div>
 
-        <div className="segmented-control">
+        <div className="segmented-control auth-mode-tabs">
           <button className={mode === 'login' ? 'active' : ''} onClick={() => handleModeChange('login')}>
             <LogIn size={16} /> {isEnglish ? 'Log in' : '로그인'}
           </button>

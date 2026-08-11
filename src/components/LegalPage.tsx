@@ -32,7 +32,7 @@ const englishPrivacy = [
 const englishTerms = [
   ['Purpose', 'ThinkFit is a training service for AI sparring, live debate, simulations and learning reports. AI output is educational assistance and is not guaranteed to be complete, accurate or professional advice.'],
   ['Account responsibility', 'Keep your sign-in method secure and do not use another person’s account or bypass access controls.'],
-  ['Live debate conduct', 'Respect every participant. Harassment, threats, hate, disclosure of personal information and unlawful content are prohibited. Review the voice and transcription notice before entering a voice debate.'],
+  ['Live debate conduct', 'Respect every participant. Harassment, threats, hate, disclosure of personal information and unlawful content are prohibited. Voice debates use live audio delivery and automatic transcription.'],
   ['Content and sharing', 'You must have the right to use content you submit. Records are private to your account unless you deliberately publish an argument or create a report-sharing link.'],
   ['Prohibited use', 'Automated bulk requests, cost abuse, security exploitation, role or capacity bypass, evaluation manipulation and disruption of other users are prohibited.'],
   ['Contact', 'Service enquiries: piorne@naver.com'],

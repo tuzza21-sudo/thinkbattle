@@ -101,6 +101,7 @@ export const LiveDebateEvaluationModal = ({
         <div className="live-evaluation-body report-live-body">
           {evaluation.participantReports.length > 1 && (
             <nav className="report-participant-tabs" aria-label="참가자별 평가 선택">
+              <strong className="report-participant-label">평가 대상 선택</strong>
               {evaluation.participantReports.map(participant => (
                 <button
                   key={participant.userId}
