@@ -23,7 +23,7 @@ const practiceStep: DebateStep = {
   purpose: '상대의 압박 의도를 파악하고 목표·근거·대안을 분명하게 전달합니다.',
   instruction: '상대의 마지막 발언에 직접 대응하세요. 필요한 경우 질문으로 숨은 요구를 확인하세요.',
   checklist: ['상대의 핵심 요구에 직접 답했는가?', '내 기준이나 근거를 밝혔는가?', '실행 가능한 다음 행동을 제시했는가?'],
-  inputPlaceholder: '실제로 말하듯 답변하세요. 마이크로 녹음하거나 텍스트로 입력할 수 있습니다.',
+  inputPlaceholder: '실제로 말하듯 답변하세요. 마이크로 말하거나 텍스트로 입력할 수 있습니다.',
 };
 
 export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {

@@ -728,7 +728,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setSpeechError('이 브라우저는 마이크 녹음을 지원하지 않습니다.');
+      setSpeechError('이 브라우저는 마이크 음성 입력을 지원하지 않습니다.');
       return;
     }
 
@@ -766,7 +766,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         if (event.data.size > 0) recordedChunksRef.current.push(event.data);
       };
       recorder.onerror = () => {
-        setSpeechError('마이크 녹음 중 오류가 발생했습니다. 다시 시도해 주세요.');
+        setSpeechError('마이크 입력 중 오류가 발생했습니다. 다시 시도해 주세요.');
         void stopSpeaking(true);
       };
       recorder.onstop = () => {
@@ -781,7 +781,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         });
         recordedChunksRef.current = [];
         if (recording.size === 0) {
-          setSpeechError('녹음된 음성이 없습니다. 다시 시도해 주세요.');
+          setSpeechError('인식된 음성이 없습니다. 다시 시도해 주세요.');
           return;
         }
         const pending = {
@@ -1213,15 +1213,15 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 <span className="live-voice-focus-icon">{isSpeaking ? <Mic size={34} /> : <Headphones size={34} />}</span>
                 <small>VOICE FOCUS · 텍스트 숨김</small>
                 <strong>{isSpeaking ? '지금 발언하고 있습니다' : currentStageOwner?.name ? `${currentStageOwner.name}님의 발언에 집중해 주세요` : `${currentPhase.label} 발언을 기다리고 있습니다`}</strong>
-                <p>발언 내용은 실시간으로 저장되며, 상단의 ‘텍스트 보기’로 언제든 확인할 수 있습니다.</p>
-                <span className="live-voice-record-count"><CheckCircle2 size={15} /> {displayArguments.length}개 발언 기록 완료 · 종료 후 기록에서 전체 텍스트 제공</span>
+                <p>발언 내용은 자동으로 전사되며, 상단의 ‘텍스트 보기’로 언제든 확인할 수 있습니다.</p>
+                <span className="live-voice-record-count"><CheckCircle2 size={15} /> {displayArguments.length}개 발언 전사 완료 · 종료 후 전체 텍스트 확인</span>
               </div>
             ) : displayArguments.length === 0 ? (
               <div className="live-room-empty">
                 {voiceEnabled ? <Mic size={28} /> : <Radio size={28} />}
                 <strong>{`${currentPhase.label} 담당자가 발언할 차례입니다.`}</strong>
                 <span>{voiceEnabled
-                  ? '말하는 동안 상대방에게 음성이 전달되고, 발언 종료를 누르면 전사문이 자동 저장됩니다.'
+                  ? '말하는 동안 상대방에게 음성이 전달되고, 발언 종료를 누르면 내용이 자동으로 전사됩니다.'
                   : '텍스트 발언은 Supabase 실시간 채널로 모든 참가자에게 전달되며 LiveKit 사용량에 포함되지 않습니다.'}</span>
               </div>
             ) : null}

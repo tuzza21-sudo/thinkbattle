@@ -80,7 +80,7 @@ export const CreateBattleModal = ({
       return;
     }
     if (battleMode === 'pvp' && voiceEnabled && !acceptedVoiceNotice) {
-      setSubmitError(isEnglish ? 'Please confirm the voice and transcription notice.' : '음성 전달 및 전사문 저장 안내를 확인해 주세요.');
+      setSubmitError(isEnglish ? 'Please confirm the voice and transcription notice.' : '음성 전달 및 자동 전사 안내를 확인해 주세요.');
       return;
     }
     setIsSubmitting(true);
@@ -226,7 +226,7 @@ export const CreateBattleModal = ({
                 </button>
               </div>
               <small className="setup-helper">{isEnglish ? 'LiveKit usage applies only to voice rooms.' : '음성 토론을 선택한 방에서만 LiveKit 사용량이 발생합니다.'}</small>
-              {voiceEnabled && <label className="voice-data-consent"><input type="checkbox" checked={acceptedVoiceNotice} onChange={event => setAcceptedVoiceNotice(event.target.checked)} /><span>{isEnglish ? <>I understand that live audio is delivered through LiveKit, a temporary recording is sent to Gemini for transcription, and the transcript—not the original audio—is stored. <a href="/privacy" target="_blank" rel="noreferrer">Details</a></> : <>음성이 LiveKit으로 실시간 전달되고, 임시 녹음이 Gemini 전사에 사용되며, 원본 음성 대신 전사문이 저장됨을 확인했습니다. <a href="/privacy" target="_blank" rel="noreferrer">자세히</a></>}</span></label>}
+              {voiceEnabled && <label className="voice-data-consent"><input type="checkbox" checked={acceptedVoiceNotice} onChange={event => setAcceptedVoiceNotice(event.target.checked)} /><span>{isEnglish ? <>I understand that live audio is delivered through LiveKit and speech is sent to Gemini for transcription. <a href="/privacy" target="_blank" rel="noreferrer">Details</a></> : <>음성이 LiveKit으로 실시간 전달되고 발언 내용이 Gemini를 통해 자동 전사됨을 확인했습니다. <a href="/privacy" target="_blank" rel="noreferrer">자세히</a></>}</span></label>}
             </section>
           )}
 

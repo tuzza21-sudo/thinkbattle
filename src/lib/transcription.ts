@@ -103,7 +103,7 @@ const convertRecordingToWavChunks = async (recording: Blob) => {
     }
     return chunks;
   } catch {
-    throw new Error('브라우저에서 녹음 파일을 처리하지 못했습니다. 최신 브라우저에서 다시 시도해 주세요.');
+    throw new Error('브라우저에서 음성 데이터를 처리하지 못했습니다. 최신 브라우저에서 다시 시도해 주세요.');
   } finally {
     void context.close();
   }
@@ -114,12 +114,12 @@ const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.onload = () => {
     const result = reader.result;
     if (typeof result !== 'string') {
-      reject(new Error('녹음 데이터를 읽지 못했습니다.'));
+      reject(new Error('음성 데이터를 읽지 못했습니다.'));
       return;
     }
     resolve(result.slice(result.indexOf(',') + 1));
   };
-  reader.onerror = () => reject(new Error('녹음 데이터를 읽지 못했습니다.'));
+  reader.onerror = () => reject(new Error('음성 데이터를 읽지 못했습니다.'));
   reader.readAsDataURL(blob);
 });
 

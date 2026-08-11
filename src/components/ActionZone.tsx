@@ -149,7 +149,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
     } catch (error) {
       if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : 'Gemini 음성 전사에 실패했습니다.';
-      setSpeechError(`${message} 녹음은 보관 중이므로 다시 시도할 수 있습니다.`);
+      setSpeechError(`${message} 아래 버튼으로 다시 시도할 수 있습니다.`);
     } finally {
       if (transcriptionControllerRef.current === controller) {
         transcriptionControllerRef.current = null;
@@ -160,7 +160,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
 
   const startRecording = async () => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setSpeechError('이 브라우저는 마이크 녹음을 지원하지 않습니다. 최신 Chrome, Edge 또는 Safari를 이용해 주세요.');
+      setSpeechError('이 브라우저는 마이크 음성 입력을 지원하지 않습니다. 최신 Chrome, Edge 또는 Safari를 이용해 주세요.');
       return;
     }
 
@@ -205,7 +205,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
           window.clearTimeout(recordingTimeoutRef.current);
           recordingTimeoutRef.current = null;
         }
-        setSpeechError('마이크 녹음 중 오류가 발생했습니다. 다시 시도해 주세요.');
+        setSpeechError('마이크 입력 중 오류가 발생했습니다. 다시 시도해 주세요.');
         releaseMicrophone();
         setIsRecording(false);
       };
@@ -222,7 +222,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
         });
         recordedChunksRef.current = [];
         if (recording.size === 0) {
-          setSpeechError('녹음된 음성이 없습니다. 다시 시도해 주세요.');
+          setSpeechError('인식된 음성이 없습니다. 다시 시도해 주세요.');
           return;
         }
         setPendingRecording(recording);
