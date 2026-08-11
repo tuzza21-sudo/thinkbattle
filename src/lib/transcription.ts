@@ -1,7 +1,12 @@
-const GEMINI_TRANSCRIPTION_MODEL = 'gemini-3.1-flash-lite';
+import { getAiGatewayHeaders } from './aiGateway';
+
+const GEMINI_TRANSCRIPTION_MODEL = 'gemini-3.5-flash-lite';
 const TRANSCRIPTION_TIMEOUT_MS = 60_000;
 const TARGET_SAMPLE_RATE = 16_000;
-const WAV_CHUNK_SECONDS = 45;
+// 16 kHz mono PCM is about 1.92 MB/minute before base64 encoding. A 150-second
+// chunk stays well below Gemini's 20 MB inline-request limit and avoids the
+// four sequential API round trips a three-minute speech previously required.
+const WAV_CHUNK_SECONDS = 75;
 
 interface GeminiTranscriptionResponse {
   candidates?: Array<{
@@ -20,6 +25,7 @@ interface TranscriptionContext {
   topic?: string;
   roundTitle?: string;
   roundInstruction?: string;
+  language?: 'ko' | 'en';
 }
 
 const writeAscii = (view: DataView, offset: number, value: string) => {
@@ -124,7 +130,24 @@ const createTranscriptionPrompt = ({
   topic,
   roundTitle,
   roundInstruction,
-}: TranscriptionContext, segment?: { current: number; total: number; previousText?: string }) => `당신은 한국어 토론 발언 전문 전사기입니다.
+  language = 'ko',
+}: TranscriptionContext, segment?: { current: number; total: number; previousText?: string }) => language === 'en' ? `You are a specialist transcriber for English debate speeches.
+Transcribe only the English speech that is actually audible in the recording.
+
+[Transcription rules]
+- Do not summarise, explain, answer or translate.
+- Do not add claims or correct the speaker's factual content.
+- Add only natural punctuation and paragraph breaks.
+- Preserve numbers, names and debate terminology accurately.
+- Return an empty string if no speech is audible.
+- Return only the transcript without a heading.
+
+[Debate context]
+Motion: ${topic?.trim() || 'Not provided'}
+Current phase: ${roundTitle?.trim() || 'Open debate'}
+Phase guidance: ${roundInstruction?.trim() || 'Not provided'}
+${segment && segment.total > 1 ? `Audio segment: ${segment.current}/${segment.total}` : ''}
+${segment?.previousText ? `End of the previous segment: ${segment.previousText}` : ''}` : `당신은 한국어 토론 발언 전문 전사기입니다.
 아래 오디오에서 실제로 들리는 한국어 발언만 정확히 전사하세요.
 
 [전사 원칙]
@@ -174,9 +197,7 @@ const transcribeAudioChunk = async (
         `/api/gemini/v1beta/models/${GEMINI_TRANSCRIPTION_MODEL}:generateContent`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: await getAiGatewayHeaders(),
           body: JSON.stringify({
             contents: [{
               role: 'user',
@@ -191,7 +212,6 @@ const transcribeAudioChunk = async (
               ],
             }],
             generationConfig: {
-              temperature: 0,
               maxOutputTokens: 2048,
             },
           }),

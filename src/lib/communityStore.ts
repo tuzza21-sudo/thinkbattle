@@ -61,18 +61,18 @@ const sampleOpinions = [
 
 // ── Helpers to map DB row to frontend type ───────────────────────────────────
 
-const mapRowToOpinion = (row: any): CommunityOpinion => ({
-  id: row.id,
-  topicId: row.topic_id,
-  userId: row.user_id,
-  nickname: row.nickname,
-  position: row.position,
-  keyReason: row.key_reason,
-  content: row.content,
-  createdAt: row.created_at,
-  likes: row.likes,
-  isBlocked: row.is_blocked,
-  blockReason: row.block_reason,
+const mapRowToOpinion = (row: Record<string, unknown>): CommunityOpinion => ({
+  id: String(row.id),
+  topicId: String(row.topic_id),
+  userId: String(row.user_id),
+  nickname: String(row.nickname || '토론 참가자'),
+  position: row.position === 'negative' ? 'negative' : 'affirmative',
+  keyReason: String(row.key_reason || ''),
+  content: String(row.content || ''),
+  createdAt: String(row.created_at || new Date().toISOString()),
+  likes: Number(row.likes) || 0,
+  isBlocked: Boolean(row.is_blocked),
+  blockReason: row.block_reason ? String(row.block_reason) : undefined,
 });
 
 // ── Initialize with sample data ──────────────────────────────────────────────

@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Newspaper,
   Scale,
+  Radio,
   Shield,
   Sparkles,
   Swords,
@@ -33,10 +34,12 @@ import { CommunityPanel } from './CommunityPanel';
 import { ProfileModal } from './ProfileModal';
 import { weeklyIssues, categorizedTopics, popularTopics, weeklyRankings } from '../data/topics';
 import { calculateUserStats } from '../lib/userStats';
+import type { UserStats } from '../lib/userStats';
 import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
-import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, LiveDebateRoomSummary, OrganizationSummary, OrganizationTopic, TopicOpinionStats, WeeklyIssue } from '../types';
+import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, LiveDebateRoomSummary, OrganizationSummary, PublicDebateTopic, TopicOpinionStats, WeeklyIssue } from '../types';
 import { SUPER_ADMIN_EMAIL } from '../lib/superAdmin';
-import { getMyMemberOrganizations, getMyOrganizationTopics } from '../lib/admin';
+import { getMyMemberOrganizations } from '../lib/admin';
+import { getPublicDebateTopics } from '../lib/publicTopics';
 import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
 import { createDebateRoom } from '../lib/debateRooms';
 
@@ -45,6 +48,7 @@ interface LandingPageProps {
   onLoginRequest: () => void;
   onLogout: () => void;
   onUserUpdate: (updatedUser: AppUser) => void;
+  onLanguageChange: (language: 'ko' | 'en') => void;
 }
 
 const accentStyles = {
@@ -65,7 +69,13 @@ const accentStyles = {
   },
 };
 
-export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate }) => {
+const AI_DEBATE_TIME_OPTIONS = [600, 900, 1200] as const;
+
+const getClosestAiDebateTime = (seconds: number) => AI_DEBATE_TIME_OPTIONS.reduce((closest, option) => (
+  Math.abs(option - seconds) < Math.abs(closest - seconds) ? option : closest
+));
+
+export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate, onLanguageChange }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLiveOnly, setCreateLiveOnly] = useState(false);
@@ -75,27 +85,35 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [selectedBattleId, setSelectedBattleId] = useState<string | null>(null);
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
+  const [selectedTimeLimit, setSelectedTimeLimit] = useState<number>(600);
   const [communityTopicId, setCommunityTopicId] = useState<string | null>(null);
   const [communityTopicTitle, setCommunityTopicTitle] = useState('');
   const [opinionStatsCache, setOpinionStatsCache] = useState<Record<string, TopicOpinionStats>>({});
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
-  const [organizationTopics, setOrganizationTopics] = useState<OrganizationTopic[]>([]);
+  const [publicTopics, setPublicTopics] = useState<PublicDebateTopic[]>([]);
   const [memberOrganizations, setMemberOrganizations] = useState<OrganizationSummary[]>([]);
 
-  const [userStats, setUserStats] = useState<any>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const hasOrganizationStaffAccess = memberOrganizations.some(organization =>
+    ['owner', 'admin', 'coach'].includes(organization.role),
+  );
 
   useEffect(() => {
-    if (user) {
-      calculateUserStats(user.id).then(stats => setUserStats(stats));
-    } else {
-      setUserStats(null);
-    }
+    let cancelled = false;
+    const statsPromise = user ? calculateUserStats(user.id) : Promise.resolve(null);
+    void statsPromise.then(stats => {
+      if (!cancelled) setUserStats(stats);
+    });
+    return () => { cancelled = true; };
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setOrganizationTopics([]); setMemberOrganizations([]); return; }
-    getMyOrganizationTopics().then(setOrganizationTopics);
-    getMyMemberOrganizations().then(setMemberOrganizations);
+    void getPublicDebateTopics().then(setPublicTopics);
+  }, []);
+
+  useEffect(() => {
+    const organizationsPromise = user ? getMyMemberOrganizations() : Promise.resolve([]);
+    void organizationsPromise.then(setMemberOrganizations);
   }, [user]);
 
   // Load opinion stats for all topics
@@ -151,7 +169,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const activeCategoryData = categorizedTopics.find(c => c.category === activeCategory) || categorizedTopics[0];
 
   const displayRankings = React.useMemo(() => {
-    let userRank: any = null;
+    let userRank: (typeof weeklyRankings)[number] | null = null;
     if (user && userStats) {
       let badgeColor = 'var(--secondary)';
       if (userStats.league === '고급' || userStats.league === '마스터') badgeColor = 'var(--primary)';
@@ -159,6 +177,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
       userRank = {
         id: user.id,
+        rank: 0,
         nickname: user.nickname || '나',
         xp: userStats.xp,
         badge: userStats.league,
@@ -205,6 +224,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         roomId,
         topic: config.topic,
         topicDescription: config.topicDescription ?? '',
+        topicBriefing: config.topicBriefing,
+        language: config.language,
         debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
         voiceEnabled: config.voiceEnabled ?? false,
         timeLimit: config.timeLimit,
@@ -236,9 +257,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   };
 
   const handleOpenBriefing = (battleId: string) => {
+    const battle = findBattle(battleId);
     setSelectedBattleId(battleId);
     setUserPosition('affirmative');
     setDebateLevel('beginner');
+    setSelectedTimeLimit(getClosestAiDebateTime(battle?.config.timeLimit ?? 600));
     setShowHistoryModal(false); // Close modal if open
     window.setTimeout(() => {
       document.getElementById('topic-briefing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -263,6 +286,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           </h1>
 
           <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+            <button className="btn btn-secondary" style={{ padding: '0.5rem .8rem', fontSize: '0.82rem' }} onClick={() => onLanguageChange('en')} aria-label="Switch to English">
+              한국어 <span style={{ color: 'var(--text-muted)' }}>|</span> English
+            </button>
             <button className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }} onClick={() => navigate('/about')}>
               <BookOpen size={16} /> 서비스 소개
             </button>
@@ -301,7 +327,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     <Shield size={18} /> 슈퍼 관리
                   </button>
                 )}
-                {user.email.toLowerCase() === SUPER_ADMIN_EMAIL && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/admin')}>
+                {(hasOrganizationStaffAccess || user.email.toLowerCase() === SUPER_ADMIN_EMAIL) && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/admin')}>
                   <Shield size={18} /> 기관 관리
                 </button>}
                 <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
@@ -335,6 +361,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           <span style={{ color: 'var(--primary)' }}>ThinkFit</span>은 생각에도 꾸준한 운동이 필요하다고 믿습니다.
         </p>
       </header>
+
+      <section className="simulation-home-launch">
+        <div className="simulation-home-launch-icon"><Sparkles size={26} /></div>
+        <div>
+          <span>THINKFIT STAGE 2</span>
+          <h2>상황극 훈련</h2>
+          <p>압박 면접관, 공격적 협상가, 권위적 상사, 까다로운 고객과 실전처럼 대화하고 대응력을 훈련하세요.</p>
+        </div>
+        <button type="button" onClick={() => navigate('/simulation')}>
+          상황극 훈련 시작 <ChevronRight size={19} />
+        </button>
+      </section>
 
       <main style={{ paddingBottom: '3rem', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 0%', minWidth: 'min(100%, 600px)' }}>
@@ -430,7 +468,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 setShowCreateModal(true);
               }}
             >
-              <Swords size={18} /> 직접 개설
+              <Swords size={18} /> AI스파링 + 자유주제
             </button>
           </div>
 
@@ -596,9 +634,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         color: '#fff',
                         boxShadow: `0 4px 12px ${selectedAccent.soft}`
                       }}
-                      onClick={() => handleStartBattle(selectedBattle.config)}
+                      onClick={() => handleStartBattle({
+                        ...selectedBattle.config,
+                        timeLimit: selectedTimeLimit,
+                        topicDescription: selectedBattle.briefing.context,
+                        topicBriefing: selectedBattle.briefing,
+                      })}
                     >
-                      토론 참여하기 <ChevronRight size={20} />
+                      이 주제로 AI 스파링 <ChevronRight size={20} />
                     </button>
                   </div>
                 </div>
@@ -715,6 +758,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
                   <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
+                      <Clock size={18} color="var(--primary)" /> 토론 시간
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {AI_DEBATE_TIME_OPTIONS.map(time => (
+                        <button
+                          key={time}
+                          type="button"
+                          className="card flex items-center justify-center"
+                          style={{
+                            cursor: 'pointer',
+                            minHeight: '48px',
+                            padding: '0.7rem 0.35rem',
+                            border: selectedTimeLimit === time ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                            color: selectedTimeLimit === time ? 'var(--primary)' : 'var(--text-main)',
+                            background: selectedTimeLimit === time ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-card)',
+                            fontWeight: 900,
+                          }}
+                          onClick={() => setSelectedTimeLimit(time)}
+                        >
+                          {time / 60}분
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                    <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <ExternalLink size={18} color="var(--primary)" /> 인터넷 기사 보기
                     </h3>
                     <div className="flex flex-col gap-2">
@@ -753,18 +823,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
         {/* Right Sidebar */}
         <aside style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-          <div className="debate-sidebar-actions">
-            <button className="btn btn-primary" onClick={() => {
+          <section className="real-debate-launch-card">
+            <span className="real-debate-eyebrow"><Radio size={14} /> REAL DEBATE</span>
+            <div className="real-debate-title"><Users size={28} /><div><h2>실전 토론</h2><p>AI 참가자 없이 실제 사람끼리 긴장감 있게 진행합니다.</p></div></div>
+            <button className="btn real-debate-primary" onClick={() => {
               if (!user) return onLoginRequest();
               setCreateLiveOnly(true);
               setShowCreateModal(true);
             }}>
-              <Swords size={18} /> 토론 생성
+              <Swords size={18} /> 실전 토론방 개설
             </button>
             <button className="btn btn-secondary" onClick={() => user ? setShowJoinModal(true) : onLoginRequest()}>
-              <LogIn size={18} /> 토론 참여
+              <LogIn size={18} /> 열린 실전 토론 참여
             </button>
-          </div>
+          </section>
           {/* Popular Topics */}
           <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <h3 className="flex items-center gap-2" style={{ fontSize: '1.2rem', margin: '0 0 1.5rem 0', color: 'var(--secondary)' }}>
@@ -906,7 +978,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
       )}
 
-      {showCreateModal && <CreateBattleModal liveOnly={createLiveOnly} onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} organizationTopics={organizationTopics} />}
+      {showCreateModal && <CreateBattleModal liveOnly={createLiveOnly} onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} publicTopics={publicTopics} />}
       {showJoinModal && <JoinDebateModal onClose={() => setShowJoinModal(false)} onJoin={handleJoinBattle} />}
 
       {showProfileModal && user && (
@@ -925,6 +997,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         user={user}
         onLoginRequest={onLoginRequest}
       />
+      <footer className="site-legal-footer"><span>© 2026 ThinkFit</span><button type="button" onClick={() => navigate('/terms')}>이용약관</button><button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button></footer>
     </div>
   );
 };

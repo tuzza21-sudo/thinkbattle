@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BarChart2, CheckCircle2, Circle, Clock, Lightbulb, MessageCircle, Pause, Play, Sparkles, Target, Users } from 'lucide-react';
+import { AlertTriangle, BarChart2, CheckCircle2, Circle, Clock, Lightbulb, MessageCircle, Pause, Play, Sparkles, Target, Users, Volume2, VolumeX } from 'lucide-react';
 import { BattleHeader } from './BattleHeader';
 import { ArgumentCard } from './ArgumentCard';
 import { ActionZone } from './ActionZone';
 import { ResultModal } from './ResultModal';
 import { EnglishRephrasePanel } from './EnglishRephrasePanel';
+import { TopicBriefingDetails } from './TopicBriefingDetails';
 import {
   generateDebateJudgment,
   generateDebateResponse,
@@ -27,12 +28,15 @@ import {
 import { createReportShareLink, saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
 import { publishArgument, unpublishArgument } from '../lib/argumentLibrary';
 import { getPlayerFromStats } from '../lib/userStats';
+import { speakWithBrowserFallback, streamPersonaSpeech } from '../lib/personaSpeech';
 import type { AppUser, Argument, BattleConfig, BattleState, DebateFocus, DebatePosition, DebateStep, EnglishRephraseEntry, FinalReport, Player } from '../types';
 
 interface ArenaProps {
   user: AppUser | null;
   onLoginRequest: () => void;
 }
+
+type DebateVoiceMode = 'quality' | 'off';
 
 const fallbackConfig: BattleConfig = {
   topic: '',
@@ -425,7 +429,9 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
 
   const playerA: Player = {
     id: 'p1',
-    name: isDebateMode ? `나 · ${getPositionLabel(userPosition)}` : '나',
+    name: config.language === 'en'
+      ? `You · ${userPosition === 'affirmative' ? 'Government' : 'Opposition'}`
+      : isDebateMode ? `나 · ${getPositionLabel(userPosition)}` : '나',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
     level: 1,
     rankBadge: '브론즈',
@@ -436,15 +442,21 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
   };
 
   if (user) {
-    playerA.name = isDebateMode ? `${user.nickname} · ${getPositionLabel(userPosition)}` : user.nickname;
+    playerA.name = isDebateMode
+      ? `${user.nickname} · ${config.language === 'en' ? (userPosition === 'affirmative' ? 'Government' : 'Opposition') : getPositionLabel(userPosition)}`
+      : user.nickname;
   }
 
   return {
     id: 'battle-local',
     topic: config.topic,
+    topicDescription: config.topicDescription,
+    language: config.language,
     matchType:
       config.gameMode === 'debate'
-        ? `정식 토론 · ${getDebateLevelLabel(debateLevel)} · ${getPositionLabel(userPosition)}`
+        ? config.language === 'en'
+          ? `English debate · ${debateLevel} · ${userPosition === 'affirmative' ? 'Government' : 'Opposition'}`
+          : `정식 토론 · ${getDebateLevelLabel(debateLevel)} · ${getPositionLabel(userPosition)}`
         : config.gameMode === 'persona'
           ? '개별 페르소나 토론'
           : config.gameMode === 'roundtable'
@@ -462,13 +474,15 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
     playerB: {
       id: 'p2',
       name: isDebateMode
-        ? `AI 토론자 · ${getPositionLabel(aiPosition)}`
+        ? config.language === 'en'
+          ? `Pressure-test AI · ${aiPosition === 'affirmative' ? 'Government' : 'Opposition'}`
+          : `압박형 AI 토론자 · ${getPositionLabel(aiPosition)}`
         : isRoundtableMode
           ? '소크라테스 · 칸트 · 니체'
           : getPersonaName(config.personaId),
       avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${isRoundtableMode ? 'Roundtable' : 'Socrates'}`,
       level: 99,
-      rankBadge: isDebateMode ? getDebateLevelLabel(debateLevel) : isRoundtableMode ? '라운드테이블' : '철학자',
+      rankBadge: isDebateMode ? `압박형 · ${getDebateLevelLabel(debateLevel)}` : isRoundtableMode ? '라운드테이블' : '철학자',
       score: 9999,
       streak: 100,
       isAi: config.gameMode !== 'pvp',
@@ -479,11 +493,11 @@ const createInitialBattleState = (config: BattleConfig, user: AppUser | null): B
             id: 'debate-intro',
             playerId: 'p2',
             isAi: true,
-            content: buildDebateIntro(config.topic, userPosition, debateLevel),
-            timestamp: '시작',
+            content: buildDebateIntro(config.topic, userPosition, debateLevel, config.language),
+            timestamp: config.language === 'en' ? 'Start' : '시작',
             roundId: 'opening',
-            roundTitle: '시작 질문',
-            nextTask: debateSteps[0].instruction,
+            roundTitle: config.language === 'en' ? 'Opening prompt' : '시작 질문',
+            nextTask: config.language === 'en' ? 'Present your opening case.' : debateSteps[0].instruction,
           },
         ]
       : [],
@@ -539,6 +553,10 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
   const savedRecordIdRef = useRef<string | null>(null);
   const roundtableOpeningStartedRef = useRef(false);
+  const debateAudioRef = useRef<HTMLAudioElement | null>(null);
+  const debateAudioUrlsRef = useRef<Map<string, string>>(new Map());
+  const debateSpeechControllerRef = useRef<AbortController | null>(null);
+  const lastAutoSpokenArgumentIdRef = useRef<string | null>('debate-intro');
   const config = location.state as BattleConfig | null;
   const effectiveConfig = config ?? fallbackConfig;
 
@@ -553,6 +571,97 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const [englishRephrases, setEnglishRephrases] = useState<EnglishRephraseEntry[]>([]);
   const [isPaused, setIsPaused] = useState(false);
   const [isReportGenerating, setIsReportGenerating] = useState(false);
+  const [debateVoiceMode, setDebateVoiceMode] = useState<DebateVoiceMode>(() => {
+    const storedMode = localStorage.getItem('debate-ai-voice-mode');
+    return storedMode === 'off' ? 'off' : 'quality';
+  });
+  const [audioLoadingArgumentId, setAudioLoadingArgumentId] = useState<string | null>(null);
+  const [aiSpeakingArgumentId, setAiSpeakingArgumentId] = useState<string | null>(null);
+
+  const stopDebateAudio = useCallback(() => {
+    debateSpeechControllerRef.current?.abort();
+    debateSpeechControllerRef.current = null;
+    debateAudioRef.current?.pause();
+    debateAudioRef.current = null;
+    window.speechSynthesis?.cancel();
+    setAudioLoadingArgumentId(null);
+    setAiSpeakingArgumentId(null);
+  }, []);
+
+  const playDebateArgument = useCallback(async (argument: Argument) => {
+    if (!argument.isAi || battleState.gameMode !== 'debate') return;
+    stopDebateAudio();
+    const language = battleState.language ?? 'ko';
+
+    if (debateVoiceMode === 'off') return;
+    setAiSpeakingArgumentId(argument.id);
+
+    const cachedUrl = debateAudioUrlsRef.current.get(argument.id);
+    if (cachedUrl) {
+      const audio = new Audio(cachedUrl);
+      debateAudioRef.current = audio;
+      const finishCachedPlayback = () => {
+        if (debateAudioRef.current === audio) debateAudioRef.current = null;
+        setAiSpeakingArgumentId(current => current === argument.id ? null : current);
+      };
+      audio.addEventListener('ended', finishCachedPlayback, { once: true });
+      audio.addEventListener('error', finishCachedPlayback, { once: true });
+      await audio.play().catch(() => finishCachedPlayback());
+      return;
+    }
+
+    const controller = new AbortController();
+    debateSpeechControllerRef.current = controller;
+    setAudioLoadingArgumentId(argument.id);
+    const voiceStyle = language === 'en'
+      ? 'Speak as a calm but demanding pressure-test debate opponent. Use a firm, analytical tone, deliberate pacing, and clear emphasis on the strongest challenge. Never sound insulting or theatrical.'
+      : '자연스러운 한국어로 말한다. 논리의 빈틈을 검증하는 압박형 토론 상대처럼 차분하고 단호하게 발화한다. 핵심 반박과 질문을 분명히 강조하되 소리를 지르거나 조롱하지 않는다.';
+
+    let browserFallbackActive = false;
+    try {
+      const blob = await streamPersonaSpeech(argument.content, 'Kore', voiceStyle, {
+        signal: controller.signal,
+        language,
+        onPlaybackStart: () => setAudioLoadingArgumentId(current => current === argument.id ? null : current),
+      });
+      if (controller.signal.aborted) return;
+      const url = URL.createObjectURL(blob);
+      debateAudioUrlsRef.current.set(argument.id, url);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.warn('Debate TTS fallback:', error);
+      browserFallbackActive = speakWithBrowserFallback(
+        argument.content,
+        language === 'en' ? 1 : 0.96,
+        language,
+        { onEnd: () => setAiSpeakingArgumentId(current => current === argument.id ? null : current) },
+      );
+    } finally {
+      if (debateSpeechControllerRef.current === controller) debateSpeechControllerRef.current = null;
+      setAudioLoadingArgumentId(current => current === argument.id ? null : current);
+      if (!browserFallbackActive) {
+        setAiSpeakingArgumentId(current => current === argument.id ? null : current);
+      }
+    }
+  }, [battleState.gameMode, battleState.language, debateVoiceMode, stopDebateAudio]);
+
+  useEffect(() => {
+    const latestArgument = battleState.arguments[battleState.arguments.length - 1];
+    if (!latestArgument?.isAi || latestArgument.id === lastAutoSpokenArgumentIdRef.current) return;
+    lastAutoSpokenArgumentIdRef.current = latestArgument.id;
+    if (battleState.gameMode === 'debate' && debateVoiceMode !== 'off') {
+      const playbackTimer = window.setTimeout(() => void playDebateArgument(latestArgument), 0);
+      return () => window.clearTimeout(playbackTimer);
+    }
+  }, [battleState.arguments, battleState.gameMode, debateVoiceMode, playDebateArgument]);
+
+  useEffect(() => () => {
+    debateSpeechControllerRef.current?.abort();
+    debateAudioRef.current?.pause();
+    window.speechSynthesis?.cancel();
+    debateAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    debateAudioUrlsRef.current.clear();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -575,25 +684,29 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     [battleState.playerA],
   );
 
+  const debateStepList = battleState.gameMode === 'debate' ? getDebateSteps(battleState.debateLevel) : [];
+  const debateUserTurnCount = battleState.arguments.filter(argument => !argument.isAi).length;
+  const aiTurnInProgress = isAiThinking || Boolean(aiSpeakingArgumentId);
+  const activeDebateTurnIndex = aiTurnInProgress && debateUserTurnCount > 0
+    ? debateUserTurnCount - 1
+    : debateUserTurnCount;
   const activeDebateStep = battleState.gameMode === 'debate'
     ? getDebateStepByTurn(
         battleState.timeLimit,
         battleState.timeRemaining,
-        battleState.arguments.filter(argument => !argument.isAi).length,
+        activeDebateTurnIndex,
         battleState.debateLevel,
       )
     : undefined;
-  const debateStepList = battleState.gameMode === 'debate' ? getDebateSteps(battleState.debateLevel) : [];
-  const debateUserTurnCount = battleState.arguments.filter(argument => !argument.isAi).length;
   const debateRoundProgress = activeDebateStep
     ? {
-        current: Math.min(debateUserTurnCount + 1, debateStepList.length),
+        current: Math.min(activeDebateTurnIndex + 1, debateStepList.length),
         total: debateStepList.length,
       }
     : undefined;
   const currentActionStep = battleState.gameMode === 'persona' ? personaDebateStep : activeDebateStep;
   const isPlayerTurn = battleState.gameMode === 'debate'
-    ? !isAiThinking && !isPaused
+    ? !isAiThinking && !aiSpeakingArgumentId && !isPaused
     : isPersonaPlayerTurn && !isAiThinking && !isPaused;
   const currentActionStepId = currentActionStep?.id ?? 'free-discussion';
   const stepElapsedSeconds = stepTimer.stepId === currentActionStepId ? stepTimer.elapsedSeconds : 0;
@@ -613,7 +726,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
 
     const interval = setInterval(() => {
       if (battleState.gameMode === 'debate') {
-        setSessionElapsedSeconds(prev => prev + 1);
+        if (isPlayerTurn) setSessionElapsedSeconds(prev => prev + 1);
         setStepTimer(prev => {
           const elapsedSeconds = prev.stepId === currentActionStepId ? prev.elapsedSeconds : 0;
           return {
@@ -762,6 +875,9 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           battleState.arguments,
           battleState.userPosition ?? 'affirmative',
           battleState.debateLevel,
+          0,
+          battleState.topicDescription,
+          battleState.language,
         );
         persistDebateRecord(report, battleState);
         setFinalReport(report);
@@ -847,6 +963,8 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           battleState.debateLevel,
           battleState.debateFocus,
           activeStep.id,
+          battleState.topicDescription,
+          battleState.language,
         );
         const aiArg: Argument = {
           id: createArgumentId(),
@@ -870,6 +988,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           timeRemaining: sessionRemainingSeconds,
         };
 
+        if (debateVoiceMode !== 'off') setAiSpeakingArgumentId(aiArg.id);
         setBattleState(finalState);
         setIsAiThinking(false);
         setIsReportGenerating(true);
@@ -879,6 +998,9 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           finalState.arguments,
           finalState.userPosition ?? 'affirmative',
           finalState.debateLevel,
+          0,
+          finalState.topicDescription,
+          finalState.language,
         );
         persistDebateRecord(report, finalState);
         setFinalReport(report);
@@ -929,6 +1051,8 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         battleState.debateLevel,
         battleState.debateFocus,
         activeStep.id,
+        battleState.topicDescription,
+        battleState.language,
       );
 
       const nextStep = debateStepList[newArgs.filter(argument => !argument.isAi).length];
@@ -949,6 +1073,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         roundTitle: getAiResponseRoundTitle(activeStep),
       };
 
+      if (debateVoiceMode !== 'off') setAiSpeakingArgumentId(aiArg.id);
       setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, aiArg] }));
     } catch (error) {
       console.error('Debate turn AI error:', error);
@@ -963,6 +1088,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         roundId: activeStep.roundId,
         roundTitle: getAiResponseRoundTitle(activeStep),
       };
+      if (debateVoiceMode !== 'off') setAiSpeakingArgumentId(errorArg.id);
       setBattleState(prev => ({ ...prev, arguments: [...prev.arguments, errorArg] }));
     }
     setIsAiThinking(false);
@@ -1031,6 +1157,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
 
   const handleActionSubmit = async (content: string) => {
     if (battleState.gameMode === 'debate' && activeDebateStep?.actor === 'user') {
+      stopDebateAudio();
       await submitDebateAction(content, activeDebateStep);
       return;
     }
@@ -1104,10 +1231,18 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const handleDebateFocusChange = (debateFocus: DebateFocus) => {
     setBattleState(prev => ({ ...prev, debateFocus }));
   };
+  const handleDebateVoiceModeChange = (nextMode: DebateVoiceMode) => {
+    setDebateVoiceMode(nextMode);
+    localStorage.setItem('debate-ai-voice-mode', nextMode);
+    stopDebateAudio();
+  };
 
   return (
     <div className="app-container">
       <BattleHeader battleState={battleState} />
+      {effectiveConfig.topicBriefing && (
+        <TopicBriefingDetails briefing={effectiveConfig.topicBriefing} language={effectiveConfig.language} />
+      )}
       <section className="session-strip">
         <div className="participant-strip">
           {participants.map(player => (
@@ -1123,10 +1258,19 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         </div>
 
         <div className="session-controls" aria-label="토론 진행 제어">
+          {battleState.gameMode === 'debate' && (
+            <label className={`session-voice-mode ${debateVoiceMode !== 'off' ? 'voice-active' : ''}`} title="AI 토론 음성 방식">
+              {debateVoiceMode === 'off' ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              <select value={debateVoiceMode} onChange={event => handleDebateVoiceModeChange(event.target.value as DebateVoiceMode)}>
+                <option value="quality">AI 음성 · 실시간 고음질</option>
+                <option value="off">AI 음성 · 끄기</option>
+              </select>
+            </label>
+          )}
           <button
             type="button"
             className="btn btn-secondary session-control-button"
-            onClick={() => setIsPaused(true)}
+            onClick={() => { stopDebateAudio(); setIsPaused(true); }}
             disabled={battleState.isFinished || isPaused}
             title="잠시 멈춤"
           >
@@ -1149,7 +1293,9 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           <span>
             {battleState.isFinished
               ? '종료'
-              : isAiThinking
+              : aiSpeakingArgumentId
+                ? 'AI 발언 중 · 다음 단계 대기'
+                : isAiThinking
                 ? 'AI 응답 중'
                 : isPaused
                   ? '일시정지'
@@ -1164,7 +1310,13 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         <section className="chat-panel" aria-label="토론 대화">
           <div className="conversation-list">
             {battleState.arguments.map(argument => (
-              <ArgumentCard key={argument.id} argument={argument} player={getPlayerForArgument(argument)} />
+              <ArgumentCard
+                key={argument.id}
+                argument={argument}
+                player={getPlayerForArgument(argument)}
+                onPlayAudio={battleState.gameMode === 'debate' && argument.isAi ? () => void playDebateArgument(argument) : undefined}
+                isAudioLoading={audioLoadingArgumentId === argument.id}
+              />
             ))}
 
             {isAiThinking && (
@@ -1176,6 +1328,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
 
             {!battleState.isFinished && (
               <ActionZone
+                language={battleState.language}
                 currentRound={currentActionStep}
                 roundProgress={battleState.gameMode === 'debate' ? debateRoundProgress : undefined}
                 timing={battleState.gameMode === 'debate' && currentActionStep ? {
@@ -1186,6 +1339,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 } : undefined}
                 isPlayerTurn={isPlayerTurn}
                 isAiThinking={isAiThinking}
+                isAiSpeaking={Boolean(aiSpeakingArgumentId)}
                 isPaused={isPaused}
                 topic={battleState.topic}
                 onSubmit={handleActionSubmit}

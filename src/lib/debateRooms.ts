@@ -5,17 +5,21 @@ import type {
   DebateParticipantRole,
   DebatePosition,
   DebateRoomAudience,
+  DebateStageId,
   DebateTeamSize,
   LiveDebateArgument,
   LiveDebateLobbyParticipant,
   LiveDebateEvaluation,
   LiveDebateRoomSummary,
+  TopicBriefing,
 } from '../types';
 
 type CreateRoomInput = {
   roomId: string;
   topic: string;
   topicDescription: string;
+  topicBriefing?: TopicBriefing;
+  language?: 'ko' | 'en';
   debateLevel: DebateLevel;
   voiceEnabled: boolean;
   timeLimit: number;
@@ -28,6 +32,14 @@ type CreateRoomInput = {
   hostRole: DebateParticipantRole;
 };
 
+type SupabaseErrorLike = { message?: string } | null;
+
+const isMissingRoomMetadataColumn = (error: SupabaseErrorLike) => {
+  const message = error?.message?.toLowerCase() ?? '';
+  return message.includes('schema cache')
+    && ['language', 'topic_briefing'].some(column => message.includes(`'${column}'`));
+};
+
 const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
   id: String(row.id),
   roomId: String(row.room_id),
@@ -35,6 +47,10 @@ const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
   hostName: String(row.host_name || '토론 개설자'),
   topic: String(row.topic),
   topicDescription: String(row.topic_description || ''),
+  topicBriefing: row.topic_briefing && typeof row.topic_briefing === 'object'
+    ? row.topic_briefing as TopicBriefing
+    : undefined,
+  language: row.language === 'en' ? 'en' : 'ko',
   debateLevel: row.debate_level === 'intermediate' ? 'intermediate' : 'beginner',
   voiceEnabled: Boolean(row.voice_enabled),
   timeLimit: Number(row.time_limit) || 600,
@@ -57,6 +73,8 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     hostName: user.nickname,
     topic: input.topic,
     topicDescription: input.topicDescription,
+    topicBriefing: input.topicBriefing,
+    language: input.language ?? 'ko',
     debateLevel: input.debateLevel,
     voiceEnabled: input.voiceEnabled,
     timeLimit: input.timeLimit,
@@ -69,12 +87,14 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     participantCount: 1,
     createdAt: new Date().toISOString(),
   };
-  const { error } = await supabase.from('live_debate_rooms').insert({
+  const roomPayload = {
     room_id: input.roomId,
     host_id: user.id,
     host_name: user.nickname,
     topic: input.topic,
     topic_description: input.topicDescription,
+    topic_briefing: input.topicBriefing ?? null,
+    language: input.language ?? 'ko',
     debate_level: input.debateLevel,
     voice_enabled: input.voiceEnabled,
     time_limit: input.timeLimit,
@@ -85,26 +105,37 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     organization_name: input.organizationName || null,
     host_position: input.hostPosition,
     host_role: input.hostRole,
-  });
+  };
+
+  let { error } = await supabase.from('live_debate_rooms').insert(roomPayload);
+
+  // Keep room creation working while the additive metadata migration is rolling out.
+  // The canonical fix is supabase_topic_visibility_migration.sql; this fallback can
+  // be removed after every environment has those two columns.
+  if (isMissingRoomMetadataColumn(error)) {
+    const legacyPayload: Record<string, unknown> = { ...roomPayload };
+    delete legacyPayload.language;
+    delete legacyPayload.topic_briefing;
+    ({ error } = await supabase.from('live_debate_rooms').insert(legacyPayload));
+  }
 
   if (error) {
     throw new Error(`토론방을 서버에 저장하지 못했습니다: ${error.message}`);
   }
-  if (!error) {
-    const { error: lobbyError } = await supabase.rpc('enter_live_debate_lobby', {
-      target_room_id: input.roomId,
-      participant_nickname: user.nickname,
-      initial_position: null,
-      initial_role: null,
-    });
-    if (lobbyError) throw new Error(`방장 대기실 입장에 실패했습니다: ${lobbyError.message}`);
-  }
+  const { error: lobbyError } = await supabase.rpc('enter_live_debate_lobby', {
+    target_room_id: input.roomId,
+    participant_nickname: user.nickname,
+    initial_position: null,
+    initial_role: null,
+  });
+  if (lobbyError) throw new Error(`방장 대기실 입장에 실패했습니다: ${lobbyError.message}`);
   return localRoom;
 };
 
 export const listDebateRooms = async (
   audience: DebateRoomAudience,
   organizationIds: string[] = [],
+  language?: 'ko' | 'en',
 ): Promise<LiveDebateRoomSummary[]> => {
   const recentThreshold = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
   let query = supabase
@@ -117,11 +148,12 @@ export const listDebateRooms = async (
   query = audience === 'public'
     ? query.eq('audience', 'public')
     : query.eq('audience', 'organization').in('organization_id', organizationIds.length ? organizationIds : ['00000000-0000-0000-0000-000000000000']);
-
   const { data, error } = await query;
   if (error) throw new Error(`토론방 목록을 불러오지 못했습니다: ${error.message}`);
   const remoteRooms = data?.map(row => mapRoom(row as Record<string, unknown>)) ?? [];
-  return remoteRooms;
+  // Filter client-side so deployments that predate the language column do not
+  // produce a 400 response. Legacy rows map to Korean.
+  return language ? remoteRooms.filter(room => room.language === language) : remoteRooms;
 };
 
 export const incrementRoomParticipants = async (roomId: string) => {
@@ -138,6 +170,8 @@ const mapParticipant = (row: Record<string, unknown>): LiveDebateLobbyParticipan
   role: ['debater', 'opening', 'rebuttal', 'closing', 'moderator'].includes(String(row.role))
     ? row.role as DebateParticipantRole
     : undefined,
+  phaseIds: (Array.isArray(row.phase_ids) ? row.phase_ids : [])
+    .filter((phaseId): phaseId is DebateStageId => ['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing'].includes(String(phaseId))),
   isAi: Boolean(row.is_ai),
   isReady: Boolean(row.is_ready),
   joinedAt: String(row.joined_at || new Date().toISOString()),
@@ -182,6 +216,7 @@ export const enterDebateLobby = async (
       'room is not open': '이 토론방은 존재하지 않거나 이미 시작되었습니다.',
       'lobby is full': '대기실 정원이 모두 찼습니다.',
       'login required': '로그인 세션이 만료되었습니다. 다시 로그인해 주세요.',
+      'host left the lobby': '방장이 대기실을 나가 토론방이 종료되었습니다.',
     };
     throw new Error(messages[error.message] || (error.message.includes('function') ? '대기실 데이터베이스 설정이 필요합니다.' : error.message));
   }
@@ -210,6 +245,20 @@ export const claimLobbySeat = async (
   if (data === false) throw new Error('다른 참가자가 방금 이 역할을 선택했습니다. 다른 자리를 골라 주세요.');
 };
 
+export const setLiveDebateStageAssignment = async (
+  roomId: string,
+  stageId: DebateStageId,
+  assigned: boolean,
+) => {
+  const { data, error } = await supabase.rpc('set_live_debate_stage_assignment', {
+    target_room_id: roomId,
+    selected_stage_id: stageId,
+    assigned,
+  });
+  if (error) throw new Error(error.message);
+  if (data === false) throw new Error('단계 담당을 변경하지 못했습니다.');
+};
+
 export const addLiveDebateAiParticipant = async (
   roomId: string,
   position: DebatePosition,
@@ -235,12 +284,18 @@ export const removeLiveDebateAiParticipant = async (roomId: string, aiUserId: st
 };
 
 export const setLobbyReady = async (roomId: string, isReady: boolean) => {
-  const { error } = await supabase
-    .from('live_debate_room_participants')
-    .update({ is_ready: isReady })
-    .eq('room_id', roomId)
-    .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '');
+  const { data, error } = await supabase.rpc('set_live_debate_ready', {
+    target_room_id: roomId,
+    ready: isReady,
+  });
   if (error) throw new Error(error.message);
+  if (data === false) throw new Error('준비 상태를 변경하지 못했습니다. 대기실 상태를 확인해 주세요.');
+};
+
+export const heartbeatDebateLobby = async (roomId: string) => {
+  const { data, error } = await supabase.rpc('heartbeat_live_debate_lobby', { target_room_id: roomId });
+  if (error) throw new Error(error.message);
+  return data !== false;
 };
 
 export const leaveDebateLobby = async (roomId: string) => {
@@ -287,7 +342,7 @@ export const getLiveDebateArguments = async (roomId: string): Promise<LiveDebate
 };
 
 export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebateArgument) => {
-  const { error } = await supabase.from('live_debate_arguments').insert({
+  const { data, error } = await supabase.from('live_debate_arguments').insert({
     id: argument.id,
     room_id: roomId,
     user_id: argument.senderId,
@@ -296,9 +351,9 @@ export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebat
     source: argument.source,
     phase_id: argument.phaseId || null,
     phase_label: argument.phaseLabel || null,
-    created_at: argument.createdAt,
-  });
+  }).select('created_at').single();
   if (error) throw new Error(`토론 발언을 저장하지 못했습니다: ${error.message}`);
+  return String(data.created_at || new Date().toISOString());
 };
 
 export const saveLiveDebateAiArgument = async (roomId: string, argument: LiveDebateArgument) => {

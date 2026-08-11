@@ -6,6 +6,7 @@ import type { AppUser } from '../types';
 interface AuthModalProps {
   onClose: () => void;
   onAuthenticated: (user: AppUser) => void;
+  language?: 'ko' | 'en';
 }
 
 const KakaoIcon: React.FC = () => (
@@ -52,12 +53,14 @@ const GoogleIcon: React.FC = () => (
   </svg>
 );
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, language = 'ko' }) => {
+  const isEnglish = language === 'en';
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nickname, setNickname] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -69,6 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
     setPassword('');
     setConfirmPassword('');
     setNickname('');
+    setAcceptedTerms(false);
   };
 
   const handleKakaoLogin = async () => {
@@ -77,7 +81,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
     try {
       await signInWithKakao();
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : '카카오 로그인에 실패했습니다.');
+      setError(authError instanceof Error ? authError.message : isEnglish ? 'Kakao login failed.' : '카카오 로그인에 실패했습니다.');
       setLoading(false);
     }
   };
@@ -88,7 +92,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
     try {
       await signInWithGoogle();
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : '구글 로그인에 실패했습니다.');
+      setError(authError instanceof Error ? authError.message : isEnglish ? 'Google login failed.' : '구글 로그인에 실패했습니다.');
       setLoading(false);
     }
   };
@@ -98,15 +102,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
 
     if (isSignup) {
       if (!nickname.trim()) {
-        setError('닉네임을 입력해 주세요.');
+        setError(isEnglish ? 'Please enter a display name.' : '닉네임을 입력해 주세요.');
         return;
       }
       if (password !== confirmPassword) {
-        setError('비밀번호가 일치하지 않습니다.');
+        setError(isEnglish ? 'The passwords do not match.' : '비밀번호가 일치하지 않습니다.');
         return;
       }
       if (password.length < 6) {
-        setError('비밀번호는 최소 6자리 이상이어야 합니다.');
+        setError(isEnglish ? 'The password must contain at least six characters.' : '비밀번호는 최소 6자리 이상이어야 합니다.');
+        return;
+      }
+      if (!acceptedTerms) {
+        setError(isEnglish ? 'Please agree to the terms and privacy notice.' : '이용약관과 개인정보 처리 안내에 동의해 주세요.');
         return;
       }
     }
@@ -120,7 +128,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
       onAuthenticated(user);
       onClose();
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : '인증에 실패했습니다.');
+      setError(authError instanceof Error ? authError.message : isEnglish ? 'Authentication failed.' : '인증에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -132,58 +140,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
         <div className="flex justify-between items-center">
           <div>
             <h2 style={{ color: 'var(--primary)', fontSize: '1.6rem', margin: 0 }}>
-              {isSignup ? '회원가입' : '로그인'}
+              {isEnglish ? (isSignup ? 'Create account' : 'Log in') : (isSignup ? '회원가입' : '로그인')}
             </h2>
             <p style={{ color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              토론 기록과 최종 보고서를 계정에 저장합니다.
+              {isEnglish ? 'Save your debate records and feedback reports.' : '토론 기록과 최종 보고서를 계정에 저장합니다.'}
             </p>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="닫기">
+          <button className="icon-button" onClick={onClose} aria-label={isEnglish ? 'Close' : '닫기'}>
             <X size={20} />
           </button>
         </div>
 
         <div className="segmented-control">
           <button className={mode === 'login' ? 'active' : ''} onClick={() => handleModeChange('login')}>
-            <LogIn size={16} /> 로그인
+            <LogIn size={16} /> {isEnglish ? 'Log in' : '로그인'}
           </button>
           <button className={mode === 'signup' ? 'active' : ''} onClick={() => handleModeChange('signup')}>
-            <UserPlus size={16} /> 가입
+            <UserPlus size={16} /> {isEnglish ? 'Sign up' : '가입'}
           </button>
         </div>
 
         <div className="flex flex-col gap-3">
           {isSignup && (
             <label className="form-field">
-              <span>닉네임</span>
-              <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder="토론자 이름" />
+              <span>{isEnglish ? 'Display name' : '닉네임'}</span>
+              <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder={isEnglish ? 'Debater name' : '토론자 이름'} />
             </label>
           )}
           <label className="form-field">
-            <span>이메일</span>
+            <span>{isEnglish ? 'Email' : '이메일'}</span>
             <input value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" type="email" />
           </label>
           <label className="form-field">
-            <span>비밀번호</span>
-            <input value={password} onChange={event => setPassword(event.target.value)} placeholder="비밀번호" type="password" />
+            <span>{isEnglish ? 'Password' : '비밀번호'}</span>
+            <input value={password} onChange={event => setPassword(event.target.value)} placeholder={isEnglish ? 'Password' : '비밀번호'} type="password" />
           </label>
           {isSignup && (
-            <label className="form-field">
-              <span>비밀번호 확인</span>
-              <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="비밀번호 확인" type="password" />
-            </label>
+            <>
+              <label className="form-field">
+                <span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span>
+                <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder={isEnglish ? 'Confirm password' : '비밀번호 확인'} type="password" />
+              </label>
+              <label className="legal-consent-check">
+                <input type="checkbox" checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} />
+                <span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span>
+              </label>
+            </>
           )}
         </div>
 
         {error && <div className="form-error">{error}</div>}
 
         <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
-          {loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기')}
+          {isEnglish ? (loading ? 'Please wait…' : isSignup ? 'Create account' : 'Log in') : (loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기'))}
         </button>
 
         <div className="divider-row" style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
-          <span style={{ padding: '0 0.75rem' }}>또는</span>
+          <span style={{ padding: '0 0.75rem' }}>{isEnglish ? 'or' : '또는'}</span>
           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
         </div>
 
@@ -206,7 +220,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
             }}
           >
             <KakaoIcon />
-            <span>카카오 로그인</span>
+            <span>{isEnglish ? 'Continue with Kakao' : '카카오 로그인'}</span>
           </button>
           <button 
             className="btn btn-secondary" 
@@ -226,9 +240,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated }
             }}
           >
             <GoogleIcon />
-            <span>구글 로그인</span>
+            <span>{isEnglish ? 'Continue with Google' : '구글 로그인'}</span>
           </button>
         </div>
+        <p className="social-legal-note">{isEnglish ? <>By continuing with a social account, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <>소셜 로그인을 계속하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의한 것으로 봅니다.</>}</p>
       </div>
     </div>
   );

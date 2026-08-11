@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { FinalReport, Player } from '../types';
-import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2, BookOpen, FileDown, ImageDown } from 'lucide-react';
+import { Trophy, Star, ChevronRight, MessageSquareText, Languages, TrendingUp, Sparkles, ChevronDown, Share2, BookOpen, FileDown, ImageDown, CircleCheckBig, Focus, Route } from 'lucide-react';
 import { downloadSocialSummaryImage, isKakaoShareConfigured, shareReportToKakao } from '../lib/reportShare';
 
 interface ResultModalProps {
@@ -32,8 +32,8 @@ const getBarColor = (score: number, maxScore: number) => {
   return 'var(--accent-coral)';
 };
 
-const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: number; feedback: string; xpEarned?: number }; index: number; animReady: boolean }> = ({ cat, index, animReady }) => {
-  const [expanded, setExpanded] = useState(true);
+export const ReportCategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: number; feedback: string; xpEarned?: number }; index: number; animReady: boolean }> = ({ cat, index, animReady }) => {
+  const [expanded, setExpanded] = useState(index === 0);
   const pct = (cat.score / cat.maxScore) * 100;
   const barColor = getBarColor(cat.score, cat.maxScore);
 
@@ -42,6 +42,15 @@ const CategoryCard: React.FC<{ cat: { name: string; score: number; maxScore: num
       className="report-category-card"
       style={{ animationDelay: `${0.3 + index * 0.08}s`, opacity: animReady ? 1 : 0 }}
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
     >
       <div className="report-cat-header">
         <div className="report-cat-name-row">
@@ -101,6 +110,12 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
   const totalPct = Math.round((report.totalScore / totalMax) * 100);
   const grade = getScoreGrade(report.totalScore, totalMax);
   const missionXp = report.categories.reduce((acc, cat) => acc + (cat.xpEarned || 0), 0);
+  const rankedCategories = [...report.categories].sort((a, b) => (b.score / b.maxScore) - (a.score / a.maxScore));
+  const strongestCategory = rankedCategories[0];
+  const priorityCategory = rankedCategories[rankedCategories.length - 1];
+  const nextTraining = report.phaseCoaching?.find(coaching => coaching.nextAction.trim())?.nextAction
+    || priorityCategory?.feedback
+    || '다음 토론에서는 핵심 주장을 한 문장으로 정리한 뒤 근거를 연결해 보세요.';
 
   const getShareUrl = async () => {
     setIsSharing(true);
@@ -204,6 +219,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
               </div>
             </div>
             <h2 className="report-title">최종 토론 평가서</h2>
+            <p className="report-topic">{topic}</p>
             <p className="report-subtitle">
               <Trophy size={15} /> {playerA.name} vs {playerB.name}
             </p>
@@ -227,15 +243,38 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
             </div>
           </section>
 
+          <section className="report-section">
+            <h3 className="report-section-title">
+              <Sparkles size={18} /> 한눈에 보는 성장 포인트
+            </h3>
+            <div className="report-highlight-grid">
+              <article className="report-highlight-card strength">
+                <span><CircleCheckBig size={17} /> 가장 강한 역량</span>
+                <strong>{strongestCategory?.name || '분석 중'}</strong>
+                <p>{strongestCategory?.feedback || '평가 내용을 확인해 주세요.'}</p>
+              </article>
+              <article className="report-highlight-card focus">
+                <span><Focus size={17} /> 우선 보완할 역량</span>
+                <strong>{priorityCategory?.name || '분석 중'}</strong>
+                <p>{priorityCategory?.feedback || '평가 내용을 확인해 주세요.'}</p>
+              </article>
+              <article className="report-highlight-card action">
+                <span><Route size={17} /> 다음 토론에서 할 일</span>
+                <strong>한 가지에 집중하기</strong>
+                <p>{nextTraining}</p>
+              </article>
+            </div>
+          </section>
+
           {/* Category Scores */}
           <section className="report-section">
             <h3 className="report-section-title">
               <TrendingUp size={18} /> 세부 역량 분석
               <span className="report-section-hint">(클릭하면 피드백 확인)</span>
             </h3>
-            <div className="report-categories-list">
+            <div className="report-categories-list report-category-grid">
               {report.categories.map((cat, idx) => (
-                <CategoryCard key={idx} cat={cat} index={idx} animReady={animReady} />
+                  <ReportCategoryCard key={idx} cat={cat} index={idx} animReady={animReady} />
               ))}
             </div>
           </section>
@@ -245,15 +284,16 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
               <h3 className="report-section-title">
                 <BookOpen size={18} /> 국면별 보완 코칭
               </h3>
-              <div className="report-categories-list">
+              <div className="report-coaching-timeline">
                 {report.phaseCoaching.map((coaching, index) => (
-                  <article key={`${coaching.phase}-${index}`} className="report-category-card" style={{ padding: '1rem' }}>
-                    <strong className="report-cat-name">{coaching.phase}</strong>
-                    <div style={{ display: 'grid', gap: '0.6rem', marginTop: '0.8rem', lineHeight: 1.55, fontSize: '0.92rem' }}>
-                      <div><strong style={{ color: 'var(--text-muted)' }}>관찰</strong><br />{coaching.observed}</div>
-                      <div><strong style={{ color: 'var(--secondary)' }}>잘한 점</strong><br />{coaching.strength}</div>
-                      <div><strong style={{ color: 'var(--accent-amber)' }}>보완할 점</strong><br />{coaching.improvement}</div>
-                      <div><strong style={{ color: 'var(--primary)' }}>다음 훈련</strong><br />{coaching.nextAction}</div>
+                  <article key={`${coaching.phase}-${index}`} className="report-coaching-card">
+                    <div className="report-coaching-index">{index + 1}</div>
+                    <div>
+                      <header><strong>{coaching.phase}</strong><span>토론 단계 분석</span></header>
+                      <p><b>관찰</b>{coaching.observed}</p>
+                      <p className="strength"><b>강점</b>{coaching.strength}</p>
+                      <p className="improvement"><b>보완</b>{coaching.improvement}</p>
+                      <p className="action"><b>다음 행동</b>{coaching.nextAction}</p>
                     </div>
                   </article>
                 ))}

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS public.live_debate_rooms (
   host_name TEXT NOT NULL DEFAULT '토론 개설자',
   topic TEXT NOT NULL CHECK (char_length(topic) BETWEEN 1 AND 120),
   topic_description TEXT NOT NULL DEFAULT '',
+  topic_briefing JSONB,
+  language TEXT NOT NULL DEFAULT 'ko' CHECK (language IN ('ko', 'en')),
   debate_level TEXT NOT NULL DEFAULT 'beginner' CHECK (debate_level IN ('beginner', 'intermediate')),
   voice_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   time_limit INTEGER NOT NULL CHECK (time_limit IN (600, 900, 1200)),
@@ -115,6 +117,8 @@ GRANT EXECUTE ON FUNCTION public.join_live_debate_room(TEXT) TO authenticated;
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS evaluation JSONB;
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS topic_description TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS topic_briefing JSONB;
+ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'ko';
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS debate_level TEXT NOT NULL DEFAULT 'beginner';
 ALTER TABLE public.live_debate_rooms ADD COLUMN IF NOT EXISTS voice_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -135,6 +139,7 @@ CREATE TABLE IF NOT EXISTS public.live_debate_room_participants (
   is_ai BOOLEAN NOT NULL DEFAULT FALSE,
   is_ready BOOLEAN NOT NULL DEFAULT FALSE,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now()),
   PRIMARY KEY (room_id, user_id),
   CHECK ((role = 'moderator' AND position IS NULL) OR role <> 'moderator' OR role IS NULL)
@@ -142,6 +147,10 @@ CREATE TABLE IF NOT EXISTS public.live_debate_room_participants (
 
 ALTER TABLE public.live_debate_room_participants
   ADD COLUMN IF NOT EXISTS is_ai BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.live_debate_room_participants
+  ADD COLUMN IF NOT EXISTS phase_ids TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE public.live_debate_room_participants
+  ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc', now());
 
 CREATE TABLE IF NOT EXISTS public.live_debate_participant_evaluations (
   room_id TEXT NOT NULL REFERENCES public.live_debate_rooms(room_id) ON DELETE CASCADE,
@@ -168,9 +177,9 @@ CREATE INDEX IF NOT EXISTS idx_live_debate_arguments_room_time
 
 GRANT SELECT, INSERT ON public.live_debate_arguments TO authenticated;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_live_debate_unique_team_seat
-  ON public.live_debate_room_participants(room_id, position, role)
-  WHERE role IS NOT NULL AND role <> 'moderator';
+-- A human debater can own multiple phases, and several people on a team share
+-- the generic `debater` role. Phase ownership is unique per team in the RPC.
+DROP INDEX IF EXISTS public.idx_live_debate_unique_team_seat;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_live_debate_unique_moderator
   ON public.live_debate_room_participants(room_id, role)
   WHERE role = 'moderator';
@@ -231,11 +240,6 @@ USING (
   )
 );
 
-CREATE POLICY "Users can update own lobby state"
-ON public.live_debate_room_participants FOR UPDATE TO authenticated
-USING (user_id = auth.uid())
-WITH CHECK (user_id = auth.uid());
-
 CREATE POLICY "Users can leave live debate lobby"
 ON public.live_debate_room_participants FOR DELETE TO authenticated
 USING (user_id = auth.uid());
@@ -264,9 +268,26 @@ BEGIN
     WHERE membership.organization_id = selected_room.organization_id AND membership.user_id = auth.uid()
   ) THEN RAISE EXCEPTION 'not an organization member'; END IF;
 
+  DELETE FROM public.live_debate_room_participants
+  WHERE room_id = target_room_id
+    AND user_id <> auth.uid()
+    AND last_seen_at < timezone('utc', now()) - interval '90 seconds';
+
+  IF selected_room.host_id <> auth.uid() AND NOT EXISTS (
+    SELECT 1 FROM public.live_debate_room_participants
+    WHERE room_id = target_room_id AND user_id = selected_room.host_id
+  ) THEN
+    UPDATE public.live_debate_rooms
+    SET status = 'closed', updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id;
+    RAISE EXCEPTION 'host left the lobby';
+  END IF;
+
   IF EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND user_id = auth.uid()) THEN
     UPDATE public.live_debate_room_participants
-    SET nickname = left(COALESCE(NULLIF(trim(participant_nickname), ''), nickname), 60), updated_at = timezone('utc', now())
+    SET nickname = left(COALESCE(NULLIF(trim(participant_nickname), ''), nickname), 60),
+        last_seen_at = timezone('utc', now()),
+        updated_at = timezone('utc', now())
     WHERE room_id = target_room_id AND user_id = auth.uid();
     RETURN TRUE;
   END IF;
@@ -278,6 +299,65 @@ BEGIN
   INSERT INTO public.live_debate_room_participants (room_id, user_id, nickname)
   VALUES (target_room_id, auth.uid(), left(COALESCE(NULLIF(trim(participant_nickname), ''), '참가자'), 60));
   RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.heartbeat_live_debate_lobby(target_room_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE selected_room public.live_debate_rooms%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
+  SELECT * INTO selected_room
+  FROM public.live_debate_rooms
+  WHERE room_id = target_room_id
+  FOR UPDATE;
+  IF selected_room.id IS NULL OR selected_room.status <> 'open' THEN RETURN FALSE; END IF;
+
+  UPDATE public.live_debate_room_participants
+  SET last_seen_at = timezone('utc', now()), updated_at = timezone('utc', now())
+  WHERE room_id = target_room_id AND user_id = auth.uid() AND NOT is_ai;
+  IF NOT FOUND THEN RETURN FALSE; END IF;
+
+  DELETE FROM public.live_debate_room_participants
+  WHERE room_id = target_room_id
+    AND user_id <> auth.uid()
+    AND last_seen_at < timezone('utc', now()) - interval '90 seconds';
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.live_debate_room_participants
+    WHERE room_id = target_room_id AND user_id = selected_room.host_id
+  ) THEN
+    UPDATE public.live_debate_rooms
+    SET status = 'closed', updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id;
+    RETURN FALSE;
+  END IF;
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_live_debate_ready(target_room_id TEXT, ready BOOLEAN)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.live_debate_rooms
+    WHERE room_id = target_room_id AND status = 'open'
+  ) THEN RETURN FALSE; END IF;
+  UPDATE public.live_debate_room_participants
+  SET is_ready = ready,
+      last_seen_at = timezone('utc', now()),
+      updated_at = timezone('utc', now())
+  WHERE room_id = target_room_id AND user_id = auth.uid() AND NOT is_ai;
+  RETURN FOUND;
 END;
 $$;
 
@@ -293,8 +373,6 @@ SET search_path = public
 AS $$
 DECLARE
   selected_room public.live_debate_rooms%ROWTYPE;
-  allowed_roles TEXT[];
-  participant_position TEXT;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
   SELECT * INTO selected_room FROM public.live_debate_rooms WHERE room_id = target_room_id AND status = 'open' FOR UPDATE;
@@ -303,28 +381,15 @@ BEGIN
     RAISE EXCEPTION 'enter lobby first';
   END IF;
 
-  SELECT position INTO participant_position
-  FROM public.live_debate_room_participants
-  WHERE room_id = target_room_id AND user_id = auth.uid();
-
-  IF selected_room.team_size = 1 THEN allowed_roles := ARRAY['debater'];
-  ELSIF selected_room.team_size = 2 THEN allowed_roles := ARRAY['opening', 'rebuttal'];
-  ELSE allowed_roles := ARRAY['opening', 'rebuttal', 'closing']; END IF;
-
   IF selected_role = 'moderator' THEN
     IF NOT selected_room.allow_moderator OR selected_position IS NOT NULL THEN RAISE EXCEPTION 'moderator is not allowed'; END IF;
     IF EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND role = 'moderator' AND user_id <> auth.uid()) THEN RETURN FALSE; END IF;
   ELSE
-    IF selected_position NOT IN ('affirmative', 'negative') OR NOT (selected_role = ANY(allowed_roles)) THEN RAISE EXCEPTION 'invalid debate seat'; END IF;
-    IF participant_position IS NULL OR participant_position <> selected_position THEN RAISE EXCEPTION 'choose team first'; END IF;
-    IF EXISTS (
-      SELECT 1 FROM public.live_debate_room_participants
-      WHERE room_id = target_room_id AND position = selected_position AND role = selected_role AND user_id <> auth.uid()
-    ) THEN RETURN FALSE; END IF;
+    RAISE EXCEPTION 'team debaters are assigned through choose_live_debate_team';
   END IF;
 
   UPDATE public.live_debate_room_participants
-  SET position = selected_position, role = selected_role, is_ready = FALSE, updated_at = timezone('utc', now())
+  SET position = NULL, role = selected_role, phase_ids = ARRAY[]::TEXT[], is_ready = FALSE, updated_at = timezone('utc', now())
   WHERE room_id = target_room_id AND user_id = auth.uid();
   RETURN TRUE;
 END;
@@ -353,16 +418,89 @@ BEGIN
   FROM public.live_debate_room_participants
   WHERE room_id = target_room_id AND user_id = auth.uid();
   IF NOT FOUND THEN RAISE EXCEPTION 'enter lobby first'; END IF;
-  IF current_position = selected_position THEN RETURN TRUE; END IF;
+  IF current_position = selected_position THEN
+    UPDATE public.live_debate_room_participants
+    SET role = 'debater',
+        phase_ids = CASE
+          WHEN selected_room.team_size = 1 AND selected_room.debate_level = 'intermediate'
+            THEN ARRAY['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing']
+          WHEN selected_room.team_size = 1
+            THEN ARRAY['opening', 'question', 'answer', 'rebuttal', 'closing']
+          ELSE phase_ids
+        END,
+        updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id AND user_id = auth.uid();
+    RETURN TRUE;
+  END IF;
 
   SELECT count(*) INTO team_count
   FROM public.live_debate_room_participants
-  WHERE room_id = target_room_id AND position = selected_position AND role IS DISTINCT FROM 'moderator';
+  WHERE room_id = target_room_id AND position = selected_position AND role IS DISTINCT FROM 'moderator' AND NOT is_ai;
   IF team_count >= selected_room.team_size THEN RETURN FALSE; END IF;
 
   UPDATE public.live_debate_room_participants
-  SET position = selected_position, role = NULL, is_ready = FALSE, updated_at = timezone('utc', now())
+  SET position = selected_position,
+      role = 'debater',
+      phase_ids = CASE
+        WHEN selected_room.team_size = 1 AND selected_room.debate_level = 'intermediate'
+          THEN ARRAY['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing']
+        WHEN selected_room.team_size = 1
+          THEN ARRAY['opening', 'question', 'answer', 'rebuttal', 'closing']
+        ELSE ARRAY[]::TEXT[]
+      END,
+      is_ready = FALSE,
+      updated_at = timezone('utc', now())
   WHERE room_id = target_room_id AND user_id = auth.uid();
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.set_live_debate_stage_assignment(
+  target_room_id TEXT,
+  selected_stage_id TEXT,
+  assigned BOOLEAN
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  selected_room public.live_debate_rooms%ROWTYPE;
+  participant_position TEXT;
+  allowed_stages TEXT[];
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
+  SELECT * INTO selected_room FROM public.live_debate_rooms WHERE room_id = target_room_id AND status = 'open' FOR UPDATE;
+  IF selected_room.id IS NULL THEN RAISE EXCEPTION 'room is not open'; END IF;
+  IF selected_room.team_size = 1 THEN RAISE EXCEPTION '1:1 stages are assigned automatically'; END IF;
+
+  allowed_stages := CASE WHEN selected_room.debate_level = 'intermediate'
+    THEN ARRAY['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing']
+    ELSE ARRAY['opening', 'question', 'answer', 'rebuttal', 'closing']
+  END;
+  IF NOT (selected_stage_id = ANY(allowed_stages)) THEN RAISE EXCEPTION 'invalid debate stage'; END IF;
+
+  SELECT position INTO participant_position
+  FROM public.live_debate_room_participants
+  WHERE room_id = target_room_id AND user_id = auth.uid() AND NOT is_ai AND role = 'debater';
+  IF participant_position IS NULL THEN RAISE EXCEPTION 'choose team first'; END IF;
+
+  IF assigned THEN
+    UPDATE public.live_debate_room_participants
+    SET phase_ids = array_remove(phase_ids, selected_stage_id), is_ready = FALSE, updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id AND position = participant_position AND NOT is_ai;
+
+    UPDATE public.live_debate_room_participants
+    SET phase_ids = CASE WHEN selected_stage_id = ANY(phase_ids) THEN phase_ids ELSE array_append(phase_ids, selected_stage_id) END,
+        is_ready = FALSE,
+        updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id AND user_id = auth.uid();
+  ELSE
+    UPDATE public.live_debate_room_participants
+    SET phase_ids = array_remove(phase_ids, selected_stage_id), is_ready = FALSE, updated_at = timezone('utc', now())
+    WHERE room_id = target_room_id AND user_id = auth.uid();
+  END IF;
   RETURN TRUE;
 END;
 $$;
@@ -375,21 +513,33 @@ SET search_path = public
 AS $$
 DECLARE
   selected_room public.live_debate_rooms%ROWTYPE;
-  required_roles TEXT[];
-  required_role TEXT;
+  required_stages TEXT[];
+  required_stage TEXT;
+  selected_position TEXT;
   started_time TIMESTAMPTZ;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
   SELECT * INTO selected_room FROM public.live_debate_rooms WHERE room_id = target_room_id AND status = 'open' FOR UPDATE;
   IF selected_room.id IS NULL OR selected_room.host_id <> auth.uid() THEN RAISE EXCEPTION 'only the host can start'; END IF;
 
-  IF selected_room.team_size = 1 THEN required_roles := ARRAY['debater'];
-  ELSIF selected_room.team_size = 2 THEN required_roles := ARRAY['opening', 'rebuttal'];
-  ELSE required_roles := ARRAY['opening', 'rebuttal', 'closing']; END IF;
+  IF EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND is_ai) THEN
+    RAISE EXCEPTION 'human debate rooms do not allow AI participants';
+  END IF;
+  IF (SELECT count(*) FROM public.live_debate_room_participants WHERE room_id = target_room_id AND position = 'affirmative' AND role = 'debater') <> selected_room.team_size THEN RETURN NULL; END IF;
+  IF (SELECT count(*) FROM public.live_debate_room_participants WHERE room_id = target_room_id AND position = 'negative' AND role = 'debater') <> selected_room.team_size THEN RETURN NULL; END IF;
+  IF EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND role = 'debater' AND NOT is_ready) THEN RETURN NULL; END IF;
 
-  FOREACH required_role IN ARRAY required_roles LOOP
-    IF NOT EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND position = 'affirmative' AND role = required_role AND is_ready) THEN RETURN NULL; END IF;
-    IF NOT EXISTS (SELECT 1 FROM public.live_debate_room_participants WHERE room_id = target_room_id AND position = 'negative' AND role = required_role AND is_ready) THEN RETURN NULL; END IF;
+  required_stages := CASE WHEN selected_room.debate_level = 'intermediate'
+    THEN ARRAY['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing']
+    ELSE ARRAY['opening', 'question', 'answer', 'rebuttal', 'closing']
+  END;
+  FOREACH selected_position IN ARRAY ARRAY['affirmative', 'negative'] LOOP
+    FOREACH required_stage IN ARRAY required_stages LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM public.live_debate_room_participants
+        WHERE room_id = target_room_id AND position = selected_position AND required_stage = ANY(phase_ids)
+      ) THEN RETURN NULL; END IF;
+    END LOOP;
   END LOOP;
 
   IF EXISTS (
@@ -415,40 +565,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  selected_room public.live_debate_rooms%ROWTYPE;
-  allowed_roles TEXT[];
-  ai_id UUID;
-  team_count INTEGER;
-  ai_name TEXT;
 BEGIN
-  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
-  SELECT * INTO selected_room FROM public.live_debate_rooms WHERE room_id = target_room_id AND status = 'open' FOR UPDATE;
-  IF selected_room.id IS NULL OR selected_room.host_id <> auth.uid() THEN RAISE EXCEPTION 'only the host can add ai'; END IF;
-  IF selected_position NOT IN ('affirmative', 'negative') THEN RAISE EXCEPTION 'invalid team'; END IF;
-
-  IF selected_room.team_size = 1 THEN allowed_roles := ARRAY['debater'];
-  ELSIF selected_room.team_size = 2 THEN allowed_roles := ARRAY['opening', 'rebuttal'];
-  ELSE allowed_roles := ARRAY['opening', 'rebuttal', 'closing']; END IF;
-  IF NOT (selected_role = ANY(allowed_roles)) THEN RAISE EXCEPTION 'invalid debate seat'; END IF;
-
-  SELECT count(*) INTO team_count
-  FROM public.live_debate_room_participants
-  WHERE room_id = target_room_id AND position = selected_position AND role IS DISTINCT FROM 'moderator';
-  IF team_count >= selected_room.team_size THEN RETURN NULL; END IF;
-  IF EXISTS (
-    SELECT 1 FROM public.live_debate_room_participants
-    WHERE room_id = target_room_id AND position = selected_position AND role = selected_role
-  ) THEN RETURN NULL; END IF;
-
-  ai_id := gen_random_uuid();
-  ai_name := 'AI · ' || CASE selected_position WHEN 'affirmative' THEN '찬성' ELSE '반대' END || ' ' ||
-    CASE selected_role WHEN 'debater' THEN '토론자' WHEN 'opening' THEN '입론' WHEN 'rebuttal' THEN '질의·반론' ELSE '최종변론' END;
-  INSERT INTO public.live_debate_room_participants
-    (room_id, user_id, nickname, position, role, is_ai, is_ready)
-  VALUES
-    (target_room_id, ai_id, ai_name, selected_position, selected_role, TRUE, TRUE);
-  RETURN ai_id;
+  RAISE EXCEPTION 'AI participants are disabled in human debate rooms';
 END;
 $$;
 
@@ -518,13 +636,25 @@ AS $$
 DECLARE
   participant_item JSONB;
   participant_user_id UUID;
+  selected_room public.live_debate_rooms%ROWTYPE;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
   IF jsonb_typeof(p_evaluation) <> 'object' THEN RAISE EXCEPTION 'invalid evaluation'; END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM public.live_debate_room_participants
-    WHERE room_id = target_room_id AND user_id = auth.uid()
-  ) THEN RAISE EXCEPTION 'not a room participant'; END IF;
+  IF jsonb_typeof(COALESCE(p_evaluation->'participantReports', 'null'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'invalid participant reports';
+  END IF;
+
+  SELECT * INTO selected_room
+  FROM public.live_debate_rooms
+  WHERE room_id = target_room_id
+  FOR UPDATE;
+  IF selected_room.id IS NULL OR selected_room.status <> 'in_progress' THEN
+    RETURN FALSE;
+  END IF;
+  IF selected_room.host_id <> auth.uid() THEN
+    RAISE EXCEPTION 'only the host can save the evaluation';
+  END IF;
+  IF selected_room.evaluation IS NOT NULL THEN RETURN FALSE; END IF;
 
   FOR participant_item IN SELECT value FROM jsonb_array_elements(COALESCE(p_evaluation->'participantReports', '[]'::jsonb)) LOOP
     BEGIN
@@ -544,7 +674,7 @@ BEGIN
 
   UPDATE public.live_debate_rooms
   SET evaluation = p_evaluation - 'participantReports', status = 'closed', updated_at = timezone('utc', now())
-  WHERE room_id = target_room_id AND status = 'in_progress' AND evaluation IS NULL;
+  WHERE room_id = target_room_id;
   RETURN FOUND;
 END;
 $$;
@@ -592,8 +722,11 @@ AFTER INSERT OR DELETE ON public.live_debate_room_participants
 FOR EACH ROW EXECUTE FUNCTION public.sync_live_debate_participant_count();
 
 GRANT EXECUTE ON FUNCTION public.enter_live_debate_lobby(TEXT, TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.heartbeat_live_debate_lobby(TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_live_debate_ready(TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.choose_live_debate_team(TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_live_debate_seat(TEXT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_live_debate_stage_assignment(TEXT, TEXT, BOOLEAN) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.start_live_debate_room(TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.add_live_debate_ai_participant(TEXT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.remove_live_debate_ai_participant(TEXT, UUID) TO authenticated;

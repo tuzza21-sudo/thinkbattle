@@ -32,10 +32,10 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({ battleState }) => {
       </div>
       
       <div className="flex gap-3 justify-end" style={{ flex: 1, rowGap: '0.75rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary" style={{ padding: '0.6rem' }} title="배틀 규칙">
+        <button className="btn btn-secondary" style={{ padding: '0.6rem' }} title={battleState.language === 'en' ? 'Debate rules' : '배틀 규칙'}>
           <LayoutDashboard size={18} />
         </button>
-        <button className="btn btn-secondary" style={{ padding: '0.6rem', color: 'var(--text-muted)' }} title="항복하기">
+        <button className="btn btn-secondary" style={{ padding: '0.6rem', color: 'var(--text-muted)' }} title={battleState.language === 'en' ? 'Leave debate' : '항복하기'}>
           <Flag size={18} />
         </button>
       </div>

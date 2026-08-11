@@ -1,23 +1,39 @@
 import { supabase } from './supabase';
-import type { DebateRecord, EnglishRephraseEntry } from '../types';
+import type { Argument, DebateRecord, EnglishRephraseEntry } from '../types';
 
-const mapDebateRecord = (row: any): DebateRecord => ({
-  id: row.id,
-  shareId: row.share_id ?? undefined,
-  userId: row.user_id ?? '',
-  topic: row.topic,
+type StoredFinalReport = {
+  report?: DebateRecord['report'];
+  englishRephrases?: EnglishRephraseEntry[];
+};
+
+type DebateRecordRow = Record<string, unknown> & {
+  final_report?: StoredFinalReport | DebateRecord['report'];
+  arguments?: Argument[];
+};
+
+const mapDebateRecord = (row: DebateRecordRow): DebateRecord => {
+  const rawFinalReport = row.final_report;
+  const storedReport = rawFinalReport && typeof rawFinalReport === 'object' && 'report' in rawFinalReport
+    ? rawFinalReport as StoredFinalReport
+    : { report: rawFinalReport as DebateRecord['report'] };
+  return ({
+  id: String(row.id),
+  shareId: row.share_id ? String(row.share_id) : undefined,
+  userId: row.user_id ? String(row.user_id) : '',
+  topic: String(row.topic || ''),
   matchType: row.game_mode === 'debate' ? '정식 토론' : '친선전',
-  gameMode: row.game_mode,
-  userPosition: row.user_position,
+  gameMode: row.game_mode as DebateRecord['gameMode'],
+  userPosition: row.user_position as DebateRecord['userPosition'],
   aiPosition: row.user_position === 'affirmative' ? 'negative' : 'affirmative',
-  debateLevel: row.debate_level,
-  debateFocus: row.debate_focus,
-  durationSeconds: row.time_limit || 0,
-  completedAt: row.created_at,
+  debateLevel: row.debate_level as DebateRecord['debateLevel'],
+  debateFocus: row.debate_focus as DebateRecord['debateFocus'],
+  durationSeconds: Number(row.time_limit) || 0,
+  completedAt: String(row.created_at || new Date().toISOString()),
   arguments: row.arguments || [],
-  report: row.final_report?.report || row.final_report,
-  englishRephrases: row.final_report?.englishRephrases || [],
-});
+  report: storedReport.report as DebateRecord['report'],
+  englishRephrases: storedReport.englishRephrases || [],
+  });
+};
 
 export const getDebateRecords = async (userId: string): Promise<DebateRecord[]> => {
   const { data, error } = await supabase
@@ -31,7 +47,7 @@ export const getDebateRecords = async (userId: string): Promise<DebateRecord[]> 
     return [];
   }
 
-  return data.map(mapDebateRecord);
+  return data.map(row => mapDebateRecord(row as DebateRecordRow));
 };
 
 export const createReportShareLink = async (userId: string, recordId: string, existingShareId?: string): Promise<string> => {
@@ -60,13 +76,13 @@ export const getSharedDebateRecord = async (shareId: string): Promise<DebateReco
     return undefined;
   }
 
-  return mapDebateRecord(data);
+  return mapDebateRecord(data as DebateRecordRow);
 };
 
 export const saveDebateRecord = async (record: DebateRecord) => {
   const { error } = await supabase
     .from('debate_records')
-    .insert([
+    .upsert([
       {
         id: record.id,
         user_id: record.userId,
@@ -83,7 +99,7 @@ export const saveDebateRecord = async (record: DebateRecord) => {
         },
         created_at: record.completedAt
       }
-    ]);
+    ], { onConflict: 'id' });
 
   if (error) {
     console.error('Failed to save debate record:', error);
@@ -107,11 +123,14 @@ export const saveEnglishRephraseEntry = async (
   if (fetchError || !currentRecord) return undefined;
 
   // 2. Update englishRephrases inside final_report jsonb
-  const finalReport = currentRecord.final_report || {};
-  const existing = finalReport.englishRephrases || [];
+  const rawFinalReport = currentRecord.final_report as unknown;
+  const finalReport: StoredFinalReport = rawFinalReport && typeof rawFinalReport === 'object' && 'report' in rawFinalReport
+    ? rawFinalReport as StoredFinalReport
+    : { report: rawFinalReport as DebateRecord['report'] };
+  const existing = Array.isArray(finalReport.englishRephrases) ? finalReport.englishRephrases : [];
   const updatedRephrases = [
     entry,
-    ...existing.filter((item: any) => item.argumentId !== entry.argumentId),
+    ...existing.filter(item => item.argumentId !== entry.argumentId),
   ];
 
   const updatedFinalReport = {
@@ -143,7 +162,7 @@ export const saveEnglishRephraseEntry = async (
     durationSeconds: currentRecord.time_limit || 0,
     completedAt: currentRecord.created_at,
     arguments: currentRecord.arguments || [],
-    report: updatedFinalReport.report || updatedFinalReport,
+    report: updatedFinalReport.report as DebateRecord['report'],
     englishRephrases: updatedRephrases,
   };
 };

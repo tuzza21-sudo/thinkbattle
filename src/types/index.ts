@@ -23,9 +23,14 @@ export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';
 export type DebatePosition = 'affirmative' | 'negative';
 export type DebateRoomAudience = 'public' | 'organization';
 export type DebateParticipantRole = 'debater' | 'opening' | 'rebuttal' | 'closing' | 'moderator';
+export type DebateStageId = 'opening' | 'question' | 'answer' | 'analysis' | 'rebuttal' | 'weighing' | 'closing';
 export type DebateTeamSize = 1 | 2 | 3;
 export type DebateLevel = 'beginner' | 'intermediate' | 'advanced';
+export type AppLanguage = 'ko' | 'en';
 export type DebateFocus = 'fact' | 'policy' | 'value';
+export type SimulationCategoryId = 'career' | 'negotiation' | 'workplace' | 'customer';
+export type SimulationPersonaId = 'pressure_interviewer' | 'aggressive_negotiator' | 'authoritarian_manager' | 'difficult_customer';
+export type SimulationDifficulty = 1 | 2 | 3;
 export type DebateRoundId =
   | 'opening'
   | 'rebuttal'
@@ -36,7 +41,9 @@ export type DebateRoundId =
 
 export type BattleConfig = {
   topic: string;
+  language?: AppLanguage;
   topicDescription?: string;
+  topicBriefing?: TopicBriefing;
   timeLimit: number;
   gameMode: GameMode;
   personaId?: PersonaId;
@@ -58,6 +65,8 @@ export type LiveDebateRoomSummary = {
   hostName: string;
   topic: string;
   topicDescription: string;
+  topicBriefing?: TopicBriefing;
+  language: AppLanguage;
   debateLevel: DebateLevel;
   voiceEnabled: boolean;
   timeLimit: number;
@@ -77,6 +86,7 @@ export type LiveDebateLobbyParticipant = {
   nickname: string;
   position?: DebatePosition;
   role?: DebateParticipantRole;
+  phaseIds: DebateStageId[];
   isAi: boolean;
   isReady: boolean;
   joinedAt: string;
@@ -176,6 +186,17 @@ export type OrganizationTopic = {
   createdAt: string;
 };
 
+export type PublicDebateTopic = {
+  id: string;
+  title: string;
+  description: string;
+  briefing: TopicBriefing;
+  config: Partial<Pick<BattleConfig, 'timeLimit' | 'debateLevel' | 'debateFocus'>>;
+  createdBy?: string;
+  createdAt: string;
+  language: AppLanguage;
+};
+
 export type OrganizationStudentRecord = {
   id: string;
   topic: string;
@@ -223,10 +244,25 @@ export type SuperAdminRecord = {
   arguments: Argument[];
 };
 
+export type SuperAdminOrganizationOwner = {
+  userId: string;
+  nickname: string;
+  email: string;
+};
+
+export type SuperAdminOrganization = {
+  id: string;
+  name: string;
+  createdAt: string;
+  memberCount: number;
+  owners: SuperAdminOrganizationOwner[];
+};
+
 export type SuperAdminDashboard = {
   totalUsers: number;
   totalRecords: number;
   activeUsers: number;
+  organizations: SuperAdminOrganization[];
   records: SuperAdminRecord[];
 };
 
@@ -241,6 +277,8 @@ export type ScoreCategory = {
 export type BattleState = {
   id: string;
   topic: string;
+  topicDescription?: string;
+  language?: AppLanguage;
   matchType: string;
   gameMode: GameMode;
   personaId?: PersonaId;
@@ -287,6 +325,60 @@ export type EnglishRephraseEntry = {
   englishDraft: string;
   feedback: EnglishRephraseFeedback;
   updatedAt: string;
+};
+
+export type SimulationPersona = {
+  id: SimulationPersonaId;
+  name: string;
+  role: string;
+  description: string;
+  voiceName: string;
+  voiceStyle: string;
+  behaviorRules: string[];
+  safetyRules: string[];
+};
+
+export type SimulationMission = {
+  id: string;
+  categoryId: SimulationCategoryId;
+  title: string;
+  summary: string;
+  situation: string;
+  userRole: string;
+  objective: string;
+  hiddenCounterpartGoal: string;
+  personaId: SimulationPersonaId;
+  difficulty: SimulationDifficulty;
+  durationMinutes: number;
+  openingLine: string;
+  successCriteria: string[];
+  coachingFocus: string[];
+};
+
+export type SimulationTurn = {
+  id: string;
+  speaker: 'user' | 'ai';
+  content: string;
+  timestamp: string;
+  pressureLevel?: number;
+  tactic?: string;
+};
+
+export type SimulationMetric = {
+  name: string;
+  score: number;
+  feedback: string;
+};
+
+export type SimulationReport = {
+  overallScore: number;
+  outcome: 'achieved' | 'partial' | 'not_achieved';
+  summary: string;
+  metrics: SimulationMetric[];
+  strengths: string[];
+  improvements: string[];
+  detectedTactics: string[];
+  retryMission: string;
 };
 
 export type DebateRecord = {

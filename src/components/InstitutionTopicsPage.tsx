@@ -66,6 +66,8 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
     navigate('/battle/new', {
       state: {
         topic: selected.title,
+        topicDescription: selected.description || selected.briefing?.context || '',
+        topicBriefing: selected.briefing,
         gameMode: 'debate',
         timeLimit: selected.config?.timeLimit ?? 600,
         userPosition: position,
@@ -76,13 +78,15 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
 
   const handleCreateLiveDebate = async (config: BattleConfig) => {
     if (!user) return onLoginRequest();
-    const organization = organizations[0];
+    const organization = organizations.find(item => item.id === config.organizationId) ?? organizations[0];
     if (!organization) return;
     const roomId = createLiveRoomId();
     await createDebateRoom({
       roomId,
       topic: config.topic,
       topicDescription: config.topicDescription ?? '',
+      topicBriefing: config.topicBriefing,
+      language: config.language,
       debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
       voiceEnabled: config.voiceEnabled ?? false,
       timeLimit: config.timeLimit,
@@ -115,18 +119,23 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ gap: '0.5rem' }}>
           <ArrowLeft size={16} /> ThinkFit
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={() => navigate('/institution/marketing')}
-          style={{
-            gap: '0.5rem',
-            background: 'linear-gradient(135deg, var(--primary) 0%, #1D4ED8 100%)',
-            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-            fontWeight: 800,
-          }}
-        >
-          <Presentation size={18} /> B2B 기관 소개 (PPT)
-        </button>
+        <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="btn btn-secondary" onClick={() => navigate('/institution/marketing')}>
+            <Presentation size={17} /> 기존 B2B 기관 소개
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate('/institution/marketing-v2')}
+            style={{
+              gap: '0.5rem',
+              background: 'linear-gradient(135deg, var(--primary) 0%, #1D4ED8 100%)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+              fontWeight: 800,
+            }}
+          >
+            <Presentation size={18} /> B2B 기관 소개 Ver.2
+          </button>
+        </div>
       </div>
 
       {/* Hero Header */}

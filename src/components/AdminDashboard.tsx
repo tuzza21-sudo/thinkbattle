@@ -88,7 +88,20 @@ export const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    if (!organizationId) return;
+    let cancelled = false;
+    void Promise.all([
+      getAdminDashboard(organizationId),
+      getOrganizationUserDirectory(organizationId),
+      getOrganizationTopics(organizationId),
+    ]).then(([nextDashboard, nextUsers, nextTopics]) => {
+      if (cancelled) return;
+      setDashboard(nextDashboard);
+      setUsers(nextUsers);
+      setTopics(nextTopics);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [organizationId]);
 
   const manage = async (action: () => Promise<void>) => {

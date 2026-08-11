@@ -542,5 +542,7 @@ export const buildDebateIntro = (
   topic: string,
   userPosition: DebatePosition,
   level?: DebateLevel,
-): string =>
-  `${getDebateLevelLabel(level)} 토론을 시작합니다. 주제는 "${topic}"이고, 당신은 ${getPositionLabel(userPosition)} 입장, 저는 ${getPositionLabel(getOppositePosition(userPosition))} 입장입니다. 먼저 ${getDebateStepByTurn(0, 0, 0, level).title} 단계에 맞춰 작성해 주세요.`;
+  language: 'ko' | 'en' = 'ko',
+): string => language === 'en'
+  ? `We are beginning an English debate on the motion: “${topic}”. You represent ${userPosition === 'affirmative' ? 'Government' : 'Opposition'}, and I represent ${userPosition === 'affirmative' ? 'Opposition' : 'Government'}. Present your opening claim, reasoning and supporting example.`
+  : `${getDebateLevelLabel(level)} 토론을 시작합니다. 주제는 "${topic}"이고, 당신은 ${getPositionLabel(userPosition)} 입장, 저는 ${getPositionLabel(getOppositePosition(userPosition))} 입장입니다. 먼저 ${getDebateStepByTurn(0, 0, 0, level).title} 단계에 맞춰 작성해 주세요.`;

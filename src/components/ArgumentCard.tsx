@@ -1,11 +1,13 @@
 import React from 'react';
 import type { Argument, Player } from '../types';
-import { BookOpen, AlertCircle } from 'lucide-react';
+import { BookOpen, AlertCircle, LoaderCircle, Volume2 } from 'lucide-react';
 
 interface ArgumentCardProps {
   argument: Argument;
   player: Player;
   isHighlighted?: boolean;
+  onPlayAudio?: () => void;
+  isAudioLoading?: boolean;
 }
 
 const formatDuration = (seconds: number) => {
@@ -15,7 +17,7 @@ const formatDuration = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, isHighlighted }) => {
+export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, isHighlighted, onPlayAudio, isAudioLoading = false }) => {
   const isPlayerA = !argument.isAi;
   const hasTiming = !argument.isAi && typeof argument.elapsedSeconds === 'number' && typeof argument.recommendedDurationSeconds === 'number';
   
@@ -41,6 +43,13 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, is
         <div className="argument-content">
           {argument.content}
         </div>
+
+        {argument.isAi && onPlayAudio && (
+          <button type="button" className="argument-audio-button" onClick={onPlayAudio} disabled={isAudioLoading}>
+            {isAudioLoading ? <LoaderCircle className="spin" size={15} /> : <Volume2 size={15} />}
+            {isAudioLoading ? '음성 생성 중' : 'AI 발언 다시 듣기'}
+          </button>
+        )}
 
         {(argument.aiQuestion || argument.aiLesson || argument.turnFeedback) && (
           <div className="argument-insight">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X,
   ThumbsUp,
@@ -53,7 +53,7 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
   // Load data
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     setIsLoading(true);
     try {
       const allOpinions = await getOpinions(topicId);
@@ -74,16 +74,18 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [topicId, user]);
 
   useEffect(() => {
-    if (isOpen) {
-      refreshData();
+    if (!isOpen) return;
+    const resetTimer = window.setTimeout(() => {
+      void refreshData();
       setShowForm(false);
       setSubmitError(null);
       setSubmitSuccess(false);
-    }
-  }, [isOpen, topicId, user]);
+    }, 0);
+    return () => window.clearTimeout(resetTimer);
+  }, [isOpen, refreshData]);
 
   // Filter & sort
   const displayedOpinions = useMemo(() => {
@@ -105,7 +107,7 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
     }
     const success = await likeOpinion(opinionId, user.id);
     if (success) {
-      refreshData();
+      void refreshData();
     }
   };
 

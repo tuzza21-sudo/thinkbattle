@@ -1,5 +1,5 @@
 import { getDebateSteps } from './debateEngine';
-import type { DebateLevel, DebatePosition, DebateRoundId, DebateStep, LiveDebateArgument } from '../types';
+import type { DebateLevel, DebatePosition, DebateRoundId, DebateStageId, DebateStep, LiveDebateArgument } from '../types';
 
 export type LiveDebatePhase = {
   id: string;
@@ -34,6 +34,36 @@ type PhaseTemplate = {
   targetPosition?: DebatePosition;
   stepId: string;
   title: string;
+};
+
+export type LiveDebateStageOption = {
+  id: DebateStageId;
+  label: string;
+  description: string;
+};
+
+const stageOptions: Record<DebateStageId, LiveDebateStageOption> = {
+  opening: { id: 'opening', label: '입론', description: '핵심 주장·이유·근거 제시' },
+  question: { id: 'question', label: '질문', description: '상대 논리의 전제와 빈틈 질문' },
+  answer: { id: 'answer', label: '질문 답변', description: '상대 질문에 직접 답변' },
+  analysis: { id: 'analysis', label: '상대 전제 분석', description: '상대 주장의 핵심 전제 분석' },
+  rebuttal: { id: 'rebuttal', label: '반박', description: '상대 주장과 근거를 직접 반박' },
+  weighing: { id: 'weighing', label: '중요성 비교', description: '핵심 충돌과 영향의 중요성 비교' },
+  closing: { id: 'closing', label: '최종발언', description: '쟁점을 정리하고 최종 입장 제시' },
+};
+
+export const getLiveDebateStageOptions = (level: DebateLevel): LiveDebateStageOption[] => {
+  const ids: DebateStageId[] = level === 'intermediate'
+    ? ['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing']
+    : ['opening', 'question', 'answer', 'rebuttal', 'closing'];
+  return ids.map(id => stageOptions[id]);
+};
+
+export const getLiveDebateStageId = (phase: Pick<LiveDebatePhase, 'id'>): DebateStageId => {
+  const stageId = phase.id.replace(/^(affirmative|negative)-/, '');
+  return (stageId === 'opening' || stageId === 'question' || stageId === 'answer'
+    || stageId === 'analysis' || stageId === 'rebuttal' || stageId === 'weighing'
+    || stageId === 'closing') ? stageId : 'rebuttal';
 };
 
 const positionLabel = (position: DebatePosition) => position === 'affirmative' ? '찬성' : '반대';

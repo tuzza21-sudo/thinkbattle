@@ -53,23 +53,50 @@ const getAuthenticatedUser = async (authorization: string) => {
   return response.json() as Promise<SupabaseAuthUser>;
 };
 
-const getVoiceEnabledRoom = async (authorization: string, roomName: string) => {
+const getVoiceRoomAccess = async (authorization: string, roomName: string, userId: string) => {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) throw new Error('Supabase 서버 환경변수가 설정되지 않았습니다.');
 
-  const response = await fetch(
-    `${supabaseUrl.replace(/\/$/, '')}/rest/v1/live_debate_rooms?room_id=eq.${encodeURIComponent(roomName)}&select=voice_enabled`,
-    {
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: authorization,
-      },
-    },
-  );
-  if (!response.ok) throw new Error('토론방의 음성 설정을 확인하지 못했습니다.');
-  const rooms = await response.json() as { voice_enabled?: boolean }[];
-  return rooms[0]?.voice_enabled === true;
+  const baseUrl = supabaseUrl.replace(/\/$/, '');
+  const authHeaders = {
+    apikey: supabaseAnonKey,
+    Authorization: authorization,
+  };
+  const [roomResponse, participantResponse] = await Promise.all([
+    fetch(
+      `${baseUrl}/rest/v1/live_debate_rooms?room_id=eq.${encodeURIComponent(roomName)}&select=voice_enabled,team_size,allow_moderator,status`,
+      { headers: authHeaders },
+    ),
+    fetch(
+      `${baseUrl}/rest/v1/live_debate_room_participants?room_id=eq.${encodeURIComponent(roomName)}&user_id=eq.${encodeURIComponent(userId)}&select=position,role,phase_ids,is_ai`,
+      { headers: authHeaders },
+    ),
+  ]);
+  if (!roomResponse.ok || !participantResponse.ok) {
+    throw new Error('토론방 참가 권한을 확인하지 못했습니다.');
+  }
+  const rooms = await roomResponse.json() as Array<{
+    voice_enabled?: boolean;
+    team_size?: number;
+    allow_moderator?: boolean;
+    status?: string;
+  }>;
+  const participants = await participantResponse.json() as Array<{
+    position?: 'affirmative' | 'negative' | null;
+    role?: 'debater' | 'opening' | 'rebuttal' | 'closing' | 'moderator' | null;
+    phase_ids?: string[];
+    is_ai?: boolean;
+  }>;
+  const room = rooms[0];
+  const participant = participants[0];
+  if (!room?.voice_enabled || room.status !== 'in_progress' || !participant || participant.is_ai) return null;
+  return {
+    maxParticipants: Math.min(7, Math.max(2, Number(room.team_size || 1) * 2 + (room.allow_moderator ? 1 : 0))),
+    position: participant.position ?? null,
+    role: participant.role === 'moderator' ? 'moderator' : 'debater',
+    phaseIds: Array.isArray(participant.phase_ids) ? participant.phase_ids.slice(0, 8) : [],
+  };
 };
 
 const handleWebRequest = async (req: Request) => {
@@ -100,22 +127,15 @@ const handleWebRequest = async (req: Request) => {
 
     const body = await req.json() as {
       roomName?: string;
-      maxParticipants?: number;
-      position?: 'affirmative' | 'negative';
-      role?: 'debater' | 'opening' | 'rebuttal' | 'closing' | 'moderator';
     };
     const roomName = body.roomName?.trim();
     if (!roomName || !/^debate-[a-zA-Z0-9_-]{8,80}$/.test(roomName)) {
       return jsonResponse({ error: '올바르지 않은 토론방입니다.' }, 400);
     }
-    if (!await getVoiceEnabledRoom(authorization, roomName)) {
-      return jsonResponse({ error: '이 토론방은 LiveKit 음성 토론을 사용하지 않습니다.' }, 403);
+    const roomAccess = await getVoiceRoomAccess(authorization, roomName, user.id);
+    if (!roomAccess) {
+      return jsonResponse({ error: '이 음성 토론방의 참가자로 등록되어 있지 않거나 토론이 진행 중이 아닙니다.' }, 403);
     }
-
-    const maxParticipants = Math.min(7, Math.max(2, Number(body.maxParticipants) || 2));
-    const position = body.position === 'negative' ? 'negative' : 'affirmative';
-    const allowedRoles = ['debater', 'opening', 'rebuttal', 'closing', 'moderator'];
-    const role = allowedRoles.includes(body.role || '') ? body.role : 'debater';
 
     const displayName = user.user_metadata?.nickname
       || user.user_metadata?.name
@@ -132,10 +152,10 @@ const handleWebRequest = async (req: Request) => {
       try {
         await roomService.createRoom({
           name: roomName,
-          maxParticipants,
+          maxParticipants: roomAccess.maxParticipants,
           emptyTimeout: 10 * 60,
           departureTimeout: 5 * 60,
-          metadata: JSON.stringify({ app: 'thinkbattle', mode: 'pvp', maxParticipants }),
+          metadata: JSON.stringify({ app: 'thinkbattle', mode: 'pvp', maxParticipants: roomAccess.maxParticipants }),
         });
       } catch (createError) {
         // Every lobby member requests a token at nearly the same moment. One
@@ -150,7 +170,12 @@ const handleWebRequest = async (req: Request) => {
       identity: user.id,
       name: displayName.slice(0, 60),
       ttl: '2h',
-      metadata: JSON.stringify({ app: 'thinkbattle', position, role }),
+      metadata: JSON.stringify({
+        app: 'thinkbattle',
+        position: roomAccess.position,
+        role: roomAccess.role,
+        phaseIds: roomAccess.phaseIds,
+      }),
     });
     accessToken.addGrant({
       room: roomName,
