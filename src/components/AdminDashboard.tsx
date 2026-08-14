@@ -25,6 +25,7 @@ import {
   getOrganizationStudentRecords,
   getOrganizationTopics,
   getOrganizationUserDirectory,
+  rememberActiveOrganization,
   removeOrganizationStudent,
 } from '../lib/admin';
 import type {
@@ -213,7 +214,10 @@ export const AdminDashboard = () => {
           <select
             className="input-field"
             value={organizationId}
-            onChange={e => setOrganizationId(e.target.value)}
+            onChange={e => {
+              setOrganizationId(e.target.value);
+              rememberActiveOrganization(e.target.value);
+            }}
             style={{
               padding: '0.65rem 1rem',
               fontWeight: 700,

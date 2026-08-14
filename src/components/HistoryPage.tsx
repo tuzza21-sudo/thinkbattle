@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Award, BookOpen, CalendarDays, CircleCheckBig, Clock, FileText, Focus, Languages, MessageSquareText, Route, Share2, Sparkles, Trash2, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Award, BookOpen, CalendarDays, CircleCheckBig, Clock, Download, FileText, Focus, Languages, LoaderCircle, MessageSquareText, Pause, Route, Share2, Sparkles, Trash2, TrendingUp, Volume2 } from 'lucide-react';
 import { createReportShareLink, getDebateRecords, saveEnglishRephraseEntry, deleteDebateRecord } from '../lib/history';
+import { downloadLiveDebateAudio, getLiveDebateAudioUrl } from '../lib/debateRooms';
 import { EnglishRephrasePanel } from './EnglishRephrasePanel';
 import { ReportCategoryCard } from './ResultModal';
 import type { AppUser, DebateRecord, EnglishRephraseEntry } from '../types';
@@ -64,6 +65,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
   const [selectedRecordId, setSelectedRecordId] = useState('');
   const [isEnglishReplayMode, setIsEnglishReplayMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingAudioId, setLoadingAudioId] = useState<string | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [downloadingAudioId, setDownloadingAudioId] = useState<string | null>(null);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const selectedRecord: DebateRecord | undefined = records.find(record => record.id === selectedRecordId) ?? records[0];
 
@@ -85,6 +91,68 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
     loadRecords();
     return () => { isMounted = false; };
   }, [user]);
+
+  useEffect(() => () => {
+    playbackAudioRef.current?.pause();
+    playbackAudioRef.current = null;
+  }, []);
+
+  const handlePlayRecordedSpeech = useCallback(async (argumentId: string, audioPath: string) => {
+    if (playingAudioId === argumentId && playbackAudioRef.current) {
+      playbackAudioRef.current.pause();
+      playbackAudioRef.current = null;
+      setPlayingAudioId(null);
+      return;
+    }
+    playbackAudioRef.current?.pause();
+    playbackAudioRef.current = null;
+    setPlayingAudioId(null);
+    setLoadingAudioId(argumentId);
+    setAudioError(null);
+    try {
+      const signedUrl = await getLiveDebateAudioUrl(audioPath);
+      const audio = new Audio(signedUrl);
+      playbackAudioRef.current = audio;
+      audio.onended = () => {
+        if (playbackAudioRef.current === audio) playbackAudioRef.current = null;
+        setPlayingAudioId(current => current === argumentId ? null : current);
+      };
+      audio.onerror = () => {
+        if (playbackAudioRef.current === audio) playbackAudioRef.current = null;
+        setPlayingAudioId(current => current === argumentId ? null : current);
+        setAudioError('저장된 음성을 재생하지 못했습니다.');
+      };
+      await audio.play();
+      setPlayingAudioId(argumentId);
+    } catch (error) {
+      playbackAudioRef.current = null;
+      setAudioError(error instanceof Error ? error.message : '저장된 음성을 재생하지 못했습니다.');
+    } finally {
+      setLoadingAudioId(current => current === argumentId ? null : current);
+    }
+  }, [playingAudioId]);
+
+  const handleDownloadRecordedSpeech = async (argumentId: string, audioPath: string, stageLabel: string) => {
+    setDownloadingAudioId(argumentId);
+    setAudioError(null);
+    try {
+      const recording = await downloadLiveDebateAudio(audioPath);
+      const extension = audioPath.split('.').pop() || 'webm';
+      const safeStage = stageLabel.replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '_');
+      const url = URL.createObjectURL(recording);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `thinkbattle-${safeStage}-${argumentId.slice(0, 8)}.${extension}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      setAudioError(error instanceof Error ? error.message : '저장된 음성을 다운로드하지 못했습니다.');
+    } finally {
+      setDownloadingAudioId(current => current === argumentId ? null : current);
+    }
+  };
 
   const handleSaveEnglishRephrase = async (record: DebateRecord, entry: EnglishRephraseEntry) => {
     if (!user) return;
@@ -302,7 +370,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
 
                   <section className="report-section history-transcript-section">
                     <div className="history-section-heading">
-                      <div><h3 className="report-section-title"><FileText size={18} /> 실제 발언 다시보기</h3><p>단계별 발언 흐름을 확인하고, 내 발언은 영어 표현으로 다시 훈련할 수 있습니다.</p></div>
+                      <div><h3 className="report-section-title"><FileText size={18} /> 실제 발언 다시보기</h3><p>단계별 발언 흐름을 확인하고, 보관 중인 내 음성은 재생하거나 만료 전에 다운로드할 수 있습니다.</p></div>
                       <button className="btn btn-secondary" onClick={() => setIsEnglishReplayMode(true)}><Languages size={17} /> 영어 표현 훈련</button>
                     </div>
                     <div className="history-report-transcript">
@@ -313,6 +381,36 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                           <article key={argument.id} className={`history-report-transcript-entry ${argument.isAi ? 'ai' : 'user'}`}>
                             <header><div><strong>{argument.isAi ? 'AI 상대방' : `${user.nickname} · 내 발언`}</strong><em>{stageLabel}</em></div><span>{String(index + 1).padStart(2, '0')}</span></header>
                             <p>{argument.content}</p>
+                            {argument.audioPath && argument.playerId === user.id && (
+                              <div className="history-audio-actions">
+                                <button
+                                  type="button"
+                                  className="argument-audio-button history-audio-button"
+                                  onClick={() => void handlePlayRecordedSpeech(argument.id, argument.audioPath as string)}
+                                  disabled={loadingAudioId === argument.id}
+                                >
+                                  {loadingAudioId === argument.id
+                                    ? <LoaderCircle className="spin" size={15} />
+                                    : playingAudioId === argument.id
+                                      ? <Pause size={15} />
+                                      : <Volume2 size={15} />}
+                                  {loadingAudioId === argument.id ? '녹음 불러오는 중' : playingAudioId === argument.id ? '재생 멈추기' : '내 음성 다시 듣기'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="argument-audio-button history-audio-button"
+                                  onClick={() => void handleDownloadRecordedSpeech(argument.id, argument.audioPath as string, stageLabel)}
+                                  disabled={downloadingAudioId === argument.id}
+                                  title="보관기간 만료 전에 기기에 저장"
+                                >
+                                  {downloadingAudioId === argument.id ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+                                  {downloadingAudioId === argument.id ? '다운로드 준비 중' : '음성 다운로드'}
+                                </button>
+                              </div>
+                            )}
+                            {!argument.audioPath && argument.audioDeletedAt && argument.playerId === user.id && (
+                              <small className="history-audio-expired">음성 보관기간이 만료되어 전사문만 제공됩니다.</small>
+                            )}
                             {!argument.isAi && savedRephrase && (
                               <section className="history-english-rephrase history-english-summary">
                                 <div><span>내 영어 초안</span><p>{savedRephrase.englishDraft}</p></div>
@@ -324,6 +422,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                         );
                       })}
                     </div>
+                    {audioError && <p className="history-audio-error" role="alert">{audioError}</p>}
                   </section>
                 </div>
               </section>

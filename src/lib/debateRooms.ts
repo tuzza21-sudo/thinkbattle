@@ -331,7 +331,88 @@ const mapLiveArgument = (row: Record<string, unknown>): LiveDebateArgument => ({
   source: row.source === 'voice' ? 'voice' : 'text',
   phaseId: row.phase_id ? String(row.phase_id) : undefined,
   phaseLabel: row.phase_label ? String(row.phase_label) : undefined,
+  audioPath: row.audio_path ? String(row.audio_path) : undefined,
+  audioDeletedAt: row.audio_deleted_at ? String(row.audio_deleted_at) : undefined,
+  audioDeleteReason: ['retention', 'capacity', 'cleanup'].includes(String(row.audio_delete_reason))
+    ? row.audio_delete_reason as LiveDebateArgument['audioDeleteReason']
+    : undefined,
 });
+
+const LIVE_DEBATE_AUDIO_BUCKET = 'live-debate-audio';
+const CLEANUP_REQUEST_INTERVAL_MS = 15 * 60 * 1000;
+let lastAudioCleanupRequestAt = 0;
+
+const getRecordingExtension = (mimeType: string) => {
+  if (mimeType.includes('mp4')) return 'm4a';
+  if (mimeType.includes('ogg')) return 'ogg';
+  return 'webm';
+};
+
+const requestLiveDebateAudioCleanup = async (force = false) => {
+  const now = Date.now();
+  if (!force && now - lastAudioCleanupRequestAt < CLEANUP_REQUEST_INTERVAL_MS) return false;
+  lastAudioCleanupRequestAt = now;
+  try {
+    const { error } = await supabase.functions.invoke('cleanup-live-debate-audio', {
+      body: { source: force ? 'upload-retry' : 'upload' },
+    });
+    if (!error) return true;
+    console.warn('Live debate audio cleanup request error:', error.message);
+  } catch (error) {
+    console.warn('Live debate audio cleanup request error:', error);
+  }
+  if (force) {
+    // The upload caller will preserve the transcript even when cleanup is unavailable.
+    return false;
+  }
+  return false;
+};
+
+export const uploadLiveDebateAudio = async (
+  roomId: string,
+  argumentId: string,
+  recording: Blob,
+) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('음성을 저장하려면 다시 로그인해 주세요.');
+  const extension = getRecordingExtension(recording.type);
+  const path = `${user.id}/${roomId}/${argumentId}.${extension}`;
+  const upload = () => supabase.storage.from(LIVE_DEBATE_AUDIO_BUCKET).upload(path, recording, {
+      contentType: recording.type || 'audio/webm',
+      upsert: false,
+    });
+  let { error } = await upload();
+  if (error) {
+    const cleanupRan = await requestLiveDebateAudioCleanup(true);
+    if (cleanupRan) ({ error } = await upload());
+  }
+  if (error) throw new Error(`내 음성 발언을 저장하지 못했습니다: ${error.message}`);
+  void requestLiveDebateAudioCleanup();
+  return path;
+};
+
+export const removeLiveDebateAudio = async (path: string) => {
+  const { error } = await supabase.storage.from(LIVE_DEBATE_AUDIO_BUCKET).remove([path]);
+  if (error) console.warn('Orphaned live debate audio cleanup error:', error.message);
+};
+
+export const getLiveDebateAudioUrl = async (path: string) => {
+  const { data, error } = await supabase.storage
+    .from(LIVE_DEBATE_AUDIO_BUCKET)
+    .createSignedUrl(path, 15 * 60);
+  if (error || !data?.signedUrl) {
+    throw new Error(`내 음성 발언을 불러오지 못했습니다: ${error?.message || '재생 주소가 없습니다.'}`);
+  }
+  return data.signedUrl;
+};
+
+export const downloadLiveDebateAudio = async (path: string) => {
+  const { data, error } = await supabase.storage.from(LIVE_DEBATE_AUDIO_BUCKET).download(path);
+  if (error || !data) {
+    throw new Error(`내 음성 발언을 다운로드하지 못했습니다: ${error?.message || '파일이 없습니다.'}`);
+  }
+  return data;
+};
 
 export const getLiveDebateArguments = async (roomId: string): Promise<LiveDebateArgument[]> => {
   const { data, error } = await supabase
@@ -344,7 +425,7 @@ export const getLiveDebateArguments = async (roomId: string): Promise<LiveDebate
 };
 
 export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebateArgument) => {
-  const { data, error } = await supabase.from('live_debate_arguments').insert({
+  const payload = {
     id: argument.id,
     room_id: roomId,
     user_id: argument.senderId,
@@ -353,7 +434,9 @@ export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebat
     source: argument.source,
     phase_id: argument.phaseId || null,
     phase_label: argument.phaseLabel || null,
-  }).select('created_at').single();
+    ...(argument.audioPath ? { audio_path: argument.audioPath } : {}),
+  };
+  const { data, error } = await supabase.from('live_debate_arguments').insert(payload).select('created_at').single();
   if (error) throw new Error(`토론 발언을 저장하지 못했습니다: ${error.message}`);
   return String(data.created_at || new Date().toISOString());
 };

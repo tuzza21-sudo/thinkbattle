@@ -4,7 +4,13 @@ import './App.css';
 import { LandingPage } from './components/LandingPage';
 import { AuthModal } from './components/AuthModal';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
-import { getCurrentUser, signOut } from './lib/auth';
+import {
+  clearOAuthCallbackError,
+  getCurrentUser,
+  getOAuthCallbackError,
+  signOut,
+  subscribeToAuthChanges,
+} from './lib/auth';
 import type { AppLanguage, AppUser } from './types';
 
 const LiveDebateRoom = lazy(async () => {
@@ -35,7 +41,8 @@ const LegalPage = lazy(async () => ({ default: (await import('./components/Legal
 function App() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [oauthError, setOAuthError] = useState<string | null>(() => getOAuthCallbackError());
+  const [showAuthModal, setShowAuthModal] = useState(() => Boolean(oauthError));
   const [language, setLanguage] = useState<AppLanguage>(() => localStorage.getItem('app-language') === 'en' ? 'en' : 'ko');
 
   const changeLanguage = (nextLanguage: AppLanguage) => {
@@ -51,14 +58,51 @@ function App() {
   }, [language]);
 
   useEffect(() => {
-    getCurrentUser()
-      .then(u => setUser(u))
-      .catch(err => {
-        console.error('Auth initialization error:', err);
+    let active = true;
+    let syncSequence = 0;
+
+    const syncCurrentUser = async () => {
+      const sequence = ++syncSequence;
+      try {
+        const currentUser = await getCurrentUser();
+        if (active && sequence === syncSequence) setUser(currentUser);
+      } catch (error) {
+        console.error('Auth synchronization error:', error);
+        if (active && sequence === syncSequence) setUser(null);
+      } finally {
+        if (active && sequence === syncSequence) setAuthLoading(false);
+      }
+    };
+
+    const subscription = subscribeToAuthChanges((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        syncSequence += 1;
         setUser(null);
-      })
-      .finally(() => setAuthLoading(false));
-  }, []);
+        setAuthLoading(false);
+        return;
+      }
+
+      if (event === 'INITIAL_SESSION' && !session) {
+        setUser(null);
+        setAuthLoading(false);
+        return;
+      }
+
+      if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+        // Supabase advises deferring follow-up auth calls outside its state-change callback.
+        window.setTimeout(() => {
+          if (active) void syncCurrentUser();
+        }, 0);
+      }
+    });
+
+    if (oauthError) clearOAuthCallbackError();
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, [oauthError]);
 
   const handleLogout = async () => {
     await signOut();
@@ -125,8 +169,15 @@ function App() {
 
       {showAuthModal && (
         <AuthModal
-          onClose={() => setShowAuthModal(false)}
-          onAuthenticated={setUser}
+          onClose={() => {
+            setShowAuthModal(false);
+            setOAuthError(null);
+          }}
+          onAuthenticated={authenticatedUser => {
+            setUser(authenticatedUser);
+            setOAuthError(null);
+          }}
+          initialError={oauthError}
           language={language}
         />
       )}

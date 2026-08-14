@@ -40,7 +40,18 @@ import { transcribeDebateAudio } from '../lib/transcription';
 import { formatDebateMinutes } from '../lib/debateTiming';
 import { getLiveDebateCourse, getLiveDebateProgress, getLiveDebateStageId, getLiveDebateStageOptions } from '../lib/liveDebateCourse';
 import { generateLiveDebateEvaluation } from '../lib/api';
-import { getDebateRoom, getLiveDebateArguments, getLiveDebateEvaluation, getLobbyParticipants, saveLiveDebateArgument, saveLiveDebateEvaluation } from '../lib/debateRooms';
+import {
+  getDebateRoom,
+  downloadLiveDebateAudio,
+  getLiveDebateArguments,
+  getLiveDebateAudioUrl,
+  getLiveDebateEvaluation,
+  getLobbyParticipants,
+  removeLiveDebateAudio,
+  saveLiveDebateArgument,
+  saveLiveDebateEvaluation,
+  uploadLiveDebateAudio,
+} from '../lib/debateRooms';
 import { saveDebateRecord } from '../lib/history';
 import type { AppUser, Argument, DebateLevel, DebateParticipantRole, DebatePosition, DebateRecord, DebateStageId, DebateTeamSize, LiveDebateArgument, LiveDebateEvaluation, Player, TopicBriefing } from '../types';
 
@@ -73,6 +84,15 @@ type LivePacket =
       version: 1;
       type: 'evaluation-error';
       message: string;
+    }
+  | {
+      version: 1;
+      type: 'live-transcript';
+      senderId: string;
+      senderName: string;
+      content: string;
+      phaseLabel?: string;
+      active: boolean;
     };
 
 type ConnectionView = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
@@ -97,6 +117,55 @@ type PendingRecording = {
   blob: Blob;
   phaseId?: string;
   phaseLabel?: string;
+};
+
+type LiveTranscriptView = {
+  senderId: string;
+  senderName: string;
+  content: string;
+  phaseLabel?: string;
+};
+
+interface BrowserSpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface BrowserSpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly [index: number]: BrowserSpeechRecognitionAlternative;
+}
+
+interface BrowserSpeechRecognitionEvent extends Event {
+  readonly results: {
+    readonly length: number;
+    readonly [index: number]: BrowserSpeechRecognitionResult;
+  };
+}
+
+interface BrowserSpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+
+interface BrowserSpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+const getBrowserSpeechRecognition = () => {
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
 };
 
 const createMessageId = () => {
@@ -193,9 +262,16 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const roomRef = useRef<Room | null>(null);
   const textChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const audioContainerRef = useRef<HTMLDivElement | null>(null);
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
+  const audioStorageNoticeTimeoutRef = useRef<number | null>(null);
   const argumentsRef = useRef<LiveDebateArgument[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const speechRecognitionCompletionRef = useRef<Promise<void>>(Promise.resolve());
+  const resolveSpeechRecognitionRef = useRef<(() => void) | null>(null);
+  const speechRecognitionTimeoutRef = useRef<number | null>(null);
+  const liveTranscriptRef = useRef('');
   const transcriptionControllerRef = useRef<AbortController | null>(null);
   const discardRecordingRef = useRef(false);
   const recordingPhaseRef = useRef<Pick<PendingRecording, 'phaseId' | 'phaseLabel'> | null>(null);
@@ -215,10 +291,15 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const [content, setContent] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isLiveTranscription, setIsLiveTranscription] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [audioStorageNotice, setAudioStorageNotice] = useState<string | null>(null);
   const [pendingRecording, setPendingRecording] = useState<PendingRecording | null>(null);
   const [isAudioBlocked, setIsAudioBlocked] = useState(false);
+  const [loadingAudioArgumentId, setLoadingAudioArgumentId] = useState<string | null>(null);
+  const [playingAudioArgumentId, setPlayingAudioArgumentId] = useState<string | null>(null);
+  const [downloadingAudioArgumentId, setDownloadingAudioArgumentId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [sessionStartedAtMs] = useState(() => Number.isFinite(startedAtMs) ? startedAtMs : Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(() => Number.isFinite(startedAtMs)
@@ -232,6 +313,38 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const [topicBriefing, setTopicBriefing] = useState<TopicBriefing | undefined>();
   const [roomLanguage, setRoomLanguage] = useState<'ko' | 'en'>('ko');
   const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
+  const [liveTranscripts, setLiveTranscripts] = useState<Record<string, LiveTranscriptView>>({});
+
+  useEffect(() => () => {
+    playbackAudioRef.current?.pause();
+    playbackAudioRef.current = null;
+    if (audioStorageNoticeTimeoutRef.current !== null) {
+      window.clearTimeout(audioStorageNoticeTimeoutRef.current);
+    }
+  }, []);
+
+  const showAudioStorageNotice = useCallback((message: string) => {
+    setAudioStorageNotice(message);
+    if (audioStorageNoticeTimeoutRef.current !== null) {
+      window.clearTimeout(audioStorageNoticeTimeoutRef.current);
+    }
+    audioStorageNoticeTimeoutRef.current = window.setTimeout(() => {
+      setAudioStorageNotice(null);
+      audioStorageNoticeTimeoutRef.current = null;
+    }, 9000);
+  }, []);
+
+  const updateLiveTranscript = useCallback((transcript: LiveTranscriptView, active: boolean) => {
+    setLiveTranscripts(previous => {
+      if (!active) {
+        if (!previous[transcript.senderId]) return previous;
+        const next = { ...previous };
+        delete next[transcript.senderId];
+        return next;
+      }
+      return { ...previous, [transcript.senderId]: transcript };
+    });
+  }, []);
 
   const queueDebateRecordSave = useCallback((record: DebateRecord) => {
     const nextSave = recordSaveQueueRef.current
@@ -314,6 +427,11 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     if (packet.version !== 1) return;
     if (packet.type === 'argument' && isLiveArgument(packet.argument)) {
       addArguments([packet.argument]);
+      updateLiveTranscript({
+        senderId: packet.argument.senderId,
+        senderName: packet.argument.senderName,
+        content: '',
+      }, false);
     }
     if (packet.type === 'history' && Array.isArray(packet.arguments)) {
       addArguments(packet.arguments.filter(isLiveArgument));
@@ -331,9 +449,25 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       setEvaluationError(packet.message || 'AI 평가를 생성하지 못했습니다.');
       setShowEvaluation(true);
     }
-  }, [addArguments, roomId]);
+    if (packet.type === 'live-transcript'
+      && typeof packet.senderId === 'string'
+      && typeof packet.senderName === 'string'
+      && typeof packet.content === 'string'
+      && typeof packet.active === 'boolean') {
+      updateLiveTranscript({
+        senderId: packet.senderId,
+        senderName: packet.senderName,
+        content: packet.content.slice(0, 1200),
+        phaseLabel: typeof packet.phaseLabel === 'string' ? packet.phaseLabel : undefined,
+      }, packet.active);
+    }
+  }, [addArguments, roomId, updateLiveTranscript]);
 
-  const publishPacket = useCallback(async (packet: LivePacket, destinationIdentities?: string[]) => {
+  const publishPacket = useCallback(async (
+    packet: LivePacket,
+    destinationIdentities?: string[],
+    reliable = true,
+  ) => {
     if (!voiceEnabled) {
       const channel = textChannelRef.current;
       if (!channel) throw new Error('텍스트 토론 채널에 연결되어 있지 않습니다.');
@@ -348,17 +482,37 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     await room.localParticipant.publishData(
       encoder.encode(JSON.stringify(packet)),
       {
-        reliable: true,
+        reliable,
         topic: LIVE_DATA_TOPIC,
         ...(destinationIdentities ? { destinationIdentities } : {}),
       },
     );
   }, [voiceEnabled]);
 
+  const publishLiveTranscript = useCallback((content: string, active: boolean) => {
+    if (!user || !voiceEnabled) return;
+    const transcript: LiveTranscriptView = {
+      senderId: user.id,
+      senderName: user.nickname,
+      content: content.trim().slice(0, 1200),
+      phaseLabel: recordingPhaseRef.current?.phaseLabel,
+    };
+    updateLiveTranscript(transcript, active);
+    void publishPacket({
+      version: 1,
+      type: 'live-transcript',
+      ...transcript,
+      active,
+    }, undefined, !active).catch(error => {
+      if (active) console.warn('Live transcript sync error:', error);
+    });
+  }, [publishPacket, updateLiveTranscript, user, voiceEnabled]);
+
   const publishArgument = useCallback(async (
     text: string,
     source: LiveDebateArgument['source'],
     completion?: Pick<PendingRecording, 'phaseId' | 'phaseLabel'>,
+    audioRecording?: Blob,
   ) => {
     if (!user) return;
     const trimmed = text.trim().slice(0, 1200);
@@ -375,8 +529,18 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     const phaseLabel = isAssignedSpeaker
       ? completion?.phaseLabel || phase.label
       : `진행자 발언 · ${phase.label}`;
+    const argumentId = createMessageId();
+    let audioPath: string | undefined;
+    if (source === 'voice' && audioRecording) {
+      try {
+        audioPath = await uploadLiveDebateAudio(roomId, argumentId, audioRecording);
+      } catch (error) {
+        console.warn('Live debate audio storage failed; saving transcript only:', error);
+        showAudioStorageNotice('저장 용량 또는 네트워크 문제로 음성은 보관하지 못했지만 전사문은 정상 저장했습니다.');
+      }
+    }
     const argument: LiveDebateArgument = {
-      id: createMessageId(),
+      id: argumentId,
       senderId: user.id,
       senderName: user.nickname,
       content: trimmed,
@@ -384,13 +548,20 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       source,
       phaseId,
       phaseLabel,
+      audioPath,
     };
 
-    const registeredAt = await saveLiveDebateArgument(roomId, argument);
+    let registeredAt: string;
+    try {
+      registeredAt = await saveLiveDebateArgument(roomId, argument);
+    } catch (error) {
+      if (audioPath) await removeLiveDebateAudio(audioPath);
+      throw error;
+    }
     const registeredArgument = { ...argument, createdAt: registeredAt };
     addArguments([registeredArgument]);
     await publishPacket({ version: 1, type: 'argument', argument: registeredArgument });
-  }, [addArguments, debateLevel, myPhaseIds, myPosition, myRole, publishPacket, roomId, sessionStartedAtMs, teamSize, timeLimit, user]);
+  }, [addArguments, debateLevel, myPhaseIds, myPosition, myRole, publishPacket, roomId, sessionStartedAtMs, showAudioStorageNotice, teamSize, timeLimit, user]);
 
   useEffect(() => {
     if (!user || !roomId || voiceEnabled) return;
@@ -632,6 +803,13 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       cancelled = true;
       discardRecordingRef.current = true;
       transcriptionControllerRef.current?.abort();
+      if (speechRecognitionTimeoutRef.current !== null) {
+        window.clearTimeout(speechRecognitionTimeoutRef.current);
+        speechRecognitionTimeoutRef.current = null;
+      }
+      speechRecognitionRef.current?.abort();
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
       if (recordingTimeoutRef.current !== null) {
         window.clearTimeout(recordingTimeoutRef.current);
         recordingTimeoutRef.current = null;
@@ -672,7 +850,34 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
 
   useEffect(() => {
     scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [argumentsList, isTranscribing]);
+  }, [argumentsList, isTranscribing, liveTranscripts]);
+
+  const finishSpeechRecognition = useCallback((discard: boolean) => {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+      return;
+    }
+
+    try {
+      if (discard) recognition.abort();
+      else recognition.stop();
+    } catch {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+    }
+
+    if (speechRecognitionTimeoutRef.current !== null) {
+      window.clearTimeout(speechRecognitionTimeoutRef.current);
+    }
+    speechRecognitionTimeoutRef.current = window.setTimeout(() => {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+      speechRecognitionRef.current = null;
+      speechRecognitionTimeoutRef.current = null;
+    }, 700);
+  }, []);
 
   const runTranscription = async (pending: PendingRecording) => {
     const controller = new AbortController();
@@ -689,7 +894,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         language: roomLanguage,
       }, controller.signal);
       if (controller.signal.aborted) return;
-      await publishArgument(transcript, 'voice', pending);
+      await publishArgument(transcript, 'voice', pending, pending.blob);
       setPendingRecording(null);
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -699,6 +904,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         transcriptionControllerRef.current = null;
         setIsTranscribing(false);
       }
+      publishLiveTranscript('', false);
+      setIsLiveTranscription(false);
     }
   };
 
@@ -707,6 +914,12 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     if (recordingTimeoutRef.current !== null) {
       window.clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
+    }
+    finishSpeechRecognition(discard);
+    if (!discard) setIsTranscribing(true);
+    else {
+      publishLiveTranscript('', false);
+      setIsLiveTranscription(false);
     }
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
     setIsSpeaking(false);
@@ -736,6 +949,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     setPendingRecording(null);
     discardRecordingRef.current = false;
     recordedChunksRef.current = [];
+    liveTranscriptRef.current = '';
+    speechRecognitionCompletionRef.current = Promise.resolve();
 
     try {
       const publication = await room.localParticipant.setMicrophoneEnabled(true, {
@@ -769,11 +984,14 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         setSpeechError('마이크 입력 중 오류가 발생했습니다. 다시 시도해 주세요.');
         void stopSpeaking(true);
       };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         mediaRecorderRef.current = null;
+        await speechRecognitionCompletionRef.current;
         if (discardRecordingRef.current) {
           recordedChunksRef.current = [];
           recordingPhaseRef.current = null;
+          setIsTranscribing(false);
+          setIsLiveTranscription(false);
           return;
         }
         const recording = new Blob(recordedChunksRef.current, {
@@ -782,6 +1000,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         recordedChunksRef.current = [];
         if (recording.size === 0) {
           setSpeechError('인식된 음성이 없습니다. 다시 시도해 주세요.');
+          setIsTranscribing(false);
+          setIsLiveTranscription(false);
+          publishLiveTranscript('', false);
+          recordingPhaseRef.current = null;
           return;
         }
         const pending = {
@@ -791,6 +1013,22 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         } satisfies PendingRecording;
         recordingPhaseRef.current = null;
         setPendingRecording(pending);
+
+        const liveTranscript = liveTranscriptRef.current.trim();
+        if (liveTranscript) {
+          try {
+            await publishArgument(liveTranscript, 'voice', pending, pending.blob);
+            setPendingRecording(null);
+          } catch (error) {
+            setSpeechError(error instanceof Error ? error.message : '실시간 전사 발언을 등록하지 못했습니다.');
+          } finally {
+            setIsTranscribing(false);
+            setIsLiveTranscription(false);
+            publishLiveTranscript('', false);
+          }
+          return;
+        }
+
         void runTranscription(pending);
       };
 
@@ -802,6 +1040,56 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         phaseLabel: recordingPhase.label,
       };
       recorder.start(1000);
+
+      const SpeechRecognition = getBrowserSpeechRecognition();
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = roomLanguage === 'en' ? 'en-US' : 'ko-KR';
+        speechRecognitionRef.current = recognition;
+        speechRecognitionCompletionRef.current = new Promise(resolve => {
+          resolveSpeechRecognitionRef.current = resolve;
+        });
+        recognition.onresult = event => {
+          const finalParts: string[] = [];
+          const interimParts: string[] = [];
+          for (let index = 0; index < event.results.length; index += 1) {
+            const result = event.results[index];
+            const transcript = result?.[0]?.transcript?.trim();
+            if (!transcript) continue;
+            (result.isFinal ? finalParts : interimParts).push(transcript);
+          }
+          const liveTranscript = [...finalParts, ...interimParts].join(' ').trim().slice(0, 1200);
+          liveTranscriptRef.current = liveTranscript;
+          publishLiveTranscript(liveTranscript, true);
+        };
+        recognition.onerror = event => {
+          if (!['aborted', 'no-speech'].includes(event.error)) {
+            console.warn('Browser live speech recognition error:', event.error);
+          }
+        };
+        recognition.onend = () => {
+          if (speechRecognitionTimeoutRef.current !== null) {
+            window.clearTimeout(speechRecognitionTimeoutRef.current);
+            speechRecognitionTimeoutRef.current = null;
+          }
+          speechRecognitionRef.current = null;
+          resolveSpeechRecognitionRef.current?.();
+          resolveSpeechRecognitionRef.current = null;
+        };
+        try {
+          recognition.start();
+          setIsLiveTranscription(true);
+          publishLiveTranscript('', true);
+        } catch (error) {
+          console.warn('Browser live speech recognition unavailable:', error);
+          speechRecognitionRef.current = null;
+          resolveSpeechRecognitionRef.current?.();
+          resolveSpeechRecognitionRef.current = null;
+        }
+      }
+
       setRecordingSeconds(0);
       setIsSpeaking(true);
       recordingTimeoutRef.current = window.setTimeout(() => {
@@ -862,6 +1150,70 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       setSpeechError('브라우저가 오디오 재생을 차단했습니다. 다시 눌러 주세요.');
     }
   };
+
+  const handlePlayOwnAudio = useCallback(async (argument: LiveDebateArgument) => {
+    if (!user || argument.senderId !== user.id || !argument.audioPath) return;
+
+    if (playingAudioArgumentId === argument.id && playbackAudioRef.current) {
+      playbackAudioRef.current.pause();
+      playbackAudioRef.current = null;
+      setPlayingAudioArgumentId(null);
+      return;
+    }
+
+    playbackAudioRef.current?.pause();
+    playbackAudioRef.current = null;
+    setPlayingAudioArgumentId(null);
+    setLoadingAudioArgumentId(argument.id);
+    setSpeechError(null);
+
+    try {
+      const signedUrl = await getLiveDebateAudioUrl(argument.audioPath);
+      const audio = new Audio(signedUrl);
+      playbackAudioRef.current = audio;
+      audio.onended = () => {
+        if (playbackAudioRef.current === audio) playbackAudioRef.current = null;
+        setPlayingAudioArgumentId(current => current === argument.id ? null : current);
+      };
+      audio.onerror = () => {
+        if (playbackAudioRef.current === audio) playbackAudioRef.current = null;
+        setPlayingAudioArgumentId(current => current === argument.id ? null : current);
+        setSpeechError('저장된 내 음성을 재생하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      };
+      await audio.play();
+      setPlayingAudioArgumentId(argument.id);
+    } catch (error) {
+      playbackAudioRef.current = null;
+      setSpeechError(error instanceof Error ? error.message : '저장된 내 음성을 재생하지 못했습니다.');
+    } finally {
+      setLoadingAudioArgumentId(current => current === argument.id ? null : current);
+    }
+  }, [playingAudioArgumentId, user]);
+
+  const handleDownloadOwnAudio = useCallback(async (argument: LiveDebateArgument) => {
+    if (!user || argument.senderId !== user.id || !argument.audioPath) return;
+    setDownloadingAudioArgumentId(argument.id);
+    setSpeechError(null);
+    try {
+      const recording = await downloadLiveDebateAudio(argument.audioPath);
+      const extension = argument.audioPath.split('.').pop() || 'webm';
+      const phase = (argument.phaseLabel || 'voice')
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, '_');
+      const url = URL.createObjectURL(recording);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `thinkbattle-${phase}-${argument.id.slice(0, 8)}.${extension}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      setSpeechError(error instanceof Error ? error.message : '내 음성 발언을 다운로드하지 못했습니다.');
+    } finally {
+      setDownloadingAudioArgumentId(current => current === argument.id ? null : current);
+    }
+  }, [user]);
 
   const handleFinishDebate = async () => {
     if (!user || user.id !== hostId || forcedFinished) return;
@@ -997,12 +1349,24 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     playerId: argument.senderId,
     isAi: participants.some(participant => participant.id === argument.senderId && participant.isAi),
     content: argument.content,
+    audioPath: argument.audioPath,
+    audioDeletedAt: argument.audioDeletedAt,
+    audioDeleteReason: argument.audioDeleteReason,
     timestamp: new Date(argument.createdAt).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     }),
     roundTitle: argument.phaseLabel || (argument.source === 'voice' ? '음성 전사' : '텍스트 발언'),
   })), [argumentsList, debateProgress.argumentTimingById, participants, phaseTimings]);
+
+  const liveDisplayArguments = useMemo(() => Object.values(liveTranscripts).map<Argument>(transcript => ({
+    id: `live-${transcript.senderId}`,
+    playerId: transcript.senderId,
+    isAi: false,
+    content: transcript.content || (roomLanguage === 'en' ? 'Listening for speech…' : '음성을 인식하고 있습니다…'),
+    timestamp: 'LIVE',
+    roundTitle: `${transcript.phaseLabel || '음성 발언'} · 실시간 STT`,
+  })), [liveTranscripts, roomLanguage]);
 
   useEffect(() => {
     if (!sessionFinished || !user || transcriptRecordQueuedRef.current) return;
@@ -1064,11 +1428,13 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
 
   const getPlayer = (argument: Argument): Player => {
     const liveArgument = argumentsList.find(item => item.id === argument.id);
-    const isLocal = liveArgument?.senderId === user?.id;
-    const remoteParticipant = participants.find(participant => participant.id === liveArgument?.senderId);
+    const liveTranscript = liveTranscripts[argument.playerId];
+    const senderId = liveArgument?.senderId || liveTranscript?.senderId || argument.playerId;
+    const isLocal = senderId === user?.id;
+    const remoteParticipant = participants.find(participant => participant.id === senderId);
     const participantPosition = isLocal ? myPosition : remoteParticipant?.position ?? getOppositePosition(myPosition);
     const participantRole = isLocal ? myRole : remoteParticipant?.role ?? 'debater';
-    const name = liveArgument?.senderName || (isLocal ? user?.nickname : remoteParticipant?.name) || '토론 참가자';
+    const name = liveArgument?.senderName || liveTranscript?.senderName || (isLocal ? user?.nickname : remoteParticipant?.name) || '토론 참가자';
     return {
       id: argument.playerId,
       name: `${name} · ${participantRole === 'moderator' ? '진행자' : `${getPositionLabel(participantPosition)} · ${getRoleLabel(participantRole)}`}`,
@@ -1108,7 +1474,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           {voiceEnabled && (
             <button type="button" className="btn btn-secondary" onClick={() => setShowVoiceTranscript(value => !value)} disabled={sessionFinished}>
               {transcriptVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-              {sessionFinished ? '전체 기록 표시 중' : transcriptVisible ? '텍스트 숨기기' : '텍스트 보기'}
+              {sessionFinished ? '전체 기록 표시 중' : transcriptVisible ? '텍스트 숨기기' : '실시간 텍스트 보기'}
             </button>
           )}
           {user.id === hostId && !sessionFinished && (
@@ -1213,21 +1579,46 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 <span className="live-voice-focus-icon">{isSpeaking ? <Mic size={34} /> : <Headphones size={34} />}</span>
                 <small>VOICE FOCUS · 텍스트 숨김</small>
                 <strong>{isSpeaking ? '지금 발언하고 있습니다' : currentStageOwner?.name ? `${currentStageOwner.name}님의 발언에 집중해 주세요` : `${currentPhase.label} 발언을 기다리고 있습니다`}</strong>
-                <p>발언 내용은 자동으로 전사되며, 상단의 ‘텍스트 보기’로 언제든 확인할 수 있습니다.</p>
+                <p>발언 내용은 실시간으로 전사되며, 상단의 ‘실시간 텍스트 보기’로 말하는 중에도 확인할 수 있습니다.</p>
                 <span className="live-voice-record-count"><CheckCircle2 size={15} /> {displayArguments.length}개 발언 전사 완료 · 종료 후 전체 텍스트 확인</span>
               </div>
-            ) : displayArguments.length === 0 ? (
+            ) : displayArguments.length === 0 && liveDisplayArguments.length === 0 ? (
               <div className="live-room-empty">
                 {voiceEnabled ? <Mic size={28} /> : <Radio size={28} />}
                 <strong>{`${currentPhase.label} 담당자가 발언할 차례입니다.`}</strong>
                 <span>{voiceEnabled
-                  ? '말하는 동안 상대방에게 음성이 전달되고, 발언 종료를 누르면 내용이 자동으로 전사됩니다.'
+                  ? '말하는 동안 상대방에게 음성과 실시간 전사문이 함께 전달되며, 종료하면 발언 기록으로 확정됩니다.'
                   : '텍스트 발언은 Supabase 실시간 채널로 모든 참가자에게 전달되며 LiveKit 사용량에 포함되지 않습니다.'}</span>
               </div>
             ) : null}
 
-            {transcriptVisible && displayArguments.map(argument => (
-              <ArgumentCard key={argument.id} argument={argument} player={getPlayer(argument)} />
+            {transcriptVisible && displayArguments.map(argument => {
+              const storedArgument = argumentsList.find(item => item.id === argument.id);
+              const canMonitorOwnVoice = storedArgument?.senderId === user.id && !!storedArgument.audioPath;
+              return (
+                <ArgumentCard
+                  key={argument.id}
+                  argument={argument}
+                  player={getPlayer(argument)}
+                  onPlayAudio={canMonitorOwnVoice && storedArgument
+                    ? () => void handlePlayOwnAudio(storedArgument)
+                    : undefined}
+                  isAudioLoading={loadingAudioArgumentId === argument.id}
+                  isAudioPlaying={playingAudioArgumentId === argument.id}
+                  audioButtonLabel="내 음성 다시 듣기"
+                  onDownloadAudio={canMonitorOwnVoice && storedArgument
+                    ? () => void handleDownloadOwnAudio(storedArgument)
+                    : undefined}
+                  isAudioDownloading={downloadingAudioArgumentId === argument.id}
+                />
+              );
+            })}
+
+            {transcriptVisible && liveDisplayArguments.map(argument => (
+              <div className="live-transcript-card" key={argument.id} aria-live="polite">
+                <ArgumentCard argument={argument} player={getPlayer(argument)} isHighlighted />
+                <span className="live-transcript-badge"><span aria-hidden="true" /> 실시간 인식 중</span>
+              </div>
             ))}
 
             <div className={`input-zone ${isRoomReady && (isMyStage || myRole === 'moderator') ? 'my-turn' : ''}`}>
@@ -1290,15 +1681,20 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                   )}
                 </div>
 
-                {(isSpeaking || isTranscribing || speechError) && (
+                {(isSpeaking || isTranscribing || speechError || audioStorageNotice) && (
                   <div className={`speech-status ${speechError ? 'error' : ''}`} role={speechError ? 'alert' : 'status'}>
                     {isSpeaking && <span className="speech-pulse" aria-hidden="true" />}
                     {isTranscribing && <LoaderCircle className="spin" size={14} />}
                     <span>
                       {speechError
+                        || audioStorageNotice
                         || (isTranscribing
-                          ? '발언을 변환한 뒤 양쪽 화면에 자동 등록하고 있습니다.'
-                          : `LiveKit으로 발언 전달 중 ${formatTimer(recordingSeconds)} · 종료하면 자동 등록됩니다. (최대 3분)`)}
+                          ? isLiveTranscription
+                            ? '실시간 인식 결과를 양쪽 화면의 발언 기록에 등록하고 있습니다.'
+                            : '발언을 변환한 뒤 양쪽 화면에 자동 등록하고 있습니다.'
+                          : isLiveTranscription
+                            ? `실시간 STT 중 ${formatTimer(recordingSeconds)} · ‘텍스트 보기’를 켜면 말하는 내용이 바로 표시됩니다.`
+                            : `LiveKit으로 발언 전달 중 ${formatTimer(recordingSeconds)} · 종료 후 자동 전사됩니다. (최대 3분)`)}
                     </span>
                     {speechError && pendingRecording && !isTranscribing && (
                       <button

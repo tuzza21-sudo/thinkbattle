@@ -1,5 +1,48 @@
 import { supabase } from './supabase';
 import type { AppUser } from '../types';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+
+type OAuthProvider = 'google' | 'kakao';
+
+const oauthErrorParams = ['error', 'error_code', 'error_description'] as const;
+
+const readOAuthParams = () => {
+  if (typeof window === 'undefined') return new URLSearchParams();
+
+  const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  hashParams.forEach((value, key) => {
+    if (!params.has(key)) params.set(key, value);
+  });
+  return params;
+};
+
+export const getOAuthCallbackError = (): string | null => {
+  const params = readOAuthParams();
+  const description = params.get('error_description');
+  if (description) return description.replace(/\+/g, ' ');
+  return params.get('error') ? '소셜 로그인을 완료하지 못했습니다. 다시 시도해 주세요.' : null;
+};
+
+export const clearOAuthCallbackError = () => {
+  if (typeof window === 'undefined') return;
+
+  const url = new URL(window.location.href);
+  oauthErrorParams.forEach(param => {
+    url.searchParams.delete(param);
+  });
+
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+  oauthErrorParams.forEach(param => {
+    hashParams.delete(param);
+  });
+  url.hash = hashParams.toString() ? `#${hashParams.toString()}` : '';
+  window.history.replaceState(window.history.state, '', url);
+};
+
+export const subscribeToAuthChanges = (
+  callback: (event: AuthChangeEvent, session: Session | null) => void,
+) => supabase.auth.onAuthStateChange(callback).data.subscription;
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
   try {
@@ -160,11 +203,11 @@ export const signOut = async () => {
   await supabase.auth.signOut();
 };
 
-export const signInWithKakao = async (): Promise<void> => {
+const signInWithOAuth = async (provider: OAuthProvider): Promise<void> => {
   const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'kakao',
+    provider,
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: new URL('/', window.location.origin).toString(),
     },
   });
 
@@ -173,17 +216,7 @@ export const signInWithKakao = async (): Promise<void> => {
   }
 };
 
-export const signInWithGoogle = async (): Promise<void> => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: window.location.origin,
-    },
-  });
+export const signInWithKakao = () => signInWithOAuth('kakao');
 
-  if (error) {
-    throw new Error(error.message);
-  }
-};
-
+export const signInWithGoogle = () => signInWithOAuth('google');
 

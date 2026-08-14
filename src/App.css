@@ -273,6 +273,8 @@
   cursor: pointer;
 }
 
+.argument-audio-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+
 .argument-audio-button:hover { color: var(--text-light); border-color: rgba(129, 140, 248, .4); }
 .argument-audio-button:disabled { opacity: .6; cursor: wait; }
 

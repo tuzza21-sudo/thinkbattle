@@ -1,6 +1,32 @@
 import { supabase } from './supabase';
 import type { AdminDashboard, OrganizationStudentRecord, OrganizationSummary, OrganizationTopic, OrganizationUser } from '../types';
 
+const activeOrganizationStorageKey = 'thinkfit-active-organization-id';
+const developerTestOrganizationName = 'ThinkFit 개발자 테스트 기관';
+
+const getStoredOrganizationId = () => (
+  typeof window === 'undefined' ? null : window.localStorage.getItem(activeOrganizationStorageKey)
+);
+
+export const orderOrganizationsByPreference = (organizations: OrganizationSummary[]) => {
+  const preferredId = getStoredOrganizationId();
+  return [...organizations].sort((left, right) => {
+    if (left.id === preferredId) return -1;
+    if (right.id === preferredId) return 1;
+
+    const leftIsDeveloperTest = left.name === developerTestOrganizationName;
+    const rightIsDeveloperTest = right.name === developerTestOrganizationName;
+    if (leftIsDeveloperTest !== rightIsDeveloperTest) return leftIsDeveloperTest ? 1 : -1;
+    return left.name.localeCompare(right.name, 'ko');
+  });
+};
+
+export const rememberActiveOrganization = (organizationId: string) => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(activeOrganizationStorageKey, organizationId);
+  }
+};
+
 export const getMyOrganizations = async (): Promise<OrganizationSummary[]> => {
   // The developer account gets a private test organization on first B2B visit.
   // The database function independently checks the authenticated email.
@@ -14,7 +40,7 @@ export const getMyOrganizations = async (): Promise<OrganizationSummary[]> => {
     if (error) console.error('Failed to load administrator organizations:', error);
     return [];
   }
-  return data as OrganizationSummary[];
+  return orderOrganizationsByPreference(data as OrganizationSummary[]);
 };
 
 export const createOrganizationGroup = async (organizationId: string, name: string) => {
@@ -66,7 +92,7 @@ export const getMyOrganizationTopics = async (): Promise<OrganizationTopic[]> =>
 export const getMyMemberOrganizations = async (): Promise<OrganizationSummary[]> => {
   const { data, error } = await supabase.rpc('get_my_member_organizations');
   if (error || !Array.isArray(data)) return [];
-  return data as OrganizationSummary[];
+  return orderOrganizationsByPreference(data as OrganizationSummary[]);
 };
 
 export const createOrganizationTopic = async (

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Argument, Player } from '../types';
-import { BookOpen, AlertCircle, LoaderCircle, Volume2 } from 'lucide-react';
+import { BookOpen, AlertCircle, Download, LoaderCircle, Pause, Volume2 } from 'lucide-react';
 
 interface ArgumentCardProps {
   argument: Argument;
@@ -8,6 +8,10 @@ interface ArgumentCardProps {
   isHighlighted?: boolean;
   onPlayAudio?: () => void;
   isAudioLoading?: boolean;
+  isAudioPlaying?: boolean;
+  audioButtonLabel?: string;
+  onDownloadAudio?: () => void;
+  isAudioDownloading?: boolean;
 }
 
 const formatDuration = (seconds: number) => {
@@ -17,7 +21,17 @@ const formatDuration = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, isHighlighted, onPlayAudio, isAudioLoading = false }) => {
+export const ArgumentCard: React.FC<ArgumentCardProps> = ({
+  argument,
+  player,
+  isHighlighted,
+  onPlayAudio,
+  isAudioLoading = false,
+  isAudioPlaying = false,
+  audioButtonLabel,
+  onDownloadAudio,
+  isAudioDownloading = false,
+}) => {
   const isPlayerA = !argument.isAi;
   const hasTiming = !argument.isAi && typeof argument.elapsedSeconds === 'number' && typeof argument.recommendedDurationSeconds === 'number';
   
@@ -44,11 +58,29 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({ argument, player, is
           {argument.content}
         </div>
 
-        {argument.isAi && onPlayAudio && (
-          <button type="button" className="argument-audio-button" onClick={onPlayAudio} disabled={isAudioLoading}>
-            {isAudioLoading ? <LoaderCircle className="spin" size={15} /> : <Volume2 size={15} />}
-            {isAudioLoading ? '음성 생성 중' : 'AI 발언 다시 듣기'}
-          </button>
+        {(onPlayAudio || onDownloadAudio) && (
+          <div className="argument-audio-actions">
+            {onPlayAudio && (
+              <button type="button" className="argument-audio-button" onClick={onPlayAudio} disabled={isAudioLoading}>
+                {isAudioLoading
+                  ? <LoaderCircle className="spin" size={15} />
+                  : isAudioPlaying
+                    ? <Pause size={15} />
+                    : <Volume2 size={15} />}
+                {isAudioLoading
+                  ? argument.isAi ? '음성 생성 중' : '녹음 불러오는 중'
+                  : isAudioPlaying
+                    ? '재생 멈추기'
+                    : audioButtonLabel || (argument.isAi ? 'AI 발언 다시 듣기' : '내 음성 다시 듣기')}
+              </button>
+            )}
+            {onDownloadAudio && (
+              <button type="button" className="argument-audio-button" onClick={onDownloadAudio} disabled={isAudioDownloading} title="보관기간 만료 전에 기기에 저장">
+                {isAudioDownloading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}
+                {isAudioDownloading ? '다운로드 준비 중' : '음성 다운로드'}
+              </button>
+            )}
+          </div>
         )}
 
         {(argument.aiQuestion || argument.aiLesson || argument.turnFeedback) && (

@@ -6,6 +6,7 @@ import type { AppUser } from '../types';
 interface AuthModalProps {
   onClose: () => void;
   onAuthenticated: (user: AppUser) => void;
+  initialError?: string | null;
   language?: 'ko' | 'en';
 }
 
@@ -53,7 +54,7 @@ const GoogleIcon: React.FC = () => (
   </svg>
 );
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, language = 'ko' }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, initialError = null, language = 'ko' }) => {
   const isEnglish = language === 'en';
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -61,7 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(initialError || '');
 
   const [loading, setLoading] = useState(false);
   const isSignup = mode === 'signup';

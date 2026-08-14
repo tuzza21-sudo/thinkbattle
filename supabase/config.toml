@@ -1,0 +1,4 @@
+project_id = "thinkbattle"
+
+[functions.cleanup-live-debate-audio]
+verify_jwt = false

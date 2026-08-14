@@ -101,6 +101,9 @@ export type LiveDebateArgument = {
   source: 'text' | 'voice';
   phaseId?: string;
   phaseLabel?: string;
+  audioPath?: string;
+  audioDeletedAt?: string;
+  audioDeleteReason?: 'retention' | 'capacity' | 'cleanup';
 };
 
 export type LiveDebateEvaluationParticipant = {
@@ -141,6 +144,9 @@ export type Argument = {
   isAi: boolean;
   content: string;
   timestamp: string;
+  audioPath?: string;
+  audioDeletedAt?: string;
+  audioDeleteReason?: 'retention' | 'capacity' | 'cleanup';
   roundId?: DebateRoundId;
   roundTitle?: string;
   recommendedDurationSeconds?: number;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, BookOpen, Building2, ChevronRight, Clock, ExternalLink, Gavel, Layers3, LogIn, Newspaper, Presentation, Scale, Sparkles, Swords, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getMyMemberOrganizations, getMyOrganizationTopics } from '../lib/admin';
+import { getMyMemberOrganizations, getMyOrganizationTopics, rememberActiveOrganization } from '../lib/admin';
 import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
 import { createDebateRoom } from '../lib/debateRooms';
 import { CreateBattleModal } from './CreateBattleModal';
@@ -37,6 +37,7 @@ const timeLimitLabel = (seconds?: number) => seconds ? `${Math.round(seconds / 6
 export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest: () => void }) => {
   const navigate = useNavigate();
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
+  const [activeOrganizationId, setActiveOrganizationId] = useState('');
   const [topics, setTopics] = useState<OrganizationTopic[]>([]);
   const [selected, setSelected] = useState<OrganizationTopic | null>(null);
   const [position, setPosition] = useState<DebatePosition>('affirmative');
@@ -47,6 +48,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
   useEffect(() => {
     if (user) void Promise.all([getMyMemberOrganizations(), getMyOrganizationTopics()]).then(([orgs, nextTopics]) => {
       setOrganizations(orgs);
+      setActiveOrganizationId(orgs[0]?.id ?? '');
       setTopics(nextTopics);
     });
   }, [user]);
@@ -78,7 +80,9 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
 
   const handleCreateLiveDebate = async (config: BattleConfig) => {
     if (!user) return onLoginRequest();
-    const organization = organizations.find(item => item.id === config.organizationId) ?? organizations[0];
+    const organization = organizations.find(item => item.id === config.organizationId)
+      ?? organizations.find(item => item.id === activeOrganizationId)
+      ?? organizations[0];
     if (!organization) return;
     const roomId = createLiveRoomId();
     await createDebateRoom({
@@ -106,10 +110,20 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
     navigate(buildDebateLobbyPath(room.roomId));
   };
 
+  const activeOrganization = organizations.find(organization => organization.id === activeOrganizationId) ?? organizations[0];
+  const visibleTopics = activeOrganization
+    ? topics.filter(topic => topic.organizationId === activeOrganization.id)
+    : [];
   const briefing = selected?.briefing;
-  const selectedIndex = selected ? topics.findIndex(t => t.id === selected.id) : -1;
+  const selectedIndex = selected ? visibleTopics.findIndex(t => t.id === selected.id) : -1;
   const selectedAccent = selectedIndex >= 0 ? getTopicAccent(selectedIndex) : accentStyles.primary;
-  const orgNames = organizations.map(org => org.name).join(' · ') || '소속 기관';
+  const organizationName = activeOrganization?.name || '소속 기관';
+
+  const selectOrganization = (organizationId: string) => {
+    setActiveOrganizationId(organizationId);
+    rememberActiveOrganization(organizationId);
+    setSelected(null);
+  };
 
   return (
     <main className="app-container page-scroll" style={{ maxWidth: 1180, padding: '0 1.25rem 4rem' }}>
@@ -179,9 +193,22 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
           기관 전용 토론 주제
         </h1>
         <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '1.05rem', lineHeight: 1.6 }}>
-          <strong style={{ color: 'var(--primary)' }}>{orgNames}</strong> 학생 전용 맞춤 토론 주제입니다.
-          {topics.length > 0 && <span> · 총 <strong>{topics.length}</strong>개 주제</span>}
+          <strong style={{ color: 'var(--primary)' }}>{organizationName}</strong> 학생 전용 맞춤 토론 주제입니다.
+          {visibleTopics.length > 0 && <span> · 총 <strong>{visibleTopics.length}</strong>개 주제</span>}
         </p>
+        {organizations.length > 1 && (
+          <select
+            className="input-field"
+            aria-label="기관 선택"
+            value={activeOrganization?.id ?? ''}
+            onChange={event => selectOrganization(event.target.value)}
+            style={{ marginTop: '1rem', maxWidth: 320, fontWeight: 700 }}
+          >
+            {organizations.map(organization => (
+              <option key={organization.id} value={organization.id}>{organization.name}</option>
+            ))}
+          </select>
+        )}
         <div className="flex gap-3" style={{ marginTop: '1.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => user ? setShowCreateModal(true) : onLoginRequest()} disabled={!!user && organizations.length === 0}>
             <Swords size={18} /> 토론 생성
@@ -200,7 +227,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '1.5rem' }}>로그인하면 소속 기관의 전용 주제를 확인할 수 있습니다.</p>
           <button className="btn btn-primary" onClick={onLoginRequest} style={{ padding: '0.85rem 2rem', fontSize: '1.05rem' }}>로그인하기</button>
         </section>
-      ) : !topics.length ? (
+      ) : !visibleTopics.length ? (
         <section className="card" style={{ padding: '3rem 2rem', textAlign: 'center' }}>
           <Sparkles size={48} color="var(--text-muted)" style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>게시된 기관 전용 주제가 아직 없습니다.</p>
@@ -209,7 +236,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
       ) : (
         <>
           <div className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))' }}>
-            {topics.map((topic, index) => {
+            {visibleTopics.map((topic, index) => {
               const accent = getTopicAccent(index);
               const isSelected = selected?.id === topic.id;
 
@@ -577,12 +604,12 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
           )}
         </>
       )}
-      {showCreateModal && organizations[0] && (
+      {showCreateModal && activeOrganization && (
         <CreateBattleModal
           liveOnly
           audience="organization"
-          organizationId={organizations[0].id}
-          organizationTopics={topics}
+          organizationId={activeOrganization.id}
+          organizationTopics={visibleTopics}
           onClose={() => setShowCreateModal(false)}
           onStart={handleCreateLiveDebate}
         />
@@ -590,7 +617,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
       {showJoinModal && (
         <JoinDebateModal
           audience="organization"
-          organizationIds={organizations.map(org => org.id)}
+          organizationIds={activeOrganization ? [activeOrganization.id] : []}
           onClose={() => setShowJoinModal(false)}
           onJoin={handleJoinLiveDebate}
         />
