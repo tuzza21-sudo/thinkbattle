@@ -1,5 +1,14 @@
 export type DebatePhaseTiming = { label: string; seconds: number };
 
+export const DEBATE_TIME_OPTIONS = [600, 900, 1200] as const;
+
+export const normalizeDebateTimeLimit = (seconds: number) => {
+  if (!Number.isFinite(seconds)) return DEBATE_TIME_OPTIONS[0];
+  return DEBATE_TIME_OPTIONS.reduce((closest, option) => (
+    Math.abs(option - seconds) < Math.abs(closest - seconds) ? option : closest
+  ));
+};
+
 const phaseWeights = [
   { label: '입론', weight: 0.22 },
   { label: '질의·응답', weight: 0.26 },

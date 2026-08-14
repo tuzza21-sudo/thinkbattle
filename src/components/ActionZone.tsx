@@ -26,6 +26,54 @@ interface ActionZoneProps {
 
 const MAX_RECORDING_SECONDS = 180;
 
+interface BrowserSpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface BrowserSpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  readonly [index: number]: BrowserSpeechRecognitionAlternative;
+}
+
+interface BrowserSpeechRecognitionEvent extends Event {
+  readonly results: {
+    readonly length: number;
+    readonly [index: number]: BrowserSpeechRecognitionResult;
+  };
+}
+
+interface BrowserSpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+
+interface BrowserSpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+const getBrowserSpeechRecognition = () => {
+  const speechWindow = window as typeof window & {
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+};
+
+const joinSpeechContent = (existingContent: string, transcript: string) =>
+  `${existingContent.trim()}${existingContent.trim() ? ' ' : ''}${transcript.trim()}`
+    .trim()
+    .slice(0, 1200);
+
 const formatTimer = (seconds: number) => {
   const safeSeconds = Math.max(0, seconds);
   const m = Math.floor(safeSeconds / 60);
@@ -48,6 +96,13 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   const discardRecordingRef = useRef(false);
   const transcriptionControllerRef = useRef<AbortController | null>(null);
   const recordingTimeoutRef = useRef<number | null>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const speechRecognitionCompletionRef = useRef<Promise<void>>(Promise.resolve());
+  const resolveSpeechRecognitionRef = useRef<(() => void) | null>(null);
+  const speechRecognitionTimeoutRef = useRef<number | null>(null);
+  const speechBaseContentRef = useRef('');
+  const liveTranscriptRef = useRef('');
+  const [isLiveTranscription, setIsLiveTranscription] = useState(false);
 
   const isOpeningRound = currentRound?.title === '입론';
   const isInputDisabled = isPaused || !isPlayerTurn || isAiThinking;
@@ -66,16 +121,46 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
     mediaStreamRef.current = null;
   }, []);
 
+  const finishSpeechRecognition = useCallback((discard: boolean) => {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+      return;
+    }
+
+    try {
+      if (discard) recognition.abort();
+      else recognition.stop();
+    } catch {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+    }
+
+    if (speechRecognitionTimeoutRef.current !== null) {
+      window.clearTimeout(speechRecognitionTimeoutRef.current);
+    }
+    speechRecognitionTimeoutRef.current = window.setTimeout(() => {
+      resolveSpeechRecognitionRef.current?.();
+      resolveSpeechRecognitionRef.current = null;
+      speechRecognitionRef.current = null;
+      speechRecognitionTimeoutRef.current = null;
+    }, 700);
+  }, []);
+
   const stopRecording = useCallback((discard = false) => {
     discardRecordingRef.current = discard;
     if (recordingTimeoutRef.current !== null) {
       window.clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
     }
+    finishSpeechRecognition(discard);
+    if (!discard) setIsTranscribing(true);
+    else setIsLiveTranscription(false);
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
     releaseMicrophone();
     setIsRecording(false);
-  }, [releaseMicrophone]);
+  }, [finishSpeechRecognition, releaseMicrophone]);
 
   useEffect(() => {
     if (isInputDisabled) {
@@ -87,6 +172,9 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   useEffect(() => () => {
     discardRecordingRef.current = true;
     if (recordingTimeoutRef.current !== null) window.clearTimeout(recordingTimeoutRef.current);
+    if (speechRecognitionTimeoutRef.current !== null) window.clearTimeout(speechRecognitionTimeoutRef.current);
+    speechRecognitionRef.current?.abort();
+    resolveSpeechRecognitionRef.current?.();
     if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
     releaseMicrophone();
     transcriptionControllerRef.current?.abort();
@@ -137,9 +225,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
       if (controller.signal.aborted) return;
 
       const existingContent = contentRef.current.trim();
-      const submittedContent = `${existingContent}${existingContent ? ' ' : ''}${transcript}`
-        .trim()
-        .slice(0, 1200);
+      const submittedContent = joinSpeechContent(existingContent, transcript);
       if (!submittedContent) throw new Error('전송할 음성 발언이 없습니다.');
 
       contentRef.current = '';
@@ -166,8 +252,12 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
 
     setSpeechError(null);
     setPendingRecording(null);
+    setIsLiveTranscription(false);
     discardRecordingRef.current = false;
     recordedChunksRef.current = [];
+    speechBaseContentRef.current = contentRef.current.trim();
+    liveTranscriptRef.current = '';
+    speechRecognitionCompletionRef.current = Promise.resolve();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -206,14 +296,20 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
           recordingTimeoutRef.current = null;
         }
         setSpeechError('마이크 입력 중 오류가 발생했습니다. 다시 시도해 주세요.');
+        finishSpeechRecognition(true);
         releaseMicrophone();
         setIsRecording(false);
+        setIsTranscribing(false);
+        setIsLiveTranscription(false);
       };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         releaseMicrophone();
         mediaRecorderRef.current = null;
+        await speechRecognitionCompletionRef.current;
         if (discardRecordingRef.current) {
           recordedChunksRef.current = [];
+          setIsTranscribing(false);
+          setIsLiveTranscription(false);
           return;
         }
 
@@ -223,13 +319,80 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
         recordedChunksRef.current = [];
         if (recording.size === 0) {
           setSpeechError('인식된 음성이 없습니다. 다시 시도해 주세요.');
+          setIsTranscribing(false);
+          setIsLiveTranscription(false);
           return;
         }
         setPendingRecording(recording);
+
+        const liveTranscript = liveTranscriptRef.current.trim();
+        if (liveTranscript) {
+          const submittedContent = joinSpeechContent(speechBaseContentRef.current, liveTranscript);
+          contentRef.current = '';
+          setContent('');
+          setPendingRecording(null);
+          setIsTranscribing(false);
+          setIsLiveTranscription(false);
+          onSubmit(submittedContent);
+          return;
+        }
+
+        setIsLiveTranscription(false);
         void runTranscription(recording);
       };
 
       recorder.start(1000);
+
+      const SpeechRecognition = getBrowserSpeechRecognition();
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = isEnglish ? 'en-US' : 'ko-KR';
+        speechRecognitionRef.current = recognition;
+        speechRecognitionCompletionRef.current = new Promise(resolve => {
+          resolveSpeechRecognitionRef.current = resolve;
+        });
+        recognition.onresult = event => {
+          const finalParts: string[] = [];
+          const interimParts: string[] = [];
+          for (let index = 0; index < event.results.length; index += 1) {
+            const result = event.results[index];
+            const transcript = result?.[0]?.transcript?.trim();
+            if (!transcript) continue;
+            (result.isFinal ? finalParts : interimParts).push(transcript);
+          }
+          const liveTranscript = [...finalParts, ...interimParts].join(' ').trim();
+          liveTranscriptRef.current = liveTranscript;
+          const nextContent = joinSpeechContent(speechBaseContentRef.current, liveTranscript);
+          contentRef.current = nextContent;
+          setContent(nextContent);
+        };
+        recognition.onerror = event => {
+          if (!['aborted', 'no-speech'].includes(event.error)) {
+            console.warn('Browser live speech recognition error:', event.error);
+          }
+        };
+        recognition.onend = () => {
+          if (speechRecognitionTimeoutRef.current !== null) {
+            window.clearTimeout(speechRecognitionTimeoutRef.current);
+            speechRecognitionTimeoutRef.current = null;
+          }
+          speechRecognitionRef.current = null;
+          resolveSpeechRecognitionRef.current?.();
+          resolveSpeechRecognitionRef.current = null;
+        };
+        try {
+          recognition.start();
+          setIsLiveTranscription(true);
+        } catch (error) {
+          console.warn('Browser live speech recognition unavailable:', error);
+          speechRecognitionRef.current = null;
+          resolveSpeechRecognitionRef.current?.();
+          resolveSpeechRecognitionRef.current = null;
+        }
+      }
+
       setRecordingSeconds(0);
       setIsRecording(true);
       recordingTimeoutRef.current = window.setTimeout(() => {
@@ -364,8 +527,12 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
             <span>
               {speechError
                 ?? (isTranscribing
-                  ? isEnglish ? 'Transcribing and submitting your speech automatically…' : '발언을 변환한 뒤 자동으로 전송하고 있습니다...'
-                  : isEnglish ? `Speaking ${formatTimer(recordingSeconds)} · Finish to submit automatically. (3-minute maximum)` : `발언 중 ${formatTimer(recordingSeconds)} · 종료하면 자동 전송됩니다. (최대 3분)`)}
+                  ? isLiveTranscription
+                    ? isEnglish ? 'Sending the live transcript…' : '실시간 인식 결과를 바로 전송하고 있습니다...'
+                    : isEnglish ? 'Transcribing and submitting your speech automatically…' : '발언을 변환한 뒤 자동으로 전송하고 있습니다...'
+                  : isLiveTranscription
+                    ? isEnglish ? `Live transcription ${formatTimer(recordingSeconds)} · Your words appear as you speak.` : `실시간 음성 인식 중 ${formatTimer(recordingSeconds)} · 말하는 내용이 바로 표시됩니다.`
+                    : isEnglish ? `Speaking ${formatTimer(recordingSeconds)} · Finish to submit automatically. (3-minute maximum)` : `발언 중 ${formatTimer(recordingSeconds)} · 종료하면 자동 전송됩니다. (최대 3분)`)}
             </span>
             {speechError && pendingRecording && !isTranscribing && (
               <button

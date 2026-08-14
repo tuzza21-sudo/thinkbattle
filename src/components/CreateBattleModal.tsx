@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, Bot, Check, Clock, Layers3, Mic2, ShieldCheck, Users, Volume2, X } from 'lucide-react';
-import { formatDebateMinutes, getDebatePhaseTimings } from '../lib/debateTiming';
+import { DEBATE_TIME_OPTIONS, formatDebateMinutes, getDebatePhaseTimings, normalizeDebateTimeLimit } from '../lib/debateTiming';
 import { getLiveDebateCourse } from '../lib/liveDebateCourse';
 import { generateOrganizationTopic } from '../lib/api';
 import { savePublicDebateTopic } from '../lib/publicTopics';
@@ -158,7 +158,7 @@ export const CreateBattleModal = ({
                   setTopicDescription(selected.description || selected.briefing?.context || '');
                   setTopicBriefing(selected.briefing);
                   setSelectedOrganizationId('organizationId' in selected ? selected.organizationId : organizationId);
-                  if (selected.config?.timeLimit) setTimeLimit(selected.config.timeLimit);
+                  if (selected.config?.timeLimit) setTimeLimit(normalizeDebateTimeLimit(selected.config.timeLimit));
                   if (selected.config?.debateLevel === 'beginner' || selected.config?.debateLevel === 'intermediate') {
                     setDebateLevel(selected.config.debateLevel);
                   }
@@ -246,7 +246,7 @@ export const CreateBattleModal = ({
           <section className="setup-section">
             <div className="setup-section-title"><span>{battleMode === 'pvp' ? (liveOnly ? '4' : '5') : '4'}</span><strong>{isEnglish ? 'Debate duration' : '토론 시간'}</strong></div>
             <div className="setup-choice-grid three">
-              {[600, 900, 1200].map(time => (
+              {DEBATE_TIME_OPTIONS.map(time => (
                 <button key={time} type="button" className={`setup-choice time ${timeLimit === time ? 'selected' : ''}`} onClick={() => setTimeLimit(time)}>
                   <Clock size={19} /><strong>{time / 60} {isEnglish ? 'min' : '분'}</strong>
                 </button>

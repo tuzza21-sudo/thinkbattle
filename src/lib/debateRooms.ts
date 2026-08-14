@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { normalizeDebateTimeLimit } from './debateTiming';
 import type {
   AppUser,
   DebateLevel,
@@ -66,6 +67,7 @@ const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
 });
 
 export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) => {
+  const timeLimit = normalizeDebateTimeLimit(input.timeLimit);
   const localRoom: LiveDebateRoomSummary = {
     id: input.roomId,
     roomId: input.roomId,
@@ -77,7 +79,7 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     language: input.language ?? 'ko',
     debateLevel: input.debateLevel,
     voiceEnabled: input.voiceEnabled,
-    timeLimit: input.timeLimit,
+    timeLimit,
     teamSize: input.teamSize,
     allowModerator: input.allowModerator,
     audience: input.audience,
@@ -97,7 +99,7 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     language: input.language ?? 'ko',
     debate_level: input.debateLevel,
     voice_enabled: input.voiceEnabled,
-    time_limit: input.timeLimit,
+    time_limit: timeLimit,
     team_size: input.teamSize,
     allow_moderator: input.allowModerator,
     audience: input.audience,
