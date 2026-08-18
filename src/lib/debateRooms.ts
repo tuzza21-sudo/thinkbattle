@@ -333,7 +333,7 @@ const mapLiveArgument = (row: Record<string, unknown>): LiveDebateArgument => ({
   phaseLabel: row.phase_label ? String(row.phase_label) : undefined,
   audioPath: row.audio_path ? String(row.audio_path) : undefined,
   audioDeletedAt: row.audio_deleted_at ? String(row.audio_deleted_at) : undefined,
-  audioDeleteReason: ['retention', 'capacity', 'cleanup'].includes(String(row.audio_delete_reason))
+  audioDeleteReason: ['retention', 'capacity', 'limit', 'cleanup'].includes(String(row.audio_delete_reason))
     ? row.audio_delete_reason as LiveDebateArgument['audioDeleteReason']
     : undefined,
 });
@@ -348,7 +348,7 @@ const getRecordingExtension = (mimeType: string) => {
   return 'webm';
 };
 
-const requestLiveDebateAudioCleanup = async (force = false) => {
+export const requestDebateAudioCleanup = async (force = false) => {
   const now = Date.now();
   if (!force && now - lastAudioCleanupRequestAt < CLEANUP_REQUEST_INTERVAL_MS) return false;
   lastAudioCleanupRequestAt = now;
@@ -383,11 +383,53 @@ export const uploadLiveDebateAudio = async (
     });
   let { error } = await upload();
   if (error) {
-    const cleanupRan = await requestLiveDebateAudioCleanup(true);
+    const cleanupRan = await requestDebateAudioCleanup(true);
     if (cleanupRan) ({ error } = await upload());
   }
   if (error) throw new Error(`내 음성 발언을 저장하지 못했습니다: ${error.message}`);
-  void requestLiveDebateAudioCleanup();
+  void requestDebateAudioCleanup();
+  return path;
+};
+
+export const uploadAiSparringAudio = async (
+  argumentId: string,
+  recording: Blob,
+) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('음성을 저장하려면 다시 로그인해 주세요.');
+
+  const extension = getRecordingExtension(recording.type);
+  const path = `${user.id}/ai-sparring/${argumentId}.${extension}`;
+  const { error: registrationError } = await supabase
+    .from('ai_sparring_audio')
+    .insert({
+      user_id: user.id,
+      argument_id: argumentId,
+      audio_path: path,
+    });
+  if (registrationError) {
+    throw new Error(`AI 스파링 음성 저장을 준비하지 못했습니다: ${registrationError.message}`);
+  }
+
+  const upload = () => supabase.storage.from(LIVE_DEBATE_AUDIO_BUCKET).upload(path, recording, {
+    contentType: recording.type || 'audio/webm',
+    upsert: false,
+  });
+  let { error } = await upload();
+  if (error) {
+    const cleanupRan = await requestDebateAudioCleanup(true);
+    if (cleanupRan) ({ error } = await upload());
+  }
+  if (error) {
+    await supabase
+      .from('ai_sparring_audio')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('argument_id', argumentId);
+    throw new Error(`AI 스파링 음성을 저장하지 못했습니다: ${error.message}`);
+  }
+
+  void requestDebateAudioCleanup();
   return path;
 };
 

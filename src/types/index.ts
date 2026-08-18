@@ -103,7 +103,7 @@ export type LiveDebateArgument = {
   phaseLabel?: string;
   audioPath?: string;
   audioDeletedAt?: string;
-  audioDeleteReason?: 'retention' | 'capacity' | 'cleanup';
+  audioDeleteReason?: 'retention' | 'capacity' | 'limit' | 'cleanup';
 };
 
 export type LiveDebateEvaluationParticipant = {
@@ -146,7 +146,7 @@ export type Argument = {
   timestamp: string;
   audioPath?: string;
   audioDeletedAt?: string;
-  audioDeleteReason?: 'retention' | 'capacity' | 'cleanup';
+  audioDeleteReason?: 'retention' | 'capacity' | 'limit' | 'cleanup';
   roundId?: DebateRoundId;
   roundTitle?: string;
   recommendedDurationSeconds?: number;

@@ -26,6 +26,7 @@ import {
   personaDebateStep,
 } from '../lib/debateEngine';
 import { createReportShareLink, saveDebateRecord, saveEnglishRephraseEntry } from '../lib/history';
+import { requestDebateAudioCleanup, uploadAiSparringAudio } from '../lib/debateRooms';
 import { publishArgument, unpublishArgument } from '../lib/argumentLibrary';
 import { getPlayerFromStats } from '../lib/userStats';
 import { speakWithBrowserFallback, streamPersonaSpeech } from '../lib/personaSpeech';
@@ -577,6 +578,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   });
   const [audioLoadingArgumentId, setAudioLoadingArgumentId] = useState<string | null>(null);
   const [aiSpeakingArgumentId, setAiSpeakingArgumentId] = useState<string | null>(null);
+  const [audioStorageNotice, setAudioStorageNotice] = useState<string | null>(null);
 
   const stopDebateAudio = useCallback(() => {
     debateSpeechControllerRef.current?.abort();
@@ -813,6 +815,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
         report,
         englishRephrases,
       });
+      void requestDebateAudioCleanup(true);
     } catch (e) {
       console.error(e);
       savedRecordIdRef.current = null;
@@ -925,15 +928,28 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     );
   }
 
-  const submitDebateAction = async (content: string, activeStep: DebateStep) => {
+  const submitDebateAction = async (content: string, activeStep: DebateStep, recording?: Blob) => {
     const userPosition: DebatePosition = battleState.userPosition ?? 'affirmative';
     const elapsedSeconds = stepElapsedSeconds;
     const recommendedDurationSeconds = getScaledStepDuration(activeStep, debateStepList, battleState.timeLimit);
+    const argumentId = createArgumentId();
+    let audioPath: string | undefined;
+    if (recording) {
+      setIsAiThinking(true);
+      setAudioStorageNotice(null);
+      try {
+        audioPath = await uploadAiSparringAudio(argumentId, recording);
+      } catch (error) {
+        console.warn('AI sparring audio storage failed; saving transcript only:', error);
+        setAudioStorageNotice('음성은 저장하지 못했지만 전사문과 토론 진행은 정상적으로 유지됩니다.');
+      }
+    }
     const newArg: Argument = {
-      id: createArgumentId(),
+      id: argumentId,
       playerId: battleState.playerA.id,
       isAi: false,
       content,
+      audioPath,
       timestamp: getTimestamp(),
       roundId: activeStep.roundId,
       roundTitle: activeStep.title,
@@ -1155,10 +1171,10 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     }
   };
 
-  const handleActionSubmit = async (content: string) => {
+  const handleActionSubmit = async (content: string, recording?: Blob) => {
     if (battleState.gameMode === 'debate' && activeDebateStep?.actor === 'user') {
       stopDebateAudio();
-      await submitDebateAction(content, activeDebateStep);
+      await submitDebateAction(content, activeDebateStep, recording);
       return;
     }
 
@@ -1343,7 +1359,12 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 isPaused={isPaused}
                 topic={battleState.topic}
                 onSubmit={handleActionSubmit}
+                persistRecording={battleState.gameMode === 'debate'}
               />
+            )}
+
+            {audioStorageNotice && (
+              <div className="speech-status error" role="status">{audioStorageNotice}</div>
             )}
 
             {showResultAnalysisButton && (

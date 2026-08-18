@@ -4,9 +4,9 @@ type CleanupCandidate = {
   path: string;
   argument_id: string;
   user_id: string;
-  room_id: string;
+  room_id: string | null;
   size_bytes: number;
-  reason: 'retention' | 'capacity';
+  reason: 'retention' | 'capacity' | 'limit';
 };
 
 const corsHeaders = {
@@ -64,7 +64,7 @@ Deno.serve(async request => {
 
   let deletedFiles = 0;
   let deletedBytes = 0;
-  const deletedByReason: Record<string, number> = { retention: 0, capacity: 0 };
+  const deletedByReason: Record<string, number> = { retention: 0, capacity: 0, limit: 0 };
 
   for (let batch = 0; batch < maxBatches; batch += 1) {
     const { data, error } = await admin.rpc('get_live_debate_audio_cleanup_candidates', {
@@ -80,7 +80,7 @@ Deno.serve(async request => {
     const candidates = (data ?? []) as CleanupCandidate[];
     if (candidates.length === 0) break;
 
-    for (const reason of ['retention', 'capacity'] as const) {
+    for (const reason of ['retention', 'capacity', 'limit'] as const) {
       const group = candidates.filter(candidate => candidate.reason === reason);
       if (group.length === 0) continue;
       const paths = group.map(candidate => candidate.path);

@@ -377,11 +377,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                       {selectedRecord.arguments.map((argument, index) => {
                         const savedRephrase = selectedRecord.englishRephrases?.find(item => item.argumentId === argument.id);
                         const stageLabel = getHistoryArgumentStage(selectedRecord, index);
+                        const isOwnArgument = !argument.isAi && (
+                          selectedRecord.gameMode !== 'pvp' || argument.playerId === user.id
+                        );
                         return (
                           <article key={argument.id} className={`history-report-transcript-entry ${argument.isAi ? 'ai' : 'user'}`}>
                             <header><div><strong>{argument.isAi ? 'AI 상대방' : `${user.nickname} · 내 발언`}</strong><em>{stageLabel}</em></div><span>{String(index + 1).padStart(2, '0')}</span></header>
                             <p>{argument.content}</p>
-                            {argument.audioPath && argument.playerId === user.id && (
+                            {argument.audioPath && isOwnArgument && (
                               <div className="history-audio-actions">
                                 <button
                                   type="button"
@@ -408,8 +411,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
                                 </button>
                               </div>
                             )}
-                            {!argument.audioPath && argument.audioDeletedAt && argument.playerId === user.id && (
-                              <small className="history-audio-expired">음성 보관기간이 만료되어 전사문만 제공됩니다.</small>
+                            {!argument.audioPath && argument.audioDeletedAt && isOwnArgument && (
+                              <small className="history-audio-expired">
+                                {argument.audioDeleteReason === 'limit'
+                                  ? '최근 음성 20개 보관 정책에 따라 전사문만 제공됩니다.'
+                                  : '음성 보관기간이 만료되어 전사문만 제공됩니다.'}
+                              </small>
                             )}
                             {!argument.isAi && savedRephrase && (
                               <section className="history-english-rephrase history-english-summary">

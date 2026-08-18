@@ -34,6 +34,8 @@ Gemini 프록시는 로그인 토큰과 Supabase 쿼터 RPC를 모두 검증합�
 
 오디오 자동 정리를 사용하려면 `supabase_live_debate_audio_retention_migration.sql`도 실행하고 `supabase functions deploy cleanup-live-debate-audio`로 Edge Function을 배포하세요. 업로드 클라이언트는 최대 15분 간격으로 정리를 요청합니다. 기본 정책은 700MB 예산, 80%에서 정리 시작, 65%까지 정리, 90일 보관, 사용자별 최근 20개 보호입니다. 95% 이상 비상 상황에서는 최근 3개를 제외한 오래된 종료 토론 녹음부터 정리합니다. 전사문과 평가는 삭제하지 않습니다.
 
+AI 스파링의 마이크 발언도 자동 저장하려면 그다음 `supabase_ai_sparring_audio_migration.sql`을 실행하고 `cleanup-live-debate-audio` Edge Function을 다시 배포하세요. 이 마이그레이션부터는 사람 간 음성 토론과 AI 스파링 녹음을 합산해 사용자별 최근 20개만 유지하며, 삭제된 음성의 전사문은 기록에 남습니다.
+
 Edge Function 정책값은 Supabase secrets로 조정할 수 있습니다.
 
 ```bash

@@ -20,8 +20,9 @@ interface ActionZoneProps {
   isAiSpeaking?: boolean;
   isPaused?: boolean;
   topic?: string;
-  onSubmit: (content: string) => void;
+  onSubmit: (content: string, recording?: Blob) => void;
   language?: 'ko' | 'en';
+  persistRecording?: boolean;
 }
 
 const MAX_RECORDING_SECONDS = 180;
@@ -81,7 +82,7 @@ const formatTimer = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, isAiSpeaking = false, isPaused = false, topic, onSubmit, language = 'ko' }) => {
+export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, isAiSpeaking = false, isPaused = false, topic, onSubmit, language = 'ko', persistRecording = false }) => {
   const isEnglish = language === 'en';
   const [content, setContent] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -231,7 +232,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
       contentRef.current = '';
       setContent('');
       setPendingRecording(null);
-      onSubmit(submittedContent);
+      onSubmit(submittedContent, recording);
     } catch (error) {
       if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : 'Gemini 음성 전사에 실패했습니다.';
@@ -333,7 +334,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
           setPendingRecording(null);
           setIsTranscribing(false);
           setIsLiveTranscription(false);
-          onSubmit(submittedContent);
+          onSubmit(submittedContent, recording);
           return;
         }
 
@@ -531,7 +532,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
                     ? isEnglish ? 'Sending the live transcript…' : '실시간 인식 결과를 바로 전송하고 있습니다...'
                     : isEnglish ? 'Transcribing and submitting your speech automatically…' : '발언을 변환한 뒤 자동으로 전송하고 있습니다...'
                   : isLiveTranscription
-                    ? isEnglish ? `Live transcription ${formatTimer(recordingSeconds)} · Your words appear as you speak.` : `실시간 음성 인식 중 ${formatTimer(recordingSeconds)} · 말하는 내용이 바로 표시됩니다.`
+                    ? isEnglish ? `Live transcription ${formatTimer(recordingSeconds)} · ${persistRecording ? 'Your recording and transcript will be saved automatically.' : 'Your words appear as you speak.'}` : `실시간 음성 인식 중 ${formatTimer(recordingSeconds)} · ${persistRecording ? '종료하면 음성과 전사문이 자동 저장됩니다.' : '말하는 내용이 바로 표시됩니다.'}`
                     : isEnglish ? `Speaking ${formatTimer(recordingSeconds)} · Finish to submit automatically. (3-minute maximum)` : `발언 중 ${formatTimer(recordingSeconds)} · 종료하면 자동 전송됩니다. (최대 3분)`)}
             </span>
             {speechError && pendingRecording && !isTranscribing && (
