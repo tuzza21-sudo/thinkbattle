@@ -4207,3 +4207,227 @@ button.live-room-alert {
   }
 }
 
+/* Public report: shares should read like the final report, without the modal chrome. */
+.shared-report-state {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.shared-report-page {
+  min-height: 100vh;
+  padding-bottom: 4.5rem;
+}
+
+.shared-report-sheet {
+  width: min(820px, 100%);
+  gap: 1rem;
+}
+
+.shared-report-hero {
+  padding: 2.4rem 1.5rem 2rem;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.shared-report-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.shared-report-ring {
+  margin: 0.35rem 0 0.1rem;
+}
+
+.shared-report-section {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.45rem;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 26px rgba(15, 23, 42, 0.035);
+}
+
+.shared-report-section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  color: var(--text-light);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.shared-report-highlights {
+  grid-template-columns: 1fr;
+}
+
+.shared-report-highlights .report-highlight-card {
+  min-height: 0;
+}
+
+.shared-score-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.shared-score-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1rem;
+  background: var(--bg-card);
+}
+
+.shared-score-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.58rem;
+}
+
+.shared-score-card-head strong {
+  min-width: 0;
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.shared-score-card-head span {
+  flex-shrink: 0;
+  font-family: var(--font-game);
+  font-size: 1.1rem;
+  font-weight: 900;
+}
+
+.shared-score-card-head small {
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.shared-score-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-color);
+}
+
+.shared-score-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.shared-score-card p {
+  margin: 0.7rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.shared-report-transcript-section > p {
+  margin: -0.2rem 0 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.shared-transcript-details {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.shared-transcript-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 0.87rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.shared-transcript-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.shared-transcript-details summary svg {
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.shared-transcript-details[open] summary {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.shared-transcript-details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.shared-transcript-details .report-transcript {
+  max-height: min(62vh, 620px);
+  margin: 0.8rem;
+}
+
+.shared-report-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 1rem 0;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 640px) {
+  .shared-report-page {
+    padding: 0.75rem 0.65rem 2.5rem;
+  }
+
+  .shared-report-hero {
+    border-radius: 16px;
+    padding: 1.75rem 1rem 1.45rem;
+  }
+
+  .shared-report-ring {
+    width: 94px;
+    height: 94px;
+  }
+
+  .shared-report-section {
+    border-radius: 16px;
+    padding: 1.05rem;
+  }
+
+  .shared-score-list {
+    grid-template-columns: 1fr;
+  }
+
+  .shared-report-section .report-coaching-card p {
+    grid-template-columns: 1fr;
+    gap: 0.12rem;
+  }
+
+  .shared-transcript-details .report-transcript {
+    margin: 0.55rem;
+    padding: 0.6rem;
+  }
+
+  .shared-transcript-details .report-transcript-entry {
+    padding: 0.8rem;
+  }
+}
+
