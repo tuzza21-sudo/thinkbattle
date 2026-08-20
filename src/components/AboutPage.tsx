@@ -244,6 +244,23 @@ export const AboutPage = () => {
             <button type="button" onClick={() => navigate('/simulation')}>페르소나 상황극</button>
           </div>
         </section>
+
+        <footer className="about-business-footer">
+          <div className="about-business-brand">
+            <img src="/brand/thinkfit-mark.svg" alt="" />
+            <div><strong>ThinkFit</strong><span>생각과 대응을 단련하는 AI 훈련소</span></div>
+          </div>
+          <div className="about-business-info">
+            <p><span>대표</span> 최석빈 <i /> <span>사업자등록번호</span> 218-14-16906</p>
+            <p><span>주소</span> 서울시 서초구 사임당로8길 13, 4층 402-331A호</p>
+            <p><span>문의</span> <a href="mailto:thinkfit99@gmail.com">thinkfit99@gmail.com</a></p>
+          </div>
+          <div className="about-business-links">
+            <button type="button" onClick={() => navigate('/terms')}>이용약관</button>
+            <button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button>
+            <span>© 2026 ThinkFit</span>
+          </div>
+        </footer>
       </main>
     </div>
   );
