@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpenCheck,
   Building2,
+  CircleAlert,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -13,6 +14,7 @@ import {
   MessageSquareText,
   Presentation,
   Scale,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +32,7 @@ type ProposalSlide = {
   outcomeTitle: string;
   outcomes: { title: string; description: string }[];
   note?: string;
+  comparison?: boolean;
 };
 
 const slides: ProposalSlide[] = [
@@ -164,6 +167,36 @@ const slides: ProposalSlide[] = [
   },
   {
     id: 6,
+    section: '도입 전 판단 · 강점과 한계',
+    title: '온라인 반복 훈련의 강점은 키우고\n현장 훈련의 역할은 남겨둡니다',
+    lead: 'ThinkFit은 오프라인 실전 교육을 대체하는 제품이 아닙니다. 토론을 자주 열고 같은 기준으로 관리하기 어려웠던 운영의 빈틈을 채우고, 비언어 표현과 현장 긴장감은 대면 훈련으로 완성하는 혼합형 훈련 도구입니다.',
+    icon: ShieldCheck,
+    leftTitle: 'ThinkFit이 확실히 개선하는 영역',
+    leftItems: [
+      '시간과 장소의 제약을 낮춰 필요한 순간에 토론을 쉽게 개설합니다.',
+      '반·강사·회차가 달라도 동일한 진행 구조와 평가 기준을 적용합니다.',
+      '회원, 반 배정, 참여 이력과 결과 보고서를 한곳에서 관리합니다.',
+      '개인·그룹별 반복 훈련 기회를 늘리고 변화 과정을 모니터링합니다.',
+    ],
+    rightTitle: '온라인만으로 대체하기 어려운 영역',
+    rightItems: [
+      '제스처, 시선 처리와 상대의 표정을 읽는 능력은 충분히 관찰하기 어렵습니다.',
+      '자세, 태도, 공간을 장악하는 현장 전달력은 대면 코칭이 필요합니다.',
+      '낯선 청중과 예측 불가능한 반응에서 오는 실전 긴장감을 완전히 재현할 수 없습니다.',
+      'AI 평가는 지도자의 맥락적 판단과 최종 평가를 대신하지 않습니다.',
+    ],
+    outcomeTitle: '가장 효과적인 보완 운영 방식',
+    outcomes: [
+      { title: '1. 사전 반복', description: 'ThinkFit에서 주장·근거·반론 구조를 충분히 연습합니다.' },
+      { title: '2. 대면 실전', description: '현장에서 제스처·시선·자세와 긴장 대응을 점검합니다.' },
+      { title: '3. 지도자 코칭', description: '기록과 현장 관찰을 함께 보고 최종 피드백을 제공합니다.' },
+      { title: '4. 재훈련', description: '확인된 약점을 다음 온라인 훈련 과제로 연결합니다.' },
+    ],
+    note: '기관이 얻는 핵심 가치는 대면 교육의 제거가 아니라, 귀한 대면 시간을 비언어 표현과 실전 코칭에 집중할 수 있도록 기본기 훈련과 기록 관리를 맡기는 것입니다.',
+    comparison: true,
+  },
+  {
+    id: 7,
     section: '도입 방식',
     title: '작게 시작하고\n기록으로 도입 효과를 확인합니다',
     lead: '처음부터 큰 운영 변화를 요구하지 않습니다. 한 그룹과 몇 개의 주제로 시작해 실제 참여와 결과 기록을 검토한 뒤 적용 범위를 결정할 수 있습니다.',
@@ -236,15 +269,19 @@ export const B2BMarketingV2Page = () => {
 
           <section className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             {[
-              { title: slide.leftTitle, items: slide.leftItems, icon: Gavel },
-              { title: slide.rightTitle, items: slide.rightItems, icon: BookOpenCheck },
+              { title: slide.leftTitle, items: slide.leftItems, icon: slide.comparison ? ShieldCheck : Gavel, tone: slide.comparison ? 'strength' : 'default' },
+              { title: slide.rightTitle, items: slide.rightItems, icon: slide.comparison ? CircleAlert : BookOpenCheck, tone: slide.comparison ? 'limitation' : 'default' },
             ].map(column => {
               const ColumnIcon = column.icon;
+              const ItemIcon = column.tone === 'limitation' ? CircleAlert : CheckCircle2;
+              const accent = column.tone === 'strength' ? '#22c55e' : column.tone === 'limitation' ? 'var(--accent-amber)' : 'var(--primary)';
+              const borderColor = column.tone === 'strength' ? 'rgba(34,197,94,.32)' : column.tone === 'limitation' ? 'rgba(217,119,6,.32)' : 'var(--border-color)';
+              const surface = column.tone === 'strength' ? 'rgba(34,197,94,.055)' : column.tone === 'limitation' ? 'rgba(217,119,6,.055)' : 'var(--bg-primary)';
               return (
-                <div key={column.title} style={{ padding: '1.25rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)' }}>
-                  <h2 className="flex items-center gap-2" style={{ margin: '0 0 .9rem', color: 'var(--text-light)', fontSize: '1rem' }}><ColumnIcon size={18} color="var(--primary)" /> {column.title}</h2>
+                <div key={column.title} style={{ padding: '1.25rem', border: `1px solid ${borderColor}`, borderTop: `3px solid ${accent}`, borderRadius: 'var(--radius-md)', background: surface }}>
+                  <h2 className="flex items-center gap-2" style={{ margin: '0 0 .9rem', color: 'var(--text-light)', fontSize: '1rem' }}><ColumnIcon size={18} color={accent} /> {column.title}</h2>
                   <ul style={{ display: 'grid', gap: '.7rem', margin: 0, padding: 0, listStyle: 'none' }}>
-                    {column.items.map(item => <li key={item} className="flex items-start gap-2" style={{ color: 'var(--text-main)', lineHeight: 1.55 }}><CheckCircle2 size={16} color="var(--primary)" style={{ flexShrink: 0, marginTop: 4 }} /> {item}</li>)}
+                    {column.items.map(item => <li key={item} className="flex items-start gap-2" style={{ color: 'var(--text-main)', lineHeight: 1.55 }}><ItemIcon size={16} color={accent} style={{ flexShrink: 0, marginTop: 4 }} /> {item}</li>)}
                   </ul>
                 </div>
               );
@@ -282,4 +319,3 @@ export const B2BMarketingV2Page = () => {
     </main>
   );
 };
-

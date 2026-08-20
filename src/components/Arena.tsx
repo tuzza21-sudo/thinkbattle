@@ -719,7 +719,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
 
   useEffect(() => {
     if (!config) {
-      navigate('/', { replace: true });
+      navigate('/debate', { replace: true });
     }
   }, [config, navigate]);
 
@@ -909,7 +909,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           initialRephrases={englishRephrases}
           onSaveRephrase={handleSaveEnglishRephrase}
           onBackToReport={() => setShowResultModal(true)}
-          onExit={() => navigate('/')}
+          onExit={() => navigate('/debate')}
         />
         {showResultModal && (
           <ResultModal
@@ -918,7 +918,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             playerA={battleState.playerA}
             playerB={battleState.playerB}
             debateArguments={battleState.arguments}
-            onClose={() => navigate('/')}
+            onClose={() => navigate('/debate')}
             onStartEnglishReplay={() => setShowResultModal(false)}
             onShareReport={handleShareReport}
             onSetArgumentPublic={user ? handleSetArgumentPublic : undefined}
@@ -1551,7 +1551,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
           playerA={battleState.playerA}
           playerB={battleState.playerB}
           debateArguments={battleState.arguments}
-          onClose={() => navigate('/')}
+          onClose={() => navigate('/debate')}
           onStartEnglishReplay={() => {
             setShowResultModal(false);
             setIsEnglishReplayMode(true);

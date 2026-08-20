@@ -135,7 +135,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
         </button>
         <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button className="btn btn-secondary" onClick={() => navigate('/institution/marketing')}>
-            <Presentation size={17} /> 기존 B2B 기관 소개
+            <Presentation size={17} /> 페르소나 훈련 도입 제안
           </button>
           <button
             className="btn btn-primary"
@@ -147,7 +147,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
               fontWeight: 800,
             }}
           >
-            <Presentation size={18} /> B2B 기관 소개 Ver.2
+            <Presentation size={18} /> 토론 훈련 도입 제안
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, ArrowLeft, ArrowRight, BriefcaseBusiness, Building2, Clock3, Handshake, Headphones, MessageCircle, Mic2, ShieldCheck, Sparkles, Star, UsersRound } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, BadgeDollarSign, BriefcaseBusiness, Building2, Clock3, FileUser, Handshake, MessageCircle, Mic2, PenLine, ShieldCheck, Sparkles, Star, UsersRound, WandSparkles } from 'lucide-react';
 import { getSimulationPersona, simulationCategories, simulationMissions } from '../data/simulations';
 import type { AppUser, SimulationCategoryId } from '../types';
 
@@ -13,7 +13,7 @@ const categoryIcons = {
   career: BriefcaseBusiness,
   negotiation: Handshake,
   workplace: Building2,
-  customer: Headphones,
+  sales: BadgeDollarSign,
 };
 
 const difficultyLabel = (difficulty: number) => ['기초', '실전', '고압'][difficulty - 1] ?? '실전';
@@ -35,13 +35,21 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
     navigate(`/simulation/${missionId}`);
   };
 
+  const openPersonalTraining = () => {
+    if (!user) {
+      onLoginRequest();
+      return;
+    }
+    navigate('/simulation/personalize');
+  };
+
   return (
     <div className="simulation-page">
       <header className="simulation-header">
         <button type="button" className="simulation-back" onClick={() => navigate('/')}>
           <ArrowLeft size={18} /> 메인으로
         </button>
-        <div className="simulation-brand"><span>ThinkFit</span> Stage 2</div>
+        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><span>ThinkFit</span> Stage 2</div>
         <div className="simulation-user">{user ? `${user.nickname}님` : '로그인 후 훈련 가능'}</div>
       </header>
 
@@ -74,6 +82,11 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
             <b>평가와 재도전까지</b>
           </div>
         </div>
+      </section>
+
+      <section className="simulation-personal-launch">
+        <div className="simulation-personal-launch-copy"><span><WandSparkles size={16} /> NEW · PERSONAL PRESSURE LAB</span><h2>내 이력과 실제 상황으로<br />새 훈련을 만드세요</h2><p>프로필 기반 맞춤 질문 또는 곧 마주칠 상황을 직접 입력하는 압박훈련을 생성할 수 있습니다.</p><button type="button" onClick={openPersonalTraining}>맞춤 훈련 만들기 <ArrowRight size={18} /></button></div>
+        <div className="simulation-personal-options"><article><FileUser size={22} /><div><strong>프로필 기반 생성</strong><span>이력서·경력·전공·활동에서 검증 질문 생성</span></div></article><article><PenLine size={22} /><div><strong>상황 직접 입력</strong><span>면접·회의·협상·영업 상황을 바로 압박훈련으로</span></div></article></div>
       </section>
 
       <section className="simulation-category-section">
@@ -123,8 +136,8 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
                 <h3>{mission.title}</h3>
                 <p>{mission.summary}</p>
                 <div className="simulation-persona-chip">
-                  <div className={`simulation-mini-avatar persona-${persona.id}`}><span>{persona.name.slice(0, 1)}</span><i /></div>
-                  <span><small>상대 페르소나</small><strong>{persona.name}</strong></span>
+                  <div className={`simulation-mini-avatar persona-${persona.id}`}><img src={persona.imageUrl} alt={`${persona.name}, ${persona.gender} ${persona.age}세`} loading="lazy" /><i /></div>
+                  <span><small>{persona.gender} · {persona.age}세 · {persona.identity}</small><strong>{persona.name} · {persona.role}</strong></span>
                   <UsersRound size={17} />
                 </div>
                 <div className="simulation-mission-objective">

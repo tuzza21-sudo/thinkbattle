@@ -28,8 +28,15 @@ export type DebateTeamSize = 1 | 2 | 3;
 export type DebateLevel = 'beginner' | 'intermediate' | 'advanced';
 export type AppLanguage = 'ko' | 'en';
 export type DebateFocus = 'fact' | 'policy' | 'value';
-export type SimulationCategoryId = 'career' | 'negotiation' | 'workplace' | 'customer';
-export type SimulationPersonaId = 'pressure_interviewer' | 'aggressive_negotiator' | 'authoritarian_manager' | 'difficult_customer';
+export type SimulationCategoryId = 'career' | 'negotiation' | 'workplace' | 'sales';
+export type SimulationPersonaId =
+  | 'pressure_interviewer'
+  | 'aggressive_negotiator'
+  | 'authoritarian_manager'
+  | 'construction_client'
+  | 'b2b_operations_executive'
+  | 'insurance_customer'
+  | 'sales_decision_maker';
 export type SimulationDifficulty = 1 | 2 | 3;
 export type DebateRoundId =
   | 'opening'
@@ -337,7 +344,19 @@ export type SimulationPersona = {
   id: SimulationPersonaId;
   name: string;
   role: string;
+  imageUrl: string;
+  gender: '여성' | '남성';
+  age: number;
+  identity: string;
+  tagline: string;
   description: string;
+  background: string;
+  personalityTraits: string[];
+  speakingPattern: string;
+  decisionCriteria: string[];
+  dislikes: string[];
+  concessionCondition: string;
+  hiddenMotivation: string;
   voiceName: string;
   voiceStyle: string;
   behaviorRules: string[];
@@ -368,6 +387,34 @@ export type SimulationTurn = {
   timestamp: string;
   pressureLevel?: number;
   tactic?: string;
+};
+
+export type TrainingProfileType = 'student' | 'job_seeker' | 'professional' | 'sales';
+
+export type TrainingProfile = {
+  userId: string;
+  profileType: TrainingProfileType;
+  targetRole: string;
+  targetIndustry: string;
+  major: string;
+  education: string;
+  careerSummary: string;
+  experiences: string;
+  activities: string;
+  strengths: string;
+  improvementAreas: string;
+  sourceText: string;
+  updatedAt?: string;
+};
+
+export type PersonalSimulationSource = 'profile' | 'custom';
+
+export type StoredSimulationMission = {
+  id: string;
+  userId: string;
+  source: PersonalSimulationSource;
+  mission: SimulationMission;
+  createdAt: string;
 };
 
 export type SimulationMetric = {

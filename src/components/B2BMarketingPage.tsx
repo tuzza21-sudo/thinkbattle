@@ -3,470 +3,261 @@ import {
   ArrowLeft,
   Bot,
   BrainCircuit,
+  BriefcaseBusiness,
   Building2,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Database,
+  ClipboardCheck,
+  FileUser,
+  GraduationCap,
   LineChart,
+  MessageSquareMore,
   Presentation,
   Sparkles,
   Target,
   Users,
-  Zap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-interface SlideData {
+type ProposalSlide = {
   id: number;
-  badge: string;
-  tagline: string;
+  section: string;
   title: string;
-  subtitle: string;
+  lead: string;
   icon: React.ElementType;
+  signals: { label: string; value: string; description: string }[];
   highlights: string[];
-  metrics: { label: string; value: string; desc: string }[];
-  features: { title: string; desc: string; detail: string }[];
-}
+  points: { title: string; eyebrow: string; description: string; icon: React.ElementType }[];
+  note?: string;
+};
 
-const slides: SlideData[] = [
+const slides: ProposalSlide[] = [
   {
     id: 1,
-    badge: 'SLIDE 01 / 06',
-    tagline: 'AI DEBATE AUTOMATION',
-    title: 'AI 토론 진행 및 운영 자동화',
-    subtitle: '사회자와 심사자 없이도 24시간 완벽하고 체계적인 토론 세션 가동',
-    icon: Bot,
+    section: 'WHY NOW · 교육의 마지막 1마일',
+    title: '교육은 했지만\n실전 질문 앞에서 답이 멈춥니다',
+    lead: '자기소개서 첨삭과 강의만으로는 꼬리질문을 듣고, 생각을 정리하고, 자신의 경험으로 설득하는 힘까지 만들기 어렵습니다.',
+    icon: Target,
+    signals: [
+      { label: '실제 대화 기회', value: '부족', description: '말해 보는 훈련의 병목' },
+      { label: '지도자 시간', value: '한정', description: '모든 학습자와 반복 실습 불가' },
+      { label: '개인별 반복', value: '어려움', description: '한 번의 모의면접으로 종료' },
+    ],
     highlights: [
-      '별도 진행 인력 0명으로 운영 비용 혁신적 절감',
-      '시간 관리, 입론·반론, 쟁점 정리, 종합 요약 자동 수행',
-      '온·오프라인 블렌디드 환경에서 표준화된 세션 유지',
+      '학습자마다 이력과 약점이 달라 같은 질문만으로는 부족합니다.',
+      '말의 모순과 추상성은 실제로 답해 볼 때 드러납니다.',
+      '기존 1:1 모의훈련만으로는 충분한 반복 횟수를 만들기 어렵습니다.',
     ],
-    metrics: [
-      { label: '진행 인력 절감', value: '100%', desc: '사회자 없이 AI가 자동 진행' },
-      { label: '세션 일관성', value: '99.9%', desc: '표준화된 시간 및 규칙 준수' },
-      { label: '운영 준비 시간', value: '-85%', desc: '논제 설정만으로 즉시 시작' },
-    ],
-    features: [
-      {
-        title: '실시간 타임키핑 & 스텝 조율',
-        desc: '발언 시간 제한 및 순서 제어',
-        detail: '입론, 반론, 교차조사, 재반론, 최종발언 단계별 시간을 AI가 초 단위로 정확히 조율합니다.',
-      },
-      {
-        title: '핵심 쟁점 실시간 캡처',
-        desc: '대화 흐름 속 주요 대립점 추출',
-        detail: '토론 중간중간 맴도는 이슈를 자동 감지해 쟁점을 명확히 짚어주어 삼천포 빠짐을 방지합니다.',
-      },
-      {
-        title: '세션 자동 요약 리포트',
-        desc: '종료 직후 즉시 제공되는 요약본',
-        detail: '토론이 끝나는 즉시 찬반 핵심 논거와 쟁점 종합 리포트를 자동 발행합니다.',
-      },
+    points: [
+      { title: '아는 것과 말하는 것의 차이', eyebrow: 'KNOWING ≠ DOING', description: '준비한 내용을 예측하지 못한 질문에 맞춰 꺼내는 훈련이 필요합니다.', icon: BrainCircuit },
+      { title: '압박 속에서 무너지는 구조', eyebrow: 'REAL PRESSURE', description: '꼬리질문이 이어지면 근거와 행동이 빠지고 답변이 추상적으로 변합니다.', icon: MessageSquareMore },
+      { title: '기관이 채우기 어려운 공백', eyebrow: 'PRACTICE GAP', description: '지도자 수를 늘리지 않고도 실전 대화 횟수를 확대할 방법이 필요합니다.', icon: Building2 },
     ],
   },
   {
     id: 2,
-    badge: 'SLIDE 02 / 06',
-    tagline: 'AUTOMATIC ARCHIVING',
-    title: '모든 발언 자동 기록 & 토론 아카이브',
-    subtitle: '휘발되던 토론 발언을 데이터화하여 기관의 영구적인 자산으로 축적',
-    icon: Database,
+    section: 'SOLUTION · 반응하는 AI 페르소나',
+    title: '답변을 외우는 대신\n상대의 반응에 대응합니다',
+    lead: 'ThinkFit의 AI 페르소나는 정해진 질문만 읽지 않습니다. 학습자의 답변을 듣고 모호한 지점, 모순, 빠진 근거를 찾아 다음 질문을 이어갑니다.',
+    icon: Bot,
+    signals: [
+      { label: '상대 반응', value: '실시간', description: '답변에 따라 질문 변화' },
+      { label: '압박 강도', value: '3단계', description: '학습 수준에 맞춰 선택' },
+      { label: '훈련 방식', value: '음성·텍스트', description: '환경에 맞게 연습' },
+    ],
     highlights: [
-      '발언자별·주제별·회차별 모든 논증 데이터 100% 자동 저장',
-      '반복되는 논리적 약점 파악 및 개인 포트폴리오 활용',
-      '신규 회원을 위한 동아리/기관 전용 토론 사례집 자동 구축',
+      '면접관·상사·고객의 성격과 의사결정 기준이 대화 내내 유지됩니다.',
+      '사용자의 실제 답변을 인용하며 구체적인 꼬리질문을 던집니다.',
+      '실패해도 부담 없이 다시 시도하며 더 나은 대응을 만들 수 있습니다.',
     ],
-    metrics: [
-      { label: '발언 기록률', value: '100%', desc: '음성/텍스트 전 발언 텍스트화' },
-      { label: '학습 복기 효과', value: '3.4x', desc: '자신의 논리 약점 재확인' },
-      { label: '자산화 속도', value: '즉시', desc: '종료 즉시DB에 자동 분류 보관' },
-    ],
-    features: [
-      {
-        title: '3차원 검색 가능한 DB',
-        desc: '회차, 주제, 참가자 기반 필터링',
-        detail: '과거 진행된 토론 데이터를 날짜, 키워드, 학생 닉네임으로 1초만에 조회할 수 있습니다.',
-      },
-      {
-        title: '성장 포트폴리오 생성',
-        desc: '활동 증빙 및 대회 제출용',
-        detail: '참여했던 입론서, 반론 기록, 종합 평가서가 모여 개인 및 기관용 포트폴리오가 됩니다.',
-      },
-      {
-        title: '우수 사례 교육자료화',
-        desc: '신입 회원 멘토링 템플릿',
-        detail: '높은 점수를 받은 모범 토론을 템플릿으로 저장해 신규 회원의 교육 가이드로 사용합니다.',
-      },
+    points: [
+      { title: '살아 있는 캐릭터', eyebrow: 'CONSISTENT PERSONA', description: '성격, 말투, 관심사와 양보 조건이 다른 상대를 경험합니다.', icon: Users },
+      { title: '답변 기반 꼬리질문', eyebrow: 'ADAPTIVE DIALOGUE', description: '직전 답변과 대화 맥락을 반영해 다음 압박이 달라집니다.', icon: MessageSquareMore },
+      { title: '안전한 반복 실전', eyebrow: 'RETRY WITHOUT RISK', description: '실수의 비용 없이 같은 상황을 여러 방식으로 다시 풀어 봅니다.', icon: ClipboardCheck },
     ],
   },
   {
     id: 3,
-    badge: 'SLIDE 03 / 06',
-    tagline: 'AI DIAGNOSTICS & FEEDBACK',
-    title: '개인별 논증력 분석 & 맞춤 피드백',
-    subtitle: '승패를 넘어 주장의 명확성, 근거 적절성, 논리적 오류를 다각도 정밀 진단',
-    icon: LineChart,
+    section: 'PERSONALIZATION · 내 경험에서 시작',
+    title: '이력서 한 장이\n개인 맞춤 훈련 시나리오가 됩니다',
+    lead: '취업 준비생의 이력서·전공·프로젝트·특별활동, 경력자의 경력기술서를 바탕으로 각자 검증받아야 할 지점을 질문으로 바꿉니다.',
+    icon: FileUser,
+    signals: [
+      { label: '입력 자료', value: '이력·활동', description: '학생과 경력자 모두 지원' },
+      { label: '질문 구성', value: '개인 맞춤', description: '내 경험에서 검증 지점 추출' },
+      { label: '예정된 상황', value: '직접 입력', description: '곧 있을 면접·회의 준비' },
+    ],
     highlights: [
-      '명확성·근거력·논리성·반론대응·질문정확도 5대 루브릭 정밀 분석',
-      '막연한 칭찬 대신 발언 문장에 근거한 즉각적 교정 가이드',
-      '초보자부터 대회 준비반까지 단계별 성장 궤적 추적',
+      'AI가 입력 자료를 항목별로 정리하고 사용자가 저장 전에 확인합니다.',
+      '성과, 역할, 실패 경험처럼 개인마다 다른 약점을 집중 검증합니다.',
+      '지원 기업 면접이나 예정된 회의 상황을 직접 입력해 즉시 연습합니다.',
     ],
-    metrics: [
-      { label: '평가 루브릭 항목', value: '5대 축', desc: '주장·근거·논리·반론·오류' },
-      { label: '피드백 정밀도', value: '문장단위', desc: '실제 발언 텍스트 인용 진단' },
-      { label: '실력 향상 속도', value: '+42%', desc: '약점 교정 피드백 반복 적용' },
-    ],
-    features: [
-      {
-        title: '논리적 오류 자동 탐지',
-        desc: '성급한 일반화, 흑백논리 차단',
-        detail: '발언 중 발생한 논리적 비약이나 허수아비 공격 등의 오류를 AI가 즉시 감지하여 지적합니다.',
-      },
-      {
-        title: '방어 & 반론 대응력 평가',
-        desc: '상대 공격에 대한 정곡 응수 분석',
-        detail: '상대방의 핵심 반론을 회피했는지, 정확한 논거로 받아쳤는지 대응 성공률을 측정합니다.',
-      },
-      {
-        title: '개인 맞춤 훈련 과제 제안',
-        desc: '다음 토론을 위한 처방전',
-        detail: '"근거의 구체성을 보완하세요" 등 개인별 다음 목표 스킬을 AI가 자동 부여합니다.',
-      },
+    points: [
+      { title: '학생 맞춤 질문', eyebrow: 'STUDENT PROFILE', description: '전공 프로젝트, 동아리, 공모전과 활동 경험을 구체화합니다.', icon: GraduationCap },
+      { title: '경력 맞춤 질문', eyebrow: 'CAREER PROFILE', description: '직무 성과, 의사결정과 본인의 기여도를 깊게 검증합니다.', icon: BriefcaseBusiness },
+      { title: '나만의 상황 만들기', eyebrow: 'BUILD YOUR OWN', description: '나의 역할과 상대, 목표와 제약을 입력해 훈련을 설계합니다.', icon: Sparkles },
     ],
   },
   {
     id: 4,
-    badge: 'SLIDE 04 / 06',
-    tagline: 'PARTICIPATION & GROUP MANAGEMENT',
-    title: '구성원 참여도 & 활동 관리 데이터',
-    subtitle: '특정 회원 독점이나 소외 없이 모두가 균등하게 성장하는 데이터 기반 관리',
-    icon: Users,
+    section: 'SCENARIOS · 취업부터 현업까지',
+    title: '합격을 위한 면접에서\n입사 후 필요한 대화까지 훈련합니다',
+    lead: '취업지원 프로그램과 직업훈련 과정이 면접 합격에서 끝나지 않고, 실제 조직에서 요구되는 협상·조율·설득 역량까지 이어집니다.',
+    icon: BriefcaseBusiness,
+    signals: [
+      { label: '훈련 범위', value: '4개 영역', description: '면접·협상·직장·세일즈' },
+      { label: '상대 역할', value: '실무형', description: '면접관·상사·고객' },
+      { label: '핵심 행동', value: '설명·조율', description: '질문·반론·설득 대응' },
+    ],
     highlights: [
-      '발언 횟수, 발언 시간, 질문/반론 참여 비율 실시간 대시보드',
-      '소극적 회원 대상 참여 유도 및 편중 현상 객관적 개선',
-      '출석, 종합 점수, 우수 회원 선발 및 인수인계 데이터 제공',
+      '압박 면접, 공백기, 실패 경험과 답변 모순을 집중적으로 검증합니다.',
+      '연봉 협상, 불가능한 마감, 책임 전가처럼 신입이 어려워하는 장면을 다룹니다.',
+      'B2B 피치, 대형 수주, 보험 상담처럼 고객을 설득하는 직무도 훈련합니다.',
     ],
-    metrics: [
-      { label: '참여 편중 개선', value: '-78%', desc: '특정인 독점 현상 방지' },
-      { label: '소극 회원 발언율', value: '+2.5배', desc: 'AI가 균등한 발언권 부여' },
-      { label: '관리공수 절감', value: '-90%', desc: '대시보드로 한눈에 현황 확인' },
-    ],
-    features: [
-      {
-        title: '실시간 참여 지표 대시보드',
-        desc: '발언량/시간 분포 시각화',
-        detail: '반별·그룹별 회원들의 발언 기여도와 시간을 그래프로 한눈에 파악할 수 있습니다.',
-      },
-      {
-        title: '발언 균형 AI 가이드',
-        desc: '소외 회원 발언 기회 배정',
-        detail: 'AI 사회자가 발언량이 적은 회원에게 우선적으로 의견을 물어 100% 참여를 유도합니다.',
-      },
-      {
-        title: '기관/동아리 활동 성과표',
-        desc: '운영진 인수인계 및 시상 자료',
-        detail: '월별/학기별 누적 데이터로 우수 활동자를 자동 선정하고 운영진 이관 자료를 출력합니다.',
-      },
+    points: [
+      { title: '취업·면접', eyebrow: 'GET THE JOB', description: '경험을 행동과 결과 중심으로 설명하고 꼬리질문을 견딥니다.', icon: GraduationCap },
+      { title: '협상·직장 대화', eyebrow: 'WORK WITH OTHERS', description: '관계를 해치지 않으면서 기준과 대안을 분명하게 제시합니다.', icon: Users },
+      { title: '세일즈·수주', eyebrow: 'WIN THE DEAL', description: '기능 나열을 넘어 고객의 우려와 결정 기준에 대응합니다.', icon: LineChart },
     ],
   },
   {
     id: 5,
-    badge: 'SLIDE 05 / 06',
-    tagline: 'AI TOPIC GENERATION & MANAGEMENT',
-    title: '시의성 높은 맞춤형 토론 주제 생성',
-    subtitle: '최신 사회 이슈부터 기관 특화 배경지식까지 AI가 완성형 논제 세트 구축',
-    icon: BrainCircuit,
+    section: 'OUTCOME · 훈련이 피드백으로 연결',
+    title: '지도자는 반복 질문보다\n관찰과 코칭에 집중할 수 있습니다',
+    lead: '학습자가 먼저 충분히 말해 보고 결과 보고서를 가져오면, 상담과 수업 시간은 답변 초안 작성이 아니라 가장 중요한 약점을 고치는 데 사용할 수 있습니다.',
+    icon: LineChart,
+    signals: [
+      { label: '결과 확인', value: '종료 즉시', description: '훈련 직후 보고서 제공' },
+      { label: '피드백', value: '항목별', description: '근거와 대응 행동 중심' },
+      { label: '다음 행동', value: '재도전', description: '같은 상황을 다시 훈련' },
+    ],
     highlights: [
-      '시사·경제·기술·문화 등 최신 트렌드 반영 주제 즉시 생성',
-      '기관 고유의 수업 맥락과 학습 목표를 반영한 가이드라인 맞춤화',
-      '초급·중급·고급 등 구성원 수준에 맞춘 난이도 자동 세팅',
+      '대응 결과와 강점·보완점, 상대가 사용한 압박 전술을 확인합니다.',
+      '다시 도전할 한 가지 행동을 제시해 피드백을 다음 훈련으로 연결합니다.',
+      '지도자는 보고서와 대면 관찰을 함께 활용해 더 구체적으로 코칭합니다.',
     ],
-    metrics: [
-      { label: '주제 출제 시간', value: '10초', desc: '키워드 입력 시 전체 셋 완성' },
-      { label: '배경지식 완성도', value: '100%', desc: '사례·쟁점·기사·질문 패키지' },
-      { label: '수준별 맞춤', value: '3단계', desc: '초급/중급/고급 자동 가공' },
-    ],
-    features: [
-      {
-        title: '기관 맥락 반영 AI 주제 엔진',
-        desc: '수업 배경 입력 시 100% 맞춤화',
-        detail: '관리자가 "중학생 대상 스마트폰 규제" 등 한 줄만 입력해도 완벽한 논제 세트가 완성됩니다.',
-      },
-      {
-        title: '찬반 대립 구조 자동 설계',
-        desc: '팽팽한 50:50 대립점 확보',
-        detail: '어느 한쪽으로 기울지 않는 정밀한 찬성/반대 논점 및 핵심 이슈 3가지씩을 자동 생성합니다.',
-      },
-      {
-        title: '최신 시사 이슈 연동',
-        desc: '트렌디한 사회적 논제 공급',
-        detail: 'AI 및 ESG, 정책 이슈 등 가장 핫한 사회적 안건을 주기적으로 토론 주제로 제공합니다.',
-      },
+    points: [
+      { title: '학습자', eyebrow: 'MORE PRACTICE', description: '상담 전에도 스스로 반복하고 달라진 답변을 확인합니다.', icon: GraduationCap },
+      { title: '지도자', eyebrow: 'BETTER COACHING', description: '실제 대화에서 드러난 취약점을 중심으로 시간을 사용합니다.', icon: Users },
+      { title: '기관', eyebrow: 'SCALABLE PROGRAM', description: '기존 프로그램에 반복 실습 단계를 더해 교육의 밀도를 높입니다.', icon: Building2 },
     ],
   },
   {
     id: 6,
-    badge: 'SLIDE 06 / 06',
-    tagline: 'PRE-RESEARCH & ISSUE ANALYSIS',
-    title: '사전 리서치 & 쟁점 구조화 지원',
-    subtitle: '감정적 주장을 넘어 팩트와 논리에 기반한 입론서 작성을 돕는 리서치 패키지',
-    icon: Target,
+    section: 'ADOPTION · 작게 검증하는 도입',
+    title: '한 개 과정에서 시작하고\n대면 코칭으로 완성하십시오',
+    lead: 'ThinkFit은 지도자를 대체하지 않습니다. 온라인에서는 말의 구조와 대응을 반복하고, 대면에서는 시선·제스처·자세와 현장 긴장감을 코칭할 때 가장 효과적입니다.',
+    icon: Building2,
+    signals: [
+      { label: '시작 범위', value: '1개 과정', description: '작은 파일럿부터 검증' },
+      { label: '운영 방식', value: '혼합형', description: '온라인 반복 + 대면 코칭' },
+      { label: '확대 판단', value: '결과 확인', description: '보고서와 현장 반응 검토' },
+    ],
     highlights: [
-      '토론 전 필수 확인 배경지식 및 최근 핵심 사례 3선 제공',
-      '연관 뉴스와 검증된 팩트 기반의 검색 링크 자동 연결',
-      '토론 전 생각할 질문으로 깊이 있는 입론서 작성 역량 강화',
+      '취업반 또는 직무 과정 하나에서 핵심 상황을 선정해 시작합니다.',
+      '사전 AI 훈련 후 지도자가 결과 보고서와 실제 수행을 함께 코칭합니다.',
+      '학습자 결과 보고서와 지도자의 현장 관찰을 확인한 뒤 적용 범위를 결정합니다.',
     ],
-    metrics: [
-      { label: '자료 조사 시간', value: '-70%', desc: '구조화된 핵심 정보 사전 제공' },
-      { label: '논거 구체성', value: '2.8배', desc: '실제 사례 기반 논증 구축' },
-      { label: '입론서 완성도', value: 'UP', desc: '사전 준비 질문으로 차원 제고' },
+    points: [
+      { title: '1. 과정 설계', eyebrow: 'SELECT', description: '대상 학습자와 반드시 연습할 상황을 정합니다.', icon: Target },
+      { title: '2. 혼합 훈련', eyebrow: 'PRACTICE', description: 'AI 반복 훈련과 지도자의 대면 피드백을 연결합니다.', icon: Bot },
+      { title: '3. 효과 검토', eyebrow: 'VALIDATE', description: '결과 보고서와 현장 반응을 보고 확대 여부를 판단합니다.', icon: ClipboardCheck },
     ],
-    features: [
-      {
-        title: '구조화된 배경 브리핑',
-        desc: '2~4문장 핵심 배경 요약',
-        detail: '복잡한 사회적 맥락을 학생들이 1분 만에 이해할 수 있도록 명쾌하게 요약해 제공합니다.',
-      },
-      {
-        title: '연관 뉴스 & 키워드 링크',
-        desc: '네이버 뉴스 검색 자동 결합',
-        detail: '주제와 관련된 최신 기사 검색 키워드 및 링크를 제공하여 팩트 기반 토론을 보장합니다.',
-      },
-      {
-        title: '토론전 생각거리 질문 3선',
-        desc: '메타인지 자극 사전 퀴즈',
-        detail: '토론장에 들어서기 전 자신의 논리를 다듬을 수 있는 핵심 리플렉션 질문을 던집니다.',
-      },
-    ],
+    note: '제스처·시선·자세·태도와 실제 현장의 긴장감은 온라인만으로 충분히 평가하기 어렵습니다. ThinkFit은 이 한계를 숨기지 않고, 귀한 대면 시간을 고차원 코칭에 집중하도록 기본기 반복을 맡습니다.',
   },
 ];
 
 export const B2BMarketingPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
-
   const slide = slides[currentSlide];
-  const IconComponent = slide.icon;
+  const SlideIcon = slide.icon;
 
-  const nextSlide = () => setCurrentSlide(prev => (prev + 1) % slides.length);
-  const prevSlide = () => setCurrentSlide(prev => (prev - 1 + slides.length) % slides.length);
+  const nextSlide = () => setCurrentSlide(index => (index + 1) % slides.length);
+  const previousSlide = () => setCurrentSlide(index => (index - 1 + slides.length) % slides.length);
 
   return (
     <main className="app-container page-scroll" style={{ maxWidth: 1200, padding: '1.5rem 1.25rem 4rem' }}>
-      {/* Top Bar */}
-      <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
-        <button className="btn btn-secondary" onClick={() => navigate('/institution')} style={{ gap: '0.5rem' }}>
+      <nav className="flex justify-between items-center" style={{ gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <button className="btn btn-secondary" onClick={() => navigate('/institution')}>
           <ArrowLeft size={16} /> 기관 페이지로 돌아가기
         </button>
-        <div className="flex items-center gap-2">
-          <span className="badge" style={{ background: 'var(--primary)', color: '#fff', border: 'none', fontWeight: 800 }}>
-            THINKFIT B2B
-          </span>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>기관/학교/동아리 도입 안내 자료</span>
+        <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+          <span className="badge" style={{ color: '#fff', background: 'var(--primary)', border: 0, fontWeight: 800 }}>THINKFIT B2B</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '.88rem' }}>대학 취업센터·직업훈련기관 도입 제안</span>
         </div>
-      </div>
+      </nav>
 
-      {/* PPT Slide Outer Container */}
-      <div style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-md)',
-        boxShadow: '0 20px 50px -15px rgba(0,0,0,0.3)',
-        overflow: 'hidden',
-        position: 'relative',
-        minHeight: '680px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {/* Slide Header Header Bar */}
-        <div style={{
-          padding: '1.25rem 2rem',
-          background: 'linear-gradient(90deg, rgba(37,99,235,0.12) 0%, rgba(15,23,42,0.4) 100%)',
-          borderBottom: '1px solid var(--border-color)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
+      <article style={{ minHeight: 680, display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', background: 'var(--bg-card)', boxShadow: '0 24px 60px -24px rgba(0,0,0,.48)' }}>
+        <header className="flex justify-between items-center" style={{ gap: '1rem', padding: '1.1rem 1.6rem', borderBottom: '1px solid var(--border-color)', background: 'linear-gradient(90deg, rgba(37,99,235,.12), rgba(15,23,42,.45))', flexWrap: 'wrap' }}>
           <div className="flex items-center gap-3">
-            <div style={{
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              background: 'var(--primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 900,
-            }}>
-              <Presentation size={18} />
-            </div>
+            <span style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: 'var(--primary)', borderRadius: 9 }}><Presentation size={19} /></span>
             <div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 800, letterSpacing: '0.08em' }}>
-                {slide.tagline}
-              </span>
-              <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)' }}>
-                ThinkFit B2B 기관 솔루션 프리젠테이션
-              </h4>
+              <small style={{ display: 'block', color: 'var(--primary)', fontWeight: 850, letterSpacing: '.07em' }}>{slide.section}</small>
+              <strong style={{ color: 'var(--text-light)' }}>AI 페르소나 실전훈련 도입 제안</strong>
             </div>
           </div>
-          <div className="badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>
-            {slide.badge}
-          </div>
-        </div>
+          <span style={{ color: 'var(--text-muted)', fontSize: '.84rem', fontWeight: 750 }}>{String(currentSlide + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}</span>
+        </header>
 
-        {/* Slide Main Body */}
-        <div style={{ padding: '2.5rem 2.5rem 2rem', flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1.45rem', padding: '2rem clamp(1.2rem, 4vw, 2.8rem)' }}>
+          <section className="flex justify-between items-start" style={{ gap: '2rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 590px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.45rem', padding: '.38rem .72rem', color: 'var(--primary)', background: 'rgba(37,99,235,.1)', borderRadius: 999, fontSize: '.8rem', fontWeight: 850 }}><SlideIcon size={16} /> KEY VALUE {String(slide.id).padStart(2, '0')}</span>
+              <h1 style={{ margin: '.65rem 0 .65rem', color: 'var(--text-light)', fontSize: 'clamp(1.85rem, 4vw, 2.55rem)', lineHeight: 1.2, letterSpacing: '-.035em', whiteSpace: 'pre-line' }}>{slide.title}</h1>
+              <p style={{ maxWidth: 800, margin: 0, color: 'var(--text-main)', fontSize: '1rem', lineHeight: 1.7 }}>{slide.lead}</p>
+            </div>
+            <div style={{ width: 82, height: 82, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', background: 'rgba(37,99,235,.09)', border: '1px solid rgba(37,99,235,.2)', borderRadius: 22 }}><SlideIcon size={37} /></div>
+          </section>
 
-          {/* Title Area */}
-          <div className="flex justify-between items-start" style={{ gap: '2rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '300px' }}>
-              <div className="flex items-center gap-3 mb-2">
-                <div style={{
-                  padding: '0.4rem 0.8rem',
-                  borderRadius: 6,
-                  background: 'rgba(37,99,235,0.15)',
-                  color: 'var(--primary)',
-                  fontSize: '0.85rem',
-                  fontWeight: 800,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.4rem',
-                }}>
-                  <IconComponent size={16} /> Key Value 0{slide.id}
-                </div>
+          <section className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            {slide.signals.map(signal => (
+              <div key={signal.label} style={{ padding: '.85rem 1rem', textAlign: 'center', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                <small style={{ display: 'block', color: 'var(--text-muted)', fontWeight: 700 }}>{signal.label}</small>
+                <strong style={{ display: 'block', margin: '.12rem 0', color: 'var(--primary)', fontSize: '1.35rem' }}>{signal.value}</strong>
+                <span style={{ color: 'var(--text-muted)', fontSize: '.74rem' }}>{signal.description}</span>
               </div>
-              <h1 style={{ fontSize: '2.1rem', margin: '0.4rem 0 0.6rem', color: 'var(--text-light)', lineHeight: 1.25, fontWeight: 900 }}>
-                {slide.title}
-              </h1>
-              <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-                {slide.subtitle}
-              </p>
-            </div>
-
-            {/* Metrics Showcase */}
-            <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>
-              {slide.metrics.map(m => (
-                <div key={m.label} style={{
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '0.9rem 1.2rem',
-                  minWidth: 125,
-                  textAlign: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', fontWeight: 600 }}>{m.label}</span>
-                  <strong style={{ fontSize: '1.6rem', color: 'var(--primary)', fontWeight: 900, display: 'block', margin: '0.1rem 0' }}>{m.value}</strong>
-                  <small style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', whiteSpace: 'nowrap' }}>{m.desc}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Core Highlights Box */}
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(217,119,6,0.04) 100%)',
-            border: '1px solid rgba(37,99,235,0.2)',
-            borderRadius: 'var(--radius-md)',
-            padding: '1.25rem 1.5rem',
-          }}>
-            <h5 style={{ margin: '0 0 0.8rem', fontSize: '0.9rem', color: 'var(--accent-amber)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={16} /> 핵심 기대 효과 & 혁신 포인트
-            </h5>
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-              {slide.highlights.map(item => (
-                <div key={item} className="flex items-start gap-2.5" style={{ fontSize: '0.95rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
-                  <CheckCircle2 size={18} color="var(--primary)" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 3 Detailed Features Cards Grid */}
-          <div>
-            <h5 style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.05em' }}>
-              SYSTEM SPECIFICATIONS & FEATURES
-            </h5>
-            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-              {slide.features.map(f => (
-                <div key={f.title} className="card" style={{
-                  background: 'var(--bg-primary)',
-                  border: '1px solid var(--border-color)',
-                  padding: '1.25rem',
-                  borderRadius: 'var(--radius-md)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}>
-                  <div className="flex items-center gap-2">
-                    <Zap size={16} color="var(--primary)" />
-                    <strong style={{ color: 'var(--text-light)', fontSize: '1.05rem' }}>{f.title}</strong>
-                  </div>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--accent-amber)', fontWeight: 700 }}>{f.desc}</span>
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', margin: 0, lineHeight: 1.6 }}>
-                    {f.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Navigation Controls */}
-        <div style={{
-          padding: '1rem 2rem',
-          background: 'var(--bg-primary)',
-          borderTop: '1px solid var(--border-color)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}>
-          {/* Slide Indicator Dots */}
-          <div className="flex items-center gap-2">
-            {slides.map((s, idx) => (
-              <button
-                key={s.id}
-                onClick={() => setCurrentSlide(idx)}
-                style={{
-                  width: idx === currentSlide ? 28 : 10,
-                  height: 10,
-                  borderRadius: 5,
-                  background: idx === currentSlide ? 'var(--primary)' : 'var(--border-color)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                }}
-                title={`Slide ${idx + 1}: ${s.title}`}
-              />
             ))}
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '0.5rem', fontWeight: 600 }}>
-              {currentSlide + 1} / {slides.length}
-            </span>
-          </div>
+          </section>
 
-          {/* Action & Slide Nav Buttons */}
-          <div className="flex items-center gap-3">
-            <button className="btn btn-secondary" onClick={prevSlide} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem' }}>
-              <ChevronLeft size={16} /> 이전 슬라이드
-            </button>
-            <button className="btn btn-secondary" onClick={nextSlide} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem' }}>
-              다음 슬라이드 <ChevronRight size={16} />
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate('/institution')}
-              style={{ padding: '0.6rem 1.2rem', fontSize: '0.9rem', fontWeight: 800, gap: '0.4rem' }}
-            >
-              <Building2 size={16} /> 기관 서비스 이용하기
-            </button>
-          </div>
+          <section style={{ padding: '1rem 1.15rem', background: 'linear-gradient(135deg, rgba(37,99,235,.07), rgba(217,119,6,.045))', border: '1px solid rgba(37,99,235,.2)', borderRadius: 'var(--radius-md)' }}>
+            <h2 className="flex items-center gap-2" style={{ margin: '0 0 .7rem', color: 'var(--accent-amber)', fontSize: '.86rem' }}><Sparkles size={16} /> 기관 도입 핵심 포인트</h2>
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+              {slide.highlights.map(item => <div key={item} className="flex items-start gap-2" style={{ color: 'var(--text-main)', fontSize: '.9rem', lineHeight: 1.5 }}><CheckCircle2 size={17} color="var(--primary)" style={{ flexShrink: 0, marginTop: 2 }} /><span>{item}</span></div>)}
+            </div>
+          </section>
+
+          <section>
+            <h2 style={{ margin: '0 0 .75rem', color: 'var(--text-muted)', fontSize: '.8rem', letterSpacing: '.06em' }}>WHY THINKFIT</h2>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))' }}>
+              {slide.points.map(point => {
+                const PointIcon = point.icon;
+                return (
+                  <article key={point.title} style={{ padding: '1rem', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderTop: '3px solid var(--primary)', borderRadius: '0 0 var(--radius-sm) var(--radius-sm)' }}>
+                    <div className="flex items-center gap-2"><PointIcon size={17} color="var(--primary)" /><strong style={{ color: 'var(--text-light)' }}>{point.title}</strong></div>
+                    <small style={{ display: 'block', margin: '.4rem 0 .3rem', color: 'var(--accent-amber)', fontWeight: 800 }}>{point.eyebrow}</small>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '.84rem', lineHeight: 1.55 }}>{point.description}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          {slide.note && <p style={{ margin: 0, padding: '.8rem 1rem', color: 'var(--text-main)', background: 'rgba(217,119,6,.06)', borderLeft: '3px solid var(--accent-amber)', fontSize: '.87rem', lineHeight: 1.55 }}>{slide.note}</p>}
         </div>
-      </div>
+
+        <footer className="flex justify-between items-center" style={{ gap: '1rem', padding: '1rem 1.5rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+          <div className="flex items-center gap-2" aria-label="제안서 페이지 선택">
+            {slides.map((item, index) => <button key={item.id} type="button" onClick={() => setCurrentSlide(index)} aria-label={`${index + 1}페이지: ${item.section}`} style={{ width: index === currentSlide ? 28 : 9, height: 9, padding: 0, border: 0, borderRadius: 10, cursor: 'pointer', background: index === currentSlide ? 'var(--primary)' : 'var(--border-color)', transition: 'width .2s' }} />)}
+          </div>
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary" onClick={previousSlide}><ChevronLeft size={16} /> 이전</button>
+            <button className="btn btn-secondary" onClick={nextSlide}>다음 <ChevronRight size={16} /></button>
+            <button className="btn btn-primary" onClick={() => navigate('/simulation')}><Users size={16} /> 페르소나 훈련 확인</button>
+          </div>
+        </footer>
+      </article>
     </main>
   );
 };

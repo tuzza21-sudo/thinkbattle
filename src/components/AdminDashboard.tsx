@@ -159,7 +159,7 @@ export const AdminDashboard = () => {
 
   if (!loading && !organizations.length) {
     return (
-      <main className="app-container page-scroll" style={{ maxWidth: 1180, padding: '3rem 1.25rem' }}>
+      <main className="app-container page-scroll admin-shell" style={{ maxWidth: 1180, padding: '3rem 1.25rem' }}>
         <section className="card" style={{ padding: '3rem', textAlign: 'center' }}>
           <Building2 size={48} color="var(--text-muted)" style={{ margin: '0 auto 1rem', opacity: 0.4 }} />
           <h2 style={{ color: 'var(--text-light)', marginBottom: '0.5rem' }}>기관 관리자 권한이 없습니다</h2>
@@ -171,7 +171,7 @@ export const AdminDashboard = () => {
   }
 
   return (
-    <main className="app-container page-scroll" style={{ maxWidth: 1180, padding: '0 1.25rem 4rem' }}>
+    <main className="app-container page-scroll admin-shell" style={{ maxWidth: 1180, padding: '0 1.25rem 4rem' }}>
       {/* Top Header Navigation */}
       <div style={{ padding: '1.5rem 0 0' }}>
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ gap: '0.5rem' }}>
@@ -405,7 +405,7 @@ export const AdminDashboard = () => {
                 </div>
 
                 {/* Create New Group Card */}
-                <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <section className="card admin-form-panel" style={{ padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
                   <h3 style={{ margin: '0 0 1rem', fontSize: '1.05rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <Plus size={18} color="var(--primary)" /> 신규 반 개설
                   </h3>
@@ -419,6 +419,7 @@ export const AdminDashboard = () => {
                         });
                       }
                     }}
+                    className="admin-inline-form"
                     style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}
                   >
                     <input
@@ -489,11 +490,11 @@ export const AdminDashboard = () => {
                 </div>
 
                 {/* Assign Students Control Card */}
-                <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <section className="card admin-form-panel" style={{ padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
                   <h3 style={{ margin: '0 0 1rem', fontSize: '1.05rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <UserPlus size={18} color="var(--primary)" /> 회원 탐색 및 반 배정
                   </h3>
-                  <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  <div className="admin-student-controls grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                     <div>
                       <label className="admin-label">1. 배정할 대상 반 선택</label>
                       <select
@@ -633,8 +634,9 @@ export const AdminDashboard = () => {
                 </div>
 
                 {/* AI Topic Generation Form Card */}
-                <section className="card" style={{ padding: '1.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+                <section className="card admin-form-panel" style={{ padding: '1.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
                   <form
+                    className="admin-topic-form"
                     onSubmit={e => {
                       e.preventDefault();
                       if (topicTitle.trim()) {

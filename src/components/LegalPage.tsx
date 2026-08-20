@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 type LegalPageProps = { kind: 'privacy' | 'terms' };
 
 const privacySections = [
-  ['수집·처리하는 정보', '계정 식별정보(이메일, 닉네임, 로그인 제공자), 토론 설정과 텍스트 발언, 사람 간 토론에서 녹음된 본인 음성 발언과 전사문, AI 평가·영어 코칭 결과, 서비스 이용 기록을 처리합니다.'],
+  ['수집·처리하는 정보', '계정 식별정보(이메일, 닉네임, 로그인 제공자), 토론 설정과 텍스트 발언, 사람 간 토론에서 녹음된 본인 음성 발언과 전사문, AI 평가·영어 코칭 결과, 선택적으로 입력한 훈련 프로필과 맞춤 시나리오, 서비스 이용 기록을 처리합니다.'],
+  ['개인 훈련 프로필', '이용자가 선택적으로 붙여넣은 이력서·경력기술서·전공·프로젝트·특별활동 내용은 맞춤 질문과 시나리오 생성을 위해 처리됩니다. 프로필과 생성 미션은 해당 계정만 접근할 수 있으며, 연락처·주소·생년월일·주민등록번호 등 훈련에 불필요한 정보는 입력하지 않아야 합니다. AI가 정리한 항목은 저장 전에 이용자가 확인하고 수정할 수 있습니다.'],
   ['음성 토론 처리', '지원 브라우저에서는 마이크 발언이 브라우저의 음성 인식 서비스를 통해 실시간 전사될 수 있습니다. 실시간 인식을 지원하지 않거나 결과가 없는 경우에는 발언 종료 후 Google Gemini API를 통해 전사합니다. 음성방에서는 마이크 음성이 LiveKit을 통해 다른 참가자에게 실시간 전달됩니다. 사람 간 토론의 본인 음성 발언은 복습과 발언 모니터링을 위해 비공개 저장소에 저장되며 해당 계정 본인만 재생하거나 다운로드할 수 있습니다.'],
   ['AI 서비스 제공', '토론 답변, 평가, 시뮬레이션, 영어 표현 코칭과 음성 합성을 위해 사용자가 입력한 문맥과 발언 일부가 Google Gemini API로 전달될 수 있습니다. 민감한 개인정보는 발언에 포함하지 마세요.'],
   ['보관과 삭제', '음성 발언은 기본 90일 보관정책과 저장 용량 정책에 따라 오래된 종료 토론부터 삭제될 수 있으므로, 필요한 음성은 보관기간 안에 다운로드해야 합니다. 용량 임계치에서는 사용자별 최근 녹음을 우선 보호하며 전사문과 평가는 유지합니다. 공개 공유 링크는 사용자가 명시적으로 생성한 경우에만 만들어지고 공유 화면에는 음성 접근 권한을 제공하지 않습니다. 계정 또는 관련 데이터 삭제 요청은 아래 문의처로 접수할 수 있습니다.'],
@@ -22,7 +23,8 @@ const termsSections = [
 ];
 
 const englishPrivacy = [
-  ['Data we process', 'We process account identifiers, debate settings and transcripts, your recorded speeches in human voice debates, AI feedback, English coaching results and basic service activity.'],
+  ['Data we process', 'We process account identifiers, debate settings and transcripts, your recorded speeches in human voice debates, AI feedback, English coaching results, optional training profiles and custom scenarios, and basic service activity.'],
+  ['Personal training profiles', 'Resume, career-description, major, project and activity text that you choose to paste is processed to create personalised questions and scenarios. Profiles and generated missions are accessible only to that account. Do not enter contact details, home addresses, birth dates, government identifiers or other information unnecessary for training. You can review and edit AI-extracted fields before saving.'],
   ['Voice debates', 'Supported browsers may transcribe microphone speech in real time through their speech-recognition service. If live recognition is unavailable or produces no result, the recording is transcribed through Google Gemini after the speech. In voice rooms, microphone audio is delivered to other participants through LiveKit. Your own speeches in human debates are stored privately for review and can only be played or downloaded by your account.'],
   ['AI processing', 'Relevant prompts, debate context and speech may be sent to Google Gemini to provide responses, judging, coaching, transcription and speech synthesis. Do not include sensitive personal information in a debate.'],
   ['Retention and choices', 'Recordings use a default 90-day retention and may be removed earlier from the oldest completed debates when storage thresholds are reached. Download any recording you need before it expires. Transcripts and evaluations remain available, and shared report viewers receive no audio access. You may choose text debate, revoke microphone permission, or request deletion of your account and related data.'],
@@ -52,7 +54,7 @@ export const LegalPage = ({ kind }: LegalPageProps) => {
     <main className="app-container page-scroll legal-page">
       <header className="legal-page-header">
         <button type="button" className="icon-button" onClick={() => navigate(-1)} aria-label={isEnglish ? 'Go back' : '뒤로 가기'}><ChevronLeft size={22} /></button>
-        <div><span><ShieldCheck size={16} /> THINKFIT TRUST CENTER</span><h1>{title}</h1><p>{isEnglish ? 'Effective 14 August 2026' : '시행일 2026년 8월 14일'}</p></div>
+        <div><span><ShieldCheck size={16} /> THINKFIT TRUST CENTER</span><h1>{title}</h1><p>{isEnglish ? 'Effective 19 August 2026' : '시행일 2026년 8월 19일'}</p></div>
       </header>
       <section className="legal-intro card">
         <strong>{isEnglish ? 'Please understand how your debate data is used before training.' : '훈련을 시작하기 전에 토론 데이터가 어떻게 처리되는지 확인해 주세요.'}</strong>

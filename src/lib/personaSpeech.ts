@@ -1,4 +1,5 @@
 import { getAiGatewayHeaders } from './aiGateway';
+import type { SimulationPersona } from '../types';
 
 const GEMINI_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 
@@ -16,6 +17,7 @@ type StreamingSpeechOptions = {
   signal?: AbortSignal;
   language?: 'ko' | 'en';
   onPlaybackStart?: () => void;
+  persona?: Pick<SimulationPersona, 'name' | 'role' | 'gender' | 'age' | 'identity' | 'speakingPattern'>;
 };
 
 type BrowserSpeechOptions = {
@@ -63,10 +65,30 @@ const createTtsRequest = (
   voiceName: string,
   voiceStyle: string,
   language: 'ko' | 'en',
+  persona?: StreamingSpeechOptions['persona'],
 ) => ({
   contents: [{
     parts: [{
-      text: `${voiceStyle}\nRead only the following ${language === 'en' ? 'English' : 'Korean'} counterpart dialogue exactly as written. Do not add an introduction or explanation.\n\n${text}`,
+      text: persona
+        ? `# AUDIO PROFILE: ${persona.name}
+Korean ${persona.gender === '여성' ? 'woman' : 'man'}, exactly ${persona.age} years old.
+Role: ${persona.role}
+Professional background: ${persona.identity}
+
+## SCENE
+This is a realistic one-to-one business pressure-training conversation. The speaker is addressing the trainee directly, not narrating or presenting.
+
+## DIRECTOR'S NOTES
+The perceived gender and vocal age must clearly match a ${persona.age}-year-old Korean ${persona.gender === '여성' ? 'woman' : 'man'} shown in the character portrait. Preserve natural adult vocal weight and lived-in authority appropriate to the stated age. Do not make the speaker sound noticeably younger, boyish, girlish, elderly, theatrical, or artificially pitch-shifted.
+Character delivery: ${voiceStyle}
+Speaking pattern: ${persona.speakingPattern}
+Use standard natural Korean pronunciation. Keep breaths and pauses subtle and realistic. Do not read stage directions aloud.
+
+## TRANSCRIPT
+Read only the following ${language === 'en' ? 'English' : 'Korean'} counterpart dialogue exactly as written. Do not add an introduction or explanation.
+
+${text}`
+        : `${voiceStyle}\nRead only the following ${language === 'en' ? 'English' : 'Korean'} counterpart dialogue exactly as written. Do not add an introduction or explanation.\n\n${text}`,
     }],
   }],
   generationConfig: {
@@ -243,12 +265,13 @@ export const synthesizePersonaSpeech = async (
   voiceStyle: string,
   signal?: AbortSignal,
   language: 'ko' | 'en' = 'ko',
+  persona?: StreamingSpeechOptions['persona'],
 ): Promise<Blob> => {
   const response = await fetch(`/api/gemini/v1beta/models/${GEMINI_TTS_MODEL}:generateContent`, {
     method: 'POST',
     headers: await getAiGatewayHeaders(),
     signal,
-    body: JSON.stringify(createTtsRequest(text, voiceName, voiceStyle, language)),
+    body: JSON.stringify(createTtsRequest(text, voiceName, voiceStyle, language, persona)),
   });
 
   if (!response.ok) throw new Error(`Gemini TTS 요청에 실패했습니다. (${response.status})`);
@@ -270,7 +293,7 @@ export const streamPersonaSpeech = async (
   voiceStyle: string,
   options: StreamingSpeechOptions = {},
 ): Promise<Blob> => {
-  const { signal, language = 'ko', onPlaybackStart } = options;
+  const { signal, language = 'ko', onPlaybackStart, persona } = options;
   if (signal?.aborted) throw signal.reason ?? new DOMException('Speech playback aborted', 'AbortError');
 
   const player = new PcmStreamPlayer(onPlaybackStart);
@@ -284,7 +307,7 @@ export const streamPersonaSpeech = async (
       method: 'POST',
       headers: await getAiGatewayHeaders(),
       signal,
-      body: JSON.stringify(createTtsRequest(text, voiceName, voiceStyle, language)),
+      body: JSON.stringify(createTtsRequest(text, voiceName, voiceStyle, language, persona)),
     });
 
     if (!response.ok) {

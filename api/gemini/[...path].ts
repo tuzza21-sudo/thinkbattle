@@ -4,6 +4,7 @@ export const config = {
 
 const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 const ALLOWED_MODELS = new Set([
+  'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
@@ -161,6 +162,12 @@ export default async function handler(req: Request) {
     const responseHeaders = new Headers(response.headers);
     responseHeaders.set('Cache-Control', 'no-store');
     responseHeaders.delete('set-cookie');
+    // Fetch runtimes transparently decode upstream gzip/br bodies but can retain
+    // the original transport headers. Forwarding those headers makes browsers
+    // attempt a second decode and fail with ERR_CONTENT_DECODING_FAILED.
+    responseHeaders.delete('content-encoding');
+    responseHeaders.delete('content-length');
+    responseHeaders.delete('transfer-encoding');
     if (allowedOrigin) {
       responseHeaders.set('Access-Control-Allow-Origin', allowedOrigin);
       responseHeaders.set('Vary', 'Origin');

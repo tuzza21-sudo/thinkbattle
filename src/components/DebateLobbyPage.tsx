@@ -256,7 +256,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   }
 
   if (!room) {
-    return <div className="app-container lobby-loading"><strong>토론방을 찾을 수 없습니다.</strong><button className="btn btn-secondary" onClick={() => navigate('/')}>메인으로</button></div>;
+    return <div className="app-container lobby-loading"><strong>토론방을 찾을 수 없습니다.</strong><button className="btn btn-secondary" onClick={() => navigate('/debate')}>토론 메인으로</button></div>;
   }
 
   if (!user) {

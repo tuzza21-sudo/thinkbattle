@@ -85,10 +85,38 @@ export default defineConfig(({ mode }) => {
                 },
               ))
               response.statusCode = handlerResponse.status
-              handlerResponse.headers.forEach((value, key) => response.setHeader(key, value))
-              response.end(Buffer.from(await handlerResponse.arrayBuffer()))
+              handlerResponse.headers.forEach((value, key) => {
+                if (['content-encoding', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) return
+                response.setHeader(key, value)
+              })
+              if (!handlerResponse.body) {
+                response.end()
+                return
+              }
+
+              // Keep SSE and audio responses incremental in local development.
+              // Buffering with arrayBuffer() made localhost appear much slower
+              // than the production edge gateway even when the upstream API streamed.
+              response.flushHeaders()
+              const reader = handlerResponse.body.getReader()
+              try {
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
+                  if (!response.write(Buffer.from(value))) {
+                    await new Promise<void>(resolve => response.once('drain', resolve))
+                  }
+                }
+                response.end()
+              } finally {
+                reader.releaseLock()
+              }
             } catch (error) {
               console.error('Local Gemini gateway middleware error:', error)
+              if (response.headersSent) {
+                response.destroy(error instanceof Error ? error : undefined)
+                return
+              }
               response.statusCode = 500
               response.setHeader('Content-Type', 'application/json')
               response.end(JSON.stringify({ error: '로컬 AI 요청 처리에 실패했습니다.' }))

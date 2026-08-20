@@ -48,7 +48,6 @@ interface LandingPageProps {
   onLoginRequest: () => void;
   onLogout: () => void;
   onUserUpdate: (updatedUser: AppUser) => void;
-  onLanguageChange: (language: 'ko' | 'en') => void;
 }
 
 const accentStyles = {
@@ -75,7 +74,7 @@ const getClosestAiDebateTime = (seconds: number) => AI_DEBATE_TIME_OPTIONS.reduc
   Math.abs(option - seconds) < Math.abs(closest - seconds) ? option : closest
 ));
 
-export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate, onLanguageChange }) => {
+export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, onLogout, onUserUpdate }) => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLiveOnly, setCreateLiveOnly] = useState(false);
@@ -278,108 +277,69 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const selectedAccent = selectedBattle ? accentStyles[selectedBattle.accent] : null;
 
   return (
-    <div className="app-container page-scroll" style={{ paddingBottom: '5rem' }}>
-      <header style={{ marginBottom: '3.5rem' }}>
-        <div className="flex justify-between items-center" style={{ gap: '1rem', rowGap: '1.25rem', flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: '2.5rem', color: 'var(--primary)', margin: 0, letterSpacing: '-0.5px' }}>
-            생각근육 ThinkFit
-          </h1>
-
-          <div className="card flex items-center gap-6" style={{ padding: '1rem 1.4rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', rowGap: '1rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <button className="btn btn-secondary" style={{ padding: '0.5rem .8rem', fontSize: '0.82rem' }} onClick={() => onLanguageChange('en')} aria-label="Switch to English">
-              한국어 <span style={{ color: 'var(--text-muted)' }}>|</span> English
-            </button>
-            <button className="btn btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', background: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)' }} onClick={() => navigate('/about')}>
-              <BookOpen size={16} /> 서비스 소개
-            </button>
-            <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-            {userStats && (
-              <>
-                <div className="flex items-center gap-3">
-                  <div style={{ background: 'rgba(217, 119, 6, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(217, 119, 6, 0.2)' }}>
-                    <Shield size={24} color="var(--accent-amber)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>MY LEAGUE</div>
-                    <div style={{ fontSize: '1.1rem', color: 'var(--accent-amber)', fontWeight: 900 }}>{userStats.league} 리그</div>
-                  </div>
-                </div>
-                <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-                <div className="flex items-center gap-3">
-                  <div style={{ background: 'rgba(37, 99, 235, 0.1)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(37, 99, 235, 0.2)' }}>
-                    <Zap size={24} color="var(--primary)" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800 }}>경험치 XP</div>
-                    <div style={{ fontSize: '1.1rem', color: 'var(--text-light)', fontWeight: 900 }}>{userStats.xp.toLocaleString()} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Lv.{userStats.level}</span></div>
-                  </div>
-                </div>
-                <div style={{ width: '1px', height: '40px', background: 'var(--border-color)' }} />
-              </>
-            )}
-            {user ? (
-              <div className="flex items-center gap-3">
-                {memberOrganizations.length > 0 && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/institution')}>
-                  <BookOpen size={18} /> {memberOrganizations[0].name}
-                </button>}
-                {user.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
-                  <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/super-admin')}>
-                    <Shield size={18} /> 슈퍼 관리
-                  </button>
-                )}
-                {(hasOrganizationStaffAccess || user.email.toLowerCase() === SUPER_ADMIN_EMAIL) && <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/admin')}>
-                  <Shield size={18} /> 기관 관리
-                </button>}
-                <button className="btn btn-secondary" style={{ padding: '0.7rem 1rem' }} onClick={() => navigate('/history')}>
-                  <FileText size={18} /> 기록
-                </button>
-                <div 
-                  onClick={() => setShowProfileModal(true)}
-                  style={{ cursor: 'pointer' }}
-                  title="닉네임 변경"
-                >
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    USER <Edit2 size={12} style={{ opacity: 0.7 }} />
-                  </div>
-                  <div style={{ fontSize: '1.05rem', color: 'var(--text-light)', fontWeight: 900 }}>
-                    {user.nickname}
-                  </div>
-                </div>
-                <button className="icon-button" onClick={onLogout} aria-label="로그아웃" title="로그아웃" style={{ color: 'var(--text-muted)' }}>
-                  <LogOut size={18} />
-                </button>
-              </div>
-            ) : (
-              <button className="btn btn-secondary" style={{ padding: '0.8rem 1.2rem' }} onClick={onLoginRequest}>
-                <LogIn size={18} /> 로그인
-              </button>
-            )}
-          </div>
-        </div>
-        <p style={{ color: 'var(--text-light)', margin: '1.8rem 0 0 0', fontWeight: 800, fontSize: '1.35rem', maxWidth: '700px', lineHeight: 1.65, letterSpacing: '-0.3px' }}>
-          AI가 생각을 대신하는 시대,<br/>
-          <span style={{ color: 'var(--primary)' }}>ThinkFit</span>은 생각에도 꾸준한 운동이 필요하다고 믿습니다.
-        </p>
+    <div className="debate-home-page page-scroll">
+      <header className="debate-home-header">
+        <button type="button" className="debate-home-brand" onClick={() => navigate('/')} aria-label="훈련 선택으로 돌아가기">
+          <span><img src="/brand/thinkfit-mark.svg" alt="" /></span><div><strong>ThinkFit</strong><small>DEBATE ARENA</small></div>
+        </button>
+        <nav className="debate-home-nav" aria-label="토론 페이지 메뉴">
+          <button type="button" onClick={() => navigate('/about')}><BookOpen size={16} /> 서비스 소개</button>
+          {user && <button type="button" onClick={() => navigate('/history')}><FileText size={16} /> 훈련 기록</button>}
+          {memberOrganizations.length > 0 && <button type="button" onClick={() => navigate('/institution')}><Users size={16} /> {memberOrganizations[0].name}</button>}
+          {(hasOrganizationStaffAccess || user?.email.toLowerCase() === SUPER_ADMIN_EMAIL) && <button type="button" onClick={() => navigate('/admin')}><Shield size={16} /> 기관 관리</button>}
+          {user?.email.toLowerCase() === SUPER_ADMIN_EMAIL && <button type="button" onClick={() => navigate('/super-admin')}><Shield size={16} /> 슈퍼 관리</button>}
+          {user ? (
+            <>
+              <button type="button" className="debate-home-profile" onClick={() => setShowProfileModal(true)} title="닉네임 변경"><span>{user.nickname.charAt(0)}</span>{user.nickname}<Edit2 size={13} /></button>
+              <button type="button" className="debate-home-logout" onClick={onLogout} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>
+            </>
+          ) : <button type="button" className="debate-home-login" onClick={onLoginRequest}><LogIn size={17} /> 로그인</button>}
+        </nav>
       </header>
 
-      <section className="simulation-home-launch">
-        <div className="simulation-home-launch-icon"><Sparkles size={26} /></div>
-        <div>
-          <span>THINKFIT STAGE 2</span>
-          <h2>상황극 훈련</h2>
-          <p>압박 면접관, 공격적 협상가, 권위적 상사, 까다로운 고객과 실전처럼 대화하고 대응력을 훈련하세요.</p>
+      <section className="debate-home-hero">
+        <div className="debate-home-hero-copy">
+          <span className="debate-home-eyebrow"><i /> AI DEBATE TRAINING</span>
+          <h1>생각을 주장으로,<br /><em>주장을 실력으로.</em></h1>
+          <p>AI의 날카로운 반론을 견디며 근거를 세우고, 질문하고, 설득하는 힘을 단계별로 훈련하세요.</p>
+          <div className="debate-home-hero-actions">
+            <button type="button" className="debate-home-primary" onClick={() => {
+              if (!user) return onLoginRequest();
+              setCreateLiveOnly(false);
+              setShowCreateModal(true);
+            }}><Sparkles size={18} /> AI 스파링 시작 <ChevronRight size={18} /></button>
+            <button type="button" className="debate-home-secondary" onClick={() => {
+              if (!user) return onLoginRequest();
+              setCreateLiveOnly(true);
+              setShowCreateModal(true);
+            }}><Radio size={17} /> 실전 토론방 열기</button>
+          </div>
+          <div className="debate-home-stats">
+            <span><strong>{categorizedTopics.reduce((total, category) => total + category.topics.length, 0)}+</strong><small>훈련 주제</small></span>
+            <span><strong>4 STEP</strong><small>구조화 토론</small></span>
+            {userStats ? <><span><strong>Lv.{userStats.level}</strong><small>{userStats.league} 리그</small></span><span><strong>{userStats.xp.toLocaleString()}</strong><small>누적 XP</small></span></> : <span><strong>AI</strong><small>즉시 피드백</small></span>}
+          </div>
         </div>
-        <button type="button" onClick={() => navigate('/simulation')}>
-          상황극 훈련 시작 <ChevronRight size={19} />
-        </button>
+
+        <div className="debate-home-arena" aria-label="ThinkFit 토론 훈련 미리보기">
+          <div className="debate-home-arena-top"><span><i /> LIVE SPARRING</span><small>LEVEL 2 · 반박 훈련</small></div>
+          <div className="debate-home-arena-topic"><small>TODAY'S MOTION</small><strong>{currentWeeklyIssue?.topic ?? '생성형 AI의 교육 활용을 확대해야 하는가?'}</strong></div>
+          <div className="debate-home-arena-sides">
+            <article className="affirmative"><span>찬성</span><strong>나</strong><p>핵심 근거와 사례를 연결해 주장을 전개합니다.</p></article>
+            <div className="debate-home-versus"><Scale size={23} /><b>VS</b></div>
+            <article className="negative"><span>반대</span><strong>AI</strong><p>전제의 빈틈을 찾고 반례와 질문으로 압박합니다.</p></article>
+          </div>
+          <div className="debate-home-arena-flow"><span className="active">입론</span><i /><span>반론</span><i /><span>교차질문</span><i /><span>최종변론</span></div>
+          <div className="debate-home-arena-footer"><span><Zap size={15} /> 실시간 논증 분석</span><b>설득력 78</b></div>
+        </div>
       </section>
 
-      <main style={{ paddingBottom: '3rem', display: 'flex', gap: '3rem', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 0%', minWidth: 'min(100%, 600px)' }}>
+      <main className="debate-home-layout">
+        <div className="debate-home-content">
           {/* Weekly Issue Banner */}
           {currentWeeklyIssue && (
             <div 
-              className="card" 
+              className="card debate-featured-card"
               style={{ 
                 marginBottom: '2.5rem',
                 padding: '2.5rem', 
@@ -455,7 +415,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             </div>
           )}
 
-          <div className="flex justify-between items-center mb-10" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap' }}>
+          <div className="debate-section-heading flex justify-between items-center mb-10" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap' }}>
             <h2 className="flex items-center gap-2" style={{ fontSize: '1.6rem', margin: 0, color: 'var(--text-light)' }}>
               <Layers3 color="var(--primary)" /> 세부 토론 주제
             </h2>
@@ -474,7 +434,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
           {/* Category Tabs */}
           <div 
-            className="flex gap-3 mb-10" 
+            className="debate-category-tabs flex gap-3 mb-10"
             style={{ 
               overflowX: 'auto', 
               paddingBottom: '0.8rem',
@@ -484,6 +444,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             {categorizedTopics.map(category => (
               <button
                 key={category.category}
+                className={activeCategory === category.category ? 'active' : ''}
                 onClick={() => setActiveCategory(category.category)}
                 style={{
                   padding: '0.75rem 1.25rem',
@@ -512,7 +473,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             ))}
           </div>
 
-          <div className="grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))' }}>
+          <div className="debate-topic-grid grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))' }}>
             {activeCategoryData.topics.map(battle => {
               const accent = accentStyles[battle.accent];
               const isSelected = selectedBattle?.id === battle.id;
@@ -520,7 +481,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               return (
                 <article
                   key={battle.id}
-                  className="card"
+                  className={`card debate-topic-card ${isSelected ? 'selected' : ''}`}
                   role="button"
                   tabIndex={0}
                   onClick={() => handleOpenBriefing(battle.id)}
@@ -580,6 +541,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           {selectedBattle && selectedAccent && (
             <section
               id="topic-briefing"
+              className="debate-briefing-panel"
               style={{
                 marginTop: '4rem',
                 border: `1px solid ${selectedAccent.border}`,
@@ -589,7 +551,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 overflow: 'hidden',
               }}
             >
-              <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: selectedAccent.soft, position: 'relative' }}>
+              <div className="debate-briefing-hero" style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', background: selectedAccent.soft, position: 'relative' }}>
                 <button
                   type="button"
                   className="icon-button"
@@ -647,35 +609,35 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 </div>
               </div>
 
-              <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', padding: '1.5rem' }}>
-                <div className="flex flex-col gap-6">
-                  <section>
+              <div className="debate-briefing-grid grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', padding: '1.5rem' }}>
+                <div className="debate-briefing-main flex flex-col gap-6">
+                  <section className="debate-briefing-section context">
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.12rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <BookOpen size={20} color="var(--primary)" /> 배경 지식
                     </h3>
                     <p style={{ color: 'var(--text-main)', lineHeight: 1.75 }}>{selectedBattle.briefing.context}</p>
                   </section>
 
-                  <section>
+                  <section className="debate-briefing-section cases">
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.12rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Newspaper size={20} color="var(--accent-amber)" /> 최근 사례로 확인할 포인트
                     </h3>
                     <div className="grid gap-3" style={{ gridTemplateColumns: '1fr' }}>
-                      {selectedBattle.briefing.recentCases.map(caseItem => (
-                      <div key={caseItem} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)', lineHeight: 1.6 }}>
-                          {caseItem}
+                      {selectedBattle.briefing.recentCases.map((caseItem, caseIndex) => (
+                        <div className="debate-case-card" key={caseItem} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)', lineHeight: 1.6 }}>
+                          <span>{String(caseIndex + 1).padStart(2, '0')}</span><p>{caseItem}</p>
                         </div>
                       ))}
                     </div>
                   </section>
 
-                  <section>
+                  <section className="debate-briefing-section clash">
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.12rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Scale size={20} color="var(--secondary)" /> 찬성 vs 반대 쟁점
                     </h3>
                     <div className="grid gap-4" style={{ gridTemplateColumns: '1fr' }}>
-                      {[selectedBattle.briefing.affirmative, selectedBattle.briefing.negative].map(side => (
-                        <div key={side.title} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                      {[selectedBattle.briefing.affirmative, selectedBattle.briefing.negative].map((side, sideIndex) => (
+                        <div className={`debate-clash-card ${sideIndex === 0 ? 'affirmative' : 'negative'}`} key={side.title} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-card)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                           <h4 style={{ marginBottom: '0.75rem', color: side.title.includes('찬성') || side.title.includes('허용') ? 'var(--accent-amber)' : 'var(--primary)' }}>
                             {side.title}
                           </h4>
@@ -690,8 +652,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   </section>
                 </div>
 
-                <aside className="flex flex-col gap-6">
-                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                <aside className="debate-briefing-settings flex flex-col gap-6">
+                  <section className="debate-setting-card" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Gavel size={18} color="var(--accent-amber)" /> 입장 선택
                     </h3>
@@ -703,7 +665,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         <button
                           key={option.value}
                           type="button"
-                          className="card flex items-center justify-center"
+                          className={`card debate-setting-option flex items-center justify-center ${userPosition === option.value ? 'active stance' : ''}`}
                           style={{
                             cursor: 'pointer',
                             minHeight: '54px',
@@ -725,7 +687,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </p>
                   </section>
 
-                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                  <section className="debate-setting-card" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Layers3 size={18} color="var(--primary)" /> 토론 수준
                     </h3>
@@ -737,7 +699,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         <button
                           key={option.value}
                           type="button"
-                          className="card flex items-center justify-center"
+                          className={`card debate-setting-option flex items-center justify-center ${debateLevel === option.value ? 'active' : ''}`}
                           style={{
                             cursor: 'pointer',
                             minHeight: '48px',
@@ -756,7 +718,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </div>
                   </section>
 
-                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                  <section className="debate-setting-card" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Clock size={18} color="var(--primary)" /> 토론 시간
                     </h3>
@@ -765,7 +727,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         <button
                           key={time}
                           type="button"
-                          className="card flex items-center justify-center"
+                          className={`card debate-setting-option flex items-center justify-center ${selectedTimeLimit === time ? 'active' : ''}`}
                           style={{
                             cursor: 'pointer',
                             minHeight: '48px',
@@ -783,7 +745,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </div>
                   </section>
 
-                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
+                  <section className="debate-setting-card resources" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-primary)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <ExternalLink size={18} color="var(--primary)" /> 인터넷 기사 보기
                     </h3>
@@ -804,7 +766,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                     </div>
                   </section>
 
-                  <section style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-card)' }}>
+                  <section className="debate-setting-card prep" style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', background: 'var(--bg-card)' }}>
                     <h3 className="flex items-center gap-2" style={{ fontSize: '1.05rem', marginBottom: '0.8rem', color: 'var(--text-light)' }}>
                       <Sparkles size={18} color="var(--secondary)" /> 토론 전 질문
                     </h3>
@@ -822,7 +784,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
 
         {/* Right Sidebar */}
-        <aside style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+        <aside className="debate-home-sidebar" style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
           <section className="real-debate-launch-card">
             <span className="real-debate-eyebrow"><Radio size={14} /> REAL DEBATE</span>
             <div className="real-debate-title"><Users size={28} /><div><h2>실전 토론</h2><p>AI 참가자 없이 실제 사람끼리 긴장감 있게 진행합니다.</p></div></div>
@@ -838,55 +800,55 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             </button>
           </section>
           {/* Popular Topics */}
-          <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <h3 className="flex items-center gap-2" style={{ fontSize: '1.2rem', margin: '0 0 1.5rem 0', color: 'var(--secondary)' }}>
-              <Flame size={20} /> 이번 주 화제의 토론
-            </h3>
-            <div className="flex flex-col gap-4">
+          <section className="card debate-side-card debate-popular-panel" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+            <header className="debate-side-card-header">
+              <span><Flame size={18} /></span><div><small>TRENDING NOW</small><h3>이번 주 화제의 토론</h3></div>
+            </header>
+            <div className="debate-popular-list flex flex-col gap-4">
               {popularTopics.map((topic, index) => (
-                <div 
+                <button
+                  type="button"
                   key={topic.id} 
-                  className="flex items-start gap-3" 
+                  className={`debate-popular-item flex items-start gap-3 ${index === 0 ? 'top' : ''}`}
                   style={{ cursor: 'pointer', transition: 'all 0.2s', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.05)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   onClick={() => handleOpenBriefing(topic.id)}
                 >
-                  <span style={{ fontSize: '1.2rem', fontWeight: 900, color: index < 3 ? 'var(--primary)' : 'var(--text-muted)', minWidth: '24px', textAlign: 'center' }}>
-                    {topic.rank}
+                  <span className="debate-popular-rank" style={{ fontSize: '1.2rem', fontWeight: 900, color: index < 3 ? 'var(--primary)' : 'var(--text-muted)', minWidth: '24px', textAlign: 'center' }}>
+                    {String(topic.rank).padStart(2, '0')}
                   </span>
-                  <div className="flex-1 min-w-0" style={{ wordBreak: 'keep-all' }}>
+                  <div className="debate-popular-copy flex-1 min-w-0" style={{ wordBreak: 'keep-all' }}>
                     <h4 style={{ margin: '0 0 0.3rem 0', fontSize: '0.95rem', lineHeight: 1.4, color: 'var(--text-light)' }}>
                       {topic.title}
                     </h4>
                     <span className="flex items-center gap-1" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                      <Eye size={12} /> {topic.views} views
+                      <Eye size={12} /> 조회 {topic.views}
                     </span>
                   </div>
-                </div>
+                  <TrendingUp size={15} />
+                </button>
               ))}
             </div>
           </section>
 
           {/* Weekly Debater Rankings */}
-          <section className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <h3 className="flex items-center gap-2" style={{ fontSize: '1.2rem', margin: '0 0 1.5rem 0', color: 'var(--accent-amber)' }}>
-              <Trophy size={20} /> 금주 토론자 랭킹
-            </h3>
-            <div className="flex flex-col gap-3">
+          <section className="card debate-side-card debater-ranking-panel" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+            <header className="debate-side-card-header ranking">
+              <span><Trophy size={18} /></span><div><small>WEEKLY LEAGUE</small><h3>금주 토론자 랭킹</h3></div>
+            </header>
+            <div className="debater-ranking-list flex flex-col gap-3">
               {displayRankings.map((u, index) => {
                 const showDivider = index > 0 && u.rank > 5 && displayRankings[index - 1].rank <= 5;
                 return (
                   <React.Fragment key={u.id}>
                     {showDivider && (
-                      <div className="flex items-center justify-center py-1 gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, margin: '0.2rem 0' }}>
+                      <div className="debater-ranking-divider flex items-center justify-center py-1 gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, margin: '0.2rem 0' }}>
                         <div style={{ flex: 1, height: '0.5px', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}></div>
                         <span>내 현재 랭킹</span>
                         <div style={{ flex: 1, height: '0.5px', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}></div>
                       </div>
                     )}
-                    <div 
-                      className="flex items-center gap-3 card" 
+                    <div
+                      className={`debater-ranking-item flex items-center gap-3 card ${index === 0 ? 'leader' : ''} ${user && u.id === user.id ? 'current' : ''}`}
                       style={{ 
                         padding: '1rem', 
                         background: index === 0 ? 'var(--accent-amber-light)' : (user && u.id === user.id) ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-elevated)',
@@ -894,15 +856,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         boxShadow: index === 0 ? '0 2px 4px var(--accent-amber-light)' : 'none'
                       }}
                     >
-                      <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div className="debater-ranking-avatar" style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <span style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--secondary)' }}>{u.nickname.charAt(0)}</span>
                         {u.rank <= 3 && (
-                          <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--bg-card)', borderRadius: '50%', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+                          <div className="debater-ranking-medal" style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: 'var(--bg-card)', borderRadius: '50%', padding: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
                             <Medal size={16} color={u.rank === 1 ? '#F59E0B' : u.rank === 2 ? '#94A3B8' : '#B45309'} />
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="debater-ranking-copy flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span style={{ fontWeight: 700, color: 'var(--text-light)', fontSize: '1rem' }}>{u.nickname}</span>
                           <span className="badge" style={{ background: 'transparent', color: u.badgeColor, border: `1px solid ${u.badgeColor}`, padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}>
@@ -912,8 +874,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                           {u.xp.toLocaleString()} XP
                         </div>
+                        <div className="debater-xp-track"><i style={{ width: `${Math.max(12, Math.round(u.xp / Math.max(1, displayRankings[0]?.xp ?? u.xp) * 100))}%` }} /></div>
                       </div>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 900, color: u.rank === 1 ? 'var(--accent-amber)' : 'var(--text-muted)', opacity: u.rank === 1 ? 1 : 0.6 }}>
+                      <div className="debater-ranking-position" style={{ fontSize: '1.2rem', fontWeight: 900, color: u.rank === 1 ? 'var(--accent-amber)' : 'var(--text-muted)', opacity: u.rank === 1 ? 1 : 0.6 }}>
                         #{u.rank}
                       </div>
                     </div>

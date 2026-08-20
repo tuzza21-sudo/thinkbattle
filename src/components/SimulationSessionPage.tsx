@@ -4,7 +4,8 @@ import { ArrowLeft, Award, CheckCircle2, ChevronRight, Clock3, Headphones, Loade
 import { ActionZone } from './ActionZone';
 import { getSimulationMission, getSimulationPersona, simulationCategories } from '../data/simulations';
 import { generateSimulationReport, generateSimulationResponse } from '../lib/api';
-import { speakWithBrowserFallback, streamPersonaSpeech } from '../lib/personaSpeech';
+import { getPersonalSimulationMission } from '../lib/personalTraining';
+import { speakWithBrowserFallback, streamPersonaSpeech, synthesizePersonaSpeech } from '../lib/personaSpeech';
 import type { AppUser, DebateStep, SimulationReport, SimulationTurn } from '../types';
 
 interface SimulationSessionPageProps {
@@ -29,12 +30,16 @@ const practiceStep: DebateStep = {
 export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
   const navigate = useNavigate();
   const { missionId = '' } = useParams();
-  const mission = getSimulationMission(missionId);
+  const staticMission = getSimulationMission(missionId);
+  const [mission, setMission] = useState(staticMission);
+  const [isMissionLoading, setIsMissionLoading] = useState(!staticMission);
+  const [missionLoadError, setMissionLoadError] = useState<string | null>(null);
   const persona = mission ? getSimulationPersona(mission.personaId) : undefined;
   const [turns, setTurns] = useState<SimulationTurn[]>(() => mission ? [{
     id: createTurnId(), speaker: 'ai', content: mission.openingLine, timestamp: timestamp(), pressureLevel: mission.difficulty + 1,
   }] : []);
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [streamingReply, setStreamingReply] = useState('');
   const [isReportGenerating, setIsReportGenerating] = useState(false);
   const [report, setReport] = useState<SimulationReport | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -43,20 +48,43 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
   const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speechControllerRef = useRef<AbortController | null>(null);
   const audioUrlsRef = useRef<Record<string, string>>({});
   const conversationEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!hasStarted || report || isReportGenerating) return;
+    if (staticMission) return;
+    let active = true;
+    getPersonalSimulationMission(user.id, missionId)
+      .then(record => {
+        if (!active) return;
+        if (!record) {
+          setMissionLoadError('존재하지 않거나 접근 권한이 없는 맞춤 미션입니다.');
+          return;
+        }
+        setMission(record.mission);
+        setTurns([{ id: createTurnId(), speaker: 'ai', content: record.mission.openingLine, timestamp: timestamp(), pressureLevel: record.mission.difficulty + 1 }]);
+      })
+      .catch(error => {
+        if (active) setMissionLoadError(error instanceof Error ? error.message : '맞춤 미션을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setIsMissionLoading(false);
+      });
+    return () => { active = false; };
+  }, [missionId, staticMission, user.id]);
+
+  useEffect(() => {
+    if (!hasStarted || report || isReportGenerating || isSessionComplete) return;
     const interval = window.setInterval(() => setElapsedSeconds(value => value + 1), 1000);
     return () => window.clearInterval(interval);
-  }, [hasStarted, isReportGenerating, report]);
+  }, [hasStarted, isReportGenerating, isSessionComplete, report]);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [turns, isAiThinking]);
+  }, [turns, isAiThinking, streamingReply]);
 
   useEffect(() => {
     audioUrlsRef.current = audioUrls;
@@ -71,18 +99,22 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
 
   const userTurnCount = useMemo(() => turns.filter(turn => turn.speaker === 'user').length, [turns]);
 
+  if (isMissionLoading) {
+    return <div className="simulation-session missing"><LoaderCircle className="spin" size={42} /><h1>맞춤 미션을 불러오는 중입니다.</h1></div>;
+  }
+
   if (!mission || !persona) {
     return (
       <div className="simulation-session missing">
         <XCircle size={42} />
-        <h1>미션을 찾을 수 없습니다.</h1>
+        <h1>{missionLoadError || '미션을 찾을 수 없습니다.'}</h1>
         <button className="btn btn-primary" onClick={() => navigate('/simulation')}>미션 목록으로</button>
       </div>
     );
   }
 
   const playAiTurn = async (turn: SimulationTurn) => {
-    if (turn.speaker !== 'ai' || audioLoadingId) return;
+    if (turn.speaker !== 'ai' || audioLoadingId === turn.id) return;
     speechControllerRef.current?.abort();
     speechControllerRef.current = null;
     window.speechSynthesis?.cancel();
@@ -97,18 +129,45 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     const controller = new AbortController();
     speechControllerRef.current = controller;
     setAudioLoadingId(turn.id);
+    let playbackStarted = false;
     try {
       const blob = await streamPersonaSpeech(turn.content, persona.voiceName, persona.voiceStyle, {
         signal: controller.signal,
-        onPlaybackStart: () => setAudioLoadingId(current => current === turn.id ? null : current),
+        onPlaybackStart: () => {
+          playbackStarted = true;
+          setAudioLoadingId(current => current === turn.id ? null : current);
+        },
+        persona,
       });
       if (controller.signal.aborted) return;
       const url = URL.createObjectURL(blob);
       setAudioUrls(current => ({ ...current, [turn.id]: url }));
     } catch (error) {
       if (controller.signal.aborted) return;
-      console.warn('Persona TTS fallback:', error);
-      speakWithBrowserFallback(turn.content, persona.id === 'difficult_customer' ? 1.08 : 0.96);
+      console.warn('Persona streaming TTS failed; retrying once:', error);
+      try {
+        const blob = await synthesizePersonaSpeech(
+          turn.content,
+          persona.voiceName,
+          persona.voiceStyle,
+          controller.signal,
+          'ko',
+          persona,
+        );
+        if (controller.signal.aborted) return;
+        const url = URL.createObjectURL(blob);
+        setAudioUrls(current => ({ ...current, [turn.id]: url }));
+        audioRef.current = new Audio(url);
+        await audioRef.current.play();
+      } catch (retryError) {
+        if (controller.signal.aborted) return;
+        console.warn('Persona TTS retry failed; using browser fallback:', retryError);
+        // Browser speech is the last-resort path. It keeps the conversation usable
+        // if Gemini has a transient TTS failure, although its timbre may vary by OS.
+        if (!playbackStarted) {
+          speakWithBrowserFallback(turn.content, persona.id === 'sales_decision_maker' ? 0.98 : 0.96);
+        }
+      }
     } finally {
       if (speechControllerRef.current === controller) speechControllerRef.current = null;
       setAudioLoadingId(current => current === turn.id ? null : current);
@@ -117,6 +176,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
 
   const finishSimulation = async (finalTurns: SimulationTurn[] = turns) => {
     if (isReportGenerating || finalTurns.filter(turn => turn.speaker === 'user').length === 0) return;
+    setIsSessionComplete(true);
     setIsReportGenerating(true);
     setSessionError(null);
     try {
@@ -136,15 +196,13 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     }
   };
 
-  const handleSubmit = async (content: string) => {
-    if (isAiThinking || report) return;
-    const userTurn: SimulationTurn = { id: createTurnId(), speaker: 'user', content: content.trim(), timestamp: timestamp() };
-    const historyWithUser = [...turns, userTurn];
-    setTurns(historyWithUser);
+  const requestCounterpartResponse = async (historyWithUser: SimulationTurn[]) => {
+    if (isAiThinking || report || isSessionComplete || historyWithUser.at(-1)?.speaker !== 'user') return;
     setIsAiThinking(true);
+    setStreamingReply('');
     setSessionError(null);
     try {
-      const response = await generateSimulationResponse(mission, persona, historyWithUser);
+      const response = await generateSimulationResponse(mission, persona, historyWithUser, setStreamingReply);
       const aiTurn: SimulationTurn = {
         id: createTurnId(), speaker: 'ai', content: response.reply, timestamp: timestamp(),
         pressureLevel: response.pressureLevel, tactic: response.tactic,
@@ -153,13 +211,27 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
       setTurns(finalTurns);
       if (voiceEnabled) void playAiTurn(aiTurn);
       if (response.shouldEnd || historyWithUser.filter(turn => turn.speaker === 'user').length >= 6) {
-        await finishSimulation(finalTurns);
+        setIsSessionComplete(true);
       }
     } catch (error) {
       setSessionError(error instanceof Error ? error.message : '상대의 응답을 생성하지 못했습니다.');
     } finally {
+      setStreamingReply('');
       setIsAiThinking(false);
     }
+  };
+
+  const handleSubmit = async (content: string) => {
+    if (isAiThinking || report || isSessionComplete || !content.trim()) return;
+    const userTurn: SimulationTurn = { id: createTurnId(), speaker: 'user', content: content.trim(), timestamp: timestamp() };
+    const historyWithUser = [...turns, userTurn];
+    setTurns(historyWithUser);
+    await requestCounterpartResponse(historyWithUser);
+  };
+
+  const retryCounterpartResponse = async () => {
+    if (isAiThinking || report || isSessionComplete || turns.at(-1)?.speaker !== 'user') return;
+    await requestCounterpartResponse(turns);
   };
 
   const restart = () => {
@@ -168,7 +240,9 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     audioRef.current?.pause();
     window.speechSynthesis?.cancel();
     setTurns([{ id: createTurnId(), speaker: 'ai', content: mission.openingLine, timestamp: timestamp(), pressureLevel: mission.difficulty + 1 }]);
+    setStreamingReply('');
     setReport(null);
+    setIsSessionComplete(false);
     setHasStarted(false);
     setElapsedSeconds(0);
     setSessionError(null);
@@ -204,12 +278,19 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
 
           <aside className={`simulation-ready-persona persona-${persona.id}`}>
             <div className="simulation-ready-live"><i /> YOUR COUNTERPART</div>
-            <div className="simulation-ready-avatar"><span>{persona.name.slice(0, 1)}</span><i /><i /></div>
+            <div className="simulation-ready-avatar"><img src={persona.imageUrl} alt={`${persona.name}, ${persona.gender} ${persona.age}세 페르소나`} /><i /><i /></div>
             <small>AI PERSONA</small>
             <h2>{persona.name}</h2>
-            <p>{persona.role}</p>
+            <p>{persona.role} · {persona.gender} · {persona.age}세 · {persona.identity}</p>
+            <strong className="simulation-persona-tagline">“{persona.tagline}”</strong>
+            <p className="simulation-persona-background">{persona.background}</p>
             <div className="simulation-persona-traits">
-              {persona.behaviorRules.slice(0, 3).map(rule => <span key={rule}>{rule.replace(/한다\.$/, '')}</span>)}
+              {persona.personalityTraits.map(trait => <span key={trait}>{trait}</span>)}
+            </div>
+            <div className="simulation-persona-details">
+              <article><span>대화 스타일</span><p>{persona.speakingPattern}</p></article>
+              <article><span>판단 기준</span><ul>{persona.decisionCriteria.map(item => <li key={item}>{item}</li>)}</ul></article>
+              <article><span>신뢰를 얻는 조건</span><p>{persona.concessionCondition}</p></article>
             </div>
             <blockquote><span>첫 질문</span>“{mission.openingLine}”</blockquote>
             <div className="simulation-ready-audio">
@@ -278,13 +359,13 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
           <button type="button" className="simulation-voice-toggle" onClick={() => { setVoiceEnabled(value => !value); speechControllerRef.current?.abort(); speechControllerRef.current = null; audioRef.current?.pause(); window.speechSynthesis?.cancel(); }}>
             {voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />} AI 음성 자동재생 {voiceEnabled ? '켜짐' : '꺼짐'}
           </button>
-          {userTurnCount >= 2 && <button type="button" className="simulation-finish-button" disabled={isAiThinking || isReportGenerating} onClick={() => void finishSimulation()}><Square size={15} /> 현재 대화로 평가받기</button>}
+          {userTurnCount >= 2 && <button type="button" className="simulation-finish-button" disabled={isAiThinking || isReportGenerating} onClick={() => void finishSimulation()}><Square size={15} /> {isSessionComplete ? '결과 보고서 보기' : '상황 종료 후 평가받기'}</button>}
         </aside>
 
         <section className="simulation-conversation-panel">
           <div className="simulation-persona-head">
-            <div className={`simulation-persona-avatar persona-${persona.id}`}><span>{persona.name.slice(0, 1)}</span><i /></div>
-            <div><small>상대 페르소나</small><strong>{persona.name}</strong><span>{persona.role}</span></div>
+            <div className={`simulation-persona-avatar persona-${persona.id}`}><img src={persona.imageUrl} alt={`${persona.name}, ${persona.gender} ${persona.age}세`} /><i /></div>
+            <div><small>{persona.gender} · {persona.age}세 · {persona.identity}</small><strong>{persona.name}</strong><span>{persona.role} · {persona.personalityTraits.slice(0, 2).join(' · ')}</span></div>
             <div className="simulation-live-wave" aria-hidden="true">{[9, 17, 12, 22, 15].map((height, index) => <i key={index} style={{ height }} />)}</div>
             <span>난이도 {mission.difficulty}/3</span>
           </div>
@@ -303,21 +384,36 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
                 )}
               </article>
             ))}
-            {isAiThinking && <div className="simulation-thinking"><LoaderCircle className="spin" size={18} /> {persona.name}이 대응을 준비하고 있습니다...</div>}
+            {isAiThinking && streamingReply && (
+              <article className="simulation-turn ai streaming" aria-live="polite">
+                <div className="simulation-turn-meta"><strong>{persona.name}</strong><span>응답 중</span></div>
+                <p>{streamingReply}</p>
+              </article>
+            )}
+            {isAiThinking && !streamingReply && <div className="simulation-thinking"><LoaderCircle className="spin" size={18} /> {persona.name}이 대응을 준비하고 있습니다...</div>}
             {isReportGenerating && <div className="simulation-thinking"><Sparkles className="spin" size={18} /> 대화 기록을 분석하고 있습니다...</div>}
-            {sessionError && <div className="simulation-session-error">{sessionError}</div>}
+            {sessionError && <div className="simulation-session-error"><span>{sessionError}</span>{turns.at(-1)?.speaker === 'user' && !isAiThinking && <button type="button" className="btn btn-secondary" onClick={() => void retryCounterpartResponse()}>같은 답변으로 다시 생성</button>}</div>}
             <div ref={conversationEndRef} />
           </div>
           <div className="simulation-action-zone">
-            <ActionZone
-              currentRound={practiceStep}
-              roundProgress={{ current: Math.min(userTurnCount + 1, 6), total: 6 }}
-              isPlayerTurn={!isReportGenerating}
-              isAiThinking={isAiThinking || isReportGenerating}
-              topic={`${mission.title}: ${mission.situation}`}
-              onSubmit={content => void handleSubmit(content)}
-              language="ko"
-            />
+            {isSessionComplete ? (
+              <div className="simulation-complete-panel" role="status">
+                <div><CheckCircle2 size={20} /><span><strong>상황극이 종료되었습니다.</strong> 상대의 마지막 발언을 확인한 뒤 결과 보고서를 열어보세요.</span></div>
+                <button type="button" className="btn btn-primary" disabled={isReportGenerating} onClick={() => void finishSimulation()}>
+                  {isReportGenerating ? <LoaderCircle className="spin" size={17} /> : <Award size={17} />} 결과 보고서 보기
+                </button>
+              </div>
+            ) : (
+              <ActionZone
+                currentRound={practiceStep}
+                roundProgress={{ current: Math.min(userTurnCount + 1, 6), total: 6 }}
+                isPlayerTurn={!isReportGenerating}
+                isAiThinking={isAiThinking || isReportGenerating}
+                topic={`${mission.title}: ${mission.situation}`}
+                onSubmit={content => void handleSubmit(content)}
+                language="ko"
+              />
+            )}
           </div>
         </section>
       </main>

@@ -1486,7 +1486,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             {copied ? <Check size={17} /> : <Copy size={17} />}
             {copied ? '복사됨' : '초대 링크'}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('/')}>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/debate')}>
             <LogOut size={17} /> 나가기
           </button>
         </div>
