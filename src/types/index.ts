@@ -48,6 +48,7 @@ export type DebateRoundId =
 
 export type BattleConfig = {
   topic: string;
+  usageSessionId?: string;
   language?: AppLanguage;
   topicDescription?: string;
   topicBriefing?: TopicBriefing;
@@ -257,6 +258,26 @@ export type SuperAdminRecord = {
   arguments: Argument[];
 };
 
+export type SuperAdminSimulationSession = {
+  id: string;
+  userId: string;
+  nickname: string;
+  email: string;
+  missionId: string;
+  missionTitle: string;
+  categoryId: SimulationCategoryId;
+  personaId: SimulationPersonaId;
+  difficulty: SimulationDifficulty;
+  source: 'preset' | PersonalSimulationSource;
+  status: 'in_progress' | 'completed' | 'abandoned' | 'failed';
+  durationSeconds: number;
+  turns: SimulationTurn[];
+  report: SimulationReport | null;
+  overallScore: number | null;
+  startedAt: string;
+  completedAt: string | null;
+};
+
 export type SuperAdminOrganizationOwner = {
   userId: string;
   nickname: string;
@@ -274,9 +295,11 @@ export type SuperAdminOrganization = {
 export type SuperAdminDashboard = {
   totalUsers: number;
   totalRecords: number;
+  totalSimulationSessions: number;
   activeUsers: number;
   organizations: SuperAdminOrganization[];
   records: SuperAdminRecord[];
+  simulationSessions: SuperAdminSimulationSession[];
 };
 
 export type ScoreCategory = {

@@ -42,6 +42,7 @@ import { getMyMemberOrganizations } from '../lib/admin';
 import { getPublicDebateTopics } from '../lib/publicTopics';
 import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
 import { createDebateRoom } from '../lib/debateRooms';
+import { claimDebateTrainingSession } from '../lib/trainingUsage';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -91,6 +92,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
   const [publicTopics, setPublicTopics] = useState<PublicDebateTopic[]>([]);
   const [memberOrganizations, setMemberOrganizations] = useState<OrganizationSummary[]>([]);
+  const [trainingStartError, setTrainingStartError] = useState<string | null>(null);
 
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const hasOrganizationStaffAccess = memberOrganizations.some(organization =>
@@ -219,6 +221,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
     if (config.gameMode === 'pvp') {
       const roomId = createLiveRoomId();
+      await claimDebateTrainingSession(roomId);
       await createDebateRoom({
         roomId,
         topic: config.topic,
@@ -240,18 +243,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
       return;
     }
 
+    const usageSessionId = globalThis.crypto?.randomUUID?.() ?? `debate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await claimDebateTrainingSession(usageSessionId);
     navigate('/battle/new', {
       state: {
         ...config,
         gameMode: 'debate',
         userPosition: position,
         debateLevel,
+        usageSessionId,
       },
     });
   };
 
-  const handleJoinBattle = (room: LiveDebateRoomSummary) => {
+  const handleJoinBattle = async (room: LiveDebateRoomSummary) => {
     if (!user) return onLoginRequest();
+    await claimDebateTrainingSession(room.roomId);
     navigate(buildDebateLobbyPath(room.roomId));
   };
 
@@ -596,12 +603,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                         color: '#fff',
                         boxShadow: `0 4px 12px ${selectedAccent.soft}`
                       }}
-                      onClick={() => handleStartBattle({
+                      onClick={() => void handleStartBattle({
                         ...selectedBattle.config,
                         timeLimit: selectedTimeLimit,
                         topicDescription: selectedBattle.briefing.context,
                         topicBriefing: selectedBattle.briefing,
-                      })}
+                      }).catch(error => setTrainingStartError(error instanceof Error ? error.message : '토론을 시작하지 못했습니다.'))}
                     >
                       이 주제로 AI 스파링 <ChevronRight size={20} />
                     </button>
@@ -941,6 +948,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
       )}
 
+      {trainingStartError && (
+        <div className="training-limit-notice" role="alert">
+          <span><Shield size={18} /><strong>이용 한도 안내</strong>{trainingStartError}</span>
+          <button type="button" onClick={() => setTrainingStartError(null)} aria-label="안내 닫기"><X size={17} /></button>
+        </div>
+      )}
       {showCreateModal && <CreateBattleModal liveOnly={createLiveOnly} onClose={() => setShowCreateModal(false)} onStart={handleStartBattle} publicTopics={publicTopics} />}
       {showJoinModal && <JoinDebateModal onClose={() => setShowJoinModal(false)} onJoin={handleJoinBattle} />}
 

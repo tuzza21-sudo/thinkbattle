@@ -6,13 +6,15 @@ import { getSimulationMission, getSimulationPersona, simulationCategories } from
 import { generateSimulationReport, generateSimulationResponse } from '../lib/api';
 import { getPersonalSimulationMission } from '../lib/personalTraining';
 import { speakWithBrowserFallback, streamPersonaSpeech, synthesizePersonaSpeech } from '../lib/personaSpeech';
-import type { AppUser, DebateStep, SimulationReport, SimulationTurn } from '../types';
+import { startSimulationTrainingSession, updateSimulationTrainingSession } from '../lib/trainingUsage';
+import type { AppUser, DebateStep, PersonalSimulationSource, SimulationReport, SimulationTurn } from '../types';
 
 interface SimulationSessionPageProps {
   user: AppUser;
 }
 
 const createTurnId = () => globalThis.crypto?.randomUUID?.() ?? `turn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const createSessionId = () => globalThis.crypto?.randomUUID?.() ?? `simulation-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const timestamp = () => new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 const formatElapsed = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
@@ -34,6 +36,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
   const [mission, setMission] = useState(staticMission);
   const [isMissionLoading, setIsMissionLoading] = useState(!staticMission);
   const [missionLoadError, setMissionLoadError] = useState<string | null>(null);
+  const [missionSource, setMissionSource] = useState<'preset' | PersonalSimulationSource>(staticMission ? 'preset' : 'custom');
   const persona = mission ? getSimulationPersona(mission.personaId) : undefined;
   const [turns, setTurns] = useState<SimulationTurn[]>(() => mission ? [{
     id: createTurnId(), speaker: 'ai', content: mission.openingLine, timestamp: timestamp(), pressureLevel: mission.difficulty + 1,
@@ -49,6 +52,8 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const speechControllerRef = useRef<AbortController | null>(null);
   const audioUrlsRef = useRef<Record<string, string>>({});
@@ -65,6 +70,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
           return;
         }
         setMission(record.mission);
+        setMissionSource(record.source);
         setTurns([{ id: createTurnId(), speaker: 'ai', content: record.mission.openingLine, timestamp: timestamp(), pressureLevel: record.mission.difficulty + 1 }]);
       })
       .catch(error => {
@@ -180,7 +186,11 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     setIsReportGenerating(true);
     setSessionError(null);
     try {
-      setReport(await generateSimulationReport(mission, persona, finalTurns));
+      const generatedReport = await generateSimulationReport(mission, persona, finalTurns);
+      setReport(generatedReport);
+      if (sessionId) {
+        await updateSimulationTrainingSession(sessionId, finalTurns, elapsedSeconds, 'completed', generatedReport);
+      }
     } catch (error) {
       setSessionError(error instanceof Error ? error.message : '평가를 생성하지 못했습니다.');
     } finally {
@@ -188,11 +198,23 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     }
   };
 
-  const beginSimulation = () => {
-    setHasStarted(true);
-    setElapsedSeconds(0);
-    if (voiceEnabled && turns[0]) {
-      window.setTimeout(() => void playAiTurn(turns[0]), 180);
+  const beginSimulation = async () => {
+    if (isStarting) return;
+    const nextSessionId = createSessionId();
+    setIsStarting(true);
+    setSessionError(null);
+    try {
+      await startSimulationTrainingSession(nextSessionId, mission, missionSource, turns);
+      setSessionId(nextSessionId);
+      setHasStarted(true);
+      setElapsedSeconds(0);
+      if (voiceEnabled && turns[0]) {
+        window.setTimeout(() => void playAiTurn(turns[0]), 180);
+      }
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : '훈련을 시작하지 못했습니다.');
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -209,6 +231,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
       };
       const finalTurns = [...historyWithUser, aiTurn];
       setTurns(finalTurns);
+      if (sessionId) void updateSimulationTrainingSession(sessionId, finalTurns, elapsedSeconds);
       if (voiceEnabled) void playAiTurn(aiTurn);
       if (response.shouldEnd || historyWithUser.filter(turn => turn.speaker === 'user').length >= 6) {
         setIsSessionComplete(true);
@@ -226,6 +249,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     const userTurn: SimulationTurn = { id: createTurnId(), speaker: 'user', content: content.trim(), timestamp: timestamp() };
     const historyWithUser = [...turns, userTurn];
     setTurns(historyWithUser);
+    if (sessionId) void updateSimulationTrainingSession(sessionId, historyWithUser, elapsedSeconds);
     await requestCounterpartResponse(historyWithUser);
   };
 
@@ -244,6 +268,7 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
     setReport(null);
     setIsSessionComplete(false);
     setHasStarted(false);
+    setSessionId(null);
     setElapsedSeconds(0);
     setSessionError(null);
   };
@@ -303,8 +328,11 @@ export const SimulationSessionPage = ({ user }: SimulationSessionPageProps) => {
           </aside>
 
           <div className="simulation-ready-action">
-            <div><ShieldAlert size={18} /><span>언제든 중단할 수 있으며, 인격 공격 없이 실전 압박만 제공합니다.</span></div>
-            <button type="button" onClick={beginSimulation}><Play size={19} fill="currentColor" /> 훈련 시작하기 <ChevronRight size={19} /></button>
+            <div><ShieldAlert size={18} /><span>{sessionError || '언제든 중단할 수 있으며, 인격 공격 없이 실전 압박만 제공합니다.'}</span></div>
+            <button type="button" onClick={() => void beginSimulation()} disabled={isStarting}>
+              {isStarting ? <LoaderCircle className="spin" size={19} /> : <Play size={19} fill="currentColor" />}
+              {isStarting ? '이용 가능 횟수 확인 중' : '훈련 시작하기'} <ChevronRight size={19} />
+            </button>
           </div>
         </main>
       </div>

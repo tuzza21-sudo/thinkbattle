@@ -5,6 +5,7 @@ import {
   CircleCheck,
   FileText,
   LockKeyhole,
+  MessageSquareText,
   RefreshCw,
   ShieldCheck,
   UserPlus,
@@ -16,15 +17,28 @@ import {
   createSuperAdminOrganization,
   getSuperAdminDashboard,
 } from '../lib/superAdmin';
-import type { SuperAdminDashboard as DashboardData, SuperAdminRecord } from '../types';
+import type { SuperAdminDashboard as DashboardData, SuperAdminRecord, SuperAdminSimulationSession } from '../types';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
+const simulationCategoryLabel: Record<SuperAdminSimulationSession['categoryId'], string> = {
+  career: '채용·면접',
+  negotiation: '협상',
+  workplace: '직장',
+  sales: '세일즈·수주',
+};
+const simulationStatusLabel: Record<SuperAdminSimulationSession['status'], string> = {
+  in_progress: '진행 중',
+  completed: '완료',
+  abandoned: '중단',
+  failed: '오류',
+};
 
 export const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<SuperAdminRecord | null>(null);
+  const [selectedSimulation, setSelectedSimulation] = useState<SuperAdminSimulationSession | null>(null);
   const [query, setQuery] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
@@ -53,6 +67,12 @@ export const SuperAdminDashboard = () => {
   const records = useMemo(
     () => (data?.records ?? []).filter(record =>
       `${record.nickname} ${record.email} ${record.topic}`.toLowerCase().includes(query.toLowerCase()),
+    ),
+    [data, query],
+  );
+  const simulationSessions = useMemo(
+    () => (data?.simulationSessions ?? []).filter(session =>
+      `${session.nickname} ${session.email} ${session.missionTitle} ${simulationCategoryLabel[session.categoryId]}`.toLowerCase().includes(query.toLowerCase()),
     ),
     [data, query],
   );
@@ -121,6 +141,7 @@ export const SuperAdminDashboard = () => {
           <section className="admin-metric-grid">
             <Metric icon={<Users />} label="전체 회원" value={`${data.totalUsers}명`} />
             <Metric icon={<FileText />} label="전체 토론 기록" value={`${data.totalRecords}건`} />
+            <Metric icon={<MessageSquareText />} label="페르소나 훈련" value={`${data.totalSimulationSessions ?? 0}건`} />
             <Metric icon={<ShieldCheck />} label="활동 회원" value={`${data.activeUsers}명`} />
             <Metric icon={<Building2 />} label="기관 게시판" value={`${organizations.length}개`} />
           </section>
@@ -194,7 +215,7 @@ export const SuperAdminDashboard = () => {
           <section className="card admin-panel">
             <div className="super-admin-section-heading">
               <h2>전체 활동 기록</h2>
-              <input className="input-field super-admin-search" placeholder="회원명 · 이메일 · 토론 주제 검색" value={query} onChange={event => setQuery(event.target.value)} />
+              <input className="input-field super-admin-search" placeholder="회원명 · 이메일 · 훈련 주제 검색" value={query} onChange={event => setQuery(event.target.value)} />
             </div>
             <div className="super-admin-table-wrap">
               <table className="super-admin-table">
@@ -211,6 +232,35 @@ export const SuperAdminDashboard = () => {
             </div>
             {!records.length && <p className="super-admin-list-empty">표시할 토론 기록이 없습니다.</p>}
           </section>
+
+          <section className="card admin-panel super-admin-simulation-section">
+            <div className="super-admin-section-heading">
+              <div>
+                <span className="admin-eyebrow">PERSONA TRAINING</span>
+                <h2>페르소나 훈련 모니터링</h2>
+              </div>
+              <p className="admin-lead">진행 중인 세션과 완료된 대화·평가 결과를 확인합니다.</p>
+            </div>
+            <div className="super-admin-table-wrap">
+              <table className="super-admin-table super-admin-simulation-table">
+                <thead><tr>{['회원', '이메일', '훈련 상황', '분류', '난이도', '상태', '점수', '시작일', ''].map(label => <th key={label}>{label}</th>)}</tr></thead>
+                <tbody>{simulationSessions.map(session => (
+                  <tr key={session.id}>
+                    <td>{session.nickname}</td>
+                    <td>{session.email}</td>
+                    <td>{session.missionTitle}</td>
+                    <td>{simulationCategoryLabel[session.categoryId]}</td>
+                    <td>{session.difficulty}/3</td>
+                    <td><span className={`super-admin-session-status ${session.status}`}>{simulationStatusLabel[session.status]}</span></td>
+                    <td>{session.overallScore == null ? '—' : `${session.overallScore}점`}</td>
+                    <td>{new Date(session.startedAt).toLocaleString('ko-KR')}</td>
+                    <td><button className="btn btn-secondary" style={{ padding: '.4rem .6rem' }} onClick={() => setSelectedSimulation(session)}>상세</button></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            {!simulationSessions.length && <p className="super-admin-list-empty">표시할 페르소나 훈련 기록이 없습니다. 새 마이그레이션 적용 후 시작된 훈련부터 기록됩니다.</p>}
+          </section>
         </>
       )}
 
@@ -224,6 +274,47 @@ export const SuperAdminDashboard = () => {
             <section><h3>AI 총평</h3><p>{selected.report?.overallFeedback || '저장된 총평이 없습니다.'}</p></section>
             <section><h3>세부 역량</h3>{selected.report?.categories?.map(category => <article key={category.name}><strong>{category.name} · {category.score}/{category.maxScore}</strong><p>{category.feedback}</p></article>)}</section>
             <section><h3>토론 발언 기록</h3>{selected.arguments?.map(argument => <article className={argument.isAi ? 'ai' : ''} key={argument.id}><strong>{argument.isAi ? 'AI' : selected.nickname}{argument.roundTitle ? ` · ${argument.roundTitle}` : ''}</strong><p>{argument.content}</p></article>)}</section>
+          </article>
+        </div>
+      )}
+
+      {selectedSimulation && (
+        <div role="dialog" aria-modal="true" className="super-admin-modal-backdrop">
+          <article className="card super-admin-report-modal super-admin-simulation-modal">
+            <div className="super-admin-section-heading">
+              <div>
+                <span className="admin-eyebrow">{simulationCategoryLabel[selectedSimulation.categoryId]} · 난이도 {selectedSimulation.difficulty}/3</span>
+                <h2>{selectedSimulation.missionTitle}</h2>
+                <p>{selectedSimulation.nickname} · {selectedSimulation.email} · {simulationStatusLabel[selectedSimulation.status]}</p>
+              </div>
+              <button className="icon-button" onClick={() => setSelectedSimulation(null)} aria-label="닫기">×</button>
+            </div>
+            <section className="super-admin-simulation-summary">
+              <h3>훈련 요약</h3>
+              <div>
+                <span>진행 시간 <strong>{Math.floor(selectedSimulation.durationSeconds / 60)}분 {selectedSimulation.durationSeconds % 60}초</strong></span>
+                <span>사용자 발언 <strong>{selectedSimulation.turns.filter(turn => turn.speaker === 'user').length}회</strong></span>
+                <span>종합 점수 <strong>{selectedSimulation.overallScore == null ? '평가 전' : `${selectedSimulation.overallScore}점`}</strong></span>
+              </div>
+              {selectedSimulation.report?.summary && <p>{selectedSimulation.report.summary}</p>}
+            </section>
+            {selectedSimulation.report?.metrics?.length ? (
+              <section>
+                <h3>세부 역량</h3>
+                {selectedSimulation.report.metrics.map(metric => (
+                  <article key={metric.name}><strong>{metric.name} · {metric.score}점</strong><p>{metric.feedback}</p></article>
+                ))}
+              </section>
+            ) : null}
+            <section>
+              <h3>페르소나 대화 기록</h3>
+              {selectedSimulation.turns.length ? selectedSimulation.turns.map(turn => (
+                <article className={turn.speaker === 'ai' ? 'ai' : ''} key={turn.id}>
+                  <strong>{turn.speaker === 'ai' ? '페르소나' : selectedSimulation.nickname}{turn.tactic ? ` · ${turn.tactic}` : ''}</strong>
+                  <p>{turn.content}</p>
+                </article>
+              )) : <p>아직 저장된 발언이 없습니다.</p>}
+            </section>
           </article>
         </div>
       )}

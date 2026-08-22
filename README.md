@@ -52,6 +52,8 @@ supabase functions deploy cleanup-live-debate-audio
 
 마지막으로 `supabase_production_hardening_migration.sql`을 실행하세요. 이 마이그레이션은 AI 사용자별 쿼터, 평가 저장 권한, 대기실 heartbeat, 공개 주제 검토 대기 정책을 적용합니다. 기존에 공개된 사용자 생성 주제는 자동 비공개 처리하지 않으므로 운영자가 한 번 검토해야 합니다.
 
+신규 가입자의 토론·페르소나 훈련 한도와 슈퍼 관리자 페르소나 모니터링을 활성화하려면 이어서 `supabase_training_usage_and_simulation_monitoring_migration.sql`을 실행하세요. 최초 적용 당시 존재하는 계정은 자동 면제되며, 이후 가입 계정에는 토론과 페르소나 훈련 각각 일 3회·월 10회 한도가 적용됩니다. 슈퍼 관리자는 자동 면제되고, 유료·기관 계정은 `public.users.training_quota_exempt` 값을 `true`로 설정해 개별 면제할 수 있습니다. 날짜 기준은 한국 시간입니다.
+
 ### 배포 순서
 
 1. 기존 기본·인증·B2B·슈퍼 관리자 마이그레이션 적용
@@ -60,9 +62,10 @@ supabase functions deploy cleanup-live-debate-audio
 4. `supabase_live_debate_audio_retention_migration.sql` 적용 후 `cleanup-live-debate-audio` Edge Function 배포
 5. `supabase_topic_visibility_migration.sql` 적용
 6. `supabase_production_hardening_migration.sql` 적용
-7. Vercel 환경변수 입력 후 `npm run lint`와 `npm run build` 실행
-8. `npm run test:livekit`으로 임시 방 생성·토큰·정리를 확인
-9. 서로 다른 두 계정과 두 브라우저로 음성 토론, 자동 전사·본인 음성 재생·다운로드와 종료 평가 확인
+7. `supabase_training_usage_and_simulation_monitoring_migration.sql` 적용
+8. Vercel 환경변수 입력 후 `npm run lint`와 `npm run build` 실행
+9. `npm run test:livekit`으로 임시 방 생성·토큰·정리를 확인
+10. 서로 다른 두 계정과 두 브라우저로 음성 토론, 자동 전사·본인 음성 재생·다운로드와 종료 평가 확인
 
 ### 기관 계정 개설
 

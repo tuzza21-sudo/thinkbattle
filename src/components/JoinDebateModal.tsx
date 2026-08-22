@@ -17,6 +17,7 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const organizationKey = organizationIds.join(',');
 
@@ -48,7 +49,9 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
   const enterLobby = async (room: LiveDebateRoomSummary) => {
     if (joiningRoomId) return;
     setJoiningRoomId(room.roomId);
+    setJoinError(null);
     try { await onJoin(room); }
+    catch (error) { setJoinError(error instanceof Error ? error.message : isEnglish ? 'The debate could not be joined.' : '토론에 참여하지 못했습니다.'); }
     finally { setJoiningRoomId(null); }
   };
 
@@ -95,7 +98,10 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
           </div>
         </div>
 
-        <div className="debate-modal-footer"><button type="button" className="btn btn-secondary" onClick={onClose}>{isEnglish ? 'Close' : '닫기'}</button></div>
+        <div className="debate-modal-footer">
+          {joinError && <span className="debate-join-error" role="alert">{joinError}</span>}
+          <button type="button" className="btn btn-secondary" onClick={onClose}>{isEnglish ? 'Close' : '닫기'}</button>
+        </div>
       </div>
     </div>
   );

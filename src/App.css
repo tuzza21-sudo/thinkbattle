@@ -622,6 +622,35 @@
 .training-gateway-card:focus-visible { outline: 3px solid #818cf8; outline-offset: 4px; }
 .training-gateway-note { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-top: 1.5rem; color: #64748b; font-size: .72rem; }
 
+.training-gateway-footer {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(190px, .7fr) minmax(360px, 1.3fr) auto;
+  align-items: start;
+  gap: 2rem;
+  width: min(1320px, calc(100% - 3rem));
+  margin: 1.5rem auto 0;
+  padding: 2rem 0;
+  color: #64748b;
+  border-top: 1px solid rgba(148, 163, 184, .12);
+}
+.training-gateway-footer-brand { display: flex; align-items: center; gap: .7rem; }
+.training-gateway-footer-brand img { width: 38px; height: 38px; object-fit: contain; }
+.training-gateway-footer-brand > div { display: grid; gap: .1rem; }
+.training-gateway-footer-brand strong { color: #cbd5e1; font-size: .92rem; }
+.training-gateway-footer-brand span { font-size: .64rem; }
+.training-gateway-footer-info { display: grid; gap: .45rem; }
+.training-gateway-footer-info p { display: flex; align-items: center; flex-wrap: wrap; gap: .32rem; margin: 0; font-size: .7rem; line-height: 1.55; }
+.training-gateway-footer-info p span { color: #94a3b8; font-weight: 800; }
+.training-gateway-footer-info p i { width: 1px; height: 10px; margin: 0 .2rem; background: rgba(148, 163, 184, .2); }
+.training-gateway-footer-info a { color: #94a3b8; text-decoration: none; }
+.training-gateway-footer-info a:hover { color: #60a5fa; }
+.training-gateway-footer-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .65rem; }
+.training-gateway-footer-links button { padding: 0; color: #64748b; font: inherit; font-size: .68rem; border: 0; background: transparent; cursor: pointer; }
+.training-gateway-footer-links button:hover { color: #93c5fd; }
+.training-gateway-footer-links span { flex-basis: 100%; color: #475569; font-size: .64rem; text-align: right; }
+
 /* ── Debate home: unified premium arena ─────────────────────────────────── */
 .debate-home-page {
   min-height: 100vh;
@@ -852,11 +881,15 @@
 @media (max-width: 860px) {
   .training-gateway-options { grid-template-columns: 1fr; }
   .training-gateway-card { height: min(480px, 70vw); min-height: 340px; }
+  .training-gateway-footer { grid-template-columns: 1fr 1.5fr; }
+  .training-gateway-footer-links { grid-column: 1 / -1; justify-content: flex-start; }
+  .training-gateway-footer-links span { flex-basis: auto; text-align: left; }
 }
 
 @media (max-width: 560px) {
   .training-gateway-header,
-  .training-gateway-main { width: min(100% - 1.25rem, 1320px); }
+  .training-gateway-main,
+  .training-gateway-footer { width: min(100% - 1.25rem, 1320px); }
   .training-gateway-header { min-height: 70px; }
   .training-gateway-brand small,
   .training-gateway-account > span { display: none; }
@@ -868,6 +901,11 @@
   .training-gateway-card-copy { padding-top: 3rem; }
   .training-gateway-card-bottom { align-items: flex-end; }
   .training-gateway-card-bottom > span { max-width: 58%; line-height: 1.45; }
+  .training-gateway-footer { grid-template-columns: 1fr; gap: 1.25rem; }
+  .training-gateway-footer-info p { display: block; }
+  .training-gateway-footer-info p span { margin-right: .25rem; }
+  .training-gateway-footer-info p i { display: none; }
+  .training-gateway-footer-links { grid-column: auto; }
 }
 
 .session-control-button.voice-active,
