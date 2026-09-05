@@ -14,7 +14,8 @@ export type AppUser = {
   id: string;
   email: string;
   nickname: string;
-  provider: 'email' | 'kakao' | 'google';
+  provider: 'email' | 'kakao' | 'google' | 'anonymous';
+  isAnonymous: boolean;
   createdAt: string;
 };
 
@@ -209,6 +210,24 @@ export type PublicDebateTopic = {
   createdBy?: string;
   createdAt: string;
   language: AppLanguage;
+};
+
+export type HomepageTopicKind = 'latest_issue' | 'detail';
+
+export type HomepageDebateTopic = {
+  id: string;
+  topicKind: HomepageTopicKind;
+  sector: string;
+  title: string;
+  description: string;
+  briefing: TopicBriefing;
+  timeLimit: number;
+  accent: FeaturedBattle['accent'];
+  issueLabel: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type OrganizationStudentRecord = {

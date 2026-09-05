@@ -36,7 +36,8 @@ const quotaError = (kind: TrainingKind, result: TrainingQuotaResult) => {
   if (result.reason === 'monthly') {
     return new TrainingLimitError('monthly', '이번 달 ' + label + ' 무료 이용 한도 10회를 모두 사용했습니다. 다음 달에 다시 이용해 주세요.');
   }
-  return new TrainingLimitError('daily', '오늘 ' + label + ' 무료 이용 한도 3회를 모두 사용했습니다. 내일 다시 이용해 주세요.');
+  const dailyLimit = result.dailyLimit ?? 3;
+  return new TrainingLimitError('daily', '오늘 ' + label + ' 무료 이용 한도 ' + dailyLimit + '회를 모두 사용했습니다. 내일 다시 이용해 주세요.');
 };
 
 const rpcSetupError = (message: string) => {

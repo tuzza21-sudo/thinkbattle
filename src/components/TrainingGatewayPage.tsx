@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowRight, BrainCircuit, BriefcaseBusiness, LogIn, LogOut, MessageSquareText, Sparkles, Swords, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
@@ -5,6 +6,7 @@ import type { AppUser } from '../types';
 interface TrainingGatewayPageProps {
   user: AppUser | null;
   onLoginRequest: () => void;
+  onGuestRequest: () => Promise<void>;
   onLogout: () => void;
 }
 
@@ -33,8 +35,25 @@ const trainingOptions = [
   },
 ] as const;
 
-export const TrainingGatewayPage = ({ user, onLoginRequest, onLogout }: TrainingGatewayPageProps) => {
+export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLogout }: TrainingGatewayPageProps) => {
   const navigate = useNavigate();
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const openTraining = async (path: string) => {
+    if (!user) {
+      if (guestLoading) return;
+      setGuestLoading(true);
+      try {
+        await onGuestRequest();
+        setGuestLoading(false);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : '게스트 체험을 시작하지 못했습니다.');
+        setGuestLoading(false);
+        return;
+      }
+    }
+    navigate(path);
+  };
 
   return (
     <div className="training-gateway">
@@ -46,8 +65,9 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onLogout }: Training
         <div className="training-gateway-account">
           {user ? (
             <>
-              <span><small>반갑습니다</small><strong>{user.nickname}님</strong></span>
-              <button type="button" onClick={onLogout} aria-label="로그아웃"><LogOut size={17} /> 로그아웃</button>
+              <span><small>{user.isAnonymous ? '무료 체험 중' : '반갑습니다'}</small><strong>{user.nickname}님</strong></span>
+              {user.isAnonymous && <button type="button" onClick={onLoginRequest}><LogIn size={17} /> 회원가입 · 로그인</button>}
+              {!user.isAnonymous && <button type="button" onClick={onLogout} aria-label="로그아웃"><LogOut size={17} /> 로그아웃</button>}
             </>
           ) : (
             <button type="button" onClick={onLoginRequest}><LogIn size={17} /> 로그인</button>
@@ -71,7 +91,8 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onLogout }: Training
                 type="button"
                 key={option.id}
                 className={`training-gateway-card ${option.id}`}
-                onClick={() => navigate(option.path)}
+                onClick={() => void openTraining(option.path)}
+                disabled={guestLoading}
                 aria-label={`${option.title} 시작하기`}
               >
                 <img src={option.image} alt="" aria-hidden="true" />
@@ -84,7 +105,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onLogout }: Training
                   </span>
                   <span className="training-gateway-card-bottom">
                     <span><FeatureIcon size={16} /> {option.feature}</span>
-                    <b>시작하기 <ArrowRight size={18} /></b>
+                    <b>{!user && guestLoading ? '게스트 준비 중...' : !user ? '게스트 무료 체험' : '시작하기'} <ArrowRight size={18} /></b>
                   </span>
                 </span>
               </button>

@@ -18,7 +18,6 @@ import {
   Swords,
   Users,
   X,
-  Zap,
   TrendingUp,
   History,
   ChevronRight,
@@ -43,6 +42,7 @@ import { getPublicDebateTopics } from '../lib/publicTopics';
 import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
 import { createDebateRoom } from '../lib/debateRooms';
 import { claimDebateTrainingSession } from '../lib/trainingUsage';
+import { buildHomepageTopicLibrary, getHomepageDebateTopics, type HomepageTopicCollection } from '../lib/homepageTopics';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -91,12 +91,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const [opinionStatsCache, setOpinionStatsCache] = useState<Record<string, TopicOpinionStats>>({});
   const [activeCategory, setActiveCategory] = useState<string>(categorizedTopics[0].category);
   const [publicTopics, setPublicTopics] = useState<PublicDebateTopic[]>([]);
+  const [homepageTopics, setHomepageTopics] = useState<HomepageTopicCollection | null>(null);
   const [memberOrganizations, setMemberOrganizations] = useState<OrganizationSummary[]>([]);
   const [trainingStartError, setTrainingStartError] = useState<string | null>(null);
 
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const hasOrganizationStaffAccess = memberOrganizations.some(organization =>
     ['owner', 'admin', 'coach'].includes(organization.role),
+  );
+  const managedTopicLibrary = React.useMemo(
+    () => homepageTopics ? buildHomepageTopicLibrary(homepageTopics.topics) : null,
+    [homepageTopics],
+  );
+  const displayWeeklyIssues = React.useMemo(
+    () => homepageTopics?.managedKinds.includes('latest_issue')
+      ? managedTopicLibrary?.latestIssues ?? []
+      : weeklyIssues,
+    [homepageTopics, managedTopicLibrary],
+  );
+  const displayCategorizedTopics = React.useMemo(
+    () => homepageTopics?.managedKinds.includes('detail')
+      ? managedTopicLibrary?.categorizedTopics ?? []
+      : categorizedTopics,
+    [homepageTopics, managedTopicLibrary],
   );
 
   useEffect(() => {
@@ -113,6 +130,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   }, []);
 
   useEffect(() => {
+    void getHomepageDebateTopics().then(topics => {
+      if (topics) setHomepageTopics(topics);
+    });
+  }, []);
+
+  useEffect(() => {
     const organizationsPromise = user ? getMyMemberOrganizations() : Promise.resolve([]);
     void organizationsPromise.then(setMemberOrganizations);
   }, [user]);
@@ -121,8 +144,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   useEffect(() => {
     const fetchStats = async () => {
       const allTopics = [
-        ...weeklyIssues.map(w => ({ id: w.id, topic: w.topic })),
-        ...categorizedTopics.flatMap(c => c.topics.map(t => ({ id: t.id, topic: t.topic }))),
+        ...displayWeeklyIssues.map(w => ({ id: w.id, topic: w.topic })),
+        ...displayCategorizedTopics.flatMap(c => c.topics.map(t => ({ id: t.id, topic: t.topic }))),
       ];
       
       const statsList = await Promise.all(allTopics.map(t => getOpinionStats(t.id)));
@@ -146,7 +169,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
     };
     
     fetchStats();
-  }, [communityTopicId]); // refresh when community panel closes
+  }, [communityTopicId, displayCategorizedTopics, displayWeeklyIssues]); // refresh when content changes or community panel closes
 
   const openCommunity = (topicId: string, topicTitle: string) => {
     setCommunityTopicId(topicId);
@@ -155,9 +178,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
   // Helper to find selected battle across all data sources
   const findBattle = (id: string): FeaturedBattle | WeeklyIssue | null => {
-    const weekly = weeklyIssues.find(w => w.id === id);
+    const weekly = displayWeeklyIssues.find(w => w.id === id);
     if (weekly) return weekly;
-    for (const cat of categorizedTopics) {
+    for (const cat of displayCategorizedTopics) {
       const topic = cat.topics.find(t => t.id === id);
       if (topic) return topic;
     }
@@ -165,9 +188,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   };
 
   const selectedBattle = selectedBattleId ? findBattle(selectedBattleId) : null;
-  const currentWeeklyIssue = weeklyIssues[0]; // Assume first is current
+  const currentWeeklyIssue = displayWeeklyIssues[0];
 
-  const activeCategoryData = categorizedTopics.find(c => c.category === activeCategory) || categorizedTopics[0];
+  const resolvedActiveCategory = displayCategorizedTopics.some(category => category.category === activeCategory)
+    ? activeCategory
+    : displayCategorizedTopics[0]?.category ?? '';
+  const activeCategoryData = displayCategorizedTopics.find(c => c.category === resolvedActiveCategory) || displayCategorizedTopics[0];
 
   const displayRankings = React.useMemo(() => {
     let userRank: (typeof weeklyRankings)[number] | null = null;
@@ -295,7 +321,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           {memberOrganizations.length > 0 && <button type="button" onClick={() => navigate('/institution')}><Users size={16} /> {memberOrganizations[0].name}</button>}
           {(hasOrganizationStaffAccess || user?.email.toLowerCase() === SUPER_ADMIN_EMAIL) && <button type="button" onClick={() => navigate('/admin')}><Shield size={16} /> 기관 관리</button>}
           {user?.email.toLowerCase() === SUPER_ADMIN_EMAIL && <button type="button" onClick={() => navigate('/super-admin')}><Shield size={16} /> 슈퍼 관리</button>}
-          {user ? (
+          {user?.isAnonymous ? (
+            <button type="button" className="debate-home-login" onClick={onLoginRequest}><LogIn size={17} /> 회원가입 · 로그인</button>
+          ) : user ? (
             <>
               <button type="button" className="debate-home-profile" onClick={() => setShowProfileModal(true)} title="닉네임 변경"><span>{user.nickname.charAt(0)}</span>{user.nickname}<Edit2 size={13} /></button>
               <button type="button" className="debate-home-logout" onClick={onLogout} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>
@@ -314,114 +342,68 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               if (!user) return onLoginRequest();
               setCreateLiveOnly(false);
               setShowCreateModal(true);
-            }}><Sparkles size={18} /> AI 스파링 시작 <ChevronRight size={18} /></button>
+            }}><Sparkles size={18} /> 토론 시작하기 <ChevronRight size={18} /></button>
             <button type="button" className="debate-home-secondary" onClick={() => {
               if (!user) return onLoginRequest();
               setCreateLiveOnly(true);
               setShowCreateModal(true);
             }}><Radio size={17} /> 실전 토론방 열기</button>
+            <button type="button" className="debate-home-secondary" onClick={() => user ? setShowJoinModal(true) : onLoginRequest()}>
+              <LogIn size={17} /> 열린 실전 토론 참여
+            </button>
           </div>
           <div className="debate-home-stats">
-            <span><strong>{categorizedTopics.reduce((total, category) => total + category.topics.length, 0)}+</strong><small>훈련 주제</small></span>
+            <span><strong>{displayCategorizedTopics.reduce((total, category) => total + category.topics.length, 0)}+</strong><small>훈련 주제</small></span>
             <span><strong>4 STEP</strong><small>구조화 토론</small></span>
             {userStats ? <><span><strong>Lv.{userStats.level}</strong><small>{userStats.league} 리그</small></span><span><strong>{userStats.xp.toLocaleString()}</strong><small>누적 XP</small></span></> : <span><strong>AI</strong><small>즉시 피드백</small></span>}
           </div>
         </div>
 
-        <div className="debate-home-arena" aria-label="ThinkFit 토론 훈련 미리보기">
-          <div className="debate-home-arena-top"><span><i /> LIVE SPARRING</span><small>LEVEL 2 · 반박 훈련</small></div>
-          <div className="debate-home-arena-topic"><small>TODAY'S MOTION</small><strong>{currentWeeklyIssue?.topic ?? '생성형 AI의 교육 활용을 확대해야 하는가?'}</strong></div>
-          <div className="debate-home-arena-sides">
-            <article className="affirmative"><span>찬성</span><strong>나</strong><p>핵심 근거와 사례를 연결해 주장을 전개합니다.</p></article>
-            <div className="debate-home-versus"><Scale size={23} /><b>VS</b></div>
-            <article className="negative"><span>반대</span><strong>AI</strong><p>전제의 빈틈을 찾고 반례와 질문으로 압박합니다.</p></article>
+        <div className="debate-home-arena debate-home-latest-issue" aria-label="최신 핵심 이슈">
+          <div className="debate-home-arena-top">
+            <span><i /> 최신 핵심 이슈</span>
+            <small>{currentWeeklyIssue?.issueDate ?? '새로운 이슈 준비 중'}</small>
           </div>
-          <div className="debate-home-arena-flow"><span className="active">입론</span><i /><span>반론</span><i /><span>교차질문</span><i /><span>최종변론</span></div>
-          <div className="debate-home-arena-footer"><span><Zap size={15} /> 실시간 논증 분석</span><b>설득력 78</b></div>
+          <div className="debate-home-arena-topic">
+            <small>THIS WEEK'S MOTION</small>
+            <strong>{currentWeeklyIssue?.topic ?? '곧 새로운 토론 논제가 공개됩니다.'}</strong>
+          </div>
+          {currentWeeklyIssue && (
+            <>
+              <p className="debate-home-issue-context">{currentWeeklyIssue.briefing.context}</p>
+              <div className="debate-home-issue-meta">
+                <span><Users size={15} /> {currentWeeklyIssue.players}명 참여</span>
+                <span><Clock size={15} /> 예상 {currentWeeklyIssue.time}분</span>
+              </div>
+              <div className="debate-home-issue-actions">
+                <button type="button" className="debate-home-issue-history" onClick={() => setShowHistoryModal(true)}>
+                  <History size={15} /> 지난 논쟁
+                </button>
+                <button
+                  type="button"
+                  className="debate-home-issue-community community-entry-button"
+                  onClick={() => openCommunity(currentWeeklyIssue.id, currentWeeklyIssue.topic)}
+                >
+                  <MessageSquare size={15} /> 커뮤니티
+                  {opinionStatsCache[currentWeeklyIssue.id]?.totalOpinions > 0 && (
+                    <span className="count-badge">
+                      <span className="count-aff">{opinionStatsCache[currentWeeklyIssue.id].affirmativeCount}</span>
+                      <span>/</span>
+                      <span className="count-neg">{opinionStatsCache[currentWeeklyIssue.id].negativeCount}</span>
+                    </span>
+                  )}
+                </button>
+                <button type="button" className="debate-home-issue-start" onClick={() => handleOpenBriefing(currentWeeklyIssue.id)}>
+                  토론 참여하기 <ChevronRight size={17} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
       <main className="debate-home-layout">
         <div className="debate-home-content">
-          {/* Weekly Issue Banner */}
-          {currentWeeklyIssue && (
-            <div 
-              className="card debate-featured-card"
-              style={{ 
-                marginBottom: '2.5rem',
-                padding: '2.5rem', 
-                border: '1px solid var(--border-color)',
-                boxShadow: 'var(--shadow-banner)',
-                background: 'var(--bg-banner)',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1.5rem'
-              }}
-            >
-              <div style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.05, transform: 'rotate(15deg)' }}>
-                <TrendingUp size={200} color="var(--primary)" />
-              </div>
-              
-              <div className="flex justify-between items-start relative z-10" style={{ flexWrap: 'wrap', gap: '1rem' }}>
-                <div className="flex items-center gap-3">
-                  <div className="badge" style={{ background: 'var(--primary)', color: '#fff', border: 'none', fontWeight: 800, padding: '0.5rem 1rem', fontSize: '1rem' }}>
-                    <Sparkles size={18} style={{ marginRight: '6px', display: 'inline' }} /> 최신 핵심 이슈
-                  </div>
-                  <span style={{ fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 600 }}>{currentWeeklyIssue.issueDate}</span>
-                </div>
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ padding: '0.6rem 1rem', fontSize: '0.9rem' }}
-                  onClick={() => setShowHistoryModal(true)}
-                >
-                  <History size={16} /> 지난 논쟁 보기
-                </button>
-              </div>
-              
-              <div className="relative z-10" style={{ maxWidth: '800px' }}>
-                <h2 style={{ fontSize: '2rem', lineHeight: 1.4, margin: '0 0 1rem 0', color: 'var(--text-light)' }}>
-                  {currentWeeklyIssue.topic}
-                </h2>
-                <p style={{ color: 'var(--text-main)', fontSize: '1.05rem', lineHeight: 1.6, margin: 0 }}>
-                  {currentWeeklyIssue.briefing.context}
-                </p>
-              </div>
-              
-              <div className="flex justify-between items-center relative z-10" style={{ marginTop: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <div className="flex items-center gap-4" style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  <span className="flex items-center gap-1.5"><Users size={16} /> {currentWeeklyIssue.players}명 참여</span>
-                  <span className="flex items-center gap-1.5"><Clock size={16} /> 예상 소요시간 {currentWeeklyIssue.time}분</span>
-                </div>
-                <div className="flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
-                  <button
-                    className="community-btn-mini"
-                    style={{ padding: '0.55rem 1rem', fontSize: '0.9rem' }}
-                    onClick={() => openCommunity(currentWeeklyIssue.id, currentWeeklyIssue.topic)}
-                  >
-                    <MessageSquare size={16} />
-                    커뮤니티
-                    {opinionStatsCache[currentWeeklyIssue.id] && opinionStatsCache[currentWeeklyIssue.id].totalOpinions > 0 && (
-                      <span className="count-badge">
-                        <span className="count-aff">{opinionStatsCache[currentWeeklyIssue.id].affirmativeCount}</span>
-                        <span style={{ color: 'var(--text-muted)', margin: '0 2px' }}>/</span>
-                        <span className="count-neg">{opinionStatsCache[currentWeeklyIssue.id].negativeCount}</span>
-                      </span>
-                    )}
-                  </button>
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ padding: '0.8rem 1.5rem', fontSize: '1.05rem', background: 'var(--primary)', borderColor: 'var(--primary)', color: '#fff' }}
-                    onClick={() => handleOpenBriefing(currentWeeklyIssue.id)}
-                  >
-                    토론 참여하기 <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="debate-section-heading flex justify-between items-center mb-10" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap' }}>
             <h2 className="flex items-center gap-2" style={{ fontSize: '1.6rem', margin: 0, color: 'var(--text-light)' }}>
               <Layers3 color="var(--primary)" /> 세부 토론 주제
@@ -435,7 +417,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 setShowCreateModal(true);
               }}
             >
-              <Swords size={18} /> AI스파링 + 자유주제
+              <Swords size={18} /> 자유주제 개설
             </button>
           </div>
 
@@ -448,20 +430,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
               borderBottom: '1px solid var(--border-color)',
             }}
           >
-            {categorizedTopics.map(category => (
+            {displayCategorizedTopics.map(category => (
               <button
                 key={category.category}
-                className={activeCategory === category.category ? 'active' : ''}
+                className={resolvedActiveCategory === category.category ? 'active' : ''}
                 onClick={() => setActiveCategory(category.category)}
                 style={{
                   padding: '0.75rem 1.25rem',
-                  background: activeCategory === category.category ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
-                  color: activeCategory === category.category ? 'var(--primary)' : 'var(--text-muted)',
+                  background: resolvedActiveCategory === category.category ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
+                  color: resolvedActiveCategory === category.category ? 'var(--primary)' : 'var(--text-muted)',
                   border: 'none',
-                  borderBottom: activeCategory === category.category ? '3px solid var(--primary)' : '3px solid transparent',
+                  borderBottom: resolvedActiveCategory === category.category ? '3px solid var(--primary)' : '3px solid transparent',
                   borderRadius: '4px 4px 0 0',
                   fontSize: '1.05rem',
-                  fontWeight: activeCategory === category.category ? 800 : 600,
+                  fontWeight: resolvedActiveCategory === category.category ? 800 : 600,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   whiteSpace: 'nowrap',
@@ -471,7 +453,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                 }}
               >
                 {category.category}
-                {activeCategory === category.category && (
+                {resolvedActiveCategory === category.category && (
                   <span style={{ fontSize: '0.85rem', fontWeight: 400, opacity: 0.8 }}>
                     - {category.description}
                   </span>
@@ -481,64 +463,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           </div>
 
           <div className="debate-topic-grid grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))' }}>
-            {activeCategoryData.topics.map(battle => {
-              const accent = accentStyles[battle.accent];
+            {(activeCategoryData?.topics ?? []).map(battle => {
               const isSelected = selectedBattle?.id === battle.id;
 
               return (
                 <article
                   key={battle.id}
-                  className={`card debate-topic-card ${isSelected ? 'selected' : ''}`}
+                  className={`card debate-topic-card accent-${battle.accent} ${isSelected ? 'selected' : ''}`}
                   role="button"
                   tabIndex={0}
                   onClick={() => handleOpenBriefing(battle.id)}
                   onKeyDown={event => handleTopicCardKeyDown(event, battle.id)}
-                  style={{
-                    textAlign: 'left',
-                    transition: 'all 0.2s',
-                    borderTop: `4px solid ${accent.border}`,
-                    borderColor: isSelected ? accent.border : 'var(--border-color)',
-                    boxShadow: isSelected ? `0 10px 20px -5px ${accent.soft}` : '0 1px 3px rgba(0,0,0,0.05)',
-                    cursor: 'pointer',
-                    minHeight: '220px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    background: isSelected ? 'var(--bg-elevated)' : 'var(--bg-card)'
-                  }}
                 >
-                  <div className="flex justify-between items-start mb-4" style={{ gap: '1rem' }}>
-                    <div className="badge" style={{ background: accent.soft, color: accent.color, border: 'none' }}>
-                      {battle.mode}
-                    </div>
-                    <div className="flex items-center gap-1" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                  <header className="debate-topic-card-top">
+                    <span className="debate-topic-card-kicker"><i /> {battle.mode}</span>
+                    <span className="debate-topic-card-time">
                       <Clock size={14} /> {battle.time}분
-                    </div>
+                    </span>
+                  </header>
+                  <div className="debate-topic-card-motion">
+                    <small>DEBATE MOTION</small>
+                    <h4>{battle.topic}</h4>
                   </div>
-                  <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', lineHeight: 1.45, color: 'var(--text-light)' }}>{battle.topic}</h4>
-                  <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', lineHeight: 1.65, marginBottom: '1rem', flex: 1 }}>
-                    {battle.briefing.context.substring(0, 80)}...
-                  </p>
-                  <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600 }}>
-                    <Users size={14} /> {battle.players}명 참여 가능
-                  </div>
-                  <div className="flex items-center gap-2" style={{ marginTop: 'auto' }}>
-                    <div className="badge" style={{ width: 'fit-content', background: isSelected ? accent.color : 'var(--bg-secondary)', color: isSelected ? '#FFF' : 'var(--text-muted)', border: 'none' }}>
-                      {isSelected ? '선택됨' : '상세 보기'}
-                    </div>
+                  <p className="debate-topic-card-context">{battle.briefing.context}</p>
+                  <footer className="debate-topic-card-footer">
+                    <span className="debate-topic-card-players"><Users size={14} /> {battle.players}명 참여</span>
                     <button
-                      className="community-btn-mini"
+                      className="community-btn-mini community-entry-button"
                       onClick={(e) => { e.stopPropagation(); openCommunity(battle.id, battle.topic); }}
                     >
                       <MessageSquare size={13} />
-                      {opinionStatsCache[battle.id] && opinionStatsCache[battle.id].totalOpinions > 0 ? (
+                      커뮤니티
+                      {opinionStatsCache[battle.id] && opinionStatsCache[battle.id].totalOpinions > 0 && (
                         <span className="count-badge">
                           <span className="count-aff">{opinionStatsCache[battle.id].affirmativeCount}</span>
-                          <span style={{ color: 'var(--text-muted)', margin: '0 1px' }}>/</span>
+                          <span>/</span>
                           <span className="count-neg">{opinionStatsCache[battle.id].negativeCount}</span>
                         </span>
-                      ) : '의견'}
+                      )}
                     </button>
-                  </div>
+                    <span className="debate-topic-card-detail">
+                      {isSelected ? '선택됨' : '상세 보기'} <ChevronRight size={15} />
+                    </span>
+                  </footer>
                 </article>
               );
             })}
@@ -578,7 +545,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   </div>
                   <div className="flex items-center gap-3" style={{ alignSelf: 'flex-end', flexWrap: 'wrap' }}>
                     <button
-                      className="community-btn-mini"
+                      className="community-btn-mini community-entry-button"
                       style={{ padding: '0.6rem 1.1rem', fontSize: '0.9rem' }}
                       onClick={() => openCommunity(selectedBattle.id, selectedBattle.topic)}
                     >
@@ -792,20 +759,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
         {/* Right Sidebar */}
         <aside className="debate-home-sidebar" style={{ width: '360px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-          <section className="real-debate-launch-card">
-            <span className="real-debate-eyebrow"><Radio size={14} /> REAL DEBATE</span>
-            <div className="real-debate-title"><Users size={28} /><div><h2>실전 토론</h2><p>AI 참가자 없이 실제 사람끼리 긴장감 있게 진행합니다.</p></div></div>
-            <button className="btn real-debate-primary" onClick={() => {
-              if (!user) return onLoginRequest();
-              setCreateLiveOnly(true);
-              setShowCreateModal(true);
-            }}>
-              <Swords size={18} /> 실전 토론방 개설
-            </button>
-            <button className="btn btn-secondary" onClick={() => user ? setShowJoinModal(true) : onLoginRequest()}>
-              <LogIn size={18} /> 열린 실전 토론 참여
-            </button>
-          </section>
           {/* Popular Topics */}
           <section className="card debate-side-card debate-popular-panel" style={{ padding: '1.5rem', background: 'var(--bg-card)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
             <header className="debate-side-card-header">
@@ -916,7 +869,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             
             <div style={{ padding: '1.5rem', overflowY: 'auto', background: 'var(--bg-card)' }}>
               <div className="flex flex-col gap-4">
-                {weeklyIssues.map(issue => (
+                {displayWeeklyIssues.map(issue => (
                   <div 
                     key={issue.id}
                     className="card flex flex-col md:flex-row gap-4"

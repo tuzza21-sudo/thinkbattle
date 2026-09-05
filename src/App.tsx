@@ -1,13 +1,15 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useState, useEffect, type ReactNode } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import './App.css';
 import { TrainingGatewayPage } from './components/TrainingGatewayPage';
 import { AuthModal } from './components/AuthModal';
+import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
 import {
   clearOAuthCallbackError,
   getCurrentUser,
   getOAuthCallbackError,
+  signInAsGuest,
   signOut,
   subscribeToAuthChanges,
 } from './lib/auth';
@@ -104,6 +106,17 @@ function App() {
     setUser(null);
   };
 
+  const requestLogin = useCallback(() => setShowAuthModal(true), []);
+  const requestGuest = useCallback(async () => {
+    const guestUser = await signInAsGuest();
+    setUser(guestUser);
+  }, []);
+  const requireAuth = (content: ReactNode, allowGuest = true) => (
+    <AuthenticatedRoute user={user} onLoginRequest={requestLogin} onGuestRequest={requestGuest} allowGuest={allowGuest}>
+      {content}
+    </AuthenticatedRoute>
+  );
+
   if (authLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading...</div>;
   }
@@ -114,38 +127,34 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<TrainingGatewayPage user={user} onLoginRequest={() => setShowAuthModal(true)} onLogout={handleLogout} />}
+          element={<TrainingGatewayPage user={user} onLoginRequest={requestLogin} onGuestRequest={requestGuest} onLogout={handleLogout} />}
         />
         <Route
           path="/debate"
-          element={<LandingPage user={user} onLoginRequest={() => setShowAuthModal(true)} onLogout={handleLogout} onUserUpdate={setUser} />}
+          element={requireAuth(<LandingPage user={user} onLoginRequest={requestLogin} onLogout={handleLogout} onUserUpdate={setUser} />)}
         />
-        <Route path="/battle/new" element={user ? <Arena user={user} onLoginRequest={() => setShowAuthModal(true)} /> : <Navigate to="/debate" replace />} />
+        <Route path="/battle/new" element={requireAuth(user ? <Arena user={user} onLoginRequest={requestLogin} /> : null)} />
         <Route
           path="/battle/lobby/:roomId"
-          element={(
-            <DebateLobbyPage user={user} onLoginRequest={() => setShowAuthModal(true)} />
-          )}
+          element={requireAuth(<DebateLobbyPage user={user} onLoginRequest={requestLogin} />)}
         />
         <Route
           path="/battle/live/:roomId"
-          element={(
-            <LiveDebateRoom user={user} onLoginRequest={() => setShowAuthModal(true)} />
-          )}
+          element={requireAuth(<LiveDebateRoom user={user} onLoginRequest={requestLogin} />)}
         />
-        <Route path="/history" element={<HistoryPage user={user} onLoginRequest={() => setShowAuthModal(true)} />} />
+        <Route path="/history" element={requireAuth(<HistoryPage user={user} onLoginRequest={requestLogin} />)} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
-        <Route path="/argument-library" element={<ArgumentLibraryPage />} />
+        <Route path="/argument-library" element={requireAuth(<ArgumentLibraryPage />)} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
-        <Route path="/institution" element={<InstitutionTopicsPage user={user} onLoginRequest={() => setShowAuthModal(true)} />} />
+        <Route path="/institution" element={requireAuth(<InstitutionTopicsPage user={user} onLoginRequest={requestLogin} />, false)} />
         <Route path="/institution/marketing" element={<B2BMarketingPage />} />
         <Route path="/institution/marketing-v2" element={<B2BMarketingV2Page />} />
-        <Route path="/simulation" element={<SimulationHubPage user={user} onLoginRequest={() => setShowAuthModal(true)} />} />
-        <Route path="/simulation/personalize" element={user ? <PersonalTrainingPage user={user} /> : <Navigate to="/simulation" replace />} />
-        <Route path="/simulation/:missionId" element={user ? <SimulationSessionPage user={user} /> : <Navigate to="/simulation" replace />} />
-        <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/" replace />} />
+        <Route path="/simulation" element={requireAuth(<SimulationHubPage user={user} onLoginRequest={requestLogin} />)} />
+        <Route path="/simulation/personalize" element={requireAuth(user ? <PersonalTrainingPage user={user} /> : null)} />
+        <Route path="/simulation/:missionId" element={requireAuth(user ? <SimulationSessionPage user={user} /> : null)} />
+        <Route path="/admin" element={requireAuth(<AdminDashboard />, false)} />
         <Route path="/super-admin" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <SuperAdminDashboard /> : <Navigate to="/" replace />} />
       </Routes>
       </Suspense>

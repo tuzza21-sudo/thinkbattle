@@ -1,4 +1,4 @@
--- ThinkFit free-user training limits and persona simulation monitoring.
+-- ThinkFit member/guest training limits and persona simulation monitoring.
 -- Run after supabase_super_admin_migration.sql and supabase_production_hardening_migration.sql.
 
 -- Grandfather accounts that exist when this migration is first applied.
@@ -52,6 +52,9 @@ DECLARE
   monthly_used INTEGER;
   already_claimed BOOLEAN := FALSE;
   is_exempt BOOLEAN := FALSE;
+  is_guest BOOLEAN := FALSE;
+  daily_limit INTEGER := 3;
+  monthly_limit INTEGER := 10;
 BEGIN
   IF current_user_id IS NULL THEN RAISE EXCEPTION 'login required'; END IF;
   IF p_training_kind NOT IN ('debate', 'simulation') THEN RAISE EXCEPTION 'invalid training kind'; END IF;
@@ -64,6 +67,24 @@ BEGIN
 
   day_start := date_trunc('day', timezone('Asia/Seoul', now())) AT TIME ZONE 'Asia/Seoul';
   month_start := date_trunc('month', timezone('Asia/Seoul', now())) AT TIME ZONE 'Asia/Seoul';
+
+  is_guest := COALESCE(NULLIF(auth.jwt() ->> 'is_anonymous', '')::BOOLEAN, FALSE);
+
+  SELECT COALESCE((
+    SELECT COALESCE(u.training_quota_exempt, FALSE)
+    FROM public.users u
+    WHERE u.id = current_user_id
+  ), FALSE) OR public.is_super_admin()
+  INTO is_exempt;
+
+  IF is_guest THEN
+    is_exempt := FALSE;
+    daily_limit := 1;
+    monthly_limit := NULL;
+  ELSIF is_exempt THEN
+    daily_limit := NULL;
+    monthly_limit := NULL;
+  END IF;
 
   SELECT EXISTS (
     SELECT 1 FROM public.training_usage_events
@@ -82,20 +103,14 @@ BEGIN
     RETURN jsonb_build_object(
       'allowed', TRUE,
       'alreadyClaimed', TRUE,
-      'exempt', FALSE,
+      'exempt', is_exempt,
+      'guest', is_guest,
       'dailyUsed', daily_used,
       'monthlyUsed', monthly_used,
-      'dailyLimit', 3,
-      'monthlyLimit', 10
+      'dailyLimit', daily_limit,
+      'monthlyLimit', monthly_limit
     );
   END IF;
-
-  SELECT
-    COALESCE(u.training_quota_exempt, FALSE)
-    OR public.is_super_admin()
-  INTO is_exempt
-  FROM public.users u
-  WHERE u.id = current_user_id;
 
   SELECT COUNT(*) FILTER (WHERE created_at >= day_start)::INT, COUNT(*)::INT
   INTO daily_used, monthly_used
@@ -104,27 +119,29 @@ BEGIN
     AND training_kind = p_training_kind
     AND created_at >= month_start;
 
-  IF NOT is_exempt AND daily_used >= 3 THEN
+  IF daily_limit IS NOT NULL AND daily_used >= daily_limit THEN
     RETURN jsonb_build_object(
       'allowed', FALSE,
       'reason', 'daily',
       'exempt', FALSE,
+      'guest', is_guest,
       'dailyUsed', daily_used,
       'monthlyUsed', monthly_used,
-      'dailyLimit', 3,
-      'monthlyLimit', 10
+      'dailyLimit', daily_limit,
+      'monthlyLimit', monthly_limit
     );
   END IF;
 
-  IF NOT is_exempt AND monthly_used >= 10 THEN
+  IF monthly_limit IS NOT NULL AND monthly_used >= monthly_limit THEN
     RETURN jsonb_build_object(
       'allowed', FALSE,
       'reason', 'monthly',
       'exempt', FALSE,
+      'guest', is_guest,
       'dailyUsed', daily_used,
       'monthlyUsed', monthly_used,
-      'dailyLimit', 3,
-      'monthlyLimit', 10
+      'dailyLimit', daily_limit,
+      'monthlyLimit', monthly_limit
     );
   END IF;
 
@@ -135,10 +152,11 @@ BEGIN
     'allowed', TRUE,
     'alreadyClaimed', FALSE,
     'exempt', is_exempt,
+    'guest', is_guest,
     'dailyUsed', daily_used + 1,
     'monthlyUsed', monthly_used + 1,
-    'dailyLimit', CASE WHEN is_exempt THEN NULL ELSE 3 END,
-    'monthlyLimit', CASE WHEN is_exempt THEN NULL ELSE 10 END
+    'dailyLimit', daily_limit,
+    'monthlyLimit', monthly_limit
   );
 END;
 $$;

@@ -2749,6 +2749,80 @@ export type GeneratedOrganizationTopic = {
   config: NonNullable<OrganizationTopic['config']>;
 };
 
+const GENERATED_ORGANIZATION_TOPIC_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    description: { type: 'string' },
+    briefing: {
+      type: 'object',
+      properties: {
+        context: { type: 'string' },
+        recentCases: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 4,
+          maxItems: 4,
+        },
+        newsSearchKeywords: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 3,
+          maxItems: 3,
+        },
+        affirmative: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            points: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 4,
+              maxItems: 4,
+            },
+          },
+          required: ['title', 'points'],
+        },
+        negative: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            points: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 4,
+              maxItems: 4,
+            },
+          },
+          required: ['title', 'points'],
+        },
+        prepQuestions: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 4,
+          maxItems: 4,
+        },
+        keywords: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 4,
+          maxItems: 7,
+        },
+      },
+      required: ['context', 'recentCases', 'newsSearchKeywords', 'affirmative', 'negative', 'prepQuestions', 'keywords'],
+    },
+    config: {
+      type: 'object',
+      properties: {
+        timeLimit: { type: 'integer', enum: [600, 900, 1200] },
+        debateLevel: { type: 'string', enum: ['beginner', 'intermediate', 'advanced'] },
+      },
+      required: ['timeLimit', 'debateLevel'],
+    },
+  },
+  required: ['title', 'description', 'briefing', 'config'],
+};
+
 export const generateOrganizationTopic = async (
   draft: string,
   scope: 'organization' | 'public' = 'organization',
@@ -2764,6 +2838,8 @@ export const generateOrganizationTopic = async (
       content: draft,
     }],
     response_format: { type: 'json_object' },
+    response_schema: GENERATED_ORGANIZATION_TOPIC_SCHEMA,
+    maxOutputTokens: 4096,
   });
   const rawContent = response.choices?.[0]?.message?.content ?? '{}';
   const parsed = parseJsonObject(rawContent);

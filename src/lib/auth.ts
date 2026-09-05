@@ -3,6 +3,7 @@ import type { AppUser } from '../types';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 type OAuthProvider = 'google' | 'kakao';
+type AppUserProvider = AppUser['provider'];
 
 const oauthErrorParams = ['error', 'error_code', 'error_description'] as const;
 
@@ -65,7 +66,10 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
                        user.email?.split('@')[0] || 
                        '사용자';
       const email = user.email || '';
-      const provider = (user.app_metadata?.provider as 'email' | 'kakao' | 'google') || 'kakao';
+      const isAnonymous = Boolean(user.is_anonymous);
+      const provider: AppUserProvider = isAnonymous
+        ? 'anonymous'
+        : (user.app_metadata?.provider as Exclude<AppUserProvider, 'anonymous'>) || 'kakao';
 
       console.log('Attempting to create missing profile for OAuth user:', { id: user.id, email, nickname, provider });
 
@@ -90,6 +94,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
         email: newProfile.email,
         nickname: newProfile.nickname,
         provider: newProfile.provider,
+        isAnonymous,
         createdAt: newProfile.created_at,
       };
     }
@@ -99,6 +104,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
       email: profile.email,
       nickname: profile.nickname,
       provider: profile.provider,
+      isAnonymous: Boolean(user.is_anonymous),
       createdAt: profile.created_at,
     };
   } catch (e) {
@@ -164,6 +170,7 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     email: profile.email,
     nickname: profile.nickname,
     provider: profile.provider,
+    isAnonymous: false,
     createdAt: profile.created_at,
   };
 };
@@ -195,8 +202,31 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     email: profile.email,
     nickname: profile.nickname,
     provider: profile.provider,
+    isAnonymous: false,
     createdAt: profile.created_at,
   };
+};
+
+export const signInAsGuest = async (): Promise<AppUser> => {
+  const currentUser = await getCurrentUser();
+  if (currentUser) return currentUser;
+
+  const { data, error } = await supabase.auth.signInAnonymously({
+    options: {
+      data: { nickname: '게스트' },
+    },
+  });
+
+  if (error || !data.user) {
+    if (error?.message.toLowerCase().includes('anonymous sign-ins are disabled')) {
+      throw new Error('게스트 체험이 아직 활성화되지 않았습니다. 관리자에게 문의해 주세요.');
+    }
+    throw new Error(error?.message || '게스트 체험을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+
+  const guestUser = await getCurrentUser();
+  if (!guestUser) throw new Error('게스트 프로필을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  return guestUser;
 };
 
 export const signOut = async () => {
@@ -219,4 +249,3 @@ const signInWithOAuth = async (provider: OAuthProvider): Promise<void> => {
 export const signInWithKakao = () => signInWithOAuth('kakao');
 
 export const signInWithGoogle = () => signInWithOAuth('google');
-

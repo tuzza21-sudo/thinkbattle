@@ -182,368 +182,107 @@ export const CommunityPanel: React.FC<CommunityPanelProps> = ({
   };
 
   return (
-    <div
-      className="modal-overlay"
-      style={{
-        position: 'fixed', inset: 0, background: 'var(--modal-overlay)',
-        backdropFilter: 'blur(6px)', zIndex: 100,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="community-panel-modal card"
-        style={{
-          width: '90%', maxWidth: '720px', maxHeight: '90vh',
-          overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          padding: 0, background: 'var(--modal-bg)',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--border-color)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '1.5rem 1.5rem 1.25rem',
-          borderBottom: '1px solid var(--border-color)',
-          background: 'var(--modal-header-bg)',
-        }}>
-          <div className="flex justify-between items-start" style={{ gap: '1rem' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="flex items-center gap-2" style={{ marginBottom: '0.6rem' }}>
-                <MessageSquare size={20} color="var(--primary)" />
-                <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--text-light)' }}>토론 커뮤니티</h2>
-              </div>
-              <p style={{
-                margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)',
-                lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-              }}>
-                {topicTitle}
-              </p>
-            </div>
-            <button className="icon-button" onClick={onClose} style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
-              <X size={20} />
-            </button>
+    <div className="modal-overlay community-modal-overlay" onClick={onClose}>
+      <div className="community-panel-modal" role="dialog" aria-modal="true" aria-labelledby="community-panel-title" onClick={event => event.stopPropagation()}>
+        <header className="community-panel-hero">
+          <div className="community-panel-heading">
+            <span className="community-panel-eyebrow"><MessageSquare size={14} /> ARGUMENT EXCHANGE</span>
+            <h2 id="community-panel-title">토론 커뮤니티</h2>
+            <div className="community-panel-motion"><small>DEBATE MOTION</small><strong>{topicTitle}</strong></div>
           </div>
+          <button type="button" className="community-close-button" onClick={onClose} aria-label="커뮤니티 닫기"><X size={20} /></button>
 
-          {/* Stats Bar */}
-          <div style={{ marginTop: '1.25rem' }}>
-            <div className="flex justify-between items-center" style={{ marginBottom: '0.5rem' }}>
-              <div className="flex items-center gap-2">
-                <ThumbsUp size={16} color="#10B981" />
-                <span style={{ fontWeight: 800, color: '#10B981', fontSize: '1.05rem' }}>
-                  찬성 {stats.affirmativeCount}
-                </span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({affirmativePercent}%)</span>
-              </div>
-              <div className="flex items-center gap-2" style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                <Users size={14} />
-                총 {stats.totalOpinions}명 참여
-              </div>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({negativePercent}%)</span>
-                <span style={{ fontWeight: 800, color: '#EF4444', fontSize: '1.05rem' }}>
-                  반대 {stats.negativeCount}
-                </span>
-                <ThumbsDown size={16} color="#EF4444" />
-              </div>
-            </div>
-            {/* Progress bar */}
-            <div className="community-progress-bar" style={{
-              display: 'flex', height: '10px', borderRadius: '999px', overflow: 'hidden',
-              background: 'var(--bg-secondary)',
-            }}>
-              <div className="community-progress-fill" style={{
-                width: `${affirmativePercent}%`, background: 'linear-gradient(90deg, #10B981, #34D399)',
-                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                borderRadius: stats.negativeCount === 0 ? '999px' : '999px 0 0 999px',
-              }} />
-              <div style={{
-                width: `${negativePercent}%`, background: 'linear-gradient(90deg, #F87171, #EF4444)',
-                transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-                borderRadius: stats.affirmativeCount === 0 ? '999px' : '0 999px 999px 0',
-              }} />
-            </div>
+          <div className="community-pulse">
+            <div className="community-pulse-side affirmative"><ThumbsUp size={18} /><span>찬성</span><strong>{stats.affirmativeCount}</strong><small>{affirmativePercent}%</small></div>
+            <div className="community-pulse-total"><Users size={17} /><strong>{stats.totalOpinions}</strong><span>전체 의견</span></div>
+            <div className="community-pulse-side negative"><ThumbsDown size={18} /><span>반대</span><strong>{stats.negativeCount}</strong><small>{negativePercent}%</small></div>
           </div>
-        </div>
+          <div className="community-progress-bar" aria-label={`찬성 ${affirmativePercent}%, 반대 ${negativePercent}%`}>
+            <i className="affirmative" style={{ width: `${affirmativePercent}%` }} />
+            <i className="negative" style={{ width: `${negativePercent}%` }} />
+          </div>
+        </header>
 
-        {/* Filter/Sort + Write button */}
-        <div className="flex justify-between items-center" style={{
-          padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--border-color)',
-          background: 'var(--modal-header-bg)', gap: '0.5rem', flexWrap: 'wrap',
-        }}>
-          <div className="flex items-center gap-2">
+        <div className="community-toolbar">
+          <div className="community-toolbar-group">
             {([
               { key: 'all' as FilterMode, label: '전체' },
               { key: 'affirmative' as FilterMode, label: '찬성' },
               { key: 'negative' as FilterMode, label: '반대' },
-            ]).map(f => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className="community-filter-btn"
-                style={{
-                  padding: '0.35rem 0.8rem', borderRadius: '999px', fontSize: '0.85rem',
-                  fontWeight: filter === f.key ? 800 : 600, cursor: 'pointer',
-                  border: filter === f.key ? '1.5px solid var(--primary)' : '1px solid var(--border-color)',
-                  background: filter === f.key ? 'rgba(37, 99, 235, 0.08)' : 'transparent',
-                  color: filter === f.key ? 'var(--primary)' : 'var(--text-muted)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {f.label}
-              </button>
+            ]).map(item => (
+              <button type="button" key={item.key} className={`community-filter-btn ${filter === item.key ? 'active' : ''}`} onClick={() => setFilter(item.key)}>{item.label}</button>
             ))}
-            <span style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 0.25rem' }} />
+            <span className="community-toolbar-divider" />
             {([
               { key: 'latest' as SortMode, label: '최신순' },
               { key: 'likes' as SortMode, label: '공감순' },
-            ]).map(s => (
-              <button
-                key={s.key}
-                onClick={() => setSort(s.key)}
-                style={{
-                  padding: '0.35rem 0.7rem', borderRadius: '999px', fontSize: '0.8rem',
-                  fontWeight: sort === s.key ? 700 : 500, cursor: 'pointer',
-                  border: 'none',
-                  background: sort === s.key ? 'var(--bg-secondary)' : 'transparent',
-                  color: sort === s.key ? 'var(--text-light)' : 'var(--text-muted)',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {s.label}
-              </button>
+            ]).map(item => (
+              <button type="button" key={item.key} className={`community-sort-btn ${sort === item.key ? 'active' : ''}`} onClick={() => setSort(item.key)}>{item.label}</button>
             ))}
           </div>
           <button
-            className="btn btn-primary"
-            style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: 700 }}
+            type="button"
+            className={`community-write-toggle ${showForm ? 'active' : ''}`}
             onClick={() => {
               if (!user) { onLoginRequest(); return; }
               setShowForm(!showForm);
               setSubmitError(null);
             }}
           >
-            <Send size={14} /> 의견 쓰기
+            <Send size={15} /> {showForm ? '작성 닫기' : '의견 쓰기'}
           </button>
         </div>
 
-        {/* Success message */}
-        {submitSuccess && (
-          <div className="flex items-center gap-2" style={{
-            padding: '0.75rem 1.5rem', background: 'rgba(16, 185, 129, 0.1)',
-            color: '#10B981', fontWeight: 700, fontSize: '0.9rem',
-            borderBottom: '1px solid rgba(16, 185, 129, 0.2)',
-          }}>
-            <CheckCircle2 size={16} /> 의견이 등록되었습니다!
-          </div>
-        )}
+        {submitSuccess && <div className="community-success"><CheckCircle2 size={17} /> 의견이 등록되었습니다.</div>}
 
-        {/* Write form */}
         {showForm && (
-          <div style={{
-            padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)',
-            background: 'var(--bg-elevated)',
-          }}>
-            <div className="flex items-center gap-2" style={{ marginBottom: '1rem' }}>
-              <Shield size={16} color="var(--primary)" />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                AI가 부적절한 댓글을 자동으로 검열합니다
-              </span>
+          <section className="community-composer">
+            <div className="community-composer-note"><Shield size={16} /><span><strong>안전한 토론 공간</strong> AI가 부적절한 표현을 자동으로 확인합니다.</span></div>
+            <div className="community-position-picker">
+              <button type="button" className={`affirmative ${formPosition === 'affirmative' ? 'active' : ''}`} onClick={() => setFormPosition('affirmative')}><ThumbsUp size={16} /> 찬성 의견</button>
+              <button type="button" className={`negative ${formPosition === 'negative' ? 'active' : ''}`} onClick={() => setFormPosition('negative')}><ThumbsDown size={16} /> 반대 의견</button>
             </div>
-
-            {/* Position selector */}
-            <div className="grid grid-cols-2 gap-3" style={{ marginBottom: '1rem' }}>
-              <button
-                type="button"
-                onClick={() => setFormPosition('affirmative')}
-                style={{
-                  padding: '0.7rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                  border: formPosition === 'affirmative' ? '2px solid #10B981' : '1px solid var(--border-color)',
-                  background: formPosition === 'affirmative' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-card)',
-                  color: formPosition === 'affirmative' ? '#10B981' : 'var(--text-muted)',
-                  fontWeight: 800, fontSize: '0.95rem', textAlign: 'center',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                }}
-              >
-                <ThumbsUp size={16} /> 찬성
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormPosition('negative')}
-                style={{
-                  padding: '0.7rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-                  border: formPosition === 'negative' ? '2px solid #EF4444' : '1px solid var(--border-color)',
-                  background: formPosition === 'negative' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-card)',
-                  color: formPosition === 'negative' ? '#EF4444' : 'var(--text-muted)',
-                  fontWeight: 800, fontSize: '0.95rem', textAlign: 'center',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                }}
-              >
-                <ThumbsDown size={16} /> 반대
+            <textarea placeholder="주장과 그 이유 또는 근거를 구체적으로 작성해 주세요." value={formContent} onChange={event => setFormContent(event.target.value)} rows={4} />
+            <div className="community-composer-meta"><span>{formContent.length}자</span><span>서로의 주장에 집중해 주세요.</span></div>
+            {submitError && <div className="community-error"><AlertTriangle size={15} /> {submitError}</div>}
+            <div className="community-composer-actions">
+              <button type="button" className="community-compose-cancel" onClick={() => { setShowForm(false); setSubmitError(null); }}>취소</button>
+              <button type="button" className="community-compose-submit" onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? <><Loader2 size={15} className="spin" /> AI 검열 중...</> : <><Send size={15} /> 의견 등록</>}
               </button>
             </div>
-
-            <textarea
-              placeholder="본인만의 의견(이유 or 근거)를 써주세요"
-              value={formContent}
-              onChange={e => setFormContent(e.target.value)}
-              rows={4}
-              style={{
-                width: '100%', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)', background: 'var(--bg-card)',
-                color: 'var(--text-light)', fontSize: '0.9rem', resize: 'vertical',
-                fontFamily: 'var(--font-sans)', marginBottom: '0.6rem',
-              }}
-            />
-
-            {submitError && (
-              <div className="flex items-center gap-2" style={{
-                padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-md)',
-                background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444',
-                fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-              }}>
-                <AlertTriangle size={14} /> {submitError}
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2">
-              <button
-                className="btn btn-secondary"
-                style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                onClick={() => { setShowForm(false); setSubmitError(null); }}
-              >
-                취소
-              </button>
-              <button
-                className="btn btn-primary"
-                style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', fontWeight: 700 }}
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <><Loader2 size={14} className="spin" /> AI 검열 중...</>
-                ) : (
-                  <><Send size={14} /> 등록하기</>
-                )}
-              </button>
-            </div>
-          </div>
+          </section>
         )}
 
-        {/* Opinions List */}
-        <div style={{
-          flex: 1, overflowY: 'auto', padding: '1rem 1.5rem',
-        }}>
+        <main className="community-opinions-scroll">
           {isLoading ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-              <Loader2 size={32} className="spin" style={{ margin: '0 auto 1rem', color: 'var(--primary)' }} />
-              <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>의견을 불러오는 중...</p>
-            </div>
+            <div className="community-state"><Loader2 size={30} className="spin" /><strong>의견을 불러오는 중입니다</strong><span>잠시만 기다려 주세요.</span></div>
           ) : displayedOpinions.length === 0 ? (
-            <div style={{
-              textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)',
-            }}>
-              <MessageSquare size={40} style={{ opacity: 0.3, marginBottom: '1rem', margin: '0 auto 1rem' }} />
-              <p style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.5rem' }}>아직 의견이 없습니다</p>
-              <p style={{ fontSize: '0.9rem' }}>첫 번째 의견을 남겨보세요!</p>
-            </div>
+            <div className="community-state"><MessageSquare size={34} /><strong>아직 등록된 의견이 없습니다</strong><span>첫 번째 관점을 남겨 토론을 시작해 보세요.</span></div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="community-opinion-list">
               {displayedOpinions.map(opinion => {
                 const isAffirmative = opinion.position === 'affirmative';
                 const alreadyLiked = likedIds.has(opinion.id);
-
                 return (
-                  <div
-                    key={opinion.id}
-                    className="community-opinion-card"
-                    style={{
-                      padding: '1rem 1.15rem',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-color)',
-                      background: 'var(--bg-card)',
-                      borderLeft: `4px solid ${isAffirmative ? '#10B981' : '#EF4444'}`,
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {/* Card header */}
-                    <div className="flex justify-between items-center" style={{ marginBottom: '0.5rem', gap: '0.5rem' }}>
-                      <div className="flex items-center gap-2">
-                        <span style={{
-                          width: '28px', height: '28px', borderRadius: '50%',
-                          background: isAffirmative ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.75rem', fontWeight: 900,
-                          color: isAffirmative ? '#10B981' : '#EF4444',
-                        }}>
-                          {opinion.nickname.charAt(0)}
-                        </span>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-light)' }}>
-                          {opinion.nickname}
-                        </span>
-                        <span className="badge" style={{
-                          padding: '0.1rem 0.45rem', fontSize: '0.7rem', fontWeight: 700,
-                          background: isAffirmative ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                          color: isAffirmative ? '#10B981' : '#EF4444',
-                          border: `1px solid ${isAffirmative ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                        }}>
-                          {isAffirmative ? '찬성' : '반대'}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {formatDate(opinion.createdAt)}
-                      </span>
-                    </div>
-
-                    {/* Content */}
-                    <div style={{
-                      margin: '0 0 0.8rem 0',
-                      padding: '0.8rem 1rem',
-                      borderRadius: 'var(--radius-sm)',
-                      background: isAffirmative ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
-                      border: `1px solid ${isAffirmative ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'}`,
-                    }}>
-                      <p style={{
-                        margin: 0,
-                        fontSize: '0.95rem',
-                        lineHeight: 1.7,
-                        color: isAffirmative ? '#059669' : '#DC2626',
-                        fontWeight: 500,
-                        whiteSpace: 'pre-wrap',
-                      }}>
-                        {opinion.content}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleLike(opinion.id)}
-                        disabled={alreadyLiked}
-                        className="community-like-btn"
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '0.35rem',
-                          padding: '0.25rem 0.6rem', borderRadius: '999px',
-                          border: alreadyLiked ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--border-color)',
-                          background: alreadyLiked ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                          color: alreadyLiked ? '#EF4444' : 'var(--text-muted)',
-                          fontSize: '0.8rem', fontWeight: 600, cursor: alreadyLiked ? 'default' : 'pointer',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        <Heart size={13} fill={alreadyLiked ? '#EF4444' : 'none'} /> {opinion.likes}
+                  <article key={opinion.id} className={`community-opinion-card ${isAffirmative ? 'affirmative' : 'negative'}`}>
+                    <header>
+                      <span className="community-opinion-avatar">{opinion.nickname.charAt(0)}</span>
+                      <div><strong>{opinion.nickname}</strong><span>{formatDate(opinion.createdAt)}</span></div>
+                      <b>{isAffirmative ? <ThumbsUp size={13} /> : <ThumbsDown size={13} />}{isAffirmative ? '찬성' : '반대'}</b>
+                    </header>
+                    <p>{opinion.content}</p>
+                    <footer>
+                      <button type="button" onClick={() => handleLike(opinion.id)} disabled={alreadyLiked} className={`community-like-btn ${alreadyLiked ? 'liked' : ''}`}>
+                        <Heart size={14} fill={alreadyLiked ? 'currentColor' : 'none'} /> 공감 {opinion.likes}
                       </button>
-                    </div>
-                  </div>
+                    </footer>
+                  </article>
                 );
               })}
             </div>
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

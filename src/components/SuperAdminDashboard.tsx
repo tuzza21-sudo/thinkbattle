@@ -18,6 +18,7 @@ import {
   getSuperAdminDashboard,
 } from '../lib/superAdmin';
 import type { SuperAdminDashboard as DashboardData, SuperAdminRecord, SuperAdminSimulationSession } from '../types';
+import { HomepageTopicManager } from './HomepageTopicManager';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 const simulationCategoryLabel: Record<SuperAdminSimulationSession['categoryId'], string> = {
@@ -33,6 +34,15 @@ const simulationStatusLabel: Record<SuperAdminSimulationSession['status'], strin
   failed: '오류',
 };
 
+type SuperAdminSection = 'topics' | 'organizations' | 'records' | 'simulations';
+
+const superAdminSections: { id: SuperAdminSection; label: string; description: string }[] = [
+  { id: 'topics', label: '토론 주제 관리 페이지', description: '메인 페이지의 최신 핵심 이슈와 섹터별 토론 주제를 관리합니다.' },
+  { id: 'organizations', label: '기관 온보딩 (기관 설정과 관리)', description: '기관 게시판을 개설하고 기관 소유자 권한을 설정합니다.' },
+  { id: 'records', label: '토론 전체 활동 기록', description: '전체 회원의 토론 기록과 AI 평가 보고서를 확인합니다.' },
+  { id: 'simulations', label: '페르소나 이용 현황', description: '페르소나 훈련 세션과 대화·평가 결과를 확인합니다.' },
+];
+
 export const SuperAdminDashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -44,6 +54,7 @@ export const SuperAdminDashboard = () => {
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerOrganizationId, setOwnerOrganizationId] = useState('');
   const [additionalOwnerEmail, setAdditionalOwnerEmail] = useState('');
+  const [activeSection, setActiveSection] = useState<SuperAdminSection>('topics');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -138,15 +149,24 @@ export const SuperAdminDashboard = () => {
         </section>
       ) : (
         <>
-          <section className="admin-metric-grid">
-            <Metric icon={<Users />} label="전체 회원" value={`${data.totalUsers}명`} />
-            <Metric icon={<FileText />} label="전체 토론 기록" value={`${data.totalRecords}건`} />
-            <Metric icon={<MessageSquareText />} label="페르소나 훈련" value={`${data.totalSimulationSessions ?? 0}건`} />
-            <Metric icon={<ShieldCheck />} label="활동 회원" value={`${data.activeUsers}명`} />
-            <Metric icon={<Building2 />} label="기관 게시판" value={`${organizations.length}개`} />
+          <section className="card super-admin-section-picker">
+            <label htmlFor="super-admin-section">
+              <span>관리 메뉴</span>
+              <select
+                id="super-admin-section"
+                className="input-field"
+                value={activeSection}
+                onChange={event => setActiveSection(event.target.value as SuperAdminSection)}
+              >
+                {superAdminSections.map(section => <option key={section.id} value={section.id}>{section.label}</option>)}
+              </select>
+              <small>{superAdminSections.find(section => section.id === activeSection)?.description}</small>
+            </label>
           </section>
 
-          <section className="card admin-panel super-admin-organization-section">
+          {activeSection === 'topics' && <HomepageTopicManager />}
+
+          {activeSection === 'organizations' && <section className="card admin-panel super-admin-organization-section">
             <div className="super-admin-section-heading">
               <div>
                 <span className="admin-eyebrow">기관 온보딩</span>
@@ -210,30 +230,39 @@ export const SuperAdminDashboard = () => {
               ))}
               {!organizations.length && <p className="super-admin-list-empty">아직 개설된 기관이 없습니다.</p>}
             </div>
-          </section>
+          </section>}
 
-          <section className="card admin-panel">
-            <div className="super-admin-section-heading">
-              <h2>전체 활동 기록</h2>
-              <input className="input-field super-admin-search" placeholder="회원명 · 이메일 · 훈련 주제 검색" value={query} onChange={event => setQuery(event.target.value)} />
-            </div>
-            <div className="super-admin-table-wrap">
-              <table className="super-admin-table">
-                <thead><tr>{['회원', '이메일', '토론 주제', '수준', '점수', '완료일', ''].map(label => <th key={label}>{label}</th>)}</tr></thead>
-                <tbody>{records.map(record => (
-                  <tr key={record.id}>
-                    <td>{record.nickname}</td><td>{record.email}</td><td>{record.topic}</td>
-                    <td>{record.debateLevel === 'beginner' ? '초급' : record.debateLevel === 'intermediate' ? '중급' : '고급'}</td>
-                    <td>{record.totalScore}점</td><td>{new Date(record.completedAt).toLocaleString('ko-KR')}</td>
-                    <td><button className="btn btn-secondary" style={{ padding: '.4rem .6rem' }} onClick={() => setSelected(record)}>보고서</button></td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-            {!records.length && <p className="super-admin-list-empty">표시할 토론 기록이 없습니다.</p>}
-          </section>
+          {activeSection === 'records' && <>
+            <section className="admin-metric-grid super-admin-activity-metrics">
+              <Metric icon={<Users />} label="전체 회원" value={`${data.totalUsers}명`} />
+              <Metric icon={<FileText />} label="전체 토론 기록" value={`${data.totalRecords}건`} />
+              <Metric icon={<MessageSquareText />} label="페르소나 훈련" value={`${data.totalSimulationSessions ?? 0}건`} />
+              <Metric icon={<ShieldCheck />} label="활동 회원" value={`${data.activeUsers}명`} />
+              <Metric icon={<Building2 />} label="기관 게시판" value={`${organizations.length}개`} />
+            </section>
+            <section className="card admin-panel">
+              <div className="super-admin-section-heading">
+                <h2>전체 활동 기록</h2>
+                <input className="input-field super-admin-search" placeholder="회원명 · 이메일 · 훈련 주제 검색" value={query} onChange={event => setQuery(event.target.value)} />
+              </div>
+              <div className="super-admin-table-wrap">
+                <table className="super-admin-table">
+                  <thead><tr>{['회원', '이메일', '토론 주제', '수준', '점수', '완료일', ''].map(label => <th key={label}>{label}</th>)}</tr></thead>
+                  <tbody>{records.map(record => (
+                    <tr key={record.id}>
+                      <td>{record.nickname}</td><td>{record.email}</td><td>{record.topic}</td>
+                      <td>{record.debateLevel === 'beginner' ? '초급' : record.debateLevel === 'intermediate' ? '중급' : '고급'}</td>
+                      <td>{record.totalScore}점</td><td>{new Date(record.completedAt).toLocaleString('ko-KR')}</td>
+                      <td><button className="btn btn-secondary" style={{ padding: '.4rem .6rem' }} onClick={() => setSelected(record)}>보고서</button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              {!records.length && <p className="super-admin-list-empty">표시할 토론 기록이 없습니다.</p>}
+            </section>
+          </>}
 
-          <section className="card admin-panel super-admin-simulation-section">
+          {activeSection === 'simulations' && <section className="card admin-panel super-admin-simulation-section">
             <div className="super-admin-section-heading">
               <div>
                 <span className="admin-eyebrow">PERSONA TRAINING</span>
@@ -260,7 +289,7 @@ export const SuperAdminDashboard = () => {
               </table>
             </div>
             {!simulationSessions.length && <p className="super-admin-list-empty">표시할 페르소나 훈련 기록이 없습니다. 새 마이그레이션 적용 후 시작된 훈련부터 기록됩니다.</p>}
-          </section>
+          </section>}
         </>
       )}
 
