@@ -94,6 +94,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
       debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
       voiceEnabled: config.voiceEnabled ?? false,
       timeLimit: config.timeLimit,
+      sessionConfig: config.sessionConfig,
       teamSize: config.teamSize ?? 1,
       allowModerator: config.allowModerator ?? true,
       audience: 'organization',

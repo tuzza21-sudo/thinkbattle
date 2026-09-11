@@ -79,6 +79,7 @@ export const EnglishLandingPage = ({ user, onLoginRequest, onLogout, onLanguageC
         debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
         voiceEnabled: config.voiceEnabled ?? false,
         timeLimit: config.timeLimit,
+        sessionConfig: config.sessionConfig,
         teamSize: config.teamSize ?? 1,
         allowModerator: config.allowModerator ?? false,
         audience: 'public',

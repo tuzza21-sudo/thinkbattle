@@ -1,0 +1,496 @@
+/* Shared with the debate studio: paper surfaces, ink text, and quiet accents. */
+.thinkfit-home {
+  --primary: #5855d6; --primary-hover: #4744bb; --secondary: #9c503c; --secondary-hover: #914c3b;
+  --bg-primary: #f5f6fa; --bg-secondary: #edf0f6; --bg-card: #fff; --bg-elevated: #fff; --bg-dark: #f5f6fa;
+  --bg-banner: linear-gradient(135deg, #fff, #f3f2fb);
+  --text-light: #20283d; --text-main: #414b61; --text-muted: #5f6b80; --text-inverse: #fff;
+  --border-color: #e3e6ee; --border-cyan: #c9c8f0; --border-pink: #e9cec6;
+  --accent-amber: #826019; --accent-amber-light: #f7f0e3; --accent-coral: #b14654;
+  --modal-bg: #fff; --modal-header-bg: #f5f6fa; --modal-overlay: #18203288;
+  --font-sans: 'Pretendard', 'Noto Sans KR', 'Segoe UI', sans-serif; --font-heading: var(--font-sans);
+  --shadow-glow-cyan: 0 3px 10px #5855d614; --shadow-glow-pink: 0 3px 10px #9c503c14;
+  --shadow-banner: 0 8px 24px #25345b05;
+  color: var(--text-main); font-family: var(--font-sans); letter-spacing: -.015em; color-scheme: light;
+}
+.thinkfit-home *, .thinkfit-home *::before, .thinkfit-home *::after { box-sizing: border-box; }
+.thinkfit-home button, .thinkfit-home input, .thinkfit-home select, .thinkfit-home textarea { font-family: inherit; }
+.thinkfit-home h1, .thinkfit-home h2, .thinkfit-home h3, .thinkfit-home h4 { font-family: inherit; text-shadow: none; color: var(--text-light); word-break: keep-all; overflow-wrap: anywhere; }
+.thinkfit-home button:focus-visible, .thinkfit-home a:focus-visible, .thinkfit-home [tabindex]:focus-visible { outline: 3px solid #5855d655; outline-offset: 3px; }
+.thinkfit-home button:disabled { cursor: not-allowed; opacity: .55; }
+.thinkfit-home .btn { border-radius: 9px; font-weight: 650; text-shadow: none; box-shadow: none; letter-spacing: 0; font-size: .84rem; }
+.thinkfit-home .btn-primary { color: #fff; background: var(--primary); border-color: var(--primary); }
+.thinkfit-home .btn-primary:hover:not(:disabled) { color: #fff; background: var(--primary-hover); border-color: var(--primary-hover); box-shadow: 0 4px 12px #5855d61a; transform: none; }
+.thinkfit-home .btn-secondary { color: var(--text-main); background: white; border-color: var(--border-color); }
+.thinkfit-home .btn-secondary:hover:not(:disabled) { color: var(--primary); background: #f4f3fb; border-color: #cecaee; }
+.thinkfit-home .card { color: var(--text-main); background: #fff; border-color: var(--border-color); box-shadow: 0 3px 15px #25345b03; backdrop-filter: none; }
+.thinkfit-home .card:hover { box-shadow: 0 5px 20px #25345b08; }
+.thinkfit-home .site-legal-footer { border-color: var(--border-color); color: var(--text-muted); }
+.thinkfit-home .site-legal-footer button { color: var(--text-muted); }
+.home-route { min-height: 100dvh; background: var(--bg-primary); }
+
+/* Main entrance */
+.training-gateway.thinkfit-home { min-height: 100dvh; background: var(--bg-primary); color: var(--text-main); }
+.thinkfit-home .training-gateway-header { width: min(1280px, calc(100% - 64px)); min-height: 84px; border-color: var(--border-color); gap: 24px; }
+.thinkfit-home .training-gateway-brand { gap: .55rem; }
+.thinkfit-home .training-gateway-brand > span { width: 32px; height: 32px; }
+.thinkfit-home .training-gateway-brand strong { color: var(--text-light); font-size: 1.2rem; font-weight: 800; }
+.thinkfit-home .training-gateway-brand small { color: var(--text-muted); font-size: .52rem; letter-spacing: .14em; margin-top: .1rem; }
+.home-gateway-nav { display: flex; justify-content: center; align-items: center; gap: 1.7rem; margin-left: auto; margin-right: 1rem; }
+.home-gateway-nav a, .home-gateway-nav button { padding: .4rem 0; color: var(--text-muted); font: inherit; font-size: .79rem; font-weight: 550; border: 0; background: none; text-decoration: none; cursor: pointer; }
+.home-gateway-nav a:hover, .home-gateway-nav button:hover { color: var(--primary); }
+.thinkfit-home .training-gateway-account { gap: .7rem; }
+.thinkfit-home .training-gateway-account > span small { color: var(--text-muted); }
+.thinkfit-home .training-gateway-account > span strong { color: var(--text-light); }
+.thinkfit-home .training-gateway-account button { color: var(--text-main); border: 1px solid var(--border-color); background: white; font-weight: 600; border-radius: 8px; }
+.thinkfit-home .training-gateway-account button:hover { border-color: #c8c7e4; color: var(--primary); }
+.thinkfit-home .training-gateway-main { width: min(1280px, calc(100% - 64px)); padding: 0; }
+.home-welcome { display: grid; grid-template-columns: 1.25fr .75fr; align-items: center; gap: clamp(2rem, 6vw, 6rem); padding: clamp(3rem, 5.8vw, 5.4rem) 0; }
+.thinkfit-home .training-gateway-intro { margin: 0; }
+.thinkfit-home .training-gateway-intro > span { color: var(--primary); font-size: .61rem; letter-spacing: .12em; font-weight: 750; }
+.thinkfit-home .training-gateway-intro h1 { margin: 1rem 0 1.2rem; color: var(--text-light); font-size: clamp(2.5rem, 4.6vw, 4.15rem); font-weight: 720; letter-spacing: -.065em; line-height: 1.28; }
+.thinkfit-home .training-gateway-intro h1 em { color: var(--primary); background: none; font-style: normal; }
+.thinkfit-home .training-gateway-intro p { color: var(--text-muted); font-size: .93rem; line-height: 1.95; }
+.home-explore-link { display: inline-flex; align-items: center; gap: .6rem; color: var(--primary); text-decoration: none; font-size: .81rem; font-weight: 650; margin-top: 1.6rem; }
+.home-explore-link:hover svg { transform: translateX(3px); }
+.home-thinking-note { position: relative; border: 1px solid #dfddef; border-radius: 18px; background: linear-gradient(140deg, #f0eef9, #f8f8fc); padding: 2rem; min-width: 0; }
+.home-thinking-note::before { content: ''; display: block; width: 36px; height: 3px; background: #b7afe0; border-radius: 4px; position: absolute; top: -2px; left: 2rem; }
+.home-thinking-note-label { display: flex; align-items: center; gap: .5rem; color: #6a5c8c; font-size: .59rem; letter-spacing: .095em; font-weight: 700; }
+.home-thinking-note > p { color: #423960; font-size: clamp(1.05rem, 1.9vw, 1.48rem); font-weight: 650; letter-spacing: -.04em; margin: 1.7rem 0 1rem; word-break: keep-all; }
+.home-thinking-note > span { display: block; color: #6d657f; font-size: .83rem; line-height: 1.85; }
+.home-thinking-path { display: flex; align-items: center; justify-content: space-between; gap: .5rem; border-top: 1px solid #dfdcec; margin-top: 2rem; padding-top: 1.2rem; color: #a69bbf; }
+.home-thinking-path span { display: flex; flex-direction: column; gap: .3rem; font-size: .73rem; color: #68607c; }
+.home-thinking-path b { font-size: .6rem; color: #75618e; font-weight: 550; }
+.home-section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; margin: 0 0 1.35rem; scroll-margin-top: 30px; }
+.home-section-heading > div > span, .home-section-heading-copy > span { display: block; color: var(--text-muted); font-size: .58rem; font-weight: 650; letter-spacing: .11em; margin-bottom: .6rem; }
+.home-section-heading h2 { color: var(--text-light); font-size: 1.4rem; font-weight: 680; letter-spacing: -.04em; margin: 0; }
+.home-section-heading > p { color: var(--text-muted); font-size: .75rem; margin: 0; }
+.thinkfit-home .training-gateway-options { gap: 22px; }
+.thinkfit-home .training-gateway-card { display: flex; flex-direction: column; height: auto; min-height: 0; background: #fff; border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 4px 16px #25345b04; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.thinkfit-home .training-gateway-card::after { display: none; }
+.thinkfit-home .training-gateway-card > img { position: static; height: 200px; width: 100%; object-fit: cover; object-position: center 43%; filter: saturate(.68); flex-shrink: 0; }
+.thinkfit-home .training-gateway-card.persona > img { object-position: center 18%; }
+.thinkfit-home .training-gateway-card:hover { border-color: #bebbe6; box-shadow: 0 10px 28px #25345b0d; transform: translateY(-3px); }
+.thinkfit-home .training-gateway-card.persona:hover { border-color: #d9b6a9; }
+.thinkfit-home .training-gateway-card:hover > img { transform: none; filter: saturate(.9); }
+.thinkfit-home .training-gateway-card-content { height: auto; flex: 1; padding: 1.6rem 1.75rem 1.35rem; }
+.thinkfit-home .training-gateway-card-top { color: var(--primary); font-size: .6rem; letter-spacing: .12em; font-weight: 700; gap: .5rem; }
+.thinkfit-home .training-gateway-card-top i { width: 31px; height: 31px; border: 0; border-radius: 8px; background: #f0eefb; color: var(--primary); backdrop-filter: none; }
+.thinkfit-home .training-gateway-card.persona .training-gateway-card-top { color: var(--secondary); }
+.thinkfit-home .training-gateway-card.persona .training-gateway-card-top i { background: #f9efea; color: var(--secondary); }
+.thinkfit-home .training-gateway-card-copy { gap: .7rem; padding: .9rem 0 .4rem; margin: 0; }
+.thinkfit-home .training-gateway-card-copy strong { color: var(--text-light); font-size: 1.7rem; font-weight: 700; line-height: 1.3; text-shadow: none; letter-spacing: -.04em; }
+.thinkfit-home .training-gateway-card-copy small { color: var(--text-muted); font-size: .85rem; line-height: 1.85; max-width: 450px; }
+.thinkfit-home .training-gateway-card-bottom { gap: .8rem; margin-top: 1.1rem; padding-top: 1rem; border-color: var(--border-color); flex-wrap: wrap; }
+.thinkfit-home .training-gateway-card-bottom > span { color: var(--text-muted); font-size: .65rem; font-weight: 500; }
+.thinkfit-home .training-gateway-card-bottom b { color: var(--primary); font-size: .74rem; font-weight: 650; margin-left: auto; }
+.thinkfit-home .training-gateway-card.persona .training-gateway-card-bottom b { color: var(--secondary); }
+.thinkfit-home .training-gateway-note { color: var(--text-muted); font-size: .69rem; margin-top: 1.2rem; }
+.home-practice-principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem; padding: 3.5rem 0; margin-top: 2rem; border-top: 1px solid var(--border-color); }
+.home-practice-principles article { display: flex; align-items: flex-start; gap: .9rem; min-width: 0; }
+.home-practice-principles article > svg { flex-shrink: 0; margin-top: 3px; color: #8a84ae; }
+.home-practice-principles h3 { margin: 0 0 .6rem; font-size: .89rem; font-weight: 650; }
+.home-practice-principles p { margin: 0; color: var(--text-muted); font-size: .78rem; line-height: 1.9; }
+.home-guest-error { color: var(--accent-coral); background: #fcf0f1; border: 1px solid #ebc8cd; padding: .8rem 1rem; border-radius: 9px; font-size: .8rem; }
+.thinkfit-home .training-gateway-footer { width: min(1280px, calc(100% - 64px)); margin-top: 0; border-color: var(--border-color); color: var(--text-muted); padding: 2rem 0; gap: 2rem; }
+.thinkfit-home .training-gateway-footer-brand img { width: 30px; height: 30px; }
+.thinkfit-home .training-gateway-footer-brand strong { color: var(--text-light); }
+.thinkfit-home .training-gateway-footer-info p span, .thinkfit-home .training-gateway-footer-info a { color: var(--text-main); }
+.thinkfit-home .training-gateway-footer-links button, .thinkfit-home .training-gateway-footer-links span { color: var(--text-muted); }
+.thinkfit-home .training-gateway-footer-links button:hover { color: var(--primary); }
+
+/* Motion library, featured issue and briefing */
+.debate-home-page.thinkfit-home { min-height: 100dvh; background: var(--bg-primary); }
+.thinkfit-home .debate-home-header { width: min(1280px, calc(100% - 64px)); min-height: 84px; border-color: var(--border-color); }
+.thinkfit-home .debate-home-brand { gap: .55rem; }
+.thinkfit-home .debate-home-brand > span { width: 32px; height: 32px; }
+.thinkfit-home .debate-home-brand strong { color: var(--text-light); font-size: 1.2rem; }
+.thinkfit-home .debate-home-brand small { color: var(--text-muted); font-size: .54rem; font-weight: 600; }
+.thinkfit-home .debate-home-nav > button { color: var(--text-muted); font-weight: 550; font-size: .75rem; min-height: 37px; }
+.thinkfit-home .debate-home-nav > button:hover { color: var(--primary); background: #eeedf7; border-color: #dedcf0; }
+.thinkfit-home .debate-home-nav .debate-home-profile, .thinkfit-home .debate-home-nav .debate-home-login { color: var(--text-main); background: white; border-color: var(--border-color); }
+.thinkfit-home .debate-home-profile > span { background: #eeecf9; color: var(--primary); }
+.thinkfit-home .debate-home-hero { width: min(1280px, calc(100% - 64px)); grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(2rem, 5vw, 4.5rem); padding: 3.5rem 0 2.6rem; }
+.thinkfit-home .debate-home-eyebrow { color: var(--primary); font-size: .6rem; font-weight: 700; letter-spacing: .12em; }
+.thinkfit-home .debate-home-eyebrow i { width: 5px; height: 5px; background: #9c96ce; box-shadow: none; }
+.thinkfit-home .debate-home-hero h1 { margin: 1.05rem 0 1.2rem; color: var(--text-light); font-size: clamp(2.3rem, 4vw, 3.8rem); font-weight: 720; line-height: 1.32; }
+.thinkfit-home .debate-home-hero h1 em { color: var(--primary); background: none; }
+.thinkfit-home .debate-home-hero-copy > p { color: var(--text-muted); font-size: .88rem; line-height: 1.95; max-width: 520px; }
+.thinkfit-home .debate-home-hero-actions { gap: .5rem; margin-top: 1.5rem; }
+.thinkfit-home .debate-home-hero-actions button { min-height: 42px; padding: .7rem .9rem; border-radius: 9px; font-size: .73rem; font-weight: 650; }
+.thinkfit-home .debate-home-primary { color: white; border-color: var(--primary); background: var(--primary); box-shadow: 0 4px 12px #5855d612; }
+.thinkfit-home .debate-home-primary:hover { background: var(--primary-hover); box-shadow: 0 5px 16px #5855d622; transform: none; }
+.thinkfit-home .debate-home-secondary { color: var(--text-main) !important; background: white; border-color: var(--border-color); }
+.thinkfit-home .debate-home-secondary:hover { color: var(--primary) !important; border-color: #c6c3e7; background: #f8f7fc; }
+.thinkfit-home .debate-home-stats { margin-top: 1.6rem; }
+.thinkfit-home .debate-home-stats > span { min-width: 80px; padding: 0 .9rem; border-color: var(--border-color); }
+.thinkfit-home .debate-home-stats > span:first-child { padding-left: 0; }
+.thinkfit-home .debate-home-stats strong { color: var(--text-main); font-size: .84rem; font-weight: 650; }
+.thinkfit-home .debate-home-stats small { color: var(--text-muted); font-size: .61rem; }
+.thinkfit-home .debate-home-arena { min-height: 0; width: 100%; padding: 1.4rem 1.6rem; border: 1px solid #dfdeeb; border-radius: 16px; background: white; box-shadow: 0 8px 30px #25345b06; }
+.thinkfit-home .debate-home-arena::before, .thinkfit-home .debate-topic-card::before, .thinkfit-home .debate-briefing-panel::before, .thinkfit-home .debate-briefing-hero::after { display: none; }
+.thinkfit-home .debate-home-arena-top { border-color: var(--border-color); }
+.thinkfit-home .debate-home-arena-top span { color: #5a7869; font-size: .69rem; letter-spacing: 0; font-weight: 650; }
+.thinkfit-home .debate-home-arena-top span i { background: #72a88c; box-shadow: none; }
+.thinkfit-home .debate-home-arena-top small { color: var(--text-muted); font-size: .63rem; }
+.thinkfit-home .debate-home-arena-topic { text-align: left; padding: 1.3rem 0 .8rem; gap: .6rem; }
+.thinkfit-home .debate-home-arena-topic small { color: var(--primary); font-weight: 650; letter-spacing: .09em; font-size: .57rem; }
+.thinkfit-home .debate-home-arena-topic strong { color: var(--text-light); font-size: 1.23rem; font-weight: 700; line-height: 1.65; letter-spacing: -.035em; word-break: keep-all; overflow-wrap: anywhere; }
+.thinkfit-home .debate-home-issue-context { color: var(--text-muted); font-size: .79rem; line-height: 1.85; -webkit-line-clamp: 3; margin-bottom: .9rem; }
+.thinkfit-home .debate-home-issue-meta { color: var(--text-muted); font-size: .65rem; }
+.thinkfit-home .debate-home-issue-actions { border-color: var(--border-color); gap: .5rem; margin-top: 1rem; }
+.thinkfit-home .debate-home-issue-actions button { color: var(--text-main); background: #f8f9fc; border-color: var(--border-color); font-size: .71rem; min-height: 37px; box-shadow: none; font-weight: 600; }
+.thinkfit-home .debate-home-issue-actions button:hover { color: var(--primary); border-color: #c8c5e9; background: #f1effa; box-shadow: none; }
+.thinkfit-home .debate-home-issue-actions .debate-home-issue-start { color: white; background: var(--primary); border-color: var(--primary); min-height: 41px; font-size: .78rem; box-shadow: none; }
+.thinkfit-home .debate-home-issue-actions .debate-home-issue-start:hover { color: white; background: var(--primary-hover); }
+.home-coach-strip { display: flex; align-items: center; gap: .9rem; width: min(1280px, calc(100% - 64px)); margin: 0 auto 3rem; padding: 1rem 1.3rem; border: 1px solid #dfdcef; border-radius: 12px; background: #f0eef8; }
+.home-coach-strip-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: #e8e4f5; color: #786aa4; flex-shrink: 0; }
+.home-coach-strip > div > strong { color: #514768; font-size: .83rem; font-weight: 650; }
+.home-coach-strip p { margin: .25rem 0 0; color: #6b617d; font-size: .73rem; line-height: 1.75; }
+.home-coach-strip > span { display: flex; align-items: center; gap: .5rem; margin-left: auto; flex-shrink: 0; color: #73628f; font-size: .68rem; }
+.thinkfit-home .debate-home-layout { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 24px; width: min(1280px, calc(100% - 64px)); }
+.thinkfit-home .debate-home-content { min-width: 0; }
+.thinkfit-home .debate-section-heading h2 { font-size: 1.35rem !important; font-weight: 680; letter-spacing: -.035em; }
+.thinkfit-home .debate-section-heading .btn { font-size: .74rem !important; padding: .6rem .85rem !important; border-color: var(--border-color); background: white; }
+.thinkfit-home .debate-category-tabs { background: #ebeef5; border-color: #e2e5ed !important; gap: .2rem !important; border-radius: 10px; scrollbar-width: thin; }
+.thinkfit-home .debate-category-tabs button { color: var(--text-muted) !important; font-size: .76rem !important; padding: .65rem .85rem !important; border-radius: 7px !important; font-weight: 550 !important; }
+.thinkfit-home .debate-category-tabs button.active { color: var(--primary) !important; background: white !important; box-shadow: 0 1px 5px #25345b0b; font-weight: 700 !important; }
+.thinkfit-home .debate-category-tabs button span { display: none; }
+.thinkfit-home .debate-topic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px !important; }
+.thinkfit-home .debate-topic-card { min-height: 255px !important; padding: 1.3rem !important; background: white !important; border: 1px solid var(--border-color) !important; border-radius: 13px !important; box-shadow: 0 3px 12px #25345b03 !important; backdrop-filter: none; }
+.thinkfit-home .debate-topic-card:hover { transform: translateY(-2px); border-color: #c7c3e8 !important; box-shadow: 0 7px 22px #25345b08 !important; }
+.thinkfit-home .debate-topic-card.selected { background: #faf9ff !important; border-color: #9690d9 !important; box-shadow: 0 0 0 1px #9690d920 !important; }
+.thinkfit-home .debate-topic-card-top, .thinkfit-home .debate-topic-card-footer { border-color: var(--border-color); }
+.thinkfit-home .debate-topic-card-kicker { color: var(--primary); font-size: .59rem; font-weight: 650; letter-spacing: .04em; }
+.thinkfit-home .debate-topic-card-kicker i { width: 5px; height: 5px; background: currentColor; box-shadow: none; }
+.thinkfit-home .debate-topic-card.accent-amber .debate-topic-card-kicker { color: var(--accent-amber); }
+.thinkfit-home .debate-topic-card.accent-pink .debate-topic-card-kicker { color: var(--secondary); }
+.thinkfit-home .debate-topic-card-time, .thinkfit-home .debate-topic-card-players { color: var(--text-muted); font-size: .62rem; font-weight: 500; }
+.thinkfit-home .debate-topic-card-motion { padding: .9rem 0 .65rem; gap: .35rem; }
+.thinkfit-home .debate-topic-card-motion small { color: #647086; font-size: .52rem; font-weight: 550; }
+.thinkfit-home .debate-topic-card h4 { color: var(--text-light) !important; font-size: 1.05rem !important; line-height: 1.65 !important; font-weight: 680; letter-spacing: -.025em; }
+.thinkfit-home .debate-topic-card-context { color: var(--text-muted) !important; font-size: .77rem !important; line-height: 1.85 !important; }
+.thinkfit-home .debate-topic-card-detail { color: var(--primary); font-size: .65rem; font-weight: 650; }
+.thinkfit-home .community-entry-button, .thinkfit-home .debate-topic-card-footer .community-btn-mini { color: var(--primary); background: #f5f3fb; border-color: #e4e0f1; box-shadow: none; font-size: .64rem; }
+.thinkfit-home .community-entry-button:hover, .thinkfit-home .debate-topic-card-footer .community-btn-mini:hover { color: var(--primary); background: #edebf7; border-color: #cac4e5; box-shadow: none; }
+.thinkfit-home .count-badge { background: #fff; color: var(--text-muted); border-color: #dedee9; }
+.thinkfit-home .count-aff { color: var(--primary); }
+.thinkfit-home .count-neg { color: var(--secondary); }
+.thinkfit-home .debate-briefing-panel { margin-top: 1.5rem !important; border-color: #cac5e8 !important; border-radius: 15px !important; background: white !important; box-shadow: 0 6px 24px #25345b08 !important; }
+.thinkfit-home .debate-briefing-hero { background: #f0eef9 !important; padding: 1.5rem !important; }
+.thinkfit-home .debate-briefing-hero .badge { color: var(--primary) !important; background: white !important; border-color: #cdc7e9 !important; font-size: .64rem; }
+.thinkfit-home .debate-briefing-hero h2 { color: var(--text-light); font-size: 1.45rem !important; line-height: 1.6; }
+.thinkfit-home .debate-briefing-hero .btn-primary { background: var(--primary) !important; border-color: var(--primary) !important; box-shadow: none !important; }
+.thinkfit-home .debate-briefing-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 1rem !important; padding: 1.2rem !important; }
+.thinkfit-home .debate-briefing-section { min-width: 0; background: #fafbfe; border-color: var(--border-color); border-radius: 11px; padding: 1.15rem; overflow-wrap: anywhere; }
+.thinkfit-home .debate-briefing-section.context { border-left-color: #a7a0d3; background: #fafbfe; }
+.thinkfit-home .debate-briefing-section.context p { color: var(--text-main) !important; font-size: .86rem; line-height: 1.9 !important; }
+.thinkfit-home .debate-briefing-section > h3 { font-size: .91rem !important; }
+.thinkfit-home .debate-case-card { color: var(--text-main); background: white !important; border-color: var(--border-color) !important; }
+.thinkfit-home .debate-case-card > span { color: var(--accent-amber); background: #f7f0e3; border-color: #ece1cc; }
+.thinkfit-home .debate-case-card p { color: var(--text-main) !important; font-size: .81rem; }
+.thinkfit-home .debate-clash-card { background: #f6f4fc !important; border-color: #e3dff0 !important; }
+.thinkfit-home .debate-clash-card.negative { background: #fbf5f1 !important; border-color: #eddfd7 !important; }
+.thinkfit-home .debate-clash-card::before { background: var(--primary); }
+.thinkfit-home .debate-clash-card.negative::before { background: var(--secondary); }
+.thinkfit-home .debate-clash-card h4 { color: var(--primary) !important; }
+.thinkfit-home .debate-clash-card.negative h4 { color: var(--secondary) !important; }
+.thinkfit-home .debate-clash-card ul { color: var(--text-main) !important; font-size: .8rem; }
+.thinkfit-home .debate-briefing-settings { display: grid; grid-template-columns: 1fr 1fr; min-width: 0; position: static; }
+.thinkfit-home .debate-setting-card { min-width: 0; background: #f9fafe !important; border-color: var(--border-color) !important; border-radius: 10px !important; }
+.thinkfit-home .debate-setting-card h3 { font-size: .84rem !important; }
+.thinkfit-home .debate-setting-card > p { color: var(--text-muted) !important; font-size: .74rem !important; }
+.thinkfit-home .debate-setting-option { color: var(--text-main) !important; background: white !important; border-color: var(--border-color) !important; font-size: .79rem; }
+.thinkfit-home .debate-setting-option.active, .thinkfit-home .debate-setting-option.active.stance { color: var(--primary) !important; background: #eeebf9 !important; border-color: #aea5d8 !important; }
+.thinkfit-home .debate-setting-option:hover { color: var(--primary) !important; border-color: #aea5d8 !important; }
+.thinkfit-home .debate-setting-card.resources a { max-width: 100%; min-width: 0; color: var(--text-main); background: white !important; border-color: var(--border-color); font-size: .74rem; white-space: normal; overflow-wrap: anywhere; }
+.thinkfit-home .debate-setting-card.resources a svg { flex-shrink: 0; }
+.thinkfit-home .debate-setting-card.prep { background: #f5f2fb !important; border-color: #e3ddef !important; }
+.thinkfit-home .debate-setting-card.prep ol { color: var(--text-main) !important; font-size: .76rem; }
+.thinkfit-home .debate-setting-card.prep li::marker { color: var(--primary); }
+.thinkfit-home .debate-home-sidebar { position: static; min-width: 0; width: 100% !important; gap: 16px !important; display: flex !important; }
+.thinkfit-home .debate-side-card { background: white !important; border-color: var(--border-color) !important; border-radius: 13px !important; box-shadow: 0 3px 12px #25345b03 !important; padding: 1.1rem !important; }
+.thinkfit-home .debate-side-card-header { gap: .6rem; }
+.thinkfit-home .debate-side-card-header > span { width: 34px; height: 34px; flex-basis: 34px; color: var(--secondary); border-color: #edddd6; background: #f8efea; border-radius: 9px; }
+.thinkfit-home .debate-side-card-header.ranking > span { color: var(--accent-amber); border-color: #ede2ce; background: #f8f2e7; }
+.thinkfit-home .debate-side-card-header small { color: var(--text-muted); font-size: .53rem; font-weight: 650; }
+.thinkfit-home .debate-side-card-header h3 { color: var(--text-light) !important; font-size: .94rem !important; font-weight: 650; }
+.thinkfit-home .debate-popular-item { grid-template-columns: 28px minmax(0, 1fr); gap: .6rem !important; padding: .75rem .3rem !important; }
+.thinkfit-home .debate-popular-item > svg { display: none; }
+.thinkfit-home .debate-popular-item.top { background: #faf6f3; border-color: #efe5dd; }
+.thinkfit-home .debate-popular-item:hover { background: #f7f5fc; border-color: #e5e0f0; transform: none; }
+.thinkfit-home .debate-popular-rank, .thinkfit-home .debate-popular-item:nth-child(-n+3) .debate-popular-rank { min-width: 28px !important; height: 28px; color: var(--secondary) !important; background: #f5eae3; font-size: .67rem !important; border-radius: 7px; }
+.thinkfit-home .debate-popular-copy h4 { color: var(--text-main); font-size: .79rem !important; font-weight: 550; line-height: 1.7 !important; }
+.thinkfit-home .debate-popular-copy span { color: var(--text-muted) !important; font-size: .65rem !important; font-weight: 400 !important; }
+.thinkfit-home .debater-ranking-item { background: #fafbfe !important; border-color: var(--border-color) !important; padding: .65rem !important; gap: .6rem; }
+.thinkfit-home .debater-ranking-item.leader { background: #fbf8f1 !important; border-color: #ebe2ce !important; }
+.thinkfit-home .debater-ranking-item.current { background: #f3f1fb !important; border-color: #dcd5ef !important; }
+.thinkfit-home .debater-ranking-avatar { width: 32px !important; height: 32px !important; flex-basis: 32px; border-radius: 8px !important; background: #eeebf7 !important; border-color: #e2dbef; }
+.thinkfit-home .debater-ranking-avatar > span { color: #6e5c8b !important; font-size: .8rem !important; }
+.thinkfit-home .debater-ranking-medal { background: white !important; }
+.thinkfit-home .debater-ranking-copy > div:first-child { flex-wrap: wrap; gap: .25rem; }
+.thinkfit-home .debater-ranking-copy > div:first-child > span:first-child { max-width: 100%; font-size: .77rem !important; }
+.thinkfit-home .debater-ranking-copy > div:nth-child(2) { color: var(--text-muted) !important; font-size: .65rem !important; }
+.thinkfit-home .debater-ranking-copy .badge { color: #6e5c8b !important; border-color: #d2c6e1 !important; }
+.thinkfit-home .debater-xp-track { background: #e6e4ee; }
+.thinkfit-home .debater-xp-track i { background: #a299ce; }
+.thinkfit-home .debater-ranking-item.leader .debater-xp-track i { background: #c2a365; }
+.thinkfit-home .debater-ranking-position { font-size: .85rem !important; font-weight: 600 !important; }
+
+/* The same palette follows visitors into the conversation training library. */
+.simulation-page.thinkfit-home { background: var(--bg-primary); padding: 0 max(32px, calc((100vw - 1280px) / 2)) 3rem; }
+.thinkfit-home .simulation-header { min-height: 84px; }
+.thinkfit-home .simulation-back { font: inherit; font-size: .75rem; font-weight: 550; }
+.thinkfit-home .simulation-brand { letter-spacing: -.025em; gap: .55rem; }
+.thinkfit-home .simulation-brand span { color: var(--text-light); font-size: 1.2rem; font-weight: 800; }
+.thinkfit-home .simulation-brand small { margin-left: .5rem; padding-left: .8rem; border-left: 1px solid var(--border-color); color: var(--text-muted); font-size: .55rem; font-weight: 550; letter-spacing: .11em; }
+.thinkfit-home .simulation-user { font-size: .75rem; }
+.thinkfit-home .simulation-hero { padding: 3.5rem 0; min-height: 0; gap: 4rem; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); }
+.thinkfit-home .simulation-eyebrow { color: var(--primary); font-size: .62rem; font-weight: 650; }
+.thinkfit-home .simulation-hero h1 { color: var(--text-light); font-size: clamp(2.1rem, 3.8vw, 3.6rem); line-height: 1.35; font-weight: 720; }
+.thinkfit-home .simulation-hero h1 span { color: var(--primary); }
+.thinkfit-home .simulation-hero > div > p { color: var(--text-muted); font-size: .88rem; line-height: 1.9; }
+.thinkfit-home .simulation-demo-console { border-color: var(--border-color); background: white; box-shadow: 0 8px 30px #25345b06; border-radius: 16px; padding: 1.4rem; }
+.thinkfit-home .simulation-demo-console::before { display: none; }
+.thinkfit-home .simulation-console-top { border-color: var(--border-color); }
+.thinkfit-home .simulation-console-top span { color: #50735f; font-size: .65rem; font-weight: 600; }
+.thinkfit-home .simulation-console-top span i { background: #7dac91; box-shadow: none; }
+.thinkfit-home .simulation-console-top small, .thinkfit-home .simulation-console-persona small { color: var(--text-muted); }
+.thinkfit-home .simulation-console-avatar { background: #efedf9; border-color: #ddd8ef; box-shadow: none; color: var(--primary); width: 47px; height: 47px; border-radius: 11px; }
+.thinkfit-home .simulation-console-avatar::before, .thinkfit-home .simulation-console-avatar::after { display: none; }
+.thinkfit-home .simulation-console-avatar > span { color: var(--primary); }
+.thinkfit-home .simulation-console-avatar i { border-color: white; background: #7dac91; }
+.thinkfit-home .simulation-console-persona strong { color: var(--text-light); font-size: .9rem; }
+.thinkfit-home .simulation-console-persona span { color: var(--text-muted); font-size: .65rem; }
+.thinkfit-home .simulation-console-pressure > b i { background: #a39ace; }
+.thinkfit-home .simulation-console-pressure > b i:nth-last-child(-n+2) { background: #e8e4f0; }
+.thinkfit-home .simulation-console-dialogue { background: #f6f4fc; border-color: #e8e2f3; color: #9282b5; }
+.thinkfit-home .simulation-console-dialogue p { color: var(--text-main); font-size: .8rem; line-height: 1.9; }
+.thinkfit-home .simulation-console-wave i { background: #aba1cf; opacity: .8; }
+.thinkfit-home .simulation-console-bottom { color: var(--text-muted); }
+.thinkfit-home .simulation-console-bottom b { color: #76638f; }
+.thinkfit-home .simulation-personal-launch { background: #f0eef8; border-color: #e0dcef; box-shadow: none; border-radius: 14px; padding: 1.6rem; }
+.thinkfit-home .simulation-personal-launch-copy > span { color: #6b5d8c; font-size: .6rem; }
+.thinkfit-home .simulation-personal-launch-copy h2 { color: #4a405e; font-size: 1.25rem; line-height: 1.6; }
+.thinkfit-home .simulation-personal-launch-copy p { color: #6c607c; font-size: .77rem; }
+.thinkfit-home .simulation-personal-launch-copy > button { color: white; background: var(--primary); font-weight: 650; border-radius: 9px; }
+.thinkfit-home .simulation-personal-launch-copy > button:hover { background: var(--primary-hover); }
+.thinkfit-home .simulation-personal-options article { color: #6b5d8c; background: #fff; border-color: #ded8ed; border-radius: 10px; }
+.thinkfit-home .simulation-personal-options strong { color: #514267; font-size: .85rem; }
+.thinkfit-home .simulation-personal-options span { color: #756b84; }
+.thinkfit-home .simulation-section-heading h2 { font-size: 1.35rem; font-weight: 680; }
+.thinkfit-home .simulation-section-heading span { color: var(--primary); font-size: .6rem; font-weight: 650; }
+.thinkfit-home .simulation-section-heading > p { color: var(--text-muted); font-size: .78rem; line-height: 1.8; }
+.thinkfit-home .simulation-category-card { color: var(--text-main); background: white; border: 1px solid var(--border-color); box-shadow: none; border-radius: 12px; }
+.thinkfit-home .simulation-category-card::before { display: none; }
+.thinkfit-home .simulation-category-card:hover, .thinkfit-home .simulation-category-card.selected { border-color: #afa7d6; background: #f7f5fc; box-shadow: 0 4px 12px #25345b05; transform: none; }
+.thinkfit-home .simulation-category-number { color: #8c839f; }
+.thinkfit-home .simulation-category-icon { color: #796d9d; background: #f0edf7; border-color: #e2dced; box-shadow: none; }
+.thinkfit-home .simulation-category-card strong { color: var(--text-light); font-size: .96rem; }
+.thinkfit-home .simulation-category-card small { color: #6e5f89; }
+.thinkfit-home .simulation-category-card p { color: var(--text-muted); font-size: .75rem; line-height: 1.9; }
+.thinkfit-home .simulation-mission-card { min-width: 0; background: white; border-color: var(--border-color); border-radius: 13px; box-shadow: 0 3px 12px #25345b03; }
+.thinkfit-home .simulation-mission-card:hover { border-color: #c7c0de; box-shadow: 0 7px 22px #25345b08; transform: translateY(-2px); }
+.thinkfit-home .simulation-mission-card h3 { color: var(--text-light); font-size: 1.12rem; font-weight: 680; }
+.thinkfit-home .simulation-mission-card > p { color: var(--text-muted); font-size: .79rem; }
+.thinkfit-home .simulation-difficulty { color: #486d55; border-color: #dbe8df; background: #f0f6f2; }
+.thinkfit-home .simulation-difficulty.level-2 { color: #806130; border-color: #eadfc7; background: #faf5ea; }
+.thinkfit-home .simulation-difficulty.level-3 { color: #925448; border-color: #ecd8d0; background: #faf0eb; }
+.thinkfit-home .simulation-persona-chip { background: #f8f9fc; border-color: var(--border-color); }
+.thinkfit-home .simulation-persona-chip strong { color: var(--text-main); font-size: .75rem; }
+.thinkfit-home .simulation-persona-chip small { color: var(--text-muted); font-size: .62rem; }
+.thinkfit-home .simulation-mission-objective { background: #f5f3fa; border-color: #e7e0ef; }
+.thinkfit-home .simulation-mission-objective b { color: #705c8b; }
+.thinkfit-home .simulation-mission-objective span { color: var(--text-main); font-size: .76rem; }
+.thinkfit-home .simulation-skill-tags span { color: #706180; border-color: #e5e0ec; background: #f7f5fa; }
+.thinkfit-home .simulation-start-button { color: white; background: var(--primary); border-color: var(--primary); box-shadow: none; border-radius: 9px; font-weight: 650; }
+.thinkfit-home .simulation-start-button:hover { background: var(--primary-hover); box-shadow: none; }
+.thinkfit-home .simulation-safety-note { color: #6d7d74; background: #f1f5f2; border-color: #dde5df; border-radius: 12px; }
+.thinkfit-home .simulation-safety-note strong { color: #4d6d59; }
+.thinkfit-home .simulation-safety-note p { color: #576e60; font-size: .77rem; }
+
+/* Entry dialogs inherit the same palette; their existing behavior stays intact. */
+.thinkfit-home .modal-overlay, .thinkfit-home .community-modal-overlay { background: var(--modal-overlay); backdrop-filter: blur(5px); }
+.thinkfit-home .modal-content, .thinkfit-home .debate-setup-modal { color: var(--text-main); background: white; border-color: var(--border-color); border-radius: 16px; box-shadow: 0 25px 90px #18203230; }
+.thinkfit-home .icon-button { flex-shrink: 0; color: var(--text-muted); background: white; border-color: var(--border-color); border-radius: 8px; }
+.thinkfit-home .icon-button:hover { color: var(--primary); background: #f4f2fb; border-color: #ccc5e8; }
+.thinkfit-home .debate-modal-head, .thinkfit-home .debate-modal-footer { background: #f7f8fc; border-color: var(--border-color); }
+.thinkfit-home .setup-choice, .thinkfit-home .segmented-control, .thinkfit-home .moderator-toggle, .thinkfit-home .phase-allocation { color: var(--text-main); background: #f8f9fc; border-color: var(--border-color); }
+.thinkfit-home .setup-choice.selected, .thinkfit-home .segmented-control button.selected, .thinkfit-home .moderator-toggle.selected { color: var(--primary); background: #eeebf9; border-color: #c3bce2; box-shadow: none; }
+.thinkfit-home .setup-choice strong, .thinkfit-home .segmented-control button, .thinkfit-home .moderator-toggle strong { color: var(--text-main); }
+.thinkfit-home .setup-choice.selected strong, .thinkfit-home .segmented-control button.selected { color: var(--primary); }
+.thinkfit-home .segmented-control button.active { color: white; background: var(--primary); }
+.thinkfit-home .setup-choice small, .thinkfit-home .moderator-toggle small { color: var(--text-muted); }
+.thinkfit-home .phase-track > div { color: var(--primary); background: #efecf8; border-color: #d9d2e9; }
+.thinkfit-home .phase-track > div span, .thinkfit-home .phase-track > div small { color: #726582; }
+.thinkfit-home .live-gate-card { color: var(--text-main); background: white; border-color: var(--border-color); box-shadow: 0 10px 35px #25345b08; }
+.thinkfit-home .live-login-gate { background: var(--bg-primary); }
+.thinkfit-home .auth-modal .divider-row > div { background: var(--border-color) !important; }
+.thinkfit-home .input-textarea, .thinkfit-home .input-field { color: var(--text-light); background: white; border-color: var(--border-color); box-shadow: none; }
+.thinkfit-home .room-search-row label, .thinkfit-home .room-search-row input { min-width: 0; }
+.thinkfit-home .debate-room-card footer { flex-wrap: wrap; }
+.thinkfit-home .debate-room-card > div { color: #42765c; }
+.thinkfit-home .live-dot { background: #7dac91; box-shadow: none; }
+.thinkfit-home .community-panel-modal { color: var(--text-main); background: white; border-color: var(--border-color); border-radius: 16px; box-shadow: 0 25px 90px #18203230; }
+.thinkfit-home .community-panel-modal::before { display: none; }
+.thinkfit-home .community-panel-hero { background: #f8f9fc; border-color: var(--border-color); }
+.thinkfit-home .community-panel-eyebrow { color: var(--primary); font-weight: 650; }
+.thinkfit-home .community-panel-heading h2 { color: var(--text-light); font-size: 1.45rem; }
+.thinkfit-home .community-panel-motion strong { color: var(--text-main); }
+.thinkfit-home .community-panel-motion small, .thinkfit-home .community-pulse-side > small { color: var(--text-muted); }
+.thinkfit-home .community-close-button { color: var(--text-muted); background: white; border-color: var(--border-color); }
+.thinkfit-home .community-close-button:hover { color: var(--primary); background: #f0edf9; border-color: #cec6e8; }
+.thinkfit-home .community-pulse-side.affirmative { color: var(--primary); background: #eeebf9; border-color: #e0d9ef; }
+.thinkfit-home .community-pulse-side.negative { color: var(--secondary); background: #fbf1ec; border-color: #eeddd3; }
+.thinkfit-home .community-pulse-total { color: var(--text-muted); background: white; border-color: var(--border-color); }
+.thinkfit-home .community-pulse-total strong { color: var(--text-light); }
+.thinkfit-home .community-progress-bar { background: #ece9f3; }
+.thinkfit-home .community-progress-bar i.affirmative, .thinkfit-home .community-opinion-card.affirmative::before { background: #9285bd; }
+.thinkfit-home .community-progress-bar i.negative, .thinkfit-home .community-opinion-card.negative::before { background: #c6917c; }
+.thinkfit-home .community-toolbar { background: white; border-color: var(--border-color); }
+.thinkfit-home .community-filter-btn, .thinkfit-home .community-sort-btn { color: var(--text-muted); font-weight: 550; }
+.thinkfit-home .community-filter-btn:hover, .thinkfit-home .community-sort-btn:hover,
+.thinkfit-home .community-filter-btn.active, .thinkfit-home .community-sort-btn.active { color: var(--primary); background: #f0edf9; border-color: #e0d9ef; }
+.thinkfit-home .community-write-toggle, .thinkfit-home .community-composer-actions .community-compose-submit { color: white; background: var(--primary); border-color: var(--primary); box-shadow: none; font-weight: 650; }
+.thinkfit-home .community-write-toggle.active { color: var(--primary); background: #f0edf9; border-color: #e0d9ef; }
+.thinkfit-home .community-composer { background: #f8f7fc; border-color: var(--border-color); }
+.thinkfit-home .community-composer-note, .thinkfit-home .community-composer-meta { color: var(--text-muted); }
+.thinkfit-home .community-composer-note strong { color: var(--text-main); }
+.thinkfit-home .community-composer-note svg { color: var(--primary); }
+.thinkfit-home .community-position-picker button, .thinkfit-home .community-composer-actions button { color: var(--text-muted); background: white; border-color: var(--border-color); font-weight: 600; }
+.thinkfit-home .community-position-picker .affirmative.active { color: var(--primary); background: #eeebf9; border-color: #c8bde2; }
+.thinkfit-home .community-position-picker .negative.active { color: var(--secondary); background: #fbf1ec; border-color: #dfbcab; }
+.thinkfit-home .community-composer textarea { color: var(--text-light); background: white; border-color: var(--border-color); }
+.thinkfit-home .community-composer textarea::placeholder { color: var(--text-muted); }
+.thinkfit-home .community-opinion-card { background: white; border-color: var(--border-color); border-radius: 11px; }
+.thinkfit-home .community-opinion-card:hover { background: #faf9fe; border-color: #d9d2e8; box-shadow: 0 4px 12px #25345b05; transform: none; }
+.thinkfit-home .community-opinion-avatar { color: var(--primary); background: #eeebf9; border-color: #e0d9ef; border-radius: 8px; }
+.thinkfit-home .community-opinion-card > header > div strong { color: var(--text-light); }
+.thinkfit-home .community-opinion-card > header > div span { color: var(--text-muted); }
+.thinkfit-home .community-opinion-card.affirmative > header > b { color: var(--primary); background: #eeebf9; }
+.thinkfit-home .community-opinion-card.negative > header > b { color: var(--secondary); background: #fbf1ec; }
+.thinkfit-home .community-opinion-card > p { color: var(--text-main); }
+.thinkfit-home .community-opinion-card > footer { border-color: var(--border-color); }
+.thinkfit-home .community-like-btn { color: var(--text-muted); background: #f8f9fc; border-color: var(--border-color); }
+.thinkfit-home .community-like-btn:not(:disabled):hover, .thinkfit-home .community-like-btn.liked { color: var(--secondary); background: #fbf1ec; border-color: #eeddd3; }
+.thinkfit-home .community-state { color: var(--text-muted); }
+.thinkfit-home .community-state strong { color: var(--text-main); }
+.thinkfit-home .community-state svg { color: var(--primary); }
+.thinkfit-home .community-error { color: #a34556; background: #fcf2f4; border-color: #eed7dd; }
+.thinkfit-home .community-success { color: #42765c; background: #f1f6f3; border-color: #dce9e1; }
+
+@media (max-width: 1100px) {
+  .thinkfit-home .debate-home-nav > button:not(.debate-home-profile):not(.debate-home-login):not(.debate-home-logout) { display: inline-flex; }
+  .thinkfit-home .debate-home-header { flex-wrap: wrap; padding: 1rem 0; gap: .75rem; }
+  .thinkfit-home .debate-home-nav { flex-wrap: wrap; }
+  .thinkfit-home .debate-home-layout { grid-template-columns: minmax(0, 1fr) 255px; gap: 18px; }
+  .thinkfit-home .debate-home-hero { gap: 2rem; }
+  .home-coach-strip > span { display: none; }
+  .thinkfit-home .simulation-hero { gap: 2rem; }
+  .thinkfit-home .simulation-personal-launch { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .thinkfit-home .training-gateway-header { flex-wrap: wrap; padding: 1rem 0; row-gap: 1rem; }
+  .home-gateway-nav { order: 3; width: 100%; margin: 0; justify-content: flex-start; border-top: 1px solid var(--border-color); padding-top: .8rem; gap: 1.5rem; }
+  .thinkfit-home .training-gateway-account { margin-left: auto; }
+  .home-welcome { grid-template-columns: 1.1fr .9fr; gap: 1.6rem; }
+  .home-thinking-note { padding: 1.4rem; }
+  .thinkfit-home .training-gateway-options { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .thinkfit-home .training-gateway-card-content { padding: 1.25rem; }
+  .thinkfit-home .training-gateway-card > img { height: 160px; }
+  .thinkfit-home .training-gateway-card-copy strong { font-size: 1.4rem; }
+  .thinkfit-home .training-gateway-card-bottom { align-items: flex-start; flex-direction: column; }
+  .thinkfit-home .training-gateway-card-bottom b { margin-left: 0; }
+  .home-practice-principles { gap: 1.5rem; }
+  .home-practice-principles article { flex-direction: column; }
+  .thinkfit-home .debate-home-layout { grid-template-columns: 1fr; }
+  .thinkfit-home .debate-home-sidebar { display: grid !important; grid-template-columns: 1fr 1fr; align-items: start; }
+  .thinkfit-home .debate-home-hero { grid-template-columns: 1fr; }
+  .thinkfit-home .debate-home-hero-copy { max-width: 620px; }
+  .thinkfit-home .debate-home-arena { width: 100%; }
+  .thinkfit-home .simulation-hero { grid-template-columns: 1fr; }
+  .thinkfit-home .simulation-demo-console { width: 100%; max-width: 620px; }
+}
+@media (max-width: 600px) {
+  .thinkfit-home .training-gateway-header, .thinkfit-home .training-gateway-main, .thinkfit-home .training-gateway-footer,
+  .thinkfit-home .debate-home-header, .thinkfit-home .debate-home-hero, .thinkfit-home .debate-home-layout, .thinkfit-home .site-legal-footer, .home-coach-strip { width: calc(100% - 32px); }
+  .thinkfit-home .training-gateway-header { gap: .75rem; }
+  .thinkfit-home .training-gateway-brand small { font-size: .46rem; }
+  .thinkfit-home .training-gateway-brand strong { font-size: 1.08rem; }
+  .thinkfit-home .training-gateway-account button { padding: .5rem .65rem; font-size: .7rem; }
+  .thinkfit-home .training-gateway-account > span { display: none; }
+  .home-gateway-nav { gap: 1.5rem; }
+  .home-gateway-nav a, .home-gateway-nav button { font-size: .72rem; }
+  .home-welcome { grid-template-columns: 1fr; gap: 1.8rem; padding: 2.5rem 0; }
+  .thinkfit-home .training-gateway-intro h1 { font-size: 2.65rem; }
+  .thinkfit-home .training-gateway-intro p { font-size: .83rem; }
+  .thinkfit-home .training-gateway-intro p br { display: none; }
+  .home-thinking-note { padding: 1.3rem 1.4rem; }
+  .home-thinking-note > p { margin: 1rem 0 .6rem; font-size: 1.25rem; }
+  .home-thinking-note > span { font-size: .75rem; }
+  .home-thinking-note > span br { display: none; }
+  .home-thinking-path { margin-top: 1.25rem; padding-top: .9rem; }
+  .home-thinking-path span { flex-direction: row; gap: .4rem; }
+  .home-section-heading { align-items: flex-start; flex-direction: column; gap: .6rem; }
+  .home-section-heading h2 { font-size: 1.22rem; }
+  .home-section-heading > p { font-size: .7rem; }
+  .thinkfit-home .training-gateway-options { grid-template-columns: 1fr; }
+  .thinkfit-home .training-gateway-card > img { height: 175px; }
+  .thinkfit-home .training-gateway-card-content { padding: 1.3rem; }
+  .thinkfit-home .training-gateway-card-copy strong { font-size: 1.5rem; }
+  .thinkfit-home .training-gateway-card-bottom { flex-direction: row; align-items: center; }
+  .thinkfit-home .training-gateway-card-bottom b { margin-left: auto; }
+  .home-practice-principles { grid-template-columns: 1fr; padding: 2rem 0; gap: 1.6rem; }
+  .home-practice-principles article { flex-direction: row; }
+  .thinkfit-home .training-gateway-footer { grid-template-columns: 1fr; gap: 1.5rem; }
+  .thinkfit-home .training-gateway-footer-links { justify-content: flex-start; }
+  .thinkfit-home .training-gateway-footer-links span { text-align: left; }
+  .thinkfit-home .debate-home-header { min-height: 0; padding: 1rem 0; }
+  .thinkfit-home .debate-home-nav { justify-content: flex-start; gap: .2rem; width: 100%; }
+  .thinkfit-home .debate-home-nav > button { font-size: .68rem; min-height: 32px; padding: .4rem .6rem; }
+  .thinkfit-home .debate-home-nav .debate-home-logout { padding-inline: .4rem; }
+  .thinkfit-home .debate-home-brand > div { display: grid; }
+  .thinkfit-home .debate-home-brand small { display: block; }
+  .thinkfit-home .debate-home-hero { padding: 2rem 0; gap: 2rem; }
+  .thinkfit-home .debate-home-hero h1 { font-size: 2.35rem; }
+  .thinkfit-home .debate-home-hero-copy > p { font-size: .82rem; }
+  .thinkfit-home .debate-home-hero-actions button { font-size: .72rem; }
+  .thinkfit-home .debate-home-hero-actions .debate-home-primary { width: 100%; }
+  .thinkfit-home .debate-home-hero-actions .debate-home-secondary { flex: 1; padding-inline: .5rem; }
+  .thinkfit-home .debate-home-stats > span { padding-inline: .65rem; min-width: 0; }
+  .thinkfit-home .debate-home-stats strong { font-size: .78rem; }
+  .thinkfit-home .debate-home-arena { padding: 1.1rem; }
+  .thinkfit-home .debate-home-arena-topic strong { font-size: 1.13rem; }
+  .home-coach-strip { margin-bottom: 2rem; padding: 1rem; align-items: flex-start; }
+  .home-coach-strip-icon { width: 32px; height: 32px; }
+  .home-coach-strip > div > strong { font-size: .74rem; }
+  .home-coach-strip p { font-size: .7rem; }
+  .thinkfit-home .debate-section-heading { gap: .75rem !important; }
+  .thinkfit-home .debate-section-heading h2 { font-size: 1.15rem !important; }
+  .thinkfit-home .debate-category-tabs button { padding: .6rem .7rem !important; font-size: .72rem !important; }
+  .thinkfit-home .debate-topic-grid { grid-template-columns: 1fr !important; }
+  .thinkfit-home .debate-topic-card { min-height: 230px !important; }
+  .thinkfit-home .debate-home-sidebar { grid-template-columns: 1fr; }
+  .thinkfit-home .debate-briefing-settings { grid-template-columns: 1fr; }
+  .thinkfit-home .debate-briefing-grid { padding: .9rem !important; }
+  .thinkfit-home .debate-briefing-hero { padding: 1.2rem !important; }
+  .thinkfit-home .debate-briefing-hero h2 { font-size: 1.2rem !important; }
+  .thinkfit-home .debate-briefing-hero .community-entry-button { font-size: .72rem !important; padding: .5rem !important; }
+  .simulation-page.thinkfit-home { padding-inline: 16px; }
+  .thinkfit-home .simulation-header { min-height: 72px; flex-wrap: wrap; gap: .5rem; }
+  .thinkfit-home .simulation-brand small { display: none; }
+  .thinkfit-home .simulation-brand span { font-size: 1.05rem; }
+  .thinkfit-home .simulation-back, .thinkfit-home .simulation-user { font-size: .68rem; }
+  .thinkfit-home .simulation-hero { padding: 2rem 0; gap: 2rem; }
+  .thinkfit-home .simulation-hero h1 { font-size: 2.15rem; }
+  .thinkfit-home .simulation-demo-console { padding: 1rem; }
+  .thinkfit-home .simulation-console-pressure { display: none; }
+  .thinkfit-home .simulation-personal-launch { padding: 1.2rem; }
+  .thinkfit-home .simulation-section-heading { flex-direction: column; align-items: flex-start; gap: .6rem; }
+  .thinkfit-home .simulation-section-heading h2 { font-size: 1.2rem; }
+  .thinkfit-home .simulation-category-grid { grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .thinkfit-home .simulation-category-card { padding: 1rem; }
+  .thinkfit-home .simulation-mission-grid { grid-template-columns: 1fr; }
+  .thinkfit-home .simulation-category-card p { font-size: .68rem; }
+  .thinkfit-home .modal-content { width: calc(100% - 24px); max-height: 92dvh; }
+}
+@media (prefers-reduced-motion: reduce) { .thinkfit-home *, .thinkfit-home *::before, .thinkfit-home *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }

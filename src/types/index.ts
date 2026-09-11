@@ -24,7 +24,7 @@ export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';
 export type DebatePosition = 'affirmative' | 'negative';
 export type DebateRoomAudience = 'public' | 'organization';
 export type DebateParticipantRole = 'debater' | 'opening' | 'rebuttal' | 'closing' | 'moderator';
-export type DebateStageId = 'opening' | 'question' | 'answer' | 'analysis' | 'rebuttal' | 'weighing' | 'closing';
+export type DebateStageId = 'opening' | 'question' | 'answer' | 'analysis' | 'rebuttal' | 'weighing' | 'closing' | 'cross-question';
 export type DebateTeamSize = 1 | 2 | 3;
 export type DebateLevel = 'beginner' | 'intermediate' | 'advanced';
 export type AppLanguage = 'ko' | 'en';
@@ -65,9 +65,11 @@ export type BattleConfig = {
   participantRole?: DebateParticipantRole;
   audience?: DebateRoomAudience;
   organizationId?: string;
+  sessionConfig?: import('../lib/liveDebateSession').LiveSessionConfig;
 };
 
 export type LiveDebateRoomSummary = {
+  sessionConfig?: import('../lib/liveDebateSession').LiveSessionConfig;
   id: string;
   roomId: string;
   hostId: string;
@@ -111,6 +113,7 @@ export type LiveDebateArgument = {
   phaseId?: string;
   phaseLabel?: string;
   audioPath?: string;
+  speechTicketId?: string;
   audioDeletedAt?: string;
   audioDeleteReason?: 'retention' | 'capacity' | 'limit' | 'cleanup';
 };

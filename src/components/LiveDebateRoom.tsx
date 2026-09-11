@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   BookOpen,
+  ChevronDown,
   Check,
   CheckCircle2,
   Clock,
@@ -35,6 +36,11 @@ import {
 import { ArgumentCard } from './ArgumentCard';
 import { LiveDebateEvaluationModal } from './LiveDebateEvaluationModal';
 import { TopicBriefingDetails } from './TopicBriefingDetails';
+import { ThinkingCoach } from './ThinkingCoach';
+import { OpeningComposer } from './OpeningComposer';
+import { getCoachStage, type CoachContext } from '../lib/thinkingCoach';
+import './DebateStudio.css';
+import './LiveDebateRoom.css';
 import { supabase } from '../lib/supabase';
 import { transcribeDebateAudio } from '../lib/transcription';
 import { formatDebateMinutes } from '../lib/debateTiming';
@@ -276,7 +282,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const discardRecordingRef = useRef(false);
   const recordingPhaseRef = useRef<Pick<PendingRecording, 'phaseId' | 'phaseLabel'> | null>(null);
   const recordingTimeoutRef = useRef<number | null>(null);
-  const scrollAnchorRef = useRef<HTMLDivElement | null>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
   const evaluationRequestedRef = useRef(false);
   const savedEvaluationRef = useRef(false);
   const transcriptRecordQueuedRef = useRef(false);
@@ -314,6 +320,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   const [roomLanguage, setRoomLanguage] = useState<'ko' | 'en'>('ko');
   const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
   const [liveTranscripts, setLiveTranscripts] = useState<Record<string, LiveTranscriptView>>({});
+  const [coachSeats, setCoachSeats] = useState<Record<string, DebatePosition>>({});
 
   useEffect(() => () => {
     playbackAudioRef.current?.pause();
@@ -383,6 +390,13 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
           phaseIds: localSeat.phaseIds,
         });
       }
+      // Coaching uses the confirmed seating plan, never inferred presence metadata.
+      setCoachSeats(Object.fromEntries(lobbyParticipants
+        .filter(participant => participant.role
+          && participant.role !== 'moderator'
+          && participant.position
+          && (teamSize === 1 || participant.phaseIds.length > 0))
+        .map(participant => [participant.userId, participant.position as DebatePosition])));
       const roster = lobbyParticipants
         .filter(participant => !participant.isAi && participant.userId !== user?.id && participant.role && (participant.role === 'moderator' || participant.position))
         .map<LiveParticipantView>(participant => ({
@@ -398,7 +412,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
       setParticipants(previous => mergeWithLobbyRoster(previous));
     }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [mergeWithLobbyRoster, roomId, user?.id]);
+  }, [mergeWithLobbyRoster, roomId, teamSize, user?.id]);
 
   const addArguments = useCallback((incoming: LiveDebateArgument[]) => {
     setArgumentsList(previous => {
@@ -849,7 +863,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   }, [isSpeaking]);
 
   useEffect(() => {
-    scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const transcript = transcriptScrollRef.current;
+    transcript?.scrollTo({ top: transcript.scrollHeight, behavior: 'smooth' });
   }, [argumentsList, isTranscribing, liveTranscripts]);
 
   const finishSpeechRecognition = useCallback((discard: boolean) => {
@@ -1282,6 +1297,27 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
     || sessionFinished
     || (myRole !== 'moderator' && !isMyStage);
   const isEvaluationLeader = !!user && user.id === hostId;
+  const coachStage = getCoachStage(currentPhase.id, currentPhase.roundId);
+  const coachContext: CoachContext | null = coachStage && user && coachSeats[user.id] ? {
+    sessionId: roomId,
+    topic,
+    topicContext: topicDescription,
+    position: coachSeats[user.id],
+    level: debateLevel,
+    stage: coachStage,
+    stepId: currentPhase.id,
+    language: roomLanguage,
+    turns: argumentsList.flatMap(argument => {
+      const position = coachSeats[argument.senderId];
+      if (!position) return [];
+      return [{
+        id: argument.id,
+        side: position === coachSeats[user.id] ? 'own' as const : 'opponent' as const,
+        content: argument.content,
+        phase: argument.phaseId || argument.phaseLabel || 'debate',
+      }];
+    }),
+  } : null;
 
   const runEvaluation = useCallback(async () => {
     if (!user || evaluationRequestedRef.current) return;
@@ -1463,95 +1499,81 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
   }
 
   return (
-    <div className="app-container live-debate-room">
-      <header className="live-room-header">
-        <div>
-          <span className="badge">{voiceEnabled ? 'VOICE LIVE' : 'TEXT LIVE'} · {debateLevel === 'intermediate' ? '중급' : '초급'} · {teamSize}:{teamSize} {teamSize === 1 ? '개인' : '팀'} 토론{allowModerator ? ' · 진행자 허용' : ''}</span>
+    <div className="app-container live-debate-room debate-studio live-studio">
+      <header className="live-studio-header">
+        <div className="live-studio-title">
+          <div className="live-studio-eyebrow">
+            <span className={`live-studio-connection ${connection}`}><span aria-hidden="true" /> {sessionFinished ? 'SESSION COMPLETE' : 'LIVE DEBATE'}</span>
+            <span>{voiceEnabled ? '음성' : '텍스트'} · {debateLevel === 'intermediate' ? '중급' : '초급'} · {teamSize}:{teamSize} {teamSize === 1 ? '개인' : '팀'} 토론{allowModerator ? ' · 진행자 참여' : ''}</span>
+          </div>
           <h1>{topic}</h1>
-          {topicDescription && <p>{topicDescription}</p>}
         </div>
-        <div className="live-room-header-actions">
+        <div className="live-studio-header-actions">
           {voiceEnabled && (
             <button type="button" className="btn btn-secondary" onClick={() => setShowVoiceTranscript(value => !value)} disabled={sessionFinished}>
               {transcriptVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-              {sessionFinished ? '전체 기록 표시 중' : transcriptVisible ? '텍스트 숨기기' : '실시간 텍스트 보기'}
+              {sessionFinished ? '전체 기록' : transcriptVisible ? '텍스트 숨기기' : '텍스트 보기'}
             </button>
           )}
           {user.id === hostId && !sessionFinished && (
-            <button type="button" className="btn btn-primary" onClick={() => void handleFinishDebate()}>
-              <Gavel size={17} /> 토론 종료·AI 평가
+            <button type="button" className="btn btn-secondary" onClick={() => void handleFinishDebate()}>
+              <Gavel size={17} /> 종료·평가
             </button>
           )}
           <button type="button" className="btn btn-secondary" onClick={handleCopyInvite}>
             {copied ? <Check size={17} /> : <Copy size={17} />}
-            {copied ? '복사됨' : '초대 링크'}
+            {copied ? '복사됨' : '초대'}
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/debate')}>
             <LogOut size={17} /> 나가기
           </button>
         </div>
       </header>
-      {topicBriefing && <TopicBriefingDetails briefing={topicBriefing} language={roomLanguage} />}
+      {(topicDescription || topicBriefing) && (
+        <details className="live-studio-briefing">
+          <summary><BookOpen size={15} /> 논제 배경 살펴보기 <ChevronDown size={15} /></summary>
+          {topicDescription && <p>{topicDescription}</p>}
+          {topicBriefing && <TopicBriefingDetails briefing={topicBriefing} language={roomLanguage} />}
+        </details>
+      )}
 
-      <section className="session-strip live-session-strip">
-        <div className="participant-strip">
-          <div className={`compact-player user ${isMyStage ? 'responsible' : ''}`}>
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.id)}`} alt="" />
-            <div>
-              <strong>{user.nickname}</strong>
-              <span>나 · {myRole === 'moderator' ? '진행자' : `${getPositionLabel(myPosition)} · ${getAssignedStageLabel(myPhaseIds)}`}</span>
+      <section className="live-studio-floor" aria-label="토론 참가자와 발언 시간">
+        {(['affirmative', 'negative'] as const).map(position => (
+          <article key={position} className={`live-studio-team ${position} ${!sessionFinished && currentPhase.position === position ? 'active' : ''}`}>
+            <div className="live-studio-team-label">
+              <span>{position === 'affirmative' ? 'AFFIRMATIVE' : 'NEGATIVE'} <b>{getPositionLabel(position)}</b></span>
+              {myRole !== 'moderator' && myPosition === position && <small>우리 팀</small>}
             </div>
-            {isSpeaking ? <em>발언 중</em> : isMyStage && <em>현재 담당</em>}
-          </div>
-          {participants.length ? participants.map(participant => (
-            <div key={participant.id} className={`compact-player user ${!sessionFinished && participant.id === currentStageOwner?.id ? 'responsible' : ''}`}>
-              <UserRound size={30} />
-              <div>
-                <strong>{participant.name}</strong>
-                <span>{participant.role === 'moderator' ? '진행자' : `${getPositionLabel(participant.position)} · ${getAssignedStageLabel(participant.phaseIds)}`}</span>
+            {allDebaters.filter(participant => participant.position === position).map(participant => (
+              <div key={participant.id} className="live-studio-person">
+                <span className="live-studio-avatar"><UserRound size={20} /></span>
+                <div><strong>{participant.name}{participant.isLocal && <small>나</small>}</strong><span>{getAssignedStageLabel(participant.phaseIds)}</span></div>
+                {!sessionFinished && participant.id === currentStageOwner?.id && <em><span aria-hidden="true" />{participant.isLocal && isSpeaking || participants.some(remote => remote.id === participant.id && remote.isSpeaking) ? '발언 중' : '현재 차례'}</em>}
               </div>
-              {participant.isSpeaking ? <em>발언 중</em> : !sessionFinished && participant.id === currentStageOwner?.id && <em>현재 담당</em>}
-            </div>
-          )) : (
-            <div className="compact-player">
-              <UserRound size={30} /><div><strong>토론방 연결 중</strong><span>대기실 참가자를 불러오고 있습니다</span></div>
-            </div>
-          )}
-        </div>
-
-        <div className={`live-connection-chip ${connection}`}>
-          {voiceEnabled ? <Volume2 size={16} /> : <Radio size={16} />}
-          <span>{voiceEnabled ? 'LiveKit' : '텍스트 채널'} {getConnectionLabel(connection)}</span>
-        </div>
-
-        <div className={`compact-timer ${currentPhaseOvertimeSeconds > 0 ? 'overtime' : currentPhaseRemainingSeconds <= 30 ? 'urgent' : ''}`}>
-          <Clock size={16} />
-          <strong>{currentPhaseOvertimeSeconds > 0 ? `+${formatTimer(currentPhaseOvertimeSeconds)}` : formatTimer(currentPhaseRemainingSeconds)}</strong>
-          <span>{sessionFinished ? '토론 종료' : currentPhaseOvertimeSeconds > 0 ? `${currentPhase.label} · 권장 시간 초과` : `${currentPhase.label} · 권장 시간`}</span>
+            ))}
+            {!allDebaters.some(participant => participant.position === position) && <p className="live-studio-team-waiting">참가자를 기다리고 있습니다</p>}
+          </article>
+        ))}
+        <div className={`live-studio-clock ${currentPhaseOvertimeSeconds > 0 ? 'overtime' : currentPhaseRemainingSeconds <= 30 ? 'urgent' : ''}`}>
+          <span><Clock size={13} /> {sessionFinished ? '토론 종료' : '이번 발언'}</span>
+          <strong>{sessionFinished ? '완료' : currentPhaseOvertimeSeconds > 0 ? `+${formatTimer(currentPhaseOvertimeSeconds)}` : formatTimer(currentPhaseRemainingSeconds)}</strong>
+          <small>{sessionFinished ? `${displayArguments.length}개 발언` : currentPhaseOvertimeSeconds > 0 ? '권장 시간을 넘겼어요' : '권장 시간'}</small>
         </div>
       </section>
 
-      <section className={`live-stage-owner-banner ${sessionFinished ? 'ended' : ''}`} aria-live="polite">
-        <div className="live-stage-title">
-          <span>{sessionFinished ? '토론 종료' : '현재 단계'}</span>
-          <strong>{sessionFinished ? 'AI 심판이 토론을 분석합니다' : currentPhase.label}</strong>
-          {!sessionFinished && <small>{stageOptions.find(stage => stage.id === currentStageId)?.label || currentPhase.label} 담당 순서</small>}
+      <section className="live-studio-stage" aria-label="토론 진행 단계">
+        <div className="live-studio-stage-heading" aria-live="polite">
+          <div><span>{sessionFinished ? 'FINISHED' : `ROUND ${String(currentPhaseIndex + 1).padStart(2, '0')}`}</span><h2>{sessionFinished ? '토론을 마쳤습니다' : currentPhase.label}</h2></div>
+          <p>{sessionFinished ? 'AI 심판이 발언을 바탕으로 평가를 준비합니다.' : currentPhase.instruction}</p>
+          <small>{sessionFinished ? phaseTimings.length : currentPhaseIndex + 1} / {phaseTimings.length}</small>
         </div>
-        {!sessionFinished && (
-          <div className="live-stage-owners">
-            <article className={currentPhase.position}>
-              <span>{getPositionLabel(currentPhase.position)}팀 현재 담당</span>
-              <strong>{currentStageOwner?.name || '담당자 확인 중'}</strong>
-              <small>{currentStageOwner?.isLocal ? '나 · 지금 담당' : `${stageOptions.find(stage => stage.id === currentStageId)?.label || currentPhase.label} 담당`}</small>
-            </article>
-            <div><Radio size={19} /><span>발언 단계</span></div>
-            <article className={currentPhase.targetPosition || (currentPhase.position === 'affirmative' ? 'negative' : 'affirmative')}>
-              <span>{currentPhase.targetPosition ? `${getPositionLabel(currentPhase.targetPosition)}팀 질문·응답 상대` : '이번 단계 목표'}</span>
-              <strong>{currentPhase.targetPosition ? targetStageOwner?.name || '상대 담당자' : currentPhase.instruction}</strong>
-              <small>{currentPhase.targetPosition ? `${stageOptions.find(stage => stage.id === targetStageId)?.label || '응답'} 담당` : `${currentPhaseIndex + 1}/${phaseTimings.length} 단계`}</small>
-            </article>
-          </div>
-        )}
+        <ol className="live-studio-progress">
+          {phaseTimings.map((phase, index) => (
+            <li key={phase.id} className={`${index < debateProgress.completedPhaseCount ? 'complete' : ''} ${!sessionFinished && index === currentPhaseIndex ? 'current' : ''}`} aria-current={!sessionFinished && index === currentPhaseIndex ? 'step' : undefined}>
+              <span>{index < debateProgress.completedPhaseCount ? <Check size={12} /> : index + 1}</span><small>{phase.label}</small>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {connectionError && (
@@ -1571,13 +1593,17 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
         </button>
       )}
 
-      <main className="live-room-workspace">
-        <section className="chat-panel" aria-label="실시간 토론 대화">
-          <div className="conversation-list">
+      <main className="live-studio-workspace">
+        <section className="live-studio-feed" aria-label="실시간 토론 대화">
+          <div className="live-studio-panel-heading">
+            <h2><Radio size={16} /> 토론 현장</h2>
+            <span>{displayArguments.length}개 발언 · {getConnectionLabel(connection)}</span>
+          </div>
+          <div className="conversation-list live-studio-transcript" ref={transcriptScrollRef}>
             {!transcriptVisible ? (
               <div className={`live-voice-focus ${isMyStage ? 'my-turn' : ''}`}>
                 <span className="live-voice-focus-icon">{isSpeaking ? <Mic size={34} /> : <Headphones size={34} />}</span>
-                <small>VOICE FOCUS · 텍스트 숨김</small>
+                <small>ON AIR · 음성 토론</small>
                 <strong>{isSpeaking ? '지금 발언하고 있습니다' : currentStageOwner?.name ? `${currentStageOwner.name}님의 발언에 집중해 주세요` : `${currentPhase.label} 발언을 기다리고 있습니다`}</strong>
                 <p>발언 내용은 실시간으로 전사되며, 상단의 ‘실시간 텍스트 보기’로 말하는 중에도 확인할 수 있습니다.</p>
                 <span className="live-voice-record-count"><CheckCircle2 size={15} /> {displayArguments.length}개 발언 전사 완료 · 종료 후 전체 텍스트 확인</span>
@@ -1588,7 +1614,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 <strong>{`${currentPhase.label} 담당자가 발언할 차례입니다.`}</strong>
                 <span>{voiceEnabled
                   ? '말하는 동안 상대방에게 음성과 실시간 전사문이 함께 전달되며, 종료하면 발언 기록으로 확정됩니다.'
-                  : '텍스트 발언은 Supabase 실시간 채널로 모든 참가자에게 전달되며 LiveKit 사용량에 포함되지 않습니다.'}</span>
+                  : '내 주장을 전하면 토론이 시작됩니다. 상대의 발언을 읽고, 생각을 한 단계씩 이어 가세요.'}</span>
               </div>
             ) : null}
 
@@ -1596,8 +1622,8 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
               const storedArgument = argumentsList.find(item => item.id === argument.id);
               const canMonitorOwnVoice = storedArgument?.senderId === user.id && !!storedArgument.audioPath;
               return (
+                <div key={argument.id} className={`live-studio-turn ${coachSeats[argument.playerId] || 'neutral'}`}>
                 <ArgumentCard
-                  key={argument.id}
                   argument={argument}
                   player={getPlayer(argument)}
                   onPlayAudio={canMonitorOwnVoice && storedArgument
@@ -1611,6 +1637,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                     : undefined}
                   isAudioDownloading={downloadingAudioArgumentId === argument.id}
                 />
+                </div>
               );
             })}
 
@@ -1620,19 +1647,35 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 <span className="live-transcript-badge"><span aria-hidden="true" /> 실시간 인식 중</span>
               </div>
             ))}
+          </div>
+        </section>
 
-            <div className={`input-zone ${isRoomReady && (isMyStage || myRole === 'moderator') ? 'my-turn' : ''}`}>
-              <div className="input-container">
-                <div className="composer-head">
-                  <span>
-                    <Radio size={17} />
-                    {isMyStage || myRole === 'moderator'
-                      ? `내 발언 · ${currentPhase.label}`
-                      : `${currentPhase.label} 진행 중`}
-                  </span>
-                  {!voiceEnabled && <small>{content.length}/1200</small>}
+        <aside className="live-studio-writing" aria-label="내 발언 준비">
+          <div className="live-studio-panel-heading">
+            <h2>{voiceEnabled ? <Mic size={16} /> : <BookOpen size={16} />} 내 발언 준비</h2>
+            <span>{myRole === 'moderator' ? '진행자' : getPositionLabel(myPosition)}</span>
+          </div>
+          <div className="live-studio-writing-body">
+            <div className={`live-studio-turn-notice ${isMyStage ? 'my-turn' : ''}`}>
+              <span aria-hidden="true" />
+              <div><strong>{sessionFinished ? '모든 발언을 마쳤습니다' : isMyStage || myRole === 'moderator' ? '지금 발언할 수 있어요' : `${currentStageOwner?.name || '상대'}님의 차례입니다`}</strong>
+                <p>{sessionFinished ? '토론 기록과 AI 평가를 확인해 보세요.' : isMyStage ? currentPhase.purpose || '한 가지 주장에 이유와 근거를 연결해 보세요.' : targetStageOwner?.isLocal ? '상대가 무엇을 묻는지 듣고 직접 답할 내용을 준비해 보세요.' : '상대 발언을 읽으며 다음에 다룰 쟁점을 생각해 보세요.'}</p>
+              </div>
+            </div>
+            {coachContext && (
+              <ThinkingCoach
+                context={coachContext}
+                draft={voiceEnabled ? '' : content}
+                disabled={!isRoomReady || sessionFinished || myRole === 'moderator'}
+              />
+            )}
+            <div className={`live-studio-composer ${isRoomReady && (isMyStage || myRole === 'moderator') ? 'my-turn' : ''}`}>
+              <div className="live-studio-composer-inner">
+                <div className="live-studio-composer-heading">
+                  <span id="live-debate-draft-label">{voiceEnabled ? '내 목소리로 논증하기' : currentStageId === 'opening' ? '나의 입론' : currentPhase.label}</span>
+                  {!voiceEnabled && <small aria-live="off">{content.length} / 1,200</small>}
                 </div>
-                <div className="composer-row">
+                <div className="live-studio-composer-body">
                   {voiceEnabled ? (
                     <button
                       type="button"
@@ -1652,7 +1695,19 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                     </button>
                   ) : (
                     <>
-                      <textarea
+                      {currentStageId === 'opening' && myRole !== 'moderator' ? (
+                        <OpeningComposer
+                          key={currentPhase.id}
+                          value={content}
+                          onChange={setContent}
+                          disabled={composerDisabled}
+                          language={roomLanguage}
+                          position={myPosition}
+                          maxLength={1200}
+                        />
+                      ) : <textarea
+                        id="live-debate-draft"
+                        aria-labelledby="live-debate-draft-label"
                         className="input-textarea"
                         value={content}
                         maxLength={1200}
@@ -1662,12 +1717,14 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                           : `${getPositionLabel(currentPhase.position)}팀 담당자의 발언을 기다려 주세요.`}
                         onChange={event => setContent(event.target.value)}
                         onKeyDown={event => {
-                          if (event.key === 'Enter' && !event.shiftKey) {
+                          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) {
                             event.preventDefault();
                             void handleTextSubmit();
                           }
                         }}
-                      />
+                      />}
+                      <div className="live-studio-composer-footer">
+                      <small>{currentStageId === 'opening' ? '생각을 골랐다면, 내 표현으로 적어 보세요.' : 'Enter 줄바꿈 · Ctrl/⌘ + Enter 전송'}</small>
                       <button
                         type="button"
                         className="btn btn-primary send-button"
@@ -1675,8 +1732,9 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                         disabled={composerDisabled || !content.trim()}
                       >
                         <Send size={18} />
-                        <span>전송</span>
+                        <span>발언 보내기</span>
                       </button>
+                      </div>
                     </>
                   )}
                 </div>
@@ -1694,7 +1752,7 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                             : '발언을 변환한 뒤 양쪽 화면에 자동 등록하고 있습니다.'
                           : isLiveTranscription
                             ? `실시간 STT 중 ${formatTimer(recordingSeconds)} · ‘텍스트 보기’를 켜면 말하는 내용이 바로 표시됩니다.`
-                            : `LiveKit으로 발언 전달 중 ${formatTimer(recordingSeconds)} · 종료 후 자동 전사됩니다. (최대 3분)`)}
+                            : `음성으로 발언 전달 중 ${formatTimer(recordingSeconds)} · 종료 후 자동 전사됩니다. (최대 3분)`)}
                     </span>
                     {speechError && pendingRecording && !isTranscribing && (
                       <button
@@ -1709,19 +1767,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 )}
               </div>
             </div>
-            <div ref={scrollAnchorRef} />
           </div>
-        </section>
-
-        <aside className="coach-panel live-room-guide">
-          {topicDescription && (
-            <div className="coach-section">
-              <h2><BookOpen size={18} /> 토론 배경</h2>
-              <p>{topicDescription}</p>
-            </div>
-          )}
-          <div className="coach-section">
-            <h2><Lightbulb size={18} /> {currentPhase.label} 도움말</h2>
+          <details className="live-studio-guide">
+            <summary><Lightbulb size={15} /> 단계 도움말 <ChevronDown size={15} /></summary>
+            <div>
             {currentPhase.purpose && <p>{currentPhase.purpose}</p>}
             <p><strong>지금 할 일</strong><br />{currentPhase.instruction}</p>
             {currentPhase.tasks.length > 0 && (
@@ -1730,9 +1779,10 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
             {currentPhase.sentenceFrames.length > 0 && (
               <p><strong>문장 시작 예시</strong><br />{currentPhase.sentenceFrames.slice(0, 2).join(' / ')}</p>
             )}
-          </div>
-          <div className="coach-section">
-            <h2><CheckCircle2 size={18} /> {debateLevel === 'intermediate' ? '중급' : '초급'} 토론 순서</h2>
+            </div>
+          </details>
+          <details className="live-studio-guide">
+            <summary><CheckCircle2 size={15} /> 전체 순서와 담당자 <ChevronDown size={15} /></summary>
             <div className="phase-list">
               {phaseTimings.map((phase, index) => (
                 <div key={phase.id} className={`phase-item ${!sessionFinished && index === currentPhaseIndex ? 'active' : ''}`}>
@@ -1742,17 +1792,19 @@ export const LiveDebateRoom = ({ user, onLoginRequest }: LiveDebateRoomProps) =>
                 </div>
               ))}
             </div>
-          </div>
-          <div className="coach-section">
-            <h2>{voiceEnabled ? <Volume2 size={18} /> : <Radio size={18} />} 현재 상태</h2>
+            {myRole === 'moderator' && <p>진행자 · {user.nickname}</p>}
+            {participants.filter(participant => participant.role === 'moderator').map(participant => <p key={participant.id}>진행자 · {participant.name}</p>)}
+          </details>
+          <details className="live-studio-guide">
+            <summary>{voiceEnabled ? <Volume2 size={15} /> : <Radio size={15} />} 연결 상태 <ChevronDown size={15} /></summary>
             <dl className="live-room-status-list">
-              <div><dt>연결 방식</dt><dd>{voiceEnabled ? `LiveKit ${getConnectionLabel(connection)}` : `텍스트 채널 ${getConnectionLabel(connection)}`}</dd></div>
+              <div><dt>참가 상태</dt><dd>{getConnectionLabel(connection)}</dd></div>
               <div><dt>대기실 확정 명단</dt><dd>{connectedDebaterCount} / {requiredDebaterCount}명</dd></div>
               <div><dt>현재 단계</dt><dd>{currentPhase.label} · {formatDebateMinutes(currentPhase.seconds)} 권장{currentPhaseOvertimeSeconds > 0 ? ` · ${formatTimer(currentPhaseOvertimeSeconds)} 초과` : ''}</dd></div>
               {voiceEnabled && <div><dt>내 마이크</dt><dd>{isSpeaking ? '송출 중' : '꺼짐'}</dd></div>}
-              <div><dt>음성 모드</dt><dd>{voiceEnabled ? '사용 · 최대 3분 · 종료 후 자동 등록' : '사용 안 함 · LiveKit 미연결'}</dd></div>
+              <div><dt>음성 모드</dt><dd>{voiceEnabled ? '사용 · 최대 3분 · 종료 후 자동 등록' : '텍스트 토론'}</dd></div>
             </dl>
-          </div>
+          </details>
         </aside>
       </main>
 

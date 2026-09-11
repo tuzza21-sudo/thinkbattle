@@ -12,6 +12,7 @@ interface ArgumentCardProps {
   audioButtonLabel?: string;
   onDownloadAudio?: () => void;
   isAudioDownloading?: boolean;
+  compactFeedback?: boolean;
 }
 
 const formatDuration = (seconds: number) => {
@@ -31,12 +32,13 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({
   audioButtonLabel,
   onDownloadAudio,
   isAudioDownloading = false,
+  compactFeedback = false,
 }) => {
   const isPlayerA = !argument.isAi;
   const hasTiming = !argument.isAi && typeof argument.elapsedSeconds === 'number' && typeof argument.recommendedDurationSeconds === 'number';
   
   return (
-    <div className={`argument-card ${isPlayerA ? 'player-a' : 'player-b'} ${isHighlighted ? 'highlight' : ''}`}>
+    <div id={`speech-${argument.id}`} className={`argument-card ${isPlayerA ? 'player-a' : 'player-b'} ${isHighlighted ? 'highlight' : ''}`}>
       <img className="argument-avatar" src={player.avatar} alt={player.name} />
       <div className="argument-bubble">
         <div className="argument-meta">
@@ -86,17 +88,17 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({
         {(argument.aiQuestion || argument.aiLesson || argument.turnFeedback) && (
           <div className="argument-insight">
             {argument.turnFeedback && (
-              <div style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-amber)', marginBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+              <details className="argument-feedback" open={!compactFeedback || undefined} style={{ background: 'var(--bg-primary)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
+                <summary style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem', cursor: 'pointer' }}>
                   <div className="insight-title" style={{ color: 'var(--accent-amber)', margin: 0 }}>
-                    <AlertCircle size={18} /> 실시간 미션 평가
+                    <AlertCircle size={16} /> {compactFeedback ? '이번 발언 피드백 보기' : '실시간 미션 평가'}
                   </div>
                   {argument.turnXp !== undefined && (
                     <div style={{ background: 'var(--accent-amber)', color: 'var(--bg-primary)', padding: '0.15rem 0.6rem', borderRadius: '12px', fontWeight: 800, fontSize: '0.85rem' }}>
                       +{argument.turnXp} XP
                     </div>
                   )}
-                </div>
+                </summary>
                 <div style={{ color: 'var(--text-light)', fontSize: '0.95rem' }}>{argument.turnFeedback}</div>
                 {argument.turnFeedbackDetail && (
                   <div style={{ display: 'grid', gap: '0.45rem', marginTop: '0.75rem', fontSize: '0.88rem', lineHeight: 1.55 }}>
@@ -106,7 +108,7 @@ export const ArgumentCard: React.FC<ArgumentCardProps> = ({
                     <div><strong>다음 행동</strong><br />{argument.turnFeedbackDetail.nextAction}</div>
                   </div>
                 )}
-              </div>
+              </details>
             )}
             {argument.aiQuestion && (
               <div>

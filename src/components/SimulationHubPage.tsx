@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, ArrowLeft, ArrowRight, BadgeDollarSign, BriefcaseBusiness, Building2, Clock3, FileUser, Handshake, MessageCircle, Mic2, PenLine, ShieldCheck, Sparkles, Star, UsersRound, WandSparkles } from 'lucide-react';
 import { getSimulationPersona, simulationCategories, simulationMissions } from '../data/simulations';
 import type { AppUser, SimulationCategoryId } from '../types';
+import './HomeStudio.css';
 
 interface SimulationHubPageProps {
   user: AppUser | null;
@@ -44,12 +45,12 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
   };
 
   return (
-    <div className="simulation-page">
+    <div className="simulation-page thinkfit-home">
       <header className="simulation-header">
         <button type="button" className="simulation-back" onClick={() => navigate('/')}>
           <ArrowLeft size={18} /> 메인으로
         </button>
-        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><span>ThinkFit</span> Stage 2</div>
+        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><span>ThinkFit</span><small>CONVERSATION STUDIO</small></div>
         <div className="simulation-user">{user ? `${user.nickname}님` : '로그인 후 훈련 가능'}</div>
       </header>
 
@@ -61,7 +62,7 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
         </div>
         <div className="simulation-demo-console" aria-label="AI 상황극 훈련 미리보기">
           <div className="simulation-console-top">
-            <span><i /> LIVE SIMULATION</span>
+            <span><i /> 대화 미리보기</span>
             <small>압박 면접 · LEVEL 2</small>
           </div>
           <div className="simulation-console-persona">

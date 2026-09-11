@@ -335,7 +335,7 @@ const readGeminiTextStream = async (
   return { choices: [{ message: { content } }] };
 };
 
-const createChatCompletion = async (request: ChatCompletionRequest): Promise<ChatCompletionResponse> => {
+export const createChatCompletion = async (request: ChatCompletionRequest): Promise<ChatCompletionResponse> => {
   const { thinking: _thinking, reasoning_effort: _reasoningEffort, model: requestedModel } = request;
   void _thinking;
   void _reasoningEffort;
@@ -1464,7 +1464,7 @@ export async function generateLiveDebateEvaluation(
   topic: string,
   participants: LiveEvaluationParticipantInput[],
   transcript: LiveEvaluationArgumentInput[],
-  context?: { description?: string; level?: DebateLevel },
+  context?: { description?: string; level?: DebateLevel; sessionConfig?: import('./liveDebateSession').LiveSessionConfig; assignments?: Record<string, string[]> },
 ): Promise<LiveDebateEvaluation> {
   const evaluationRubric = getDebateEvaluationRubric(context?.level ?? 'beginner');
   const evaluationCategoryNames = evaluationRubric.names;
@@ -1473,12 +1473,15 @@ export async function generateLiveDebateEvaluation(
   const roleLabels: Record<DebateParticipantRole, string> = {
     debater: '토론자', opening: '입론 담당', rebuttal: '질의·반론 담당', closing: '최종 변론 담당', moderator: '진행자',
   };
-  const transcriptText = transcript.slice(-80).map(argument => {
+  const transcriptText = (context?.sessionConfig ? transcript : transcript.slice(-80)).map(argument => {
     const participant = participantById.get(argument.senderId);
     const position = participant?.role === 'moderator' ? '진행자' : participant?.position === 'negative' ? '반대' : '찬성';
     const role = participant ? roleLabels[participant.role] : '역할 미상';
     return `[${argument.createdAt}] ${argument.senderName} (${position}, ${role}, ${argument.phaseLabel || '단계 미상'}, ${argument.source === 'voice' ? '음성 전사' : '텍스트'}): ${argument.content}`;
-  }).join('\n').slice(-40_000);
+  }).join('\n');
+  // Four-stage rooms may contain many short cross-examination exchanges. Keep
+  // earlier openings and both teams' remarks instead of silently dropping them.
+  if (context?.sessionConfig && transcriptText.length > 180_000) throw new Error('발언 기록이 매우 길어 한 번에 평가할 수 없습니다. 공식 기록은 토론방과 내 기록에 보관됩니다.');
   const rosterText = participants.map(participant => (
     `- userId=${participant.userId} | ${participant.nickname} | ${participant.role === 'moderator' ? '중립' : participant.position === 'affirmative' ? '찬성' : '반대'} | ${roleLabels[participant.role]}`
   )).join('\n');
@@ -1488,12 +1491,20 @@ export async function generateLiveDebateEvaluation(
 Debate topic: "${topic}"
 Debate level: ${getDebateLevelLabel(context?.level)}
 Topic background: ${context?.description || '(별도 배경 설명 없음)'}
+${context?.sessionConfig ? `
+[Session rules]
+This debate uses opening -> cross-examination -> rebuttal -> closing. Premise analysis and weighing are skills demonstrated within these stages, not separate required speeches.
+Enabled stages: ${context.sessionConfig.stages.filter(stage => stage.enabled).map(stage => stage.id).join(', ')}. Do not penalize an omitted stage.
+Each cross-examination session contains unlimited exchanges. In 찬성 교차질문, the affirmative asks and the negative answers; in 반대 교차질문, the negative asks and the affirmative answers. Evaluate each actual speaker accordingly.
+Team participation: ${context.sessionConfig.assignmentMode}. Stage assignments by user ID: ${JSON.stringify(context.assignments || {})}.
+Private team strategy chats are not part of the transcript or evaluation. Judge only the official remarks below.
+` : ''}
 
 [Participants]
 ${rosterText}
 
 [Full debate transcript]
-${transcriptText || '(기록된 발언 없음)'}
+${(context?.sessionConfig ? transcriptText : transcriptText.slice(-40_000)) || '(기록된 발언 없음)'}
 
 Do not participate in the debate or invent evidence. Judge only observable statements in the transcript.
 First identify the central clashes and compare both teams on claim clarity, evidence quality, direct engagement with opposing arguments, and consistency.

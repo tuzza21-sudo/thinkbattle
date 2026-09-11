@@ -1,0 +1,24 @@
+.opening-composer { width: 100%; min-width: 0; }
+.opening-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .65rem; flex-wrap: wrap; margin-bottom: .85rem; }
+.opening-toolbar > span { color: var(--text-muted); font-size: .72rem; }
+.opening-mode { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--bg-secondary); gap: 2px; }
+.opening-mode button { display: inline-flex; align-items: center; gap: .35rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); padding: .4rem .65rem; font: inherit; font-size: .76rem; cursor: pointer; }
+.opening-mode button[aria-pressed="true"] { background: var(--bg-elevated); color: var(--text-light); box-shadow: 0 1px 4px #15223812; }
+.opening-foundation, .opening-argument-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.opening-field { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+.opening-field > span { font-size: .74rem; font-weight: 700; color: var(--text-main); }
+.opening-field textarea { width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; border: 1px solid var(--border-color); border-radius: 9px; padding: .65rem .75rem; background: var(--bg-elevated); color: var(--text-light); font: inherit; font-size: .83rem; line-height: 1.65; transition: border-color .15s; }
+.opening-field.compact textarea { min-height: 43px; }
+.opening-field textarea:focus { outline: 2px solid color-mix(in srgb, var(--primary) 22%, transparent); outline-offset: 1px; border-color: var(--primary); }
+.opening-field textarea::placeholder { color: var(--text-muted); opacity: .78; }
+.opening-field textarea:disabled { opacity: .6; cursor: not-allowed; }
+.opening-logic { display: flex; align-items: center; gap: .8rem; padding: .95rem 0 .7rem; }
+.opening-logic span { display: inline-flex; align-items: center; gap: .4rem; color: var(--text-muted); font-size: .72rem; }
+.opening-logic b { color: var(--primary); font-size: .64rem; }
+.opening-add { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: none; color: var(--primary); padding: .7rem 0 .2rem; font: inherit; font-size: .77rem; cursor: pointer; }
+.opening-add:disabled { opacity: .5; cursor: not-allowed; }
+.opening-second { margin-top: .8rem; }
+.opening-second summary { color: var(--text-main); font-size: .8rem; cursor: pointer; padding: .3rem 0 .8rem; }
+.opening-length-error { color: var(--accent-coral); font-size: .78rem; margin: .5rem 0 0; }
+.opening-free { width: 100%; resize: vertical; }
+@media (max-width: 600px) { .opening-foundation, .opening-argument-fields { grid-template-columns: 1fr; } .opening-logic { gap: .55rem; } .opening-logic span { gap: .25rem; } }

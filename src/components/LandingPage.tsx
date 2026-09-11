@@ -7,6 +7,7 @@ import {
   FileText,
   Gavel,
   Layers3,
+  Lightbulb,
   LogIn,
   LogOut,
   MessageSquare,
@@ -43,6 +44,7 @@ import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
 import { createDebateRoom } from '../lib/debateRooms';
 import { claimDebateTrainingSession } from '../lib/trainingUsage';
 import { buildHomepageTopicLibrary, getHomepageDebateTopics, type HomepageTopicCollection } from '../lib/homepageTopics';
+import './HomeStudio.css';
 
 interface LandingPageProps {
   user: AppUser | null;
@@ -257,6 +259,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         debateLevel: config.debateLevel === 'intermediate' ? 'intermediate' : 'beginner',
         voiceEnabled: config.voiceEnabled ?? false,
         timeLimit: config.timeLimit,
+        sessionConfig: config.sessionConfig,
         teamSize: config.teamSize ?? 1,
         allowModerator: config.allowModerator ?? false,
         audience: config.audience ?? 'public',
@@ -310,10 +313,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
   const selectedAccent = selectedBattle ? accentStyles[selectedBattle.accent] : null;
 
   return (
-    <div className="debate-home-page page-scroll">
+    <div className="debate-home-page page-scroll thinkfit-home">
       <header className="debate-home-header">
         <button type="button" className="debate-home-brand" onClick={() => navigate('/')} aria-label="훈련 선택으로 돌아가기">
-          <span><img src="/brand/thinkfit-mark.svg" alt="" /></span><div><strong>ThinkFit</strong><small>DEBATE ARENA</small></div>
+          <span><img src="/brand/thinkfit-mark.svg" alt="" /></span><div><strong>ThinkFit</strong><small>DEBATE STUDIO</small></div>
         </button>
         <nav className="debate-home-nav" aria-label="토론 페이지 메뉴">
           <button type="button" onClick={() => navigate('/about')}><BookOpen size={16} /> 서비스 소개</button>
@@ -334,9 +337,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
 
       <section className="debate-home-hero">
         <div className="debate-home-hero-copy">
-          <span className="debate-home-eyebrow"><i /> AI DEBATE TRAINING</span>
+          <span className="debate-home-eyebrow"><i /> A SPACE FOR BETTER THINKING</span>
           <h1>생각을 주장으로,<br /><em>주장을 실력으로.</em></h1>
-          <p>AI의 날카로운 반론을 견디며 근거를 세우고, 질문하고, 설득하는 힘을 단계별로 훈련하세요.</p>
+          <p>하나의 논제, 서로 다른 관점. 내 주장을 세우고 상대의 이야기에 응답하며 생각을 넓혀보세요. 막힐 때는 AI 코치가 다음 방향을 함께 찾습니다.</p>
           <div className="debate-home-hero-actions">
             <button type="button" className="debate-home-primary" onClick={() => {
               if (!user) return onLoginRequest();
@@ -354,7 +357,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           </div>
           <div className="debate-home-stats">
             <span><strong>{displayCategorizedTopics.reduce((total, category) => total + category.topics.length, 0)}+</strong><small>훈련 주제</small></span>
-            <span><strong>4 STEP</strong><small>구조화 토론</small></span>
+            <span><strong>Thinking Coach</strong><small>단계별 사고 지원</small></span>
             {userStats ? <><span><strong>Lv.{userStats.level}</strong><small>{userStats.league} 리그</small></span><span><strong>{userStats.xp.toLocaleString()}</strong><small>누적 XP</small></span></> : <span><strong>AI</strong><small>즉시 피드백</small></span>}
           </div>
         </div>
@@ -402,12 +405,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         </div>
       </section>
 
+      <section className="home-coach-strip" aria-label="토론 코칭 안내"><div className="home-coach-strip-icon"><Lightbulb size={21} /></div><div><strong>생각이 막힐 때, AI Thinking Coach</strong><p>입론의 씨앗부터 질문의 방향, 반박의 실마리까지. 선택하고 표현하는 주인공은 나입니다.</p></div><span>입론 <ChevronRight size={13} /> 교차질문 <ChevronRight size={13} /> 반박</span></section>
+
       <main className="debate-home-layout">
         <div className="debate-home-content">
           <div className="debate-section-heading flex justify-between items-center mb-10" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap' }}>
-            <h2 className="flex items-center gap-2" style={{ fontSize: '1.6rem', margin: 0, color: 'var(--text-light)' }}>
-              <Layers3 color="var(--primary)" /> 세부 토론 주제
-            </h2>
+            <div className="home-section-heading-copy"><span>EXPLORE THE MOTIONS</span><h2 className="flex items-center gap-2" style={{ fontSize: '1.6rem', margin: 0, color: 'var(--text-light)' }}><Layers3 size={21} color="var(--primary)" /> 어떤 논제로 시작할까요?</h2></div>
             <button
               className="btn btn-secondary"
               style={{ padding: '0.8rem 1.2rem', fontSize: '0.95rem' }}
@@ -462,7 +465,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             ))}
           </div>
 
-          <div className="debate-topic-grid grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))' }}>
+          <div className="debate-topic-grid grid gap-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(290px, 100%), 1fr))' }}>
             {(activeCategoryData?.topics ?? []).map(battle => {
               const isSelected = selectedBattle?.id === battle.id;
 
@@ -537,7 +540,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
                   <X size={16} />
                 </button>
                 <div className="flex justify-between items-end" style={{ gap: '1rem', rowGap: '1rem', flexWrap: 'wrap', paddingRight: '0.5rem' }}>
-                  <div style={{ flex: 1, minWidth: '280px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="badge" style={{ background: 'var(--bg-card)', color: selectedAccent.color, border: `1px solid ${selectedAccent.color}`, marginBottom: '0.8rem' }}>
                       토론 전 브리핑
                     </div>

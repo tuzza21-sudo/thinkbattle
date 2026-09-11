@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useState, useEffect, type ReactNode } from 'react';
-import { Navigate, Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
+import './components/HomeStudio.css';
+import './components/ServiceStudio.css';
 import { TrainingGatewayPage } from './components/TrainingGatewayPage';
 import { AuthModal } from './components/AuthModal';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
@@ -16,8 +18,8 @@ import {
 import type { AppUser } from './types';
 
 const LiveDebateRoom = lazy(async () => {
-  const module = await import('./components/LiveDebateRoom');
-  return { default: module.LiveDebateRoom };
+  const module = await import('./components/LiveDebateRouter');
+  return { default: module.LiveDebateRouter };
 });
 
 const DebateLobbyPage = lazy(async () => {
@@ -42,6 +44,11 @@ const PersonalTrainingPage = lazy(async () => ({ default: (await import('./compo
 const LegalPage = lazy(async () => ({ default: (await import('./components/LegalPage')).LegalPage }));
 
 function App() {
+  const { pathname } = useLocation();
+  const normalizedPath = pathname.replace(/\/$/, '') || '/';
+  const isHomeRoute = ['/', '/debate', '/about', '/simulation'].includes(normalizedPath)
+    || normalizedPath.startsWith('/simulation/')
+    || normalizedPath.startsWith('/battle/lobby/');
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [oauthError, setOAuthError] = useState<string | null>(() => getOAuthCallbackError());
@@ -118,11 +125,11 @@ function App() {
   );
 
   if (authLoading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>Loading...</div>;
+    return <div className={isHomeRoute ? 'thinkfit-home home-route' : undefined} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>화면을 준비하고 있습니다...</div>;
   }
 
   return (
-    <>
+    <div className={isHomeRoute ? 'thinkfit-home home-route' : undefined} style={isHomeRoute ? undefined : { display: 'contents' }}>
       <Suspense fallback={<div className="app-container live-login-gate">화면을 준비하고 있습니다...</div>}>
       <Routes>
         <Route
@@ -173,7 +180,7 @@ function App() {
           language="ko"
         />
       )}
-    </>
+    </div>
   );
 }
 

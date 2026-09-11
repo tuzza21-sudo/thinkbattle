@@ -5,15 +5,16 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  ChevronDown,
   Clock,
   Copy,
   Crown,
   LoaderCircle,
   LogIn,
-  Layers3,
   Play,
+  Plus,
+  Settings2,
   ShieldCheck,
-  Swords,
   UserRound,
   Users,
   Volume2,
@@ -42,6 +43,11 @@ import type {
   LiveDebateLobbyParticipant,
   LiveDebateRoomSummary,
 } from '../types';
+import './DebateLobbyPage.css';
+import { buildSessionPhases, SESSION_STAGES } from '../lib/liveDebateSession';
+import { SessionSettings } from './SessionSettings';
+import { updateSessionSettings } from '../lib/liveSessionApi';
+import { TeamChat } from './TeamChat';
 
 type DebateLobbyPageProps = {
   user: AppUser | null;
@@ -61,6 +67,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
+  const [showAssignments, setShowAssignments] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -129,7 +136,8 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   }, [refresh, room?.status, roomId, user]);
 
   const me = participants.find(participant => participant.userId === user?.id);
-  const requiredStages = useMemo(() => getLiveDebateStageOptions(room?.debateLevel ?? 'beginner'), [room?.debateLevel]);
+  const requiredStages = useMemo(() => room?.sessionConfig ? SESSION_STAGES.filter(stage => room.sessionConfig!.stages.some(item => item.id === stage.id && item.enabled)) : getLiveDebateStageOptions(room?.debateLevel ?? 'beginner'), [room]);
+  const freeParticipation = room?.sessionConfig?.assignmentMode === 'free';
   const requiredSeatCount = (room?.teamSize ?? 1) * 2;
   const humanParticipants = participants.filter(participant => !participant.isAi);
   const affirmativeMembers = humanParticipants.filter(participant => participant.position === 'affirmative' && participant.role !== 'moderator');
@@ -142,13 +150,14 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
       + (affirmativeMembers.some(member => member.phaseIds.includes(stage.id)) ? 1 : 0)
       + (negativeMembers.some(member => member.phaseIds.includes(stage.id)) ? 1 : 0), 0);
   const requiredStageCount = requiredStages.length * 2;
-  const allStagesAssigned = room?.teamSize === 1 || completedStageCount === requiredStageCount;
+  const allStagesAssigned = freeParticipation || room?.teamSize === 1 || completedStageCount === requiredStageCount;
   const requiredDebaters = humanParticipants.filter(participant => participant.role !== 'moderator' && participant.position);
   const moderator = humanParticipants.find(participant => participant.role === 'moderator');
   const everyoneReady = requiredDebaters.length === requiredSeatCount
     && requiredDebaters.every(participant => participant.isReady)
     && (!moderator || moderator.isReady);
-  const canStart = teamSelectionComplete && allStagesAssigned && everyoneReady;
+  const isRoomOpen = room?.status === 'open';
+  const canStart = isRoomOpen && teamSelectionComplete && allStagesAssigned && everyoneReady;
   const isHost = !!user && room?.hostId === user.id;
 
   useEffect(() => {
@@ -213,7 +222,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   };
 
   const toggleReady = async () => {
-    if ((!me?.position && me?.role !== 'moderator') || actionLoading || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned))) return;
+    if (!isRoomOpen || (!me?.position && me?.role !== 'moderator') || actionLoading || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned))) return;
     setActionLoading(true);
     setError(null);
     try {
@@ -241,14 +250,25 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
   };
 
   const exitLobby = async () => {
-    if (user && room?.status === 'open') await leaveDebateLobby(roomId);
-    navigate(room?.audience === 'organization' ? '/institution' : '/');
+    setActionLoading(true);
+    try {
+      if (user && room?.status === 'open') await leaveDebateLobby(roomId);
+      navigate(room?.audience === 'organization' ? '/institution' : '/debate');
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : '대기실을 나가지 못했습니다. 다시 시도해 주세요.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const copyInvite = async () => {
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError('초대 링크를 복사하지 못했습니다. 주소창의 링크를 복사해 주세요.');
+    }
   };
 
   if (loading) {
@@ -263,139 +283,158 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
     return <div className="app-container live-login-gate"><div className="live-gate-card"><Users size={38} /><h1>{room.topic}</h1><p>로그인하면 이 토론 대기실에서 입장과 역할을 선택할 수 있습니다.</p><button className="btn btn-primary" onClick={onLoginRequest}><LogIn size={18} /> 로그인하고 입장</button></div></div>;
   }
 
+  const waitingMembers = humanParticipants.filter(participant => !participant.position && participant.role !== 'moderator');
+  const readyCount = requiredDebaters.filter(participant => participant.isReady).length;
+  const canReady = isRoomOpen && !actionLoading && (!!me?.position || me?.role === 'moderator')
+    && (!!me?.isReady || (teamSelectionComplete && allStagesAssigned));
+  const myStageLabels = requiredStages.filter(stage => me?.phaseIds.includes(stage.id)).map(stage => stage.label);
+  const nextAction = !isRoomOpen
+    ? room.status === 'in_progress' ? '토론이 시작되었습니다.' : '종료된 토론방입니다.'
+    : !me ? '대기실에 입장하고 있습니다.'
+    : !me.position && me.role !== 'moderator' ? '참여할 팀을 선택해 주세요.'
+    : !teamSelectionComplete ? `참가자 ${requiredSeatCount - assignedTeamCount}명을 기다리고 있습니다.`
+    : !allStagesAssigned ? '팀별 발언 역할을 정해 주세요.'
+    : !me.isReady ? '준비가 끝났다면 준비 완료를 눌러 주세요.'
+    : !everyoneReady ? '다른 참가자의 준비를 기다리고 있습니다.'
+    : isHost ? '모두 준비됐습니다. 토론을 시작해 주세요.' : '방장이 토론을 시작하면 자동으로 입장합니다.';
+
   const renderTeam = (position: DebatePosition) => {
-    const teamMembers = position === 'affirmative' ? affirmativeMembers : negativeMembers;
+    const members = position === 'affirmative' ? affirmativeMembers : negativeMembers;
     const isMyTeam = me?.position === position && me.role !== 'moderator';
-    const teamIsFull = teamMembers.length >= room.teamSize;
+    const isFull = members.length >= room.teamSize;
     return (
-    <section className={`lobby-team-panel ${position}`}>
-      <header>
-        <div><span>{position === 'affirmative' ? 'TEAM A' : 'TEAM B'}</span><h2>{getPositionLabel(position)}</h2></div>
-        <div className="lobby-team-head-actions"><strong>{teamMembers.length}/{room.teamSize}명</strong><button className={`btn ${isMyTeam ? 'btn-primary' : 'btn-secondary'}`} disabled={actionLoading || me?.isReady || isMyTeam || (teamIsFull && !isMyTeam)} onClick={() => void chooseTeam(position)}>{isMyTeam ? '선택됨' : '이 팀 선택'}</button></div>
-      </header>
-      <div className="lobby-team-member-list">
-        {Array.from({ length: room.teamSize }, (_, index) => {
-          const member = teamMembers[index];
-          return member
-            ? <div key={member.userId} className={member.userId === user.id ? 'mine' : ''}><UserRound size={21} /><span><strong>{member.nickname}</strong><small>{member.userId === user.id ? '나 · 팀 선택 완료' : member.isReady ? '준비 완료' : '단계 협의 중'}</small></span></div>
-            : <div key={`empty-${index}`} className="empty"><span>+</span><span><strong>사람 참가자 대기</strong><small>초대 링크를 공유해 팀원을 모아 주세요.</small></span></div>;
-        })}
-      </div>
-      <div className="lobby-seat-list">
-        {room.teamSize === 1 ? (
-          <div className="lobby-seat occupied">
-            <span className="lobby-seat-icon"><Check size={22} /></span>
-            <span><strong>전 단계 자동 담당</strong><small>1:1 토론에서는 한 사람이 입론부터 최종발언까지 모두 진행합니다.</small></span>
-            <i className="ready">자동 배정</i>
-          </div>
-        ) : requiredStages.map(stage => {
-          const occupant = teamMembers.find(participant => participant.phaseIds.includes(stage.id));
-          const isMine = occupant?.userId === user.id;
+      <section className={`match-team ${position}`} aria-label={`${getPositionLabel(position)} 팀`}>
+        <header>
+          <div className="match-team-title"><span>{position === 'affirmative' ? 'A' : 'B'}</span><h2>{getPositionLabel(position)}</h2><small>{members.length} / {room.teamSize}</small></div>
+          <button type="button" className={`match-team-join ${isMyTeam ? 'selected' : ''}`} disabled={!isRoomOpen || actionLoading || !me || me.isReady || isMyTeam || isFull} onClick={() => void chooseTeam(position)}>
+            {isMyTeam ? <><Check size={14} /> 내 팀</> : isFull ? '정원 마감' : '팀 선택'}
+          </button>
+        </header>
+        <div className="match-player-list">
+          {Array.from({ length: room.teamSize }, (_, index) => {
+            const member = members[index];
+            const labels = member ? requiredStages.filter(stage => member.phaseIds.includes(stage.id)).map(stage => stage.label) : [];
+            return member ? (
+              <div key={member.userId} className={`match-player ${member.userId === user.id ? 'mine' : ''}`}>
+                <span className="match-player-avatar"><UserRound size={20} /></span>
+                <div className="match-player-info">
+                  <strong>{member.nickname}{member.userId === user.id && <small>나</small>}{member.userId === room.hostId && <Crown size={13} aria-label="방장" />}</strong>
+                  <span title={labels.join(' · ')}>{freeParticipation ? '팀 내 자유 참여' : room.teamSize === 1 ? '전 단계 담당' : labels.length ? labels.join(' · ') : '발언 역할 미선택'}</span>
+                </div>
+                <span className={`match-ready-state ${member.isReady ? 'ready' : ''}`}>{member.isReady && <Check size={12} />}{member.isReady ? '준비 완료' : '준비 중'}</span>
+              </div>
+            ) : (
+              <div key={`empty-${index}`} className="match-player empty">
+                <span className="match-player-avatar"><Plus size={18} /></span>
+                <div className="match-player-info"><strong>빈 자리</strong><span>참가자를 기다리고 있어요</span></div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
+  const renderAssignments = (position: DebatePosition) => {
+    const members = position === 'affirmative' ? affirmativeMembers : negativeMembers;
+    const isMyTeam = me?.position === position && me.role !== 'moderator';
+    return (
+      <section key={position} className={`match-assignment-team ${position}`}>
+        <h3>{getPositionLabel(position)} <span>{requiredStages.filter(stage => members.some(member => member.phaseIds.includes(stage.id))).length}/{requiredStages.length} 배정</span></h3>
+        {requiredStages.map(stage => {
+          const owner = members.find(member => member.phaseIds.includes(stage.id));
+          const isMine = owner?.userId === user.id;
           return (
-            <div
-              key={`${position}-${stage.id}`}
-              className={`lobby-seat ${occupant ? 'occupied' : ''} ${isMine ? 'mine' : ''}`}
-            >
-              <span className="lobby-seat-icon">{occupant ? <UserRound size={23} /> : <span>+</span>}</span>
-              <span><strong>{stage.label}</strong><small>{occupant ? `${occupant.nickname} · ${stage.description}` : stage.description}</small></span>
-              {occupant ? (
-                isMine
-                  ? <button type="button" className="lobby-seat-action" disabled={actionLoading || me?.isReady} onClick={() => void changeStageAssignment(stage.id, false)}>담당 해제</button>
-                  : <span className="lobby-seat-actions">{isMyTeam && !me?.isReady && <button type="button" disabled={actionLoading || occupant.isReady} onClick={() => void changeStageAssignment(stage.id, true)}>내가 맡기</button>}<i className={occupant.isReady ? 'ready' : ''}>{occupant.isReady ? '준비 완료' : '배정됨'}</i></span>
-              ) : (
-                <span className="lobby-seat-actions">
-                  {isMyTeam && <button type="button" disabled={actionLoading || me?.isReady} onClick={() => void changeStageAssignment(stage.id, true)}>내가 맡기</button>}
-                  {!isMyTeam && <i>담당자 대기</i>}
-                </span>
-              )}
+            <div key={stage.id} className={isMine ? 'mine' : ''}>
+              <span title={stage.description}>{stage.label}</span>
+              <strong>{owner?.nickname || '미배정'}</strong>
+              {isMyTeam && <button type="button" aria-label={`${stage.label} ${isMine ? '담당 해제' : '내가 맡기'}`} disabled={!isRoomOpen || actionLoading || me?.isReady || owner?.isReady} onClick={() => void changeStageAssignment(stage.id, !isMine)}>{isMine ? '해제' : '맡기'}</button>}
             </div>
           );
         })}
-      </div>
-    </section>
+      </section>
     );
   };
 
   return (
-    <main className="app-container page-scroll debate-lobby-page">
-      <nav className="lobby-nav">
-        <button className="btn btn-secondary" onClick={() => void exitLobby()}><ArrowLeft size={17} /> 나가기</button>
-        <button className="btn btn-secondary" onClick={() => void copyInvite()}><Copy size={17} /> {copied ? '복사됨' : '대기실 초대'}</button>
+    <main className="match-lobby">
+      <nav className="match-lobby-nav" aria-label="대기실 메뉴">
+        <button type="button" className="match-back" disabled={actionLoading} onClick={() => void exitLobby()}><ArrowLeft size={17} /> 토론 목록</button>
+        <span>ThinkFit <i /> 토론 대기실</span>
+        <button type="button" className="match-invite" onClick={() => void copyInvite()}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? '복사했어요' : '초대 링크 복사'}</button>
       </nav>
 
-      <header className="lobby-hero">
-        <div className="lobby-hero-topic">
-          <span className="debate-modal-eyebrow">{room.audience === 'organization' ? `${room.organizationName || '기관'} 전용 대기실` : '공개 토론 대기실'}</span>
+      <header className="match-lobby-heading">
+        <div>
+          <span className="match-room-label">{room.audience === 'organization' ? `${room.organizationName || '기관'} 전용` : '공개 토론'} <i /> {room.teamSize}:{room.teamSize} {room.teamSize === 1 ? '개인전' : '팀전'}</span>
           <h1>{room.topic}</h1>
-          <div className="lobby-meta"><span><Users size={16} /> {room.teamSize}:{room.teamSize}</span><span><Clock size={16} /> {room.timeLimit / 60}분</span><span><Layers3 size={16} /> {room.debateLevel === 'intermediate' ? '중급' : '초급'}</span><span><Volume2 size={16} /> {room.voiceEnabled ? 'LiveKit 음성' : '텍스트 전용'}</span>{room.allowModerator && <span><ShieldCheck size={16} /> 진행자 선택 가능</span>}</div>
         </div>
-        <div className="lobby-host"><Crown size={18} /><span><small>방장</small><strong>{room.hostName}</strong></span></div>
-        {(room.topicDescription || room.topicBriefing) && (
-          <div className="lobby-topic-actions" aria-label="토론 주제 참고 정보">
-            <button type="button" className={showBriefing ? 'active' : ''} aria-expanded={showBriefing} aria-controls="lobby-topic-detail" onClick={() => setShowBriefing(value => !value)}>
-              <BookOpen size={16} /> 토론 배경 및 논점 확인
-            </button>
-          </div>
-        )}
+        <span className={`match-room-status ${canStart ? 'ready' : ''}`} role="status"><i />{!isRoomOpen ? room.status === 'in_progress' ? '토론 진행 중' : '종료됨' : canStart ? '시작 가능' : '참가자 준비 중'}</span>
       </header>
 
-      {error && <div className="live-room-alert error" role="alert">{error}</div>}
+      {error && <div className="match-error" role="alert">{error}<button type="button" onClick={() => setError(null)} aria-label="오류 알림 닫기">닫기</button></div>}
 
-      {showBriefing && (
-        <section id="lobby-topic-detail" className="lobby-topic-detail">
-          <header><span><BookOpen size={18} /></span><div><small>TOPIC BRIEF</small><strong>토론 배경 및 논점</strong></div><button type="button" onClick={() => setShowBriefing(false)} aria-label="주제 정보 닫기">닫기</button></header>
-          {room.topicBriefing
-            ? <TopicBriefingDetails briefing={room.topicBriefing} language={room.language} embedded />
-            : <div className="lobby-background-summary"><p>{room.topicDescription}</p></div>}
+      <div className="match-lobby-layout">
+        <section className="match-room-board" aria-label="참가자와 준비 상태">
+          <header className="match-board-heading"><h2><Users size={17} /> 참가자</h2><span>{assignedTeamCount} / {requiredSeatCount}명</span></header>
+          <div className="match-teams">{renderTeam('affirmative')}{renderTeam('negative')}</div>
+
+          {waitingMembers.length > 0 && <div className="match-waiting"><span>팀 선택 중</span><div>{waitingMembers.map(member => <span key={member.userId}>{member.nickname}{member.userId === user.id ? ' (나)' : ''}</span>)}</div></div>}
+
+          {room.allowModerator && (
+            <div className="match-moderator">
+              <span><ShieldCheck size={16} /> 진행자 <small>선택 사항</small></span>
+              {moderator ? <div><strong>{moderator.nickname}{moderator.userId === user.id ? ' (나)' : ''}</strong><span className={`match-ready-state ${moderator.isReady ? 'ready' : ''}`}>{moderator.isReady ? '준비 완료' : '준비 중'}</span></div>
+                : <button type="button" disabled={!isRoomOpen || !me || actionLoading || me.isReady} onClick={() => void chooseSeat(null, 'moderator')}>진행자로 참여</button>}
+            </div>
+          )}
+
+          {room.teamSize > 1 && !freeParticipation && (
+            <div className="match-role-settings">
+              <button type="button" className="match-disclosure" aria-expanded={showAssignments} aria-controls="match-assignments" onClick={() => setShowAssignments(value => !value)}>
+                <span><Settings2 size={16} /> 발언 역할 설정 <small>{allStagesAssigned ? '배정 완료' : `${requiredStageCount - completedStageCount}개 미배정`}</small></span><ChevronDown size={16} />
+              </button>
+              {showAssignments && <div id="match-assignments"><p>담당할 역할의 ‘맡기’를 눌러 주세요. 한 사람이 여러 역할을 맡을 수 있습니다.</p><div className="match-assignment-grid">{renderAssignments('affirmative')}{renderAssignments('negative')}</div></div>}
+            </div>
+          )}
+
+          <footer className="match-room-actions">
+            <div className="match-next-action" aria-live="polite"><strong>{nextAction}</strong><span>{readyCount} / {requiredSeatCount}명 준비 완료{moderator ? ` · 진행자 ${moderator.isReady ? '준비 완료' : '준비 중'}` : ''}</span></div>
+            <div className="match-action-buttons">
+              {isRoomOpen && room.teamSize > 1 && !!me?.position && !allStagesAssigned && !showAssignments && <button type="button" className="btn btn-secondary" onClick={() => setShowAssignments(true)}>역할 설정</button>}
+              <button type="button" className={`btn ${me?.isReady ? 'btn-secondary' : 'btn-primary'}`} disabled={!canReady} onClick={() => void toggleReady()}><Check size={17} />{me?.isReady ? '준비 취소' : '준비 완료'}</button>
+              {isHost && <button type="button" className="btn btn-primary match-start" disabled={!canStart || actionLoading} onClick={() => void startDebate()}>{actionLoading ? <LoaderCircle className="spin" size={17} /> : <Play size={17} fill="currentColor" />} 토론 시작</button>}
+            </div>
+          </footer>
         </section>
-      )}
 
-      <section className="lobby-stepper" aria-label="대기실 준비 단계">
-        <div className={!teamSelectionComplete ? 'active' : 'complete'}><span>{teamSelectionComplete ? <Check size={16} /> : '1'}</span><strong>찬성·반대 팀 선택</strong><small>각 참가자가 먼저 입장을 선택합니다.</small></div>
-        <i />
-        <div className={teamSelectionComplete && !allStagesAssigned ? 'active' : allStagesAssigned ? 'complete' : ''}><span>{allStagesAssigned ? <Check size={16} /> : '2'}</span><strong>단계별 담당 선택</strong><small>{room.teamSize === 1 ? '1:1은 전 단계가 자동 배정됩니다.' : '입론·질문·답변·반박·최종발언을 빠짐없이 정합니다.'}</small></div>
-        <i />
-        <div className={allStagesAssigned && !canStart ? 'active' : canStart ? 'complete' : ''}><span>{canStart ? <Check size={16} /> : '3'}</span><strong>전원 준비 완료</strong><small>방장이 토론을 시작합니다.</small></div>
-      </section>
+        <aside className="match-room-sidebar" aria-label="토론방 정보">
+          <section className="match-settings">
+            <h2>방 정보</h2>
+            <dl>
+              <div><dt>방장</dt><dd><Crown size={14} />{room.hostName}</dd></div>
+              <div><dt>토론 시간</dt><dd><Clock size={14} />{formatDebateMinutes(room.timeLimit)}</dd></div>
+              <div><dt>진행 방식</dt><dd><Volume2 size={14} />{room.voiceEnabled ? '음성 토론' : '텍스트 토론'}</dd></div>
+              {room.sessionConfig ? <div><dt>시간 종료</dt><dd>{room.sessionConfig.progressionMode === 'automatic' ? '자동진행' : '방장·진행자 진행'}</dd></div> : <div><dt>훈련 수준</dt><dd>{room.debateLevel === 'intermediate' ? '중급' : '초급'}</dd></div>}
+            </dl>
+            {(room.topicDescription || room.topicBriefing) && <button type="button" className="match-briefing-toggle" aria-expanded={showBriefing} aria-controls="match-topic-briefing" onClick={() => setShowBriefing(value => !value)}><BookOpen size={15} /> 주제 배경과 논점 <ChevronDown size={15} /></button>}
+            <details className="match-schedule">
+              <summary>진행 순서와 시간 <ChevronDown size={15} /></summary>
+              <p>{room.sessionConfig ? '교차질문은 질문 측과 답변 측이 시간 안에서 자유롭게 주고받습니다. 작전시간은 총 시간에 포함됩니다.' : '각 시간은 권장 시간입니다. 발언을 마치면 다음 순서로 넘어갑니다.'}</p>
+              <ol>{(room.sessionConfig ? buildSessionPhases(room.sessionConfig) : getLiveDebateCourse(room.timeLimit, room.debateLevel)).map(phase => <li key={phase.id}><span>{phase.label}</span><small>{formatDebateMinutes(phase.seconds)}</small></li>)}</ol>
+            </details>
+          </section>
+          <section className="match-my-seat">
+            <span>내 참여 정보</span>
+            <strong>{me?.role === 'moderator' ? '진행자' : me?.position ? `${getPositionLabel(me.position)} 팀` : '팀을 선택해 주세요'}</strong>
+            <p>{me?.role === 'moderator' ? '토론 순서와 시간을 진행합니다.' : me?.position ? room.teamSize === 1 ? '입론부터 최종발언까지 직접 진행합니다.' : freeParticipation ? '발언 가능한 세션에 팀원 누구나 참여합니다.' : myStageLabels.length ? myStageLabels.join(' · ') : '팀원과 발언 역할을 나눠 주세요.' : '참여할 팀의 ‘팀 선택’을 눌러 입장하세요.'}</p>
+          </section>
+          {room.sessionConfig && room.teamSize > 1 && me?.position && me.role !== 'moderator' && <TeamChat key={`${me.position}:${participants.filter(p => p.position === me.position && p.role !== 'moderator' && !p.isAi).map(p => p.userId).sort().join(',')}`} roomId={roomId} userId={user.id} disabled={!isRoomOpen} />}
+        </aside>
+      </div>
+      {isHost && isRoomOpen && room.sessionConfig && <details className="match-settings" style={{ marginTop: 20 }}><summary>방 진행 설정 수정</summary><p>설정을 바꾸면 모든 참가자의 준비 완료가 해제됩니다.</p><SessionSettings value={room.sessionConfig} teamSize={room.teamSize} onChange={config => { if (actionLoading) return; setActionLoading(true); void updateSessionSettings(roomId, config).then(refresh).catch(err => setError(err.message)).finally(() => setActionLoading(false)); }} /></details>}
 
-      <section className="lobby-progress-card">
-        <div><strong>{teamSelectionComplete ? `단계 배정 ${completedStageCount}/${requiredStageCount}` : `팀 선택 ${assignedTeamCount}/${requiredSeatCount}명`}</strong><span>{teamSelectionComplete ? allStagesAssigned ? '모든 토론 단계의 담당자가 정해졌습니다.' : '한 사람이 여러 단계를 맡아도 됩니다. 빈 단계를 모두 배정해 주세요.' : '먼저 찬성 또는 반대 팀을 선택해 주세요.'}</span></div>
-        <div className="lobby-progress-track"><span style={{ width: `${Math.min(100, (teamSelectionComplete ? completedStageCount / requiredStageCount : assignedTeamCount / requiredSeatCount) * 100)}%` }} /></div>
-        <div className={`lobby-status-pill ${canStart ? 'ready' : ''}`}>{canStart ? <><Check size={16} /> 시작 준비 완료</> : '참가자 대기 중'}</div>
-      </section>
-
-      <section className="lobby-team-grid">{renderTeam('affirmative')}<div className="lobby-versus"><Swords size={22} /><strong>VS</strong></div>{renderTeam('negative')}</section>
-
-      {room.allowModerator && (
-        <section className="lobby-moderator-section">
-          <div><ShieldCheck size={22} /><span><strong>진행자</strong><small>선택 사항 · 팀 정원과 별도로 토론 순서와 시간을 진행합니다.</small></span></div>
-          {(() => {
-            return moderator
-              ? <div className="lobby-moderator-user"><UserRound size={20} /><strong>{moderator.nickname}</strong><span className={moderator.isReady ? 'ready' : ''}>{moderator.isReady ? '준비 완료' : '선택 완료'}</span></div>
-              : <button className="btn btn-secondary" disabled={actionLoading || me?.isReady} onClick={() => void chooseSeat(null, 'moderator')}>진행자로 참여</button>;
-          })()}
-        </section>
-      )}
-
-      <section className="lobby-bottom-grid">
-        <div className="lobby-participants-card">
-          <h3><Users size={18} /> 대기실 참가자</h3>
-          <div>{humanParticipants.map(participant => <span key={participant.userId} className={participant.isReady ? 'ready' : ''}><i />{participant.nickname}{participant.userId === user.id ? ' (나)' : ''}<small>{participant.role === 'moderator' ? '진행자' : participant.position ? `${getPositionLabel(participant.position)} · ${participant.phaseIds.length ? `${participant.phaseIds.length}개 단계 담당` : room.teamSize === 1 ? '전 단계 담당' : '단계 선택 중'}` : '팀 선택 중'}</small></span>)}</div>
-        </div>
-        <div className="lobby-timing-card">
-          <h3><Clock size={18} /> 자동 진행표</h3>
-          <div>{getLiveDebateCourse(room.timeLimit, room.debateLevel).map(phase => <span key={phase.id}><strong>{phase.label}</strong><small>{formatDebateMinutes(phase.seconds)}</small></span>)}</div>
-        </div>
-      </section>
-
-      <footer className="lobby-action-bar">
-        <div>
-          <strong>{me?.role === 'moderator' ? '진행자' : me?.position ? `${getPositionLabel(me.position)} · ${room.teamSize === 1 ? '전 단계 담당' : requiredStages.filter(stage => me.phaseIds.includes(stage.id)).map(stage => stage.label).join(' · ') || '단계 선택 전'}` : '아직 팀을 선택하지 않았습니다.'}</strong>
-          <span>{me?.isReady ? '준비를 취소하면 담당 단계를 다시 조정할 수 있습니다.' : allStagesAssigned ? '모든 단계가 배정되었습니다. 준비 완료를 눌러 주세요.' : '팀원과 협의해 모든 단계의 담당을 먼저 정해 주세요.'}</span>
-        </div>
-        <button className={`btn ${me?.isReady ? 'btn-secondary' : 'btn-primary'}`} disabled={(!me?.position && me?.role !== 'moderator') || (!me?.isReady && (!teamSelectionComplete || !allStagesAssigned)) || actionLoading} onClick={() => void toggleReady()}>{me?.isReady ? '준비 취소' : '준비 완료'}</button>
-        {isHost && <button className="btn btn-primary lobby-start-button" disabled={!canStart || actionLoading} onClick={() => void startDebate()}><Play size={18} fill="currentColor" /> 토론 시작하기</button>}
-      </footer>
+      {showBriefing && <section id="match-topic-briefing" className="match-topic-briefing"><header><h2><BookOpen size={18} /> 주제 배경과 논점</h2><button type="button" onClick={() => setShowBriefing(false)}>접기</button></header>{room.topicBriefing ? <TopicBriefingDetails briefing={room.topicBriefing} language={room.language} embedded /> : <p>{room.topicDescription}</p>}</section>}
     </main>
   );
 };

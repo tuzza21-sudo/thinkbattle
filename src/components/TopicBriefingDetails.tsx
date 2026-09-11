@@ -13,7 +13,7 @@ export const TopicBriefingDetails = ({
   embedded?: boolean;
 }) => {
   const content = (
-    <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', marginTop: '1rem' }}>
+    <div className="grid gap-6 topic-briefing-content" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', marginTop: '1rem', minWidth: 0, overflowWrap: 'anywhere' }}>
       <div className="flex flex-col gap-6">
         <section>
           <h3 className="flex items-center gap-2"><BookOpen size={18} color="var(--primary)" /> {language === 'en' ? 'Background' : '배경 설명'}</h3>

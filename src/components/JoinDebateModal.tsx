@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Clock, Layers3, LoaderCircle, RefreshCw, Search, ShieldCheck, Users, Volume2, X } from 'lucide-react';
 import { listDebateRooms } from '../lib/debateRooms';
+import { formatDebateMinutes } from '../lib/debateTiming';
 import type { DebateRoomAudience, LiveDebateRoomSummary } from '../types';
 
 type JoinDebateModalProps = {
@@ -87,7 +88,7 @@ export const JoinDebateModal = ({ audience = 'public', organizationIds = [], onC
                 <p>{isEnglish ? `Hosted by ${room.hostName} · ${room.participantCount} waiting` : `${room.hostName} 개설 · 현재 ${room.participantCount}명 대기`} · {new Date(room.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 <footer>
                   <span><Users size={14} /> {room.teamSize}:{room.teamSize}</span>
-                  <span><Clock size={14} /> {room.timeLimit / 60} {isEnglish ? 'min' : '분'}</span>
+                  <span><Clock size={14} /> {isEnglish ? `${Math.floor(room.timeLimit / 60)}m${room.timeLimit % 60 ? ` ${room.timeLimit % 60}s` : ''}` : `총 ${formatDebateMinutes(room.timeLimit)}`}{room.sessionConfig?.strategySeconds ? (isEnglish ? ' incl. strategy' : ' · 작전 포함') : ''}</span>
                   <span><Layers3 size={14} /> {isEnglish ? (room.debateLevel === 'intermediate' ? 'Intermediate' : 'Beginner') : (room.debateLevel === 'intermediate' ? '중급' : '초급')}</span>
                   <span><Volume2 size={14} /> {isEnglish ? (room.voiceEnabled ? 'Voice' : 'Text') : (room.voiceEnabled ? '음성' : '텍스트')}</span>
                   {room.allowModerator && <span><ShieldCheck size={14} /> {isEnglish ? 'Moderator' : '진행자'}</span>}

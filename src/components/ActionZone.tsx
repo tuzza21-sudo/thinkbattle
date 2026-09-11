@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Lock, Zap, Lightbulb, Mic, Square, LoaderCircle, RotateCcw } from 'lucide-react';
+import { Send, Lock, Zap, Mic, Square, LoaderCircle, RotateCcw } from 'lucide-react';
 import type { DebateStep } from '../types';
 import { transcribeDebateAudio } from '../lib/transcription';
+import type { CoachContext } from '../lib/thinkingCoach';
+import { ThinkingCoach } from './ThinkingCoach';
+import { OpeningComposer } from './OpeningComposer';
 
 interface ActionZoneProps {
   currentRound?: DebateStep;
@@ -23,6 +26,7 @@ interface ActionZoneProps {
   onSubmit: (content: string, recording?: Blob) => void;
   language?: 'ko' | 'en';
   persistRecording?: boolean;
+  coachContext?: CoachContext;
 }
 
 const MAX_RECORDING_SECONDS = 180;
@@ -82,7 +86,7 @@ const formatTimer = (seconds: number) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, isAiSpeaking = false, isPaused = false, topic, onSubmit, language = 'ko', persistRecording = false }) => {
+export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgress, timing, isPlayerTurn, isAiThinking, isAiSpeaking = false, isPaused = false, topic, onSubmit, language = 'ko', persistRecording = false, coachContext }) => {
   const isEnglish = language === 'en';
   const [content, setContent] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -105,7 +109,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   const liveTranscriptRef = useRef('');
   const [isLiveTranscription, setIsLiveTranscription] = useState(false);
 
-  const isOpeningRound = currentRound?.title === '입론';
+  const isOpeningRound = currentRound?.roundId === 'opening' && !currentRound.id.includes('framing');
   const isInputDisabled = isPaused || !isPlayerTurn || isAiThinking;
   const inputDisabledRef = useRef(isInputDisabled);
 
@@ -190,7 +194,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   }, [isRecording]);
 
   const handleSubmit = () => {
-    if (!isPaused && !isRecording && !isTranscribing && content.trim()) {
+    if (!isInputDisabled && !isRecording && !isTranscribing && content.trim()) {
       onSubmit(content);
       contentRef.current = '';
       setContent('');
@@ -200,7 +204,8 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter' && (coachContext ? e.ctrlKey || e.metaKey : !e.shiftKey)) {
       e.preventDefault();
       handleSubmit();
     }
@@ -458,28 +463,20 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
           </div>
         )}
         
-        {isOpeningRound && isPlayerTurn && (
-          <div className="opening-guide-tip">
-            <div className="opening-guide-tip-header">
-              <Lightbulb size={15} />
-              <span>{isEnglish ? 'Opening speech guide' : '입론 작성 가이드'}</span>
-            </div>
-            <div className="opening-guide-tip-body">
-              <p>{isEnglish ? <><strong>Explain</strong> your reason and provide <strong>supporting evidence</strong>.</> : <><strong>이유</strong>와 <strong>근거</strong>를 구분하여 작성해 보세요!</>}</p>
-              <ul>
-                <li><strong>{isEnglish ? 'Reason' : '이유'}</strong> — {isEnglish ? 'the causal explanation supporting your position' : <>나의 입장을 뒷받침하는 <em>핵심 주장</em> (왜 그렇게 생각하는가?)</>}</li>
-                <li><strong>{isEnglish ? 'Evidence' : '근거'}</strong> — {isEnglish ? 'a concrete example, fact or comparison supporting that reason' : <>이유를 증명하는 <em>구체적 사례·통계·사실</em></>}</li>
-              </ul>
-              <p className="opening-guide-example">{isEnglish ? 'Example: Claim → reason → concrete example → impact.' : '예) 이유: "원격 수업은 학습 효율을 높인다" → 근거: "OO 연구에 따르면 자기주도 학습 시간이 30% 증가했다"'}</p>
-            </div>
-          </div>
-        )}
+        {coachContext && <ThinkingCoach context={coachContext} draft={content} disabled={isPaused || isRecording || isTranscribing || isAiThinking || isAiSpeaking} />}
 
         <div className="composer-row">
-          <textarea
+          {isOpeningRound && coachContext && !isRecording && !isTranscribing ? <OpeningComposer
+            value={content}
+            onChange={value => { contentRef.current = value; setContent(value); }}
+            disabled={isInputDisabled}
+            language={language}
+            position={coachContext.position}
+          /> : <textarea
             className={`input-textarea ${isRecording ? 'is-listening' : ''}`}
             style={isOpeningRound ? { minHeight: '120px' } : undefined}
-            placeholder={isEnglish ? (isPaused ? 'Resume the debate to continue writing.' : isPlayerTurn ? 'Write your argument or a direct response to the opposing case…' : isAiSpeaking ? 'Listen to your opponent before the next phase begins…' : isAiThinking ? 'Your opponent is preparing a response…' : 'Waiting…') : isPaused ? "진행 버튼을 누르면 이어서 작성할 수 있습니다." : isPlayerTurn ? (isOpeningRound ? "이유와 근거를 구분하여 입론을 작성해 주세요...\n\n예)\n[이유] 원격 수업은 학습 효율을 높인다.\n[근거] OO 연구에 따르면 자기주도 학습 시간이 30% 증가했다." : currentRound?.inputPlaceholder ?? "주장에 대한 반박이나 질문을 입력하세요...") : isAiSpeaking ? "상대방 발언이 끝나면 다음 단계가 시작됩니다..." : isAiThinking ? "상대방이 답변을 준비 중입니다..." : "대기 중..."}
+            aria-label={isEnglish ? 'Your speech' : '내 발언 작성'}
+            placeholder={isEnglish ? (isPaused ? 'Resume the debate to continue writing.' : isPlayerTurn ? 'Write your argument or a direct response to the opposing case…' : isAiSpeaking ? 'Listen to your opponent before the next phase begins…' : isAiThinking ? 'Your opponent is preparing a response…' : 'Waiting…') : isPaused ? "진행 버튼을 누르면 이어서 작성할 수 있습니다." : isPlayerTurn ? (isOpeningRound ? "내 입장과 이유를 적고, 확인한 자료나 구체적인 사례로 뒷받침해 보세요." : currentRound?.inputPlaceholder ?? "주장에 대한 반박이나 질문을 입력하세요...") : isAiSpeaking ? "상대방 발언이 끝나면 다음 단계가 시작됩니다..." : isAiThinking ? "상대방이 답변을 준비 중입니다..." : "대기 중..."}
             value={content}
             onChange={(e) => {
               contentRef.current = e.target.value;
@@ -488,8 +485,10 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
             onKeyDown={handleKeyDown}
             disabled={isInputDisabled}
             maxLength={1200}
-          />
+          />}
 
+          <div className="composer-actions">
+          <span className="composer-action-note">{isEnglish ? 'Write your thoughts, or speak them.' : '내 생각을 글로, 또는 목소리로.'}</span>
           <button
             type="button"
             className={`btn microphone-button ${isRecording ? 'is-listening' : ''}`}
@@ -516,6 +515,7 @@ export const ActionZone: React.FC<ActionZoneProps> = ({ currentRound, roundProgr
             <Send size={18} />
             <span>{isEnglish ? 'Submit' : '제출'}</span>
           </button>
+          </div>
         </div>
         {(isRecording || isTranscribing || speechError) && (
           <div

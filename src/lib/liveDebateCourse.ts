@@ -43,6 +43,7 @@ export type LiveDebateStageOption = {
 };
 
 const stageOptions: Record<DebateStageId, LiveDebateStageOption> = {
+  'cross-question': { id: 'cross-question', label: '교차질문', description: '질문과 답변을 시간 안에 반복' },
   opening: { id: 'opening', label: '입론', description: '핵심 주장·이유·근거 제시' },
   question: { id: 'question', label: '질문', description: '상대 논리의 전제와 빈틈 질문' },
   answer: { id: 'answer', label: '질문 답변', description: '상대 질문에 직접 답변' },

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BarChart2, CheckCircle2, Circle, Clock, Lightbulb, MessageCircle, Pause, Play, Sparkles, Target, Users, Volume2, VolumeX } from 'lucide-react';
+import { AlertTriangle, BarChart2, BookOpen, CheckCircle2, Circle, Clock, Lightbulb, MessageCircle, Pause, Play, Sparkles, Target, Users, Volume2, VolumeX } from 'lucide-react';
 import { BattleHeader } from './BattleHeader';
+import { DebateStudioHeader } from './DebateStudioHeader';
 import { ArgumentCard } from './ArgumentCard';
 import { ActionZone } from './ActionZone';
 import { ResultModal } from './ResultModal';
@@ -16,6 +17,8 @@ import {
   generateRoundtableResponse,
 } from '../lib/api';
 import type { AIResponse } from '../lib/api';
+import { getCoachStage, type CoachContext } from '../lib/thinkingCoach';
+import './DebateStudio.css';
 import {
   buildDebateIntro,
   getDebateLevelLabel,
@@ -579,6 +582,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
   const [audioLoadingArgumentId, setAudioLoadingArgumentId] = useState<string | null>(null);
   const [aiSpeakingArgumentId, setAiSpeakingArgumentId] = useState<string | null>(null);
   const [audioStorageNotice, setAudioStorageNotice] = useState<string | null>(null);
+  const [coachSessionId] = useState(createArgumentId);
 
   const stopDebateAudio = useCallback(() => {
     debateSpeechControllerRef.current?.abort();
@@ -1252,14 +1256,37 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
     localStorage.setItem('debate-ai-voice-mode', nextMode);
     stopDebateAudio();
   };
+  const isStudio = battleState.gameMode === 'debate';
+  const isEnglish = battleState.language === 'en';
+  const coachContext: CoachContext | undefined = (() => {
+    const stage = currentActionStep && getCoachStage(currentActionStep.id, currentActionStep.roundId);
+    if (!isStudio || !stage || !currentActionStep) return undefined;
+    return {
+      sessionId: `${coachSessionId}:${location.key}`,
+      topic: battleState.topic,
+      topicContext: [battleState.topicDescription, effectiveConfig.topicBriefing ? JSON.stringify(effectiveConfig.topicBriefing) : ''].filter(Boolean).join('\n'),
+      position: battleState.userPosition ?? 'affirmative',
+      level: battleState.debateLevel ?? 'beginner',
+      stage,
+      stepId: currentActionStep.id,
+      language: battleState.language,
+      turns: battleState.arguments.filter(argument => argument.id !== 'debate-intro').map(argument => ({
+        id: argument.id,
+        side: argument.isAi ? 'opponent' : 'own',
+        content: [argument.content, argument.aiQuestion].filter(Boolean).join('\n'),
+        phase: argument.roundTitle ?? argument.roundId ?? '',
+      })),
+    };
+  })();
+  const visibleArguments = isStudio ? battleState.arguments.filter(argument => argument.id !== 'debate-intro') : battleState.arguments;
 
   return (
-    <div className="app-container">
-      <BattleHeader battleState={battleState} />
-      {effectiveConfig.topicBriefing && (
+    <div className={`app-container ${isStudio ? 'debate-studio' : ''}`}>
+      {isStudio ? <DebateStudioHeader battle={battleState} steps={debateStepList} currentIndex={activeStepIndex} remaining={currentRemainingSeconds} overtime={currentOvertimeSeconds} paused={isPaused} thinking={isAiThinking} speaking={Boolean(aiSpeakingArgumentId)} voiceMode={debateVoiceMode} onVoiceModeChange={handleDebateVoiceModeChange} onPauseToggle={() => { stopDebateAudio(); setIsPaused(value => !value); }} /> : <BattleHeader battleState={battleState} />}
+      {!isStudio && effectiveConfig.topicBriefing && (
         <TopicBriefingDetails briefing={effectiveConfig.topicBriefing} language={effectiveConfig.language} />
       )}
-      <section className="session-strip">
+      {!isStudio && <section className="session-strip">
         <div className="participant-strip">
           {participants.map(player => (
             <div key={player.id} className={`compact-player ${player.isAi ? 'ai' : 'user'}`}>
@@ -1320,18 +1347,23 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                   : `${currentActionStep?.title ?? '현재 단계'} 권장 시간`}
           </span>
         </div>
-      </section>
+      </section>}
 
       <main className="debate-workspace">
         <section className="chat-panel" aria-label="토론 대화">
+          {isStudio && <header className="studio-conversation-header"><div><MessageCircle size={16} /><strong>{isEnglish ? 'The debate floor' : '토론 현장'}</strong><span>{visibleArguments.length} {isEnglish ? 'speeches' : '개의 발언'}</span></div><span>{isEnglish ? 'Listen · think · respond' : '경청하고, 생각하고, 응답하세요'}</span></header>}
           <div className="conversation-list">
-            {battleState.arguments.map(argument => (
+            {isStudio && visibleArguments.length === 0 && <div className="studio-welcome"><div className="studio-welcome-symbol"><MessageCircle size={27} /><Sparkles size={15} /></div><span>{isEnglish ? 'YOUR VOICE STARTS THE DEBATE' : '첫 생각이 토론의 시작입니다'}</span><h2>{isEnglish ? 'What is your position?' : '이 논제에 대한 내 생각은?'}</h2><p>{isEnglish ? 'Start with one clear idea. Your opponent will listen and respond.' : '가장 말하고 싶은 한 가지부터 시작하세요.\n상대는 내 발언을 듣고 논의를 이어갑니다.'}</p><div><span>01 {isEnglish ? 'Choose a direction' : '방향을 정하고'}</span><i /><span>02 {isEnglish ? 'Build your reasoning' : '이유를 연결하고'}</span><i /><span>03 {isEnglish ? 'Speak in your words' : '내 언어로 말하기'}</span></div></div>}
+            {visibleArguments.map(argument => (
               <ArgumentCard
                 key={argument.id}
                 argument={argument}
                 player={getPlayerForArgument(argument)}
                 onPlayAudio={battleState.gameMode === 'debate' && argument.isAi ? () => void playDebateArgument(argument) : undefined}
                 isAudioLoading={audioLoadingArgumentId === argument.id}
+                isAudioPlaying={aiSpeakingArgumentId === argument.id}
+                isHighlighted={aiSpeakingArgumentId === argument.id}
+                compactFeedback={isStudio}
               />
             ))}
 
@@ -1341,6 +1373,8 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 <span>AI가 방금 발언을 읽고 다음 응답을 구성하고 있습니다.</span>
               </div>
             )}
+            <div ref={scrollAnchorRef} className="scroll-anchor" />
+          </div>
 
             {!battleState.isFinished && (
               <ActionZone
@@ -1360,6 +1394,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 topic={battleState.topic}
                 onSubmit={handleActionSubmit}
                 persistRecording={battleState.gameMode === 'debate'}
+                coachContext={coachContext}
               />
             )}
 
@@ -1385,11 +1420,16 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
                 </span>
               </div>
             )}
-            <div ref={scrollAnchorRef} className="scroll-anchor" />
-          </div>
         </section>
 
-        <aside className="coach-panel" aria-label="AI 피드백">
+        {isStudio ? <aside className="studio-companion" aria-label={isEnglish ? 'Debate notebook' : '토론 노트'}>
+          <section className="studio-note current"><div className="studio-note-label"><Target size={15} />{isEnglish ? 'FOCUS NOW' : '지금 집중할 것'}</div><h2>{battleState.isFinished ? (isEnglish ? 'Debate complete' : '토론을 마쳤습니다') : currentActionStep?.title}</h2><p>{battleState.isFinished ? (isEnglish ? 'Review the strongest points from both sides.' : '양측의 논증을 돌아보고 다음 토론의 방향을 찾아보세요.') : currentActionStep?.instruction}</p>
+          {!battleState.isFinished && <div className="studio-note-foot"><span>{isEnglish ? 'Progress' : '진행 단계'}</span><strong>{debateRoundProgress?.current ?? 1}<small> / {debateStepList.length}</small></strong></div>}</section>
+          <section className="studio-note coach-intro"><div className="studio-note-label"><Lightbulb size={16} />THINKING COACH</div><h3>{isEnglish ? 'A little help to think further.' : '생각이 막힐 땐,\n다음 방향을 함께.'}</h3><p>{isEnglish ? 'Open AI coaching beside your draft to explore ideas, questions and rebuttal paths.' : '작성창의 AI 코칭에서 주장 씨앗, 질문 방향, 반박 경로를 찾아보세요.'}</p><span>{isEnglish ? 'The final words are yours.' : '선택하고 표현하는 주인공은 나입니다.'}</span></section>
+          {(effectiveConfig.topicBriefing || battleState.topicDescription) && <details className="studio-reference"><summary><BookOpen size={16} />{isEnglish ? 'Background & arguments' : '논제 배경과 찬반 쟁점'}</summary>{effectiveConfig.topicBriefing ? <TopicBriefingDetails briefing={effectiveConfig.topicBriefing} language={effectiveConfig.language} embedded /> : <p>{battleState.topicDescription}</p>}</details>}
+          <details className="studio-reference"><summary><CheckCircle2 size={16} />{isEnglish ? 'Stage checklist' : '이번 단계 체크리스트'}</summary><ul>{(currentStageEvaluation?.items ?? coachChecklist.map(item => ({ label: item.label, description: item.hint }))).map(item => <li key={item.label}><strong>{item.label}</strong><p>{item.description}</p></li>)}</ul></details>
+          {showFocusTip && <details className="studio-reference"><summary><Target size={16} />{isEnglish ? 'Choose a debate focus' : '논제 초점 선택'}</summary><div className="focus-choice-list">{focusTips.map(option => <button key={option.value} type="button" className={selectedFocus === option.value ? 'active' : ''} onClick={() => handleDebateFocusChange(option.value)}>{option.label}</button>)}</div><p>{activeFocusTip.headline}</p></details>}
+        </aside> : <aside className="coach-panel" aria-label="AI 피드백">
           <div className="coach-section">
             <div className="coach-title">
               <MessageCircle size={18} />
@@ -1541,7 +1581,7 @@ export const Arena: React.FC<ArenaProps> = ({ user }) => {
             </div>
           )}
 
-        </aside>
+        </aside>}
       </main>
 
       {showResultModal && (

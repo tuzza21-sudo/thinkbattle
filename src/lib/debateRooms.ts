@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { normalizeDebateTimeLimit } from './debateTiming';
+import { getSessionTotals, validateSessionConfig, type LiveSessionConfig } from './liveDebateSession';
 import type {
   AppUser,
   DebateLevel,
@@ -16,6 +17,7 @@ import type {
 } from '../types';
 
 type CreateRoomInput = {
+  sessionConfig?: LiveSessionConfig;
   roomId: string;
   topic: string;
   topicDescription: string;
@@ -42,6 +44,7 @@ const isMissingRoomMetadataColumn = (error: SupabaseErrorLike) => {
 };
 
 const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
+  sessionConfig: row.session_config ? row.session_config as LiveSessionConfig : undefined,
   id: String(row.id),
   roomId: String(row.room_id),
   hostId: String(row.host_id),
@@ -67,8 +70,13 @@ const mapRoom = (row: Record<string, unknown>): LiveDebateRoomSummary => ({
 });
 
 export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) => {
-  const timeLimit = normalizeDebateTimeLimit(input.timeLimit);
+  if (input.sessionConfig) {
+    const validation = validateSessionConfig(input.sessionConfig, input.teamSize);
+    if (validation) throw new Error(validation);
+  }
+  const timeLimit = input.sessionConfig ? getSessionTotals(input.sessionConfig).totalSeconds : normalizeDebateTimeLimit(input.timeLimit);
   const localRoom: LiveDebateRoomSummary = {
+    sessionConfig: input.sessionConfig,
     id: input.roomId,
     roomId: input.roomId,
     hostId: user.id,
@@ -90,6 +98,7 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
     createdAt: new Date().toISOString(),
   };
   const roomPayload = {
+    ...(input.sessionConfig ? { session_config: input.sessionConfig } : {}),
     room_id: input.roomId,
     host_id: user.id,
     host_name: user.nickname,
@@ -122,6 +131,9 @@ export const createDebateRoom = async (input: CreateRoomInput, user: AppUser) =>
   }
 
   if (error) {
+    if (input.sessionConfig && /session_config|session_plan/.test(error.message)) {
+      throw new Error('새 토론 기능의 서버 설정이 아직 적용되지 않았습니다. 관리자에게 업데이트를 요청해 주세요.');
+    }
     throw new Error(`토론방을 서버에 저장하지 못했습니다: ${error.message}`);
   }
   const { error: lobbyError } = await supabase.rpc('enter_live_debate_lobby', {
@@ -173,7 +185,7 @@ const mapParticipant = (row: Record<string, unknown>): LiveDebateLobbyParticipan
     ? row.role as DebateParticipantRole
     : undefined,
   phaseIds: (Array.isArray(row.phase_ids) ? row.phase_ids : [])
-    .filter((phaseId): phaseId is DebateStageId => ['opening', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing'].includes(String(phaseId))),
+    .filter((phaseId): phaseId is DebateStageId => ['opening', 'cross-question', 'question', 'answer', 'analysis', 'rebuttal', 'weighing', 'closing'].includes(String(phaseId))),
   isAi: Boolean(row.is_ai),
   isReady: Boolean(row.is_ready),
   joinedAt: String(row.joined_at || new Date().toISOString()),
@@ -457,13 +469,15 @@ export const downloadLiveDebateAudio = async (path: string) => {
 };
 
 export const getLiveDebateArguments = async (roomId: string): Promise<LiveDebateArgument[]> => {
-  const { data, error } = await supabase
-    .from('live_debate_arguments')
-    .select('*')
-    .eq('room_id', roomId)
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(`토론 발언을 불러오지 못했습니다: ${error.message}`);
-  return (data ?? []).map(row => mapLiveArgument(row as Record<string, unknown>));
+  const records = new Map<string, LiveDebateArgument>();
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase.from('live_debate_arguments').select('*').eq('room_id', roomId)
+      .order('created_at', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 499);
+    if (error) throw new Error(`토론 발언을 불러오지 못했습니다: ${error.message}`);
+    for (const row of data ?? []) { const argument = mapLiveArgument(row as Record<string, unknown>); records.set(argument.id, argument); }
+    if (!data || data.length < 500) break;
+  }
+  return [...records.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 };
 
 export const saveLiveDebateArgument = async (roomId: string, argument: LiveDebateArgument) => {

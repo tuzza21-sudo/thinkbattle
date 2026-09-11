@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { BookOpen, Bot, Check, Clock, Layers3, Mic2, ShieldCheck, Users, Volume2, X } from 'lucide-react';
 import { DEBATE_TIME_OPTIONS, formatDebateMinutes, getDebatePhaseTimings, normalizeDebateTimeLimit } from '../lib/debateTiming';
-import { getLiveDebateCourse } from '../lib/liveDebateCourse';
+import { createSessionConfig, getSessionTotals, validateSessionConfig } from '../lib/liveDebateSession';
+import { SessionSettings } from './SessionSettings';
 import { generateOrganizationTopic } from '../lib/api';
 import { savePublicDebateTopic } from '../lib/publicTopics';
 import type {
@@ -53,6 +54,7 @@ export const CreateBattleModal = ({
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(organizationId);
   const [timeLimit, setTimeLimit] = useState(600);
+  const [sessionConfig, setSessionConfig] = useState(() => createSessionConfig());
   const [userPosition, setUserPosition] = useState<DebatePosition>('affirmative');
   const [debateLevel, setDebateLevel] = useState<DebateLevel>('beginner');
   const [battleMode, setBattleMode] = useState<'debate' | 'pvp'>(liveOnly ? 'pvp' : 'debate');
@@ -61,9 +63,7 @@ export const CreateBattleModal = ({
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const phases = useMemo(() => battleMode === 'pvp'
-    ? getLiveDebateCourse(timeLimit, debateLevel)
-    : getDebatePhaseTimings(timeLimit), [battleMode, debateLevel, timeLimit]);
+  const phases = useMemo(() => getDebatePhaseTimings(timeLimit), [timeLimit]);
   const availableTopics = audience === 'organization' ? organizationTopics : publicTopics;
   const formatPhaseDuration = (seconds: number) => {
     if (!isEnglish) return formatDebateMinutes(seconds);
@@ -74,6 +74,10 @@ export const CreateBattleModal = ({
 
   const handleStart = async () => {
     if (!topic.trim() || isSubmitting) return;
+    if (battleMode === 'pvp') {
+      const validation = validateSessionConfig(sessionConfig, teamSize);
+      if (validation) { setSubmitError(validation); return; }
+    }
     if (!topicDescription.trim()) {
       setSubmitError(isEnglish ? 'A new motion requires background information for participants.' : '새 주제에는 참가자가 읽을 상세 배경 설명이 필요합니다.');
       return;
@@ -102,7 +106,8 @@ export const CreateBattleModal = ({
         language,
         topicDescription: finalDescription,
         topicBriefing: finalBriefing,
-        timeLimit,
+        timeLimit: battleMode === 'pvp' ? getSessionTotals(sessionConfig).totalSeconds : timeLimit,
+        sessionConfig: battleMode === 'pvp' ? sessionConfig : undefined,
         gameMode: battleMode,
         userPosition,
         debateLevel,
@@ -158,7 +163,11 @@ export const CreateBattleModal = ({
                   setTopicDescription(selected.description || selected.briefing?.context || '');
                   setTopicBriefing(selected.briefing);
                   setSelectedOrganizationId('organizationId' in selected ? selected.organizationId : organizationId);
-                  if (selected.config?.timeLimit) setTimeLimit(normalizeDebateTimeLimit(selected.config.timeLimit));
+                  if (selected.config?.timeLimit) {
+                    const selectedTime = normalizeDebateTimeLimit(selected.config.timeLimit);
+                    setTimeLimit(selectedTime);
+                    setSessionConfig(current => ({ ...createSessionConfig(selectedTime, teamSize), progressionMode: current.progressionMode, assignmentMode: current.assignmentMode, strategySeconds: current.strategySeconds }));
+                  }
                   if (selected.config?.debateLevel === 'beginner' || selected.config?.debateLevel === 'intermediate') {
                     setDebateLevel(selected.config.debateLevel);
                   }
@@ -229,7 +238,7 @@ export const CreateBattleModal = ({
               <div className="setup-section-title"><span>{liveOnly ? '3' : '4'}</span><strong>{isEnglish ? 'Team size' : '토론 인원'}</strong></div>
               <div className="setup-choice-grid three">
                 {teamOptions.map(option => (
-                  <button key={option.value} type="button" className={`setup-choice ${teamSize === option.value ? 'selected' : ''}`} onClick={() => setTeamSize(option.value)}>
+                  <button key={option.value} type="button" className={`setup-choice ${teamSize === option.value ? 'selected' : ''}`} onClick={() => { setTeamSize(option.value); setSessionConfig(current => ({ ...current, strategySeconds: option.value === 1 ? 0 : 60, assignmentMode: option.value === 1 ? 'free' : current.assignmentMode })); }}>
                     <strong>{option.title}</strong><small>{isEnglish ? (option.value === 1 ? 'Individual debate' : option.value === 2 ? 'Team debate' : 'Extended team debate') : option.detail}</small>
                     {teamSize === option.value && <Check className="setup-check" size={16} />}
                   </button>
@@ -245,7 +254,7 @@ export const CreateBattleModal = ({
 
           <section className="setup-section">
             <div className="setup-section-title"><span>{battleMode === 'pvp' ? (liveOnly ? '4' : '5') : '4'}</span><strong>{isEnglish ? 'Debate duration' : '토론 시간'}</strong></div>
-            <div className="setup-choice-grid three">
+            {battleMode === 'pvp' ? <SessionSettings value={sessionConfig} teamSize={teamSize} onChange={setSessionConfig} language={language} /> : <><div className="setup-choice-grid three">
               {DEBATE_TIME_OPTIONS.map(time => (
                 <button key={time} type="button" className={`setup-choice time ${timeLimit === time ? 'selected' : ''}`} onClick={() => setTimeLimit(time)}>
                   <Clock size={19} /><strong>{time / 60} {isEnglish ? 'min' : '분'}</strong>
@@ -254,12 +263,12 @@ export const CreateBattleModal = ({
             </div>
             <div className="phase-allocation" aria-label={isEnglish ? 'Automatic phase timing' : '단계별 자동 시간 배분'}>
               <div className="phase-allocation-head"><Mic2 size={16} /><strong>{isEnglish ? `${timeLimit / 60}-minute structure` : `${timeLimit / 60}분 자동 진행표`}</strong></div>
-              <div className={`phase-track ${battleMode === 'pvp' ? 'detailed' : ''}`}>
+              <div className="phase-track">
                 {phases.map((phase, index) => (
                   <div key={phase.label} style={{ flex: phase.seconds }}><span>{isEnglish ? `Phase ${index + 1}` : phase.label}</span><small>{formatPhaseDuration(phase.seconds)}</small></div>
                 ))}
               </div>
-            </div>
+            </div></>}
           </section>
 
           {battleMode === 'debate' ? (
