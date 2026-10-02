@@ -26,6 +26,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const recorder = useRef<MediaRecorder | null>(null);
   const frame = useRef(0);
   const elements = useRef(new Set<HTMLMediaElement>());
+  const subscribedAudio = useRef(new Map<Track, HTMLMediaElement>());
   const callback = useRef(onUtterance);
   const hostIdRef = useRef(hostId);
   const aiSpeakingRef = useRef(false);
@@ -70,6 +71,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     void current?.disconnect();
     void outputContext.current?.close(); outputContext.current = null;
     elements.current.forEach(element => element.remove()); elements.current.clear();
+    subscribedAudio.current.clear();
     remoteMicrophones.current.clear();
     aiSpeakingRef.current = false;
     setConnected(false); setAudioReady(false); setAiSpeaking(false); setHostText(''); setParticipants([]); setSpeakers([]);
@@ -103,11 +105,17 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const sync = () => setParticipants([room.localParticipant, ...room.remoteParticipants.values()].map(participant => ({ id: participant.identity, name: participant.name || '친구', muted: !participant.isMicrophoneEnabled, avatarIndex: readAvatar(participant.metadata), avatarUrl: readAvatarUrl(participant.metadata) })));
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         if (track.kind !== Track.Kind.Audio) return;
+        // Repeated subscription notifications must not create a second playback path.
+        if (subscribedAudio.current.has(track)) return;
         const element = track.attach(); elements.current.add(element);
+        subscribedAudio.current.set(track, element);
         if (publication.source === Track.Source.Microphone) { remoteMicrophones.current.set(element, participant.identity); element.muted = Boolean(floorRef.current && floorRef.current.speakerId !== participant.identity); }
         document.body.appendChild(element);
       });
-      room.on(RoomEvent.TrackUnsubscribed, track => track.detach().forEach(element => { elements.current.delete(element); remoteMicrophones.current.delete(element); element.remove(); }));
+      room.on(RoomEvent.TrackUnsubscribed, track => {
+        subscribedAudio.current.delete(track);
+        track.detach().forEach(element => { elements.current.delete(element); remoteMicrophones.current.delete(element); element.remove(); });
+      });
       room.on(RoomEvent.ParticipantConnected, sync); room.on(RoomEvent.ParticipantDisconnected, sync);
       room.on(RoomEvent.ParticipantMetadataChanged, sync);
       room.on(RoomEvent.ParticipantDisconnected, participant => { if (participant.identity === hostIdRef.current) { aiSpeakingRef.current = false; setAiSpeaking(false); } });

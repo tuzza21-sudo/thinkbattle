@@ -56,7 +56,7 @@ export class Pcm16Decoder {
   }
 }
 
-// Coalesce network packets and fade waveform edges to prevent startup clicks.
+// Buffer the onset and recover from jitter without replaying consumed samples.
 export class PcmAudioQueue {
   private sources = new Set<AudioBufferSourceNode>();
   private nextStart = 0;
@@ -77,7 +77,10 @@ export class PcmAudioQueue {
     const merged = new Float32Array(this.pending.length + samples.length);
     merged.set(this.pending); merged.set(samples, this.pending.length);
     this.pending = merged;
-    if (merged.length < (this.nextStart ? 1440 : 2400)) return false;
+    // A 100 ms onset could run dry before the next network packet arrived.
+    // Keep 400 ms at startup, 300 ms after an underrun, and 60 ms while flowing.
+    const minimum = !this.nextStart ? 9600 : this.context.currentTime >= this.fadeStart ? 7200 : 1440;
+    if (merged.length < minimum) return false;
     // Keep 10 ms for a smooth ending, including EOF on a packet boundary.
     const ready = merged.slice(0, -240);
     this.pending = merged.slice(-240);
@@ -97,7 +100,8 @@ export class PcmAudioQueue {
     this.sources.add(source);
     source.onended = () => { this.sources.delete(source); source.disconnect(); if (!this.sources.size) this.draining?.(); };
     const continuous = this.nextStart > 0 && this.context.currentTime < this.fadeStart;
-    const start = continuous ? this.nextStart : Math.max(this.nextStart, this.context.currentTime + (this.nextStart ? 0.02 : 0.08));
+    // Publication/subscription and audio devices need a little time to settle.
+    const start = continuous ? this.nextStart : Math.max(this.nextStart, this.context.currentTime + 0.12);
     const fade = Math.min(0.008, buffer.duration / 2);
     if (continuous) {
       this.gain.gain.cancelScheduledValues(this.fadeStart);

@@ -17,7 +17,7 @@ socket.addEventListener('message', event => {
 const send = (method, params) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
 try {
   const response = await send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
-    const { Pcm16Decoder, PcmAudioQueue, readLoungeStream } = await import('/src/lib/loungeStream.ts');
+    const { Pcm16Decoder, PcmAudioQueue, readLoungeStream } = await import('/src/lib/loungeStream.ts?check=' + Date.now());
     const context = new AudioContext({sampleRate: 24000}); await context.resume();
     const decoder = new Pcm16Decoder();
     const queue = new PcmAudioQueue(context, [context.destination]);
@@ -27,9 +27,9 @@ try {
     context.createBufferSource = () => {
       const source = createSource(); source.addEventListener('ended', () => { firstEnded = true; }); return source;
     };
-    const bytes = new Uint8Array(4800); // 100 ms at 24 kHz PCM16.
+    const bytes = new Uint8Array(24000); // 500 ms at 24 kHz PCM16.
     const view = new DataView(bytes.buffer);
-    for (let index = 0; index < 2400; index++) view.setInt16(index * 2, Math.sin(index * 2 * Math.PI * 440 / 24000) * 1000, true);
+    for (let index = 0; index < 12000; index++) view.setInt16(index * 2, Math.sin(index * 2 * Math.PI * 440 / 24000) * 1000, true);
     let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
     const stream = new ReadableStream({ start(controller) { upstream = controller; } });
     const consuming = (async () => {
@@ -44,7 +44,7 @@ try {
       decoder.finish(); queue.finish(); await queue.drain();
     })();
     upstream.enqueue(encoder.encode(JSON.stringify({ type: 'audio', audio: btoa(binary) }) + '\\n'));
-    await new Promise(resolve => setTimeout(resolve, 350));
+    await new Promise(resolve => setTimeout(resolve, 800));
     const playedBeforeComplete = firstScheduled && firstEnded && !completed;
     upstream.enqueue(encoder.encode(JSON.stringify({ type: 'done' }) + '\\n')); upstream.close();
     await consuming; queue.stop(); await context.close();
@@ -53,20 +53,46 @@ try {
     const wait = (async () => { try { for await (const event of readLoungeStream(blocked, abort.signal)) void event; } catch {} })();
     abort.abort(); await wait;
     // Render a deliberately nonzero onset: a hard start would jump by 0.5.
-    const offline = new OfflineAudioContext(1, 12000, 24000);
+    const offline = new OfflineAudioContext(1, 24000, 24000);
     const smooth = new PcmAudioQueue(offline, [offline.destination]);
-    smooth.push(new Float32Array(2400).fill(.5));
+    smooth.push(new Float32Array(9600).fill(.5));
     smooth.push(new Float32Array(2400).fill(.5)); smooth.finish();
     const rendered = (await offline.startRendering()).getChannelData(0);
     let biggestStep = 0;
     for (let index=1; index<rendered.length; index++) biggestStep=Math.max(biggestStep,Math.abs(rendered[index]-rendered[index-1]));
-    const join = Math.round(.17 * 24000);
+    const join = Math.round(.51 * 24000);
     const smoothEdges = biggestStep < .006 && rendered[0]===0 && rendered.at(-1)===0;
     const continuousJoin = rendered[join-1]===.5 && rendered[join]===.5 && rendered[join+1]===.5;
     smooth.stop();
-    return { playedBeforeComplete, completed, cancelled, smoothEdges, continuousJoin };
+    // Reproduce slow onset delivery using real audio-clock pauses at 200/360 ms.
+    const jitterContext = new OfflineAudioContext(1, 28800, 24000);
+    const starts = [], nativeSource = jitterContext.createBufferSource.bind(jitterContext);
+    jitterContext.createBufferSource = () => {
+      const source = nativeSource(), start = source.start.bind(source);
+      source.start = time => { starts.push(time); start(time); };
+      return source;
+    };
+    const jitterQueue = new PcmAudioQueue(jitterContext, [jitterContext.destination]);
+    const original = Float32Array.from({length:12000},(_,i)=>i/24000);
+    const startupHeld = !jitterQueue.push(original.slice(0,2400));
+    const pauses = [.2,.36,.5].map(time=>jitterContext.suspend(time));
+    const rendering = jitterContext.startRendering();
+    await pauses[0];
+    const secondHeld = !jitterQueue.push(original.slice(2400,4800)) && starts.length===0;
+    void jitterContext.resume(); await pauses[1];
+    jitterQueue.push(original.slice(4800,9600));
+    void jitterContext.resume(); await pauses[2];
+    jitterQueue.push(original.slice(9600)); jitterQueue.finish();
+    void jitterContext.resume();
+    const jitterAudio = (await rendering).getChannelData(0), onset = Math.round(starts[0]*24000);
+    let biggestError = 0;
+    for(let i=240;i<original.length-240;i++) biggestError=Math.max(biggestError,Math.abs(jitterAudio[onset+i]-original[i]));
+    const intactOnset = startupHeld && secondHeld && biggestError<.00001;
+    jitterQueue.stop();
+    if (!intactOnset) throw new Error(JSON.stringify({startupHeld,secondHeld,biggestError,starts,onset,firstActual:jitterAudio[onset+240],firstExpected:original[240]}));
+    return { playedBeforeComplete, completed, cancelled, smoothEdges, continuousJoin, intactOnset };
   })()` });
   assert.equal(response.exceptionDetails, undefined, JSON.stringify(response.exceptionDetails));
-  assert.deepEqual(response.result.value, { playedBeforeComplete: true, completed: true, cancelled: true, smoothEdges:true, continuousJoin:true });
-  console.log('PASS: real Web Audio plays PCM before stream completion; pending browser reads cancel cleanly.');
+  assert.deepEqual(response.result.value, { playedBeforeComplete: true, completed: true, cancelled: true, smoothEdges:true, continuousJoin:true, intactOnset:true });
+  console.log('PASS: real Web Audio preserves the onset under delayed packets without duplicate samples or gaps; streaming and cancellation remain intact.');
 } finally { socket.close(); }

@@ -28,10 +28,11 @@ try {
     const now = new Date().toISOString();
     let session = { room_id:'fixture',stage:0,state:'ready',speaker_id:'me',turn_id:'turn-a',turn_kind:'basic',round_order:['me','peer-a','peer-b'],completed:[],hand_queue:[],started_at:now,stage_started_at:now,turn_started_at:null,spoken_seconds:0,nudged:false,announced_turn:'turn-a',updated_at:now };
     const room = {id:'fixture',host_id:'me',host_persona:'ina',topic:'영화 호프',capacity:3,status:'active',guided_session:true,created_at:now,started_at:now,expires_at:new Date(Date.now()+3600000).toISOString(),ai_turns:1,last_ai_at:now};
+    let messages=[{id:1,user_id:'me',nickname:'나',kind:'human',text:'저는 주인공의 선택이 마음에 남았어요.'},{id:2,user_id:'peer-a',nickname:'친구',kind:'human',text:'저는 마지막 장면의 분위기가 인상적이었어요.'},{id:3,user_id:null,nickname:'사회자',kind:'host',text:'서로 다른 첫인상을 나눠 주세요.'}];
     let floor, sequence=0;
     const api = {
       LoungeApiError: class extends Error {}, joinLounge:async()=>{}, controlLounge:async()=>{},
-      loadLounge:async()=>({room:{...room},session:{...session},members:session.round_order.map(id=>({user_id:id,nickname:id==='me'?'나':id})),messages:[]}),
+      loadLounge:async()=>({room:{...room},session:{...session},members:session.round_order.map(id=>({user_id:id,nickname:id==='me'?'나':id})),messages:[...messages]}),
       requestLoungeHost:async()=>({skipped:true}),
       controlLoungeSession:async(id,action,turn)=> {
         if(['begin','done','pass','yield'].includes(action)) check(turn===session.turn_id,'Action used a stale turn');
@@ -65,10 +66,26 @@ try {
     check(container.textContent.includes('참여한 이유'),'Introduction omitted participation reason');
     check(container.textContent.includes('얻고 싶은'),'Introduction omitted participant goals');
     check(floor.allowed===false,'Waiting microphone was open');
+    check(container.querySelector('.lounge-participant-log article.self').textContent.includes('주인공의 선택'),'My speech missing from participant pane');
+    check(container.querySelector('.lounge-participant-log').textContent.includes('마지막 장면'),'Other participant speech missing');
+    check(!container.querySelector('.lounge-participant-log').textContent.includes('서로 다른 첫인상'),'AI speech duplicated in participant pane');
+    messages.push({id:4,user_id:'peer-b',nickname:'다른 친구',kind:'human',text:'다른 분의 이야기를 듣고 다시 생각하게 됐어요.'});
+    await until(()=>container.querySelector('.lounge-participant-log').textContent.includes('다시 생각하게'));
+    const participantLog=container.querySelector('.lounge-participant-log');
+    participantLog.style.cssText='height:80px;flex:none;overflow:auto';
+    participantLog.scrollTo(0,participantLog.scrollHeight);participantLog.dispatchEvent(new Event('scroll'));
+    messages.push({id:5,user_id:'peer-a',nickname:'친구',kind:'human',text:'새로운 발언을 덧붙였어요. '.repeat(20)});
+    await until(()=>participantLog.textContent.includes('덧붙였어요'));
+    check(participantLog.scrollHeight-participantLog.scrollTop-participantLog.clientHeight<2,'New speech did not follow the bottom of the log');
+    participantLog.scrollTo(0,0);participantLog.dispatchEvent(new Event('scroll'));
+    messages.push({id:6,user_id:'peer-b',nickname:'다른 친구',kind:'human',text:'지난 발언을 읽는 동안 추가된 이야기예요.'});
+    await until(()=>participantLog.textContent.includes('읽는 동안'));
+    check(participantLog.scrollTop===0,'New speech interrupted reading earlier messages');
     const click = text => {const button=[...container.querySelectorAll('.lounge-session-actions button')].find(b=>b.textContent.includes(text));check(button&&!button.disabled,'Missing or disabled button: '+text);button.click();};
     click('말하기');await until(()=>floor.allowed===true);check(floor.turnId===session.turn_id,'Microphone lacked a turn identifier');
     session={...session,nudged:true,spoken_seconds:121};await until(()=>container.querySelector('.lounge-session-nudge'));
-    click('추가로 이야기');await until(()=>container.querySelector('[aria-pressed=true]'));
+    click('손들기');await until(()=>container.querySelector('[aria-label="손 내리기"]'));
+    check(container.querySelector('.lounge-participant-controls .lounge-session-queue-summary').textContent.includes('손들기 대기나'),'Hand queue missing below profiles');
     click('이야기 마쳤어요');await until(()=>session.speaker_id==='peer-a'&&floor.allowed===false);
     check(container.querySelector('.lounge-session-queues').textContent.includes('추가 이야기 대기'),'Hand was missing from additional queue');
     click('다음 분께');await until(()=>session.speaker_id==='peer-b');await wait(50);
@@ -103,6 +120,9 @@ try {
       const remote={kind:'audio',attach:()=>document.createElement('audio'),detach:()=>[]};
       liveRoom.emit('TrackSubscribed',remote,{source:'microphone'},{identity:'peer'});
       const remoteElement=[...document.querySelectorAll('audio')].at(-1);check(remoteElement.muted,'Off-turn remote microphone was audible');
+      const audioCount=document.querySelectorAll('audio').length;
+      liveRoom.emit('TrackSubscribed',remote,{source:'microphone'},{identity:'peer'});
+      check(document.querySelectorAll('audio').length===audioCount,'Repeated subscription created duplicate audio playback');
       audioRoot.render(React.createElement(AudioFixture,{allowed:true,speakerId:'me',turnId:'turn-a'}));await until(()=>!tracks[0].muted);await wait(400);
       check(hook.getSpeechActivity().voicedMs>0,'Actual speech activity was not measured');
       audioRoot.render(React.createElement(AudioFixture,{allowed:false,speakerId:'peer',turnId:'turn-b'}));await until(()=>tracks[0].muted&&captions.length>0);

@@ -453,14 +453,15 @@ test('NDJSON, PCM byte boundaries, scheduled playback and cancellation work with
   const queue = new streaming.PcmAudioQueue(context, [{}]);
   assert.equal(queue.push(new Float32Array(24)), false, 'tiny startup packets are buffered');
   assert.equal(sources.length, 0);
-  assert.equal(queue.push(new Float32Array(2376)), true);
-  assert.equal(sources[0].startTime, .08, 'first packet is scheduled immediately');
+  assert.equal(queue.push(new Float32Array(2376)), false, '100 ms is not enough to start speech safely');
+  assert.equal(queue.push(new Float32Array(7200)), true);
+  assert.equal(sources[0].startTime, .12, 'startup leaves publication and device headroom');
   queue.push(new Float32Array(2400));
   assert.equal(sources[1].startTime, sources[0].startTime + sources[0].buffer.duration, 'timely packets join without gaps');
-  assert.deepEqual(automation.slice(0, 2), [['set', 0, .08], ['ramp', 1, .088]], 'startup has a smooth gain ramp');
+  assert.deepEqual(automation.slice(0, 2), [['set', 0, .12], ['ramp', 1, .128]], 'startup has a smooth gain ramp');
   assert.ok(automation.some(event => event[0] === 'cancel'), 'the provisional ending fade is removed between timely chunks');
   assert.equal(queue.finish(), true);
-  assert.equal(sources.reduce((sum, source) => sum + source.buffer.duration * 24000, 0), 4800, 'EOF plays all held samples');
+  assert.equal(sources.reduce((sum, source) => sum + source.buffer.duration * 24000, 0), 12000, 'EOF plays all held samples exactly once');
   assert.equal(automation.at(-1)[1], 0, 'the final waveform fades to silence');
   assert.equal(queue.finish(), false, 'EOF cannot enqueue its tail twice');
   const draining = queue.drain(); queue.stop(); await draining;
@@ -472,11 +473,43 @@ test('NDJSON, PCM byte boundaries, scheduled playback and cancellation work with
   const empty = new streaming.PcmAudioQueue(context, [{}]);
   assert.equal(empty.finish(), false); empty.stop();
   const delayed = new streaming.PcmAudioQueue(context, [{}]);
-  delayed.push(new Float32Array(2400));
+  delayed.push(new Float32Array(9600));
   context.currentTime = 1;
-  delayed.push(new Float32Array(2400));
-  assert.equal(sources.at(-1).startTime, 1.02, 'late packets get a fresh playback lead');
-  assert.deepEqual(automation.slice(-4, -2), [['set', 0, 1.02], ['ramp', 1, 1.028]], 'a jitter gap fades in without a hard edge'); delayed.stop();
+  const beforeRecovery = sources.length;
+  assert.equal(delayed.push(new Float32Array(2400)), false, 'a late 100 ms packet cannot trigger another short stutter');
+  assert.equal(sources.length, beforeRecovery);
+  assert.equal(delayed.push(new Float32Array(4800)), true);
+  assert.equal(sources.at(-1).startTime, 1.12, 'rebuffered audio gets a fresh playback lead');
+  assert.deepEqual(automation.slice(-4, -2).map(event => event.slice(0, 2)), [['set', 0], ['ramp', 1]], 'a jitter gap fades in without a hard edge');
+  assert.ok(Math.abs(automation.at(-3)[2] - 1.128) < 1e-12); delayed.stop();
+});
+
+test('delayed onset packets preserve each first syllable once and join without silence', () => {
+  const client = compile('../src/lib/loungeApi.ts', () => ({}));
+  const { PcmAudioQueue } = compile('../src/lib/loungeStream.ts', () => client);
+  const scheduled = [];
+  const context = {
+    currentTime: 0,
+    createGain: () => ({ connect() {}, disconnect() {}, gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} } }),
+    createBuffer: (_, size, rate) => { const pcm = new Float32Array(size); return { duration: size / rate, getChannelData: () => pcm }; },
+    createBufferSource() { return { connect() {}, disconnect() {}, stop() {}, start(time) { scheduled.push({ time, pcm: this.buffer.getChannelData(0), duration: this.buffer.duration }); } }; },
+  };
+  const queue = new PcmAudioQueue(context, [{}]);
+  const original = Float32Array.from({ length: 12000 }, (_, i) => i / 12000);
+  assert.equal(queue.push(original.slice(0, 2400)), false);
+  context.currentTime = .2;
+  assert.equal(queue.push(original.slice(2400, 4800)), false);
+  assert.equal(scheduled.length, 0, 'nothing plays before delayed onset audio is buffered');
+  context.currentTime = .36;
+  assert.equal(queue.push(original.slice(4800, 9600)), true);
+  context.currentTime = .5;
+  queue.push(original.slice(9600)); queue.finish();
+  const actual = new Float32Array(scheduled.reduce((n, item) => n + item.pcm.length, 0));
+  let offset = 0;
+  for (const item of scheduled) { actual.set(item.pcm, offset); offset += item.pcm.length; }
+  assert.deepEqual(actual, original, 'no first samples are duplicated, dropped or reordered');
+  for (let i = 1; i < scheduled.length; i++) assert.equal(scheduled[i].time, scheduled[i - 1].time + scheduled[i - 1].duration, 'onset is contiguous despite 200 ms packet latency');
+  queue.stop();
 });
 
 test('empty or non-JSON HTTP failures preserve status and retry delay in the client', async () => {

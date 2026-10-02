@@ -78,13 +78,14 @@ try {
     assert.equal(await evaluate("document.querySelectorAll('.lounge-seat.occupied').length"), 3);
     assert.match(await evaluate("document.querySelector('.lounge-preview-notice').textContent"), /실제 참가자/);
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-chat-panel')).display"), 'none', 'journal starts collapsed');
-    assert.ok(await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().height") >= (width > 800 ? 650 : width > 600 ? 590 : 540), 'immersive scenery height');
-    assert.equal(await evaluate("(()=>{const face=document.querySelector('.lounge-seat-avatar').getBoundingClientRect(),scene=document.querySelector('.lounge-scene').getBoundingClientRect(),intro=document.querySelector('.lounge-scene-intro').getBoundingClientRect();return face.top<scene.bottom&&face.top>intro.bottom+8;})()"), true, 'portraits overlap the softened lower scenery without covering its caption');
+    assert.equal(await evaluate("document.documentElement.scrollHeight<=innerHeight+1"), true, 'room fits the viewport');
+    if (width > 760) assert.equal(await evaluate("document.querySelector('.lounge-participant-panel').getBoundingClientRect().left>document.querySelector('.lounge-moderator').getBoundingClientRect().left"), true, 'participants stay to the right on desktop');
+    else assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-conversation-space')).overflowY"), 'auto', 'mobile content scrolls over the stationary photo');
     await screenshot(`room-${width}`);
     const sceneWidth = await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().width");
     const scrollBefore = await evaluate('scrollY');
-    await evaluate("document.querySelector('.lounge-records-tab').click()");
-    await waitFor("document.querySelector('.lounge-records-tab').getAttribute('aria-expanded')==='true'");
+    await evaluate("document.querySelector('.lounge-journal-toggle').click()");
+    await waitFor("document.querySelector('.lounge-journal-toggle').getAttribute('aria-expanded')==='true'");
     assert.equal(await evaluate('scrollY'), scrollBefore, 'records open without scrolling away from the scenery');
     assert.equal(await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().width"), sceneWidth, 'records do not resize the view');
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-chat-panel')).position"), 'fixed');
@@ -93,7 +94,7 @@ try {
     assert.ok(await evaluate("document.querySelectorAll('.lounge-chat-log article').length")>0, 'shared messages are visible');
     await screenshot(`records-${width}`);
     await evaluate("document.querySelector('.lounge-chat-panel').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
-    assert.equal(await evaluate("document.activeElement===document.querySelector('.lounge-records-tab')"), true, 'closing restores the side tab focus');
+    assert.equal(await evaluate("document.activeElement===document.querySelector('.lounge-journal-toggle')"), true, 'closing restores record button focus');
   }
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-voice-preview').length===4");
@@ -131,7 +132,7 @@ try {
       await send('Page.navigate', { url:`${base}/lounge/preview?capacity=${capacity}` });
       await waitFor(`document.querySelectorAll('.lounge-seat').length===${capacity}`);
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `capacity ${capacity} overflow at ${width}`);
-      assert.equal(await evaluate("Array.from(document.querySelectorAll('.lounge-seat-avatar')).every(el=>el.getBoundingClientRect().width>=80)"), true, 'portraits remain readable');
+      assert.equal(await evaluate("Array.from(document.querySelectorAll('.lounge-seat-avatar')).filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().width>=(innerWidth>760?68:58))"), true, 'portraits remain readable');
     }
   }
   await send('Page.navigate', { url: `${base}/lounge/preview?capacity=4` });
@@ -166,24 +167,15 @@ try {
   await waitFor("document.querySelector('.lounge-journal-toggle').getAttribute('aria-expanded')==='true'");
   assert.equal(await evaluate("(()=>{const r=document.querySelector('.lounge-chat-panel').getBoundingClientRect();return r.top<innerHeight&&r.bottom>0})()"), true, 'opening records brings them into view');
   await evaluate("document.querySelector('.lounge-journal-close').click()");
-  await evaluate("document.querySelector('.lounge-write-button').click()");
-  assert.equal(await evaluate("document.activeElement === document.querySelector('.lounge-chat-form input')"), true, 'writing opens and focuses input');
-  await type('.lounge-chat-form input', '작성 중인 이야기');
+  assert.equal(await evaluate("document.querySelector('.lounge-write-button,.lounge-stage-composer')"), null, 'text entry removed');
+  await evaluate("document.querySelector('.lounge-journal-toggle').click()");
   await evaluate("document.querySelector('.lounge-journal-close').click()");
   assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-chat-panel')).display"), 'none');
   assert.equal(await evaluate("document.activeElement === document.querySelector('.lounge-journal-toggle')"), true, 'closing restores focus');
-  await evaluate("document.querySelector('.lounge-write-button').click()");
-  assert.equal(await evaluate("document.querySelector('.lounge-chat-form input').value"), '작성 중인 이야기', 'draft survives collapse');
-  await evaluate("document.querySelector('.lounge-chat-form input').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
+  await evaluate("document.querySelector('.lounge-journal-toggle').click()");
+  await evaluate("document.querySelector('.lounge-chat-panel').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
   assert.equal(await evaluate("document.querySelector('.lounge-journal-toggle').getAttribute('aria-expanded')"), 'false');
-  await evaluate("document.querySelector('.lounge-write-button').click()");
-  for (const text of ['퇴근 후 산책하면 기분이 좋아요', '친구와 맛있는 음식을 먹었어요']) {
-    const count = await evaluate("document.querySelectorAll('.lounge-chat-log article').length");
-    await type('.lounge-chat-form input', text);
-    await evaluate("document.querySelector('.lounge-chat-form button').click()");
-    await waitFor(`document.querySelectorAll('.lounge-chat-log article').length===${count + 2}`);
-    assert.match(await evaluate("document.querySelector('.lounge-chat-log article:last-child p').textContent"), /기억에 남는 순간/);
-  }
+  assert.equal(await evaluate("document.querySelector('.lounge-participant-controls .lounge-session-queue-summary')!==null"), true, 'queues available below profiles');
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-capacities button').length===6");
   await evaluate("document.querySelector('.lounge-capacities button').click()");
@@ -193,10 +185,10 @@ try {
   await waitFor("document.querySelectorAll('.lounge-seat').length===1");
   assert.match(await evaluate("document.querySelector('.lounge-stage-label').textContent"), /AI와 1:1/);
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'solo overflow');
-  await evaluate("document.querySelector('.lounge-write-button').click()");
-  await type('.lounge-chat-form input', '영화 보고 기분이 좋아졌어요');
-  await evaluate("document.querySelector('.lounge-chat-form button').click()");
-  await waitFor("document.querySelectorAll('.lounge-chat-log article').length===3");
+  await evaluate("document.querySelector('.lounge-on-air button').click()");
+  await waitFor("!document.querySelector('.lounge-ask-button').disabled");
+  await evaluate("document.querySelector('.lounge-ask-button').click()");
+  await waitFor("document.querySelectorAll('.lounge-chat-log article').length===2");
   assert.doesNotMatch(await evaluate("document.querySelector('.lounge-chat-log article:last-child p').textContent"), /다른 분들/);
   await screenshot('solo-room-320');
   await send('Page.navigate', { url: `${base}/` });
@@ -213,5 +205,5 @@ try {
   await evaluate("document.querySelector('.auth-modal-header .icon-button').click()");
   assert.deepEqual(errors, []);
   assert.deepEqual(paidRequests, []);
-  console.log('PASS: 320–1440px, full photo hero, 1–6 seats with blended scenery, right-side records/focus/draft/Escape, speaker effects, avatars, reduced motion, repeated preview conversations, no paid preview requests or runtime errors.');
+  console.log('PASS: 320–1440px, full photo hero, 1–6 seats over fixed scenery, removed text entry, visible group queues, records/focus/Escape, speaker effects, avatars, reduced motion, preview host responses, no paid preview requests or runtime errors.');
 } finally { await send('Fetch.disable'); socket.close(); }

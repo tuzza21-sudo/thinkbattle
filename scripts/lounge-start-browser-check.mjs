@@ -74,15 +74,20 @@ try {
       else if (scenario === 'blocked') {
         await until(() => calls.mic === 1);
         if (calls.start !== 0) throw new Error('Started before playback permission');
-        container.querySelector('.lounge-room-controls .lounge-primary').click();
+        container.querySelector('.lounge-room-top-actions .lounge-connect-button').click();
         await until(() => calls.start === 1 && container.querySelector('.lounge-mic-button'));
       } else if (scenario === 'connection-failure') {
         await until(() => calls.connect === 1);
         await wait(150);
         if (calls.connect !== 1) throw new Error('Automatic connect retry loop');
-        container.querySelector('.lounge-room-controls .lounge-primary').click();
+        container.querySelector('.lounge-room-top-actions .lounge-connect-button').click();
         await until(() => calls.start === 1 && container.querySelector('.lounge-mic-button'));
-      } else if (scenario === 'group') { await until(() => calls.mic === 1); await wait(100); }
+      } else if (scenario === 'group') {
+        await until(() => calls.mic === 1); await wait(100);
+        if (!container.querySelector('.lounge-room-top-actions .lounge-start-button')) throw new Error('Group start button missing from header');
+        if (!container.querySelector('.lounge-session-waiting .lounge-session-actions button:disabled')) throw new Error('Pre-session hand control missing');
+        if (container.querySelector('.lounge-room-controls .lounge-start-button,.lounge-room-controls .lounge-connect-button')) throw new Error('Connection/start duplicated in dock');
+      }
       else { await until(() => calls.start === 1 && container.querySelector('.lounge-mic-button')); }
       if (studying) {
         container.querySelector('.lounge-ask-button').click();
