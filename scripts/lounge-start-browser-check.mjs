@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const compiled = ts.transpileModule(readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8') + '\nexport { LoungeRoomPage };', { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const portraitCode = ts.transpileModule(readFileSync(new URL('../src/components/LoungeHostPortrait.tsx', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const loungeCode = ts.transpileModule(readFileSync(new URL('../src/lib/lounge.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText;
 const sessionCode = ts.transpileModule(readFileSync(new URL('../src/lib/loungeSession.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText;
 const targets = await (await fetch(`http://127.0.0.1:${process.env.LOUNGE_CDP_PORT || 9243}/json`)).json();
@@ -62,7 +63,8 @@ try {
         return { ...audio, connect, startMicrophone, enableAudio, disconnect, getSpeechActivity, participants: audio.connected ? [{ id: 'me', name: 'Me', muted: !audio.micOn }] : [], speakers: [], aiSpeaking: false };
       };
       const output = {};
-      const require = name => name === 'react' ? React : name === 'react/jsx-runtime' ? JSX : name === 'lucide-react' ? new Proxy({}, { get: () => () => null }) : name === 'react-router-dom' ? { Link: props => React.createElement('a', props, props.children), useNavigate: () => () => {} } : name === '../lib/lounge' ? lounge : name === '../lib/loungeSession' ? session : name === '../lib/loungeApi' ? api : name === '../lib/useLoungeAudio' ? { useLoungeAudio: useAudio } : {};
+      const require = name => name === 'react' ? React : name === 'react/jsx-runtime' ? JSX : name === 'lucide-react' ? new Proxy({}, { get: () => () => null }) : name === 'react-router-dom' ? { Link: props => React.createElement('a', props, props.children), useNavigate: () => () => {} } : name === './LoungeHostPortrait' ? portrait : name === '../lib/lounge' ? lounge : name === '../lib/loungeSession' ? session : name === '../lib/loungeApi' ? api : name === '../lib/useLoungeAudio' ? { useLoungeAudio: useAudio } : {};
+      const portrait = {}; new Function('exports','require', ${JSON.stringify(portraitCode)})(portrait, require);
       new Function('exports', 'require', ${JSON.stringify(compiled)})(output, require);
       const container = document.createElement('div'); document.body.appendChild(container);
       const root = createRoot(container);

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, X } from 'lucide-react';
+import { ArrowRight, LoaderCircle, LogIn, Mail, UserPlus } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle, EmailConfirmationRequiredError } from '../lib/auth';
 import type { AppUser } from '../types';
 import { AvatarPhotoInput, LoungeAvatarEditor } from './LoungeAvatarEditor';
+import { LoungeAccountDialog } from './LoungeAccountDialog';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -107,6 +108,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
     setError('');
 
     if (isSignup) {
@@ -145,124 +147,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   };
 
   const finish = (user: AppUser) => { onAuthenticated(user); onClose(); };
-  if (createdUser) return <div className="modal-overlay auth-modal-overlay"><div className="modal-content auth-modal"><div className="auth-modal-header"><div><h2>{isEnglish ? 'Welcome to the lounge' : '가입 완료! 이제 나를 닮은 아바타'}</h2><p className="avatar-signup-intro">{isEnglish ? 'Your account is ready. Review your avatar before using it.' : '계정이 만들어졌어요. 사진을 변환한 뒤 마음에 드는 결과를 적용하세요.'}</p></div><button type="button" className="icon-button" aria-label={isEnglish ? 'Close' : '닫기'} onClick={() => finish(createdUser)}><X size={20} /></button></div><LoungeAvatarEditor user={createdUser} initialFile={photo} language={language} onSaved={finish} /><button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Set up later in my profile' : '나중에 프로필에서 만들기'}</button></div></div>;
+  if (createdUser) return <LoungeAccountDialog title={isEnglish ? 'Make this seat yours' : '이제 나만의 얼굴을 더해요'} description={isEnglish ? 'Your account is ready. Review your portrait before joining the conversation.' : '가입이 완료됐어요. 사진으로 아바타를 만들거나, 지금은 가볍게 시작해도 좋아요.'} eyebrow="YOUR FIRST HELLO" onClose={() => finish(createdUser)} language={language} displayName={createdUser.nickname} avatarUrl={createdUser.loungeAvatarUrl}>
+    <LoungeAvatarEditor user={createdUser} initialFile={photo} language={language} onSaved={finish} />
+    <button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Set up later in my profile' : '나중에 프로필에서 만들기'}</button>
+  </LoungeAccountDialog>;
 
-  if (confirmationSent) return <div className="modal-overlay auth-modal-overlay"><div className="modal-content auth-modal"><h2>{isEnglish ? 'Check your email' : '가입 확인 메일을 보냈어요'}</h2><p className="avatar-signup-intro">{isEnglish ? 'Verify your email, then log in and create your avatar in your profile. Your photo has not been uploaded.' : '이메일 인증 후 로그인해 프로필 수정에서 아바타를 만들어 주세요. 첨부한 사진은 아직 전송하지 않았어요.'}</p><button type="button" className="btn btn-primary avatar-generate" onClick={() => handleModeChange('login')}>{isEnglish ? 'Back to login' : '로그인으로 돌아가기'}</button><button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={onClose}>{isEnglish ? 'Close' : '닫기'}</button></div></div>;
-
-  return (
-    <div className="modal-overlay auth-modal-overlay">
-      <div className="modal-content auth-modal">
-        <div className="auth-modal-header">
-          <div className="auth-modal-heading">
-            <h2 style={{ color: 'var(--primary)', fontSize: '1.6rem', margin: 0 }}>
-              {isEnglish ? (isSignup ? 'Create account' : 'Log in') : (isSignup ? '회원가입' : '로그인')}
-            </h2>
-            <p style={{ color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              {context === 'lounge'
-                ? isEnglish ? 'Set up your profile and avatar, and join the conversation.' : '나만의 프로필과 아바타로, 함께 이야기를 나눠요.'
-                : isEnglish ? 'Save your debate records and feedback reports.' : '토론 기록과 최종 보고서를 계정에 저장합니다.'}
-            </p>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label={isEnglish ? 'Close' : '닫기'}>
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="segmented-control auth-mode-tabs">
-          <button className={mode === 'login' ? 'active' : ''} onClick={() => handleModeChange('login')}>
-            <LogIn size={16} /> {isEnglish ? 'Log in' : '로그인'}
-          </button>
-          <button className={mode === 'signup' ? 'active' : ''} onClick={() => handleModeChange('signup')}>
-            <UserPlus size={16} /> {isEnglish ? 'Sign up' : '가입'}
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {isSignup && (
-            <label className="form-field">
-              <span>{isEnglish ? 'Display name' : '닉네임'}</span>
-              <input value={nickname} onChange={event => setNickname(event.target.value)} placeholder={isEnglish ? 'Debater name' : '토론자 이름'} />
-            </label>
-          )}
-          <label className="form-field">
-            <span>{isEnglish ? 'Email' : '이메일'}</span>
-            <input value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" type="email" />
-          </label>
-          <label className="form-field">
-            <span>{isEnglish ? 'Password' : '비밀번호'}</span>
-            <input value={password} onChange={event => setPassword(event.target.value)} placeholder={isEnglish ? 'Password' : '비밀번호'} type="password" />
-          </label>
-          {isSignup && (
-            <>
-              <label className="form-field">
-                <span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span>
-                <input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder={isEnglish ? 'Confirm password' : '비밀번호 확인'} type="password" />
-              </label>
-              <label className="legal-consent-check">
-                <input type="checkbox" checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} />
-                <span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span>
-              </label>
-              <div><p className="avatar-signup-intro">{isEnglish ? 'Lounge photo (optional). Create a lifelike avatar with Nano Banana 2 after signup.' : '라운지 사진 (선택). 가입 후 Nano Banana 2로 나를 닮은 아바타를 만들어요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></div>
-            </>
-          )}
-        </div>
-
-        {error && <div className="form-error">{error}</div>}
-
-        <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={handleSubmit} disabled={loading}>
-          {isEnglish ? (loading ? 'Please wait…' : isSignup ? 'Create account' : 'Log in') : (loading ? '처리 중...' : (isSignup ? '계정 만들기' : '로그인하기'))}
-        </button>
-
-        <div className="divider-row" style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
-          <span style={{ padding: '0 0.75rem' }}>{isEnglish ? 'or' : '또는'}</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
-        </div>
-
-        <div className="social-login-row">
-          <button 
-            className="btn btn-secondary" 
-            onClick={handleKakaoLogin}
-            disabled={loading}
-            style={{ 
-              backgroundColor: '#FEE500', 
-              color: '#191919', 
-              border: 'none',
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}
-          >
-            <KakaoIcon />
-            <span>{isEnglish ? 'Continue with Kakao' : '카카오 로그인'}</span>
-          </button>
-          <button 
-            className="btn btn-secondary" 
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            style={{ 
-              backgroundColor: '#FFFFFF', 
-              color: '#374151', 
-              border: '1px solid #D1D5DB',
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-            }}
-          >
-            <GoogleIcon />
-            <span>{isEnglish ? 'Continue with Google' : '구글 로그인'}</span>
-          </button>
-        </div>
-        <p className="social-legal-note">{isEnglish ? <>By continuing with a social account, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <>소셜 로그인을 계속하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의한 것으로 봅니다.</>}</p>
-      </div>
+  if (confirmationSent) return <LoungeAccountDialog title={isEnglish ? 'Check your email' : '가입 확인 메일을 보냈어요'} description={isEnglish ? 'One small step before your first conversation.' : '이메일을 확인하면, 첫 이야기를 시작할 수 있어요.'} eyebrow="ALMOST THERE" onClose={onClose} language={language}>
+    <div className="lounge-account-status"><span className="lounge-account-mail-icon"><Mail size={26} /></span><p><strong>{email}</strong><br />{isEnglish ? 'Follow the link in your email, then log in. You can create your avatar in your profile. Your photo has not been uploaded.' : '메일의 인증 링크를 누른 뒤 로그인해 주세요. 아바타는 프로필에서 만들 수 있어요. 첨부한 사진은 아직 전송하지 않았어요.'}</p>
+      <button type="button" className="btn btn-primary lounge-account-submit" onClick={() => handleModeChange('login')}>{isEnglish ? 'Back to login' : '로그인으로 돌아가기'}<ArrowRight size={17} /></button>
+      <button type="button" className="avatar-text-button" onClick={onClose}>{isEnglish ? 'Close' : '지금은 닫기'}</button>
     </div>
-  );
+  </LoungeAccountDialog>;
+
+  return <LoungeAccountDialog
+    title={isEnglish ? isSignup ? 'A seat for your story' : 'Good to see you again' : isSignup ? '당신의 이야기를 기다려요' : '다시 만나서 반가워요'}
+    description={context === 'lounge' ? isEnglish ? 'Your own profile, your own voice. Make yourself at home.' : isSignup ? '나만의 이름으로, 편안한 대화에 함께해요.' : '내 이름과 목소리로, 이어지는 대화에 들어가요.' : isEnglish ? 'Continue with your account.' : '기존 계정으로 편하게 이어서 이용하세요.'}
+    eyebrow={isSignup ? 'JOIN THE LOUNGE' : 'WELCOME BACK'} onClose={onClose} language={language}>
+    <div className="segmented-control auth-mode-tabs" aria-label={isEnglish ? 'Account options' : '로그인과 회원가입'}>
+      <button type="button" className={mode === 'login' ? 'active' : ''} aria-pressed={mode === 'login'} disabled={loading} onClick={() => handleModeChange('login')}><LogIn size={15} />{isEnglish ? 'Log in' : '로그인'}</button>
+      <button type="button" className={mode === 'signup' ? 'active' : ''} aria-pressed={mode === 'signup'} disabled={loading} onClick={() => handleModeChange('signup')}><UserPlus size={15} />{isEnglish ? 'Sign up' : '회원가입'}</button>
+    </div>
+    <div className="social-login-row">
+      <button type="button" className="lounge-social kakao" onClick={() => void handleKakaoLogin()} disabled={loading}><KakaoIcon />{isEnglish ? 'Kakao' : '카카오로 시작'}</button>
+      <button type="button" className="lounge-social google" onClick={() => void handleGoogleLogin()} disabled={loading}><GoogleIcon />{isEnglish ? 'Google' : '구글로 시작'}</button>
+    </div>
+    <p className="social-legal-note">{isEnglish ? <>By continuing with a social account, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <>소셜 계정으로 시작하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</p>
+    <div className="lounge-account-divider">{isEnglish ? 'or with email' : '또는 이메일로'}</div>
+    <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSubmit(); }} aria-busy={loading}>
+      {isSignup && <label className="form-field"><span>{isEnglish ? 'Display name' : '닉네임'}</span><input data-dialog-autofocus value={nickname} onChange={event => setNickname(event.target.value)} autoComplete="nickname" maxLength={20} required disabled={loading} placeholder={isEnglish ? 'What should we call you?' : '대화에서 불리고 싶은 이름'} /><small className="lounge-account-field-note">{isEnglish ? 'A name you feel comfortable with. Up to 20 characters.' : '실명 대신 편한 이름도 좋아요. 최대 20자.'}</small></label>}
+      <label className="form-field"><span>{isEnglish ? 'Email' : '이메일'}</span><input data-dialog-autofocus={!isSignup || undefined} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" type="email" required disabled={loading} /></label>
+      <div className={isSignup ? 'lounge-account-passwords' : undefined}>
+        <label className="form-field"><span>{isEnglish ? 'Password' : '비밀번호'}</span><input value={password} onChange={event => setPassword(event.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} placeholder={isEnglish ? isSignup ? 'At least 6 characters' : 'Your password' : isSignup ? '6자리 이상' : '비밀번호를 입력해 주세요'} type="password" required disabled={loading} /></label>
+        {isSignup && <label className="form-field"><span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span><input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} autoComplete="new-password" placeholder={isEnglish ? 'Once more' : '한 번 더 입력'} type="password" required disabled={loading} /></label>}
+      </div>
+      {isSignup && <>
+        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Bring your photo' : '나를 닮은 아바타로 만나기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Add a photo now and create your illustrated avatar after signup. You can also do this later.' : '사진을 첨부하면 가입 후 나를 닮은 아바타를 만들 수 있어요. 나중에 프로필에서 만들어도 괜찮아요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></details>
+        <label className="legal-consent-check"><input type="checkbox" checked={acceptedTerms} disabled={loading} onChange={event => setAcceptedTerms(event.target.checked)} /><span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span></label>
+      </>}
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <button type="submit" className="btn btn-primary lounge-account-submit" disabled={loading}>{loading ? <LoaderCircle size={17} className="lounge-spin" /> : null}{isEnglish ? loading ? 'Please wait…' : isSignup ? 'Create account' : 'Enter the lounge' : loading ? '잠시만 기다려 주세요…' : isSignup ? '내 자리 만들기' : '라운지에 들어가기'}{!loading && <ArrowRight size={17} />}</button>
+    </form>
+  </LoungeAccountDialog>;
 };

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, Coffee, Copy, Headphones, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, Radio, RefreshCw, Send, Sparkles, UserRound, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Coffee, Copy, Headphones, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, RefreshCw, Send, Sparkles, UserRound, Users, X } from 'lucide-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getCurrentUser } from '../lib/auth';
-import { getLoungeHost, getLoungeTheme, loungeThemes, loungeHosts, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, nextLoungeHostReason, previewHostReply, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
+import { getLoungeHost, getLoungeTheme, loungeThemes, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, nextLoungeHostReason, previewHostReply, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
 import { LoungeApiError, controlLounge, controlLoungeSession, createLounge, joinLounge, loadLounge, postLoungeMessage, prepareLoungeTopic, requestLoungeHost, transcribeLoungeAudio } from '../lib/loungeApi';
 import { newerLoungeSession, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
+import { LoungeOpenRooms } from './LoungeOpenRooms';
+import { LoungeHostOptions } from './LoungeHostOptions';
+import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { ProfileModal } from './ProfileModal';
 import { useLoungeAudio } from '../lib/useLoungeAudio';
 import './LoungePage.css';
@@ -49,7 +52,6 @@ function LoungeLobby({ user, onGuestRequest, onLoginRequest }: Props) {
   const [topicId, setTopicId] = useState<string>('movie');
   const [capacity, setCapacity] = useState(4);
   const [customTopic, setCustomTopic] = useState('');
-  const [invite, setInvite] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const topic = loungeTopics.find(item => item.id === topicId) ?? loungeTopics[0];
@@ -67,11 +69,6 @@ function LoungeLobby({ user, onGuestRequest, onLoginRequest }: Props) {
     } catch (err) { setError(errorText(err)); }
     finally { setBusy(false); }
   };
-  const openInvite = () => {
-    const match = invite.trim().match(/(?:^|\/)(lounge-[a-f0-9-]{36})(?:[/?#]|$)/);
-    if (!match) { setError('초대 링크 또는 lounge-로 시작하는 방 코드를 넣어 주세요.'); return; }
-    navigate(`/lounge/${match[1]}`);
-  };
   const themeOptions = <section className="lounge-section">
     <div className="lounge-section-title"><div><span>03 · YOUR VIEW</span><h2>어떤 풍경에서 만날까요?</h2></div><p>함께 들어오는 사람도 같은 뷰를 즐겨요.</p></div>
     <div className="lounge-theme-options" role="group" aria-label="라운지 테마">
@@ -82,17 +79,17 @@ function LoungeLobby({ user, onGuestRequest, onLoginRequest }: Props) {
   </section>;
   return <main className="lounge-lobby">
     <section className="lounge-hero">
-      <div className="lounge-hero-copy"><span className="lounge-eyebrow"><span /> GOOD CONVERSATIONS, NEW CONNECTIONS</span><h1>사진보다 먼저,<br /><em>당신의 이야기를.</em></h1><p>좋아하는 영화, 마음에 남은 문장, 조금 다른 생각.<br />목소리와 취향으로, 이야기할수록 서로를 알아가는 라운지.</p><div className="lounge-hero-meta"><span><Users size={16} /> 혼자 또는 친구와 1~6명</span><span><Headphones size={16} /> 실시간 음성</span><span><Coffee size={16} /> 그룹 대화 약 30분</span></div></div>
-      <div className="lounge-hero-art" aria-hidden="true"><div className="lounge-orbit orbit-one" /><div className="lounge-orbit orbit-two" /><div className="lounge-art-center">☕<span>취향에서 시작해,<br />서로에게 가까이.</span></div><span className="lounge-art-face face-one"><LoungePortrait index={0} name="가상 참가자" /></span><span className="lounge-art-face face-two"><LoungePortrait index={1} name="가상 참가자" /></span><span className="lounge-art-face face-three"><LoungePortrait index={2} name="가상 참가자" /></span><span className="lounge-art-note note-one">그 장면, 나도 좋아해요.</span><span className="lounge-art-note note-two">조금 더 듣고 싶어요.</span><span className="lounge-art-star">✳</span></div>
+      <div className="lounge-hero-copy"><span className="lounge-eyebrow"><span /> GOOD CONVERSATIONS, NEW CONNECTIONS</span><h1>문득 사람과의 대화가 하고 싶은 순간이 찾아올 때...</h1><p>좋아하는 영화, 걷다 만난 풍경, 기억에 남는 맛집.<br />목소리와 취향으로, 이야기할수록 서로를 알아가는 라운지.</p><div className="lounge-hero-meta"><span><Users size={16} /> 혼자 또는 친구와 1~6명</span><span><Headphones size={16} /> 실시간 음성</span><span><Coffee size={16} /> 그룹 대화 약 30분</span></div></div>
+      <div className="lounge-hero-visual" aria-hidden="true"><img src="/lounge/lounge-club-hero-v1.webp" alt="" fetchPriority="high" /></div>
     </section>
-    <div className="lounge-lobby-layout"><div className="lounge-selections">
-      <section className="lounge-section"><div className="lounge-section-title"><div><span>01 · YOUR HOST</span><h2>누구와 이야기할까요?</h2></div><p>호스트마다 질문도, 분위기도 달라요.</p></div><div className="lounge-host-options">{loungeHosts.map(item => <button type="button" key={item.id} className={`lounge-host-option ${hostId === item.id ? 'selected' : ''}`} onClick={() => setHostId(item.id)} aria-pressed={hostId === item.id}><span className="lounge-host-emoji" style={{ background: item.color }}>{item.emoji}</span><span className="lounge-host-tag">{item.tag}</span><strong>{item.name}</strong><small>{item.description}</small><span className="lounge-selection-check">{hostId === item.id ? <Check size={14} /> : '+'}</span></button>)}</div><p className="lounge-persona-note">실제 인물이 아닌, 진행 성격에서 착안한 AI 호스트예요. 목소리는 AI 합성 음성입니다.</p></section>
-      <section className="lounge-section"><div className="lounge-section-title"><div><span>02 · TALK ABOUT</span><h2>무슨 이야기로 시작할까요?</h2></div><span className="lounge-soft-label">대화는 어디로 흘러가도 OK</span></div><div className="lounge-topic-options">{loungeTopics.map(item => <button type="button" key={item.id} onClick={() => { setTopicId(item.id); setCustomTopic(''); }} className={topicId === item.id && !customTopic ? 'selected' : ''} aria-pressed={topicId === item.id && !customTopic}><span>{item.emoji}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div>{topicId === item.id && !customTopic && <Check size={16} />}</button>)}</div><label className="lounge-custom-topic"><MessageCircle size={18} /><input value={customTopic} onChange={event => setCustomTopic(event.target.value)} maxLength={160} placeholder="직접 고른 이야기도 좋아요. 예: 요즘 빠진 취미" aria-label="직접 입력하는 대화 주제" /></label></section>
-      <p className="lounge-study-hint">직접 입력한 주제는 사회자가 자료를 찾아보고 질문을 준비해요. 작품명과 감독·작가를 함께 적으면 더 정확해요.</p>
+    <LoungeOpenRooms />
+    <div className="lounge-lobby-layout" id="lounge-create"><div className="lounge-selections">
+      <section className="lounge-section"><div className="lounge-section-title"><div><span>01 · TALK ABOUT</span><h2>무슨 이야기로 시작할까요?</h2></div><span className="lounge-soft-label">대화는 어디로 흘러가도 OK</span></div><div className="lounge-topic-options">{loungeTopics.map(item => <button type="button" key={item.id} onClick={() => { setTopicId(item.id); setCustomTopic(''); }} className={topicId === item.id && !customTopic ? 'selected' : ''} aria-pressed={topicId === item.id && !customTopic}><span>{item.emoji}</span><div><strong>{item.title}</strong><small>{item.subtitle}</small></div>{topicId === item.id && !customTopic && <Check size={16} />}</button>)}</div><label className="lounge-custom-topic"><MessageCircle size={18} /><input value={customTopic} onChange={event => setCustomTopic(event.target.value)} maxLength={160} placeholder="직접 고른 이야기도 좋아요. 예: 영화 호프 / 설악산 산행 / 제주에서 먹은 한 끼" aria-label="직접 입력하는 대화 주제" /></label></section>
+      <p className="lounge-study-hint">직접 입력한 주제는 사회자가 자료를 찾아보고 질문을 준비해요. 작품명·감독이나 여행지·지역을 함께 적으면 더 정확해요.</p>
+      <section className="lounge-section"><div className="lounge-section-title"><div><span>02 · CONVERSATION STYLE</span><h2>어떤 분위기로 이야기할까요?</h2></div><p>진행 스타일에 따라 질문과 반응이 달라요.</p></div><LoungeHostOptions selected={hostId} onSelect={setHostId} /><p className="lounge-persona-note">AI로 만든 가상의 인물 사진과 합성 음성입니다. 먼저 목소리를 들어 보고 진행 스타일을 골라 주세요.</p></section>
       {themeOptions}
-    </div><aside className="lounge-room-builder"><span className="lounge-eyebrow">MAKE SOME ROOM</span><h2>{capacity === 1 ? '사회자와 둘이서' : '우리의 작은 수다방'}</h2><div className="lounge-builder-host"><span style={{ background: host.color }}>{host.emoji}</span><div><small>오늘의 AI 호스트</small><strong>{host.name}</strong></div><Sparkles size={19} /></div><p className="lounge-builder-topic">“{title}”</p><p className="lounge-builder-theme"><Coffee size={14} />{getLoungeTheme(themeId).name}</p><label className="lounge-capacity-label" htmlFor="lounge-capacity">함께할 인원 <small>AI 호스트는 별도예요</small></label><div className="lounge-capacities" id="lounge-capacity" role="group" aria-label="참여 인원">{[1, 2, 3, 4, 5, 6].map(count => <button type="button" key={count} className={capacity === count ? 'selected' : ''} onClick={() => setCapacity(count)} aria-pressed={capacity === count}>{count === 1 ? '혼자' : `${count}명`}</button>)}</div><div className="lounge-builder-rules"><span><Check size={15} /> {capacity === 1 ? 'AI 사회자와 편안한 1:1 대화' : '초대 링크로 친구와 함께'}</span><span><Check size={15} /> {capacity === 1 ? '이야기를 이어 주는 AI 사회자' : '기본 차례 · 손들기 · 자유로운 패스'}</span><span><Check size={15} /> 점수도, 정답도 없는 대화</span></div><button type="button" className="lounge-primary" disabled={busy} onClick={() => void openRoom()}>{busy ? <LoaderCircle size={18} className="lounge-spin" /> : <Mic size={18} />}{busy ? '수다방 준비 중…' : capacity === 1 ? 'AI와 1:1 대화 시작' : '수다방 만들기'}<ArrowRight size={18} /></button><button type="button" className="lounge-preview-button" onClick={() => navigate(`/lounge/preview?host=${hostId}&topic=${encodeURIComponent(title)}&capacity=${capacity}&theme=${themeId}`)}>먼저 분위기 둘러보기 <ArrowRight size={15} /></button><p className="lounge-builder-footnote">{capacity === 1 ? '입장하면 음성과 마이크를 연결하고 시작해요.' : '2명이 모이면 약 30분의 이야기를 시작해요.'}<br />테스트 기간에는 방장이 나가면 종료됩니다.</p>{!user && <button type="button" className="lounge-signin" onClick={onLoginRequest}>계정으로 로그인하기</button>}</aside></div>
+    </div><aside className="lounge-room-builder"><span className="lounge-eyebrow">MAKE SOME ROOM</span><h2>{capacity === 1 ? '사회자와 둘이서' : '우리의 작은 수다방'}</h2><div className="lounge-builder-host"><LoungeHostPortrait hostId={hostId} /><div><small>오늘의 진행 스타일</small><strong>{host.name}</strong></div><Sparkles size={19} /></div><p className="lounge-builder-topic">“{title}”</p><p className="lounge-builder-theme"><Coffee size={14} />{getLoungeTheme(themeId).name}</p><label className="lounge-capacity-label" htmlFor="lounge-capacity">함께할 인원 <small>AI 호스트는 별도예요</small></label><div className="lounge-capacities" id="lounge-capacity" role="group" aria-label="참여 인원">{[1, 2, 3, 4, 5, 6].map(count => <button type="button" key={count} className={capacity === count ? 'selected' : ''} onClick={() => setCapacity(count)} aria-pressed={capacity === count}>{count === 1 ? '혼자' : `${count}명`}</button>)}</div><div className="lounge-builder-rules"><span><Check size={15} /> {capacity === 1 ? 'AI 사회자와 편안한 1:1 대화' : '열린 수다방에서 함께 이야기'}</span><span><Check size={15} /> {capacity === 1 ? '이야기를 이어 주는 AI 사회자' : '기본 차례 · 손들기 · 자유로운 패스'}</span><span><Check size={15} /> 점수도, 정답도 없는 대화</span></div><button type="button" className="lounge-primary" disabled={busy} onClick={() => void openRoom()}>{busy ? <LoaderCircle size={18} className="lounge-spin" /> : <Mic size={18} />}{busy ? '수다방 준비 중…' : capacity === 1 ? 'AI와 1:1 대화 시작' : '수다방 만들기'}<ArrowRight size={18} /></button><button type="button" className="lounge-preview-button" onClick={() => navigate(`/lounge/preview?host=${hostId}&topic=${encodeURIComponent(title)}&capacity=${capacity}&theme=${themeId}`)}>먼저 분위기 둘러보기 <ArrowRight size={15} /></button><p className="lounge-builder-footnote">{capacity === 1 ? '입장하면 음성과 마이크를 연결하고 시작해요.' : '2명이 모이면 약 30분의 이야기를 시작해요.'}<br />테스트 기간에는 방장이 나가면 종료됩니다.</p>{!user && <button type="button" className="lounge-signin" onClick={onLoginRequest}>계정으로 로그인하기</button>}</aside></div>
     {error && <p className="lounge-error" role="alert">{error}</p>}
-    <section className="lounge-invite"><div><Radio size={21} /><h3>친구가 먼저 방을 열었나요?</h3></div><form onSubmit={event => { event.preventDefault(); openInvite(); }}><input value={invite} onChange={event => setInvite(event.target.value)} placeholder="초대 링크 또는 방 코드 붙여넣기" aria-label="초대 링크 또는 방 코드" /><button type="submit">함께 들어가기 <ArrowRight size={16} /></button></form></section>
     <footer className="lounge-footer"><span>조금 말하고, 많이 웃고. 오늘의 여유를 여기서.</span><span>수다 라운지 · 테스트 오픈</span></footer>
   </main>;
 }
@@ -136,7 +133,7 @@ function RoomView(props: RoomViewProps) {
   useEffect(() => {
     if (!journalOpen) return;
     if (focusMessage.current && !messageInput.current?.disabled) messageInput.current?.focus();
-    else journalPanel.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    else journalPanel.current?.focus({ preventScroll: true });
     focusMessage.current = false;
   }, [journalOpen]);
   const send = async () => {
@@ -155,21 +152,25 @@ function RoomView(props: RoomViewProps) {
     try { await props.onAvatarChoice(index); setAvatarPicker(false); } catch (err) { setSendError(errorText(err)); } finally { setChoosingAvatar(false); }
   };
   const closeJournal = () => { setJournalOpen(false); journalToggle.current?.focus(); };
+  const toggleJournal = (button: HTMLButtonElement) => {
+    journalToggle.current = button;
+    if (journalOpen) closeJournal();
+    else setJournalOpen(true);
+  };
   const openMessage = () => {
     if (journalOpen) messageInput.current?.focus();
     else { focusMessage.current = true; setJournalOpen(true); }
   };
   return <main className="lounge-room-main" data-theme={theme.id}>
+    <button type="button" className="lounge-records-tab" aria-expanded={journalOpen} aria-controls={journalId} onClick={event => toggleJournal(event.currentTarget)}><MessageCircle size={16} /><span>대화 기록</span></button>
     {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 참가자·AI 연결 없이 분위기를 둘러보는 화면이에요. 글을 보내면 호스트의 예시 반응을 볼 수 있어요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
     <div className="lounge-conversation-layout"><section className="lounge-stage" aria-label="풍경과 대화석">
       <div className={`lounge-scene scene-${props.capacity}`}>
-        <div className="lounge-room-topline"><div><span className={`lounge-room-status ${props.preview ? 'preview' : ''}`}><span />{props.preview ? '화면 미리보기' : ended ? '오늘의 수다 끝' : props.status === 'lobby' ? solo ? 'AI와 1:1 대화 준비' : '친구를 기다리는 중' : '우리 지금 이야기 중'}</span><h1>{theme.name}</h1></div><div className="lounge-room-top-actions"><span><Coffee size={16} /> {props.remaining}</span><button type="button" ref={journalToggle} className="lounge-journal-toggle" aria-expanded={journalOpen} aria-controls={journalId} onClick={() => journalOpen ? closeJournal() : setJournalOpen(true)}><MessageCircle size={16} /> 대화 기록</button>{props.inviteUrl && !solo && <button type="button" onClick={() => { void navigator.clipboard.writeText(props.inviteUrl!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); }).catch(() => setSendError('주소창의 링크를 복사해 친구에게 보내 주세요.')); }}><Copy size={16} />{copied ? '복사했어요!' : '친구 초대'}</button>}<button type="button" onClick={props.onLeave}><X size={18} /> 나가기</button></div></div>
+        <div className="lounge-scene-soften" aria-hidden="true" />
+        <div className="lounge-room-topline"><div><span className={`lounge-room-status ${props.preview ? 'preview' : ''}`}><span />{props.preview ? '화면 미리보기' : ended ? '오늘의 수다 끝' : props.status === 'lobby' ? solo ? 'AI와 1:1 대화 준비' : '친구를 기다리는 중' : '우리 지금 이야기 중'}</span><h1>{theme.name}</h1></div><div className="lounge-room-top-actions"><span><Coffee size={16} /> {props.remaining}</span><button type="button" ref={journalToggle} className="lounge-journal-toggle" aria-expanded={journalOpen} aria-controls={journalId} onClick={event => toggleJournal(event.currentTarget)}><MessageCircle size={16} /> 대화 기록</button>{props.inviteUrl && !solo && <button type="button" onClick={() => { void navigator.clipboard.writeText(props.inviteUrl!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); }).catch(() => setSendError('주소창의 링크를 복사해 친구에게 보내 주세요.')); }}><Copy size={16} />{copied ? '복사했어요!' : '친구 초대'}</button>}<button type="button" onClick={props.onLeave}><X size={18} /> 나가기</button></div></div>
         <div className="lounge-scene-intro"><span>{theme.tag}</span><p>{theme.caption}</p><div className="lounge-stage-label"><Headphones size={15} /> 함께 머무는 대화석 <span>{solo ? 'AI와 1:1' : `${props.members.length} / ${props.capacity}명`}</span></div></div>
       </div>
       <div className="lounge-conversation-space">
-        <div className="lounge-table-topic"><span>오늘의 이야기</span><h2>{props.topic}</h2></div>
-        {props.study && <LoungeStudyNotes study={props.study} />}
-        {props.session && props.currentUserId && props.onSessionAction && <LoungeSessionPanel session={props.session} userId={props.currentUserId} names={props.sessionNames ?? Object.fromEntries(props.members.map(member => [member.id, member.name]))} questions={props.study?.questions} isHost={props.isHost} blocked={props.pending || props.aiSpeaking} onAction={props.onSessionAction} />}
         <div className={`lounge-seats seats-${props.capacity}`}>{Array.from({ length: props.capacity }, (_, index) => {
           const member = props.members[index];
           const speaking = Boolean(member && liveSpeakers.some(speaker => speaker.id === member.id));
@@ -179,7 +180,10 @@ function RoomView(props: RoomViewProps) {
             <span className="lounge-seat-speaking"><VoiceWave active={speaking} />{speaking ? '지금 이야기 중' : member ? member.muted ? '듣고 있어요' : '함께하는 중' : '초대 링크로 함께해요'}</span>
           </div>;
         })}</div>
-      <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><Headphones size={22} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{host.name}</h2><span className="lounge-moderator-caption">{hostSpeaking ? '사회자 · 이야기하는 중' : props.pending ? '사회자 · 이야기를 생각하는 중…' : '사회자 · 이야기를 이어 드려요'}</span></div><VoiceWave active={hostSpeaking} /><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : ended ? '함께 이야기해 줘서 고마워요. 오늘 남은 시간도 편안하길 바라요.' : props.liveHostText || latestHost?.text || host.greeting}</div></div>
+        <div className="lounge-table-topic"><span>오늘의 이야기</span><h2>{props.topic}</h2></div>
+        {props.study && <LoungeStudyNotes study={props.study} />}
+        {props.session && props.currentUserId && props.onSessionAction && <LoungeSessionPanel session={props.session} userId={props.currentUserId} names={props.sessionNames ?? Object.fromEntries(props.members.map(member => [member.id, member.name]))} questions={props.study?.questions} isHost={props.isHost} blocked={props.pending || props.aiSpeaking} onAction={props.onSessionAction} />}
+      <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><LoungeHostPortrait hostId={props.hostId} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{host.name}</h2><span className="lounge-moderator-caption">{hostSpeaking ? '사회자 · 이야기하는 중' : props.pending ? '사회자 · 이야기를 생각하는 중…' : '사회자 · 이야기를 이어 드려요'}</span></div><VoiceWave active={hostSpeaking} /><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : ended ? '함께 이야기해 줘서 고마워요. 오늘 남은 시간도 편안하길 바라요.' : props.liveHostText || latestHost?.text || host.greeting}</div></div>
       <div className="lounge-on-air" role="status"><VoiceWave active={hostSpeaking || liveSpeakers.length > 0} /><span>{speakingLabel}</span>{props.preview && <button type="button" onClick={props.onDemoToggle} aria-label={props.demoPlaying ? '발언 효과 미리보기 일시정지' : '발언 효과 미리보기 재생'}>{props.demoPlaying ? <Pause size={13} /> : <Play size={13} />} 발언 효과 예시</button>}</div>
       <div className="lounge-stage-note">{solo ? '편하게 이야기해 주세요. 답하기 어려운 질문은 패스해도 괜찮아요.' : '같은 취향도, 다른 생각도 좋아요. 한 사람씩 서로의 이야기를 들어 주세요.'}</div>
       {props.onAvatarChoice && <div className="lounge-avatar-settings"><button type="button" className="lounge-avatar-toggle" onClick={() => setAvatarPicker(value => !value)} aria-expanded={avatarPicker} disabled={ended}>내 아바타 고르기 <Sparkles size={13} /></button>{avatarPicker && <div className="lounge-avatar-picker"><p>오늘의 나를 표현할 아바타를 골라 주세요.</p><div role="group" aria-label="캐리커처 아바타 선택">{Array.from({ length: 6 }, (_, index) => <button key={index} type="button" disabled={choosingAvatar} onClick={() => void pickAvatar(index)} aria-label={`아바타 ${index + 1} 선택`} aria-pressed={props.members.find(member => member.id === props.currentUserId)?.avatarIndex === index}><LoungePortrait index={index} name={`아바타 ${index + 1}`} /></button>)}</div><small>기본 캐릭터예요. 내 사진으로 만든 아바타는 홈의 프로필에서 관리할 수 있어요.</small></div>}</div>}
@@ -189,7 +193,7 @@ function RoomView(props: RoomViewProps) {
         <button type="button" className="lounge-write-button" aria-expanded={journalOpen} aria-controls={journalId} onClick={openMessage}><MessageCircle size={16} /> {ended ? '대화 돌아보기' : '글로 이야기하기'}</button>
       </div>
       </div>
-    </section><aside className="lounge-chat-panel" ref={journalPanel} id={journalId} hidden={!journalOpen} aria-label="대화 기록과 글 대화" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeJournal(); } }}><div className="lounge-chat-heading"><MessageCircle size={19} /><h2>우리의 대화</h2><span>{props.preview ? 'PREVIEW' : 'LIVE'}</span><button type="button" className="lounge-journal-close" onClick={closeJournal} aria-label="대화 기록 접기"><X size={18} /></button></div><p className="lounge-chat-intro">목소리에 담긴 생각, 천천히 알아가는 우리.</p><div className="lounge-chat-log" ref={log} role="log" aria-label="대화 내용">{props.messages.length === 0 && <div className="lounge-chat-empty"><Coffee size={32} /><p>아직은 고요한 수다방.<br />첫 이야기를 기다리고 있어요.</p></div>}{props.messages.map(message => <article key={message.id} className={message.kind === 'host' ? 'host' : ''}><span className="lounge-chat-avatar">{message.kind === 'host' ? <Headphones size={16} /> : <LoungePortrait index={props.members.find(member => member.id === message.user_id)?.avatarIndex} url={props.members.find(member => member.id === message.user_id)?.avatarUrl} name={message.nickname} />}</span><div><strong>{message.kind === 'host' ? host.name : message.nickname}{message.kind === 'host' && <b>AI 사회자</b>}</strong><p>{message.text}</p></div></article>)}</div><form className="lounge-chat-form" onSubmit={event => { event.preventDefault(); void send(); }}><input ref={messageInput} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1200} placeholder="말 대신 글로 이야기해도 좋아요" aria-label="수다 메시지" disabled={ended || props.status === 'lobby'} /><button type="submit" aria-label="이야기 보내기" disabled={!draft.trim() || sending || ended || props.status === 'lobby'}><Send size={18} /></button></form><p className="lounge-chat-privacy">음성은 AI 진행을 위해 글로 전사됩니다.<br />원본 음성은 저장하지 않아요.</p></aside></div>
+    </section><aside className="lounge-chat-panel" ref={journalPanel} id={journalId} tabIndex={-1} hidden={!journalOpen} aria-label="대화 기록과 글 대화" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeJournal(); } }}><div className="lounge-chat-heading"><MessageCircle size={19} /><h2>우리의 대화</h2><span>{props.preview ? 'PREVIEW' : 'LIVE'}</span><button type="button" className="lounge-journal-close" onClick={closeJournal} aria-label="대화 기록 접기"><X size={18} /></button></div><p className="lounge-chat-intro">목소리에 담긴 생각, 천천히 알아가는 우리.</p><div className="lounge-chat-log" ref={log} role="log" aria-label="대화 내용">{props.messages.length === 0 && <div className="lounge-chat-empty"><Coffee size={32} /><p>아직은 고요한 수다방.<br />첫 이야기를 기다리고 있어요.</p></div>}{props.messages.map(message => <article key={message.id} className={message.kind === 'host' ? 'host' : ''}><span className="lounge-chat-avatar">{message.kind === 'host' ? <LoungeHostPortrait hostId={props.hostId} /> : <LoungePortrait index={props.members.find(member => member.id === message.user_id)?.avatarIndex} url={props.members.find(member => member.id === message.user_id)?.avatarUrl} name={message.nickname} />}</span><div><strong>{message.kind === 'host' ? host.name : message.nickname}{message.kind === 'host' && <b>AI 사회자</b>}</strong><p>{message.text}</p></div></article>)}</div><form className="lounge-chat-form" onSubmit={event => { event.preventDefault(); void send(); }}><input ref={messageInput} value={draft} onChange={event => setDraft(event.target.value)} maxLength={1200} placeholder="말 대신 글로 이야기해도 좋아요" aria-label="수다 메시지" disabled={ended || props.status === 'lobby'} /><button type="submit" aria-label="이야기 보내기" disabled={!draft.trim() || sending || ended || props.status === 'lobby'}><Send size={18} /></button></form><p className="lounge-chat-privacy">음성은 AI 진행을 위해 글로 전사됩니다.<br />원본 음성은 저장하지 않아요.</p></aside></div>
     {(props.error || sendError) && <p className="lounge-error" role="alert">{props.error || sendError}</p>}
     {ended && <div className="lounge-ended"><Coffee size={24} /><span>오늘의 대화가 끝났어요. 다음에 또 만나요.</span><Link to="/lounge">새로운 수다방 <ArrowRight size={16} /></Link></div>}
   </main>;
@@ -201,10 +205,11 @@ function LoungePreview() {
   const host = getLoungeHost(params.get('host') ?? 'jaeseok');
   const topic = params.get('topic')?.slice(0, 160) || loungeTopics[0].question;
   const capacity = Math.min(6, Math.max(1, Math.trunc(Number(params.get('capacity'))) || 4));
+  const opening = `${capacity === 1 ? '오늘은 둘이 편하게' : '오늘은 함께'} “${topic}” 이야기를 나눠요. 먼저 떠오르는 경험이나 궁금한 점이 있나요? 편하게 패스해도 좋아요.`;
   const [messages, setMessages] = useState<LoungeMessage[]>(() => [
-    { id: 1, room_id: 'preview', user_id: null, nickname: host.name, kind: 'host', text: capacity === 1 ? '오늘은 둘이 편하게 이야기해요. ' + host.greeting : host.greeting, created_at: new Date().toISOString() },
-    ...(capacity > 1 ? [{ id: 2, room_id: 'preview', user_id: 'demo-soyeon', nickname: '소연 · 예시', kind: 'human' as const, text: '같은 영화도 누구와 보느냐에 따라 다르게 남더라고요.', created_at: new Date().toISOString() }] : []),
-    ...(capacity > 2 ? [{ id: 3, room_id: 'preview', user_id: 'demo-jiwoo', nickname: '지우 · 예시', kind: 'human' as const, text: '맞아요. 전 보고 나서 같이 이야기하는 시간이 더 좋아요.', created_at: new Date().toISOString() }] : []),
+    { id: 1, room_id: 'preview', user_id: null, nickname: host.name, kind: 'host', text: opening, created_at: new Date().toISOString() },
+    ...(capacity > 1 ? [{ id: 2, room_id: 'preview', user_id: 'demo-soyeon', nickname: '소연 · 예시', kind: 'human' as const, text: '같은 경험도 누구와 함께하느냐에 따라 다르게 남더라고요.', created_at: new Date().toISOString() }] : []),
+    ...(capacity > 2 ? [{ id: 3, room_id: 'preview', user_id: 'demo-jiwoo', nickname: '지우 · 예시', kind: 'human' as const, text: '맞아요. 전 이렇게 같이 이야기하는 시간이 더 좋아요.', created_at: new Date().toISOString() }] : []),
   ]);
   const [pending, setPending] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

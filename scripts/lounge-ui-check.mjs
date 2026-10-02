@@ -9,8 +9,17 @@ const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
 let sequence = 0;
 const pending = new Map(), errors = [], paidRequests = [];
+const openRooms = [
+  { id: 'lounge-00000000-0000-4000-8000-000000000001', topic: '영화 호프를 보고 남은 이야기', host_persona: 'ina', theme: 'hotel', capacity: 4, status: 'lobby', participant_count: 2 },
+  { id: 'lounge-00000000-0000-4000-8000-000000000002', topic: '여행과 산행에서 만난 멋진 풍경', host_persona: 'dodi', theme: 'forest', capacity: 6, status: 'active', participant_count: 3 },
+  { id: 'lounge-00000000-0000-4000-8000-000000000003', topic: '한 번 더 가고 싶은 맛집과 먹거리', host_persona: 'jaeseok', theme: 'rooftop', capacity: 2, status: 'lobby', participant_count: 2 },
+];
+let roomResponse = openRooms, roomResponseCode = 200;
 socket.addEventListener('message', event => {
   const result = JSON.parse(event.data);
+  if (result.method === 'Fetch.requestPaused') {
+    void send('Fetch.fulfillRequest', { requestId: result.params.requestId, responseCode: roomResponseCode, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Access-Control-Allow-Headers', value: '*' }], body: Buffer.from(JSON.stringify(roomResponse)).toString('base64') }).catch(error => errors.push(error.message));
+  }
   if (result.method === 'Runtime.exceptionThrown') errors.push(result.params.exceptionDetails.exception?.description || result.params.exceptionDetails.text);
   if (result.method === 'Network.requestWillBeSent' && /\/api\/(lounge|livekit-token)/.test(result.params.request.url)) paidRequests.push(result.params.request.url);
   if (!result.id) return;
@@ -25,12 +34,43 @@ const type = (selector, value) => evaluate(`(() => { const el = document.querySe
 const directory = 'node_modules/.cache/lounge-artifacts'; await fs.mkdir(directory, { recursive: true });
 const screenshot = async name => { const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }); await fs.writeFile(`${directory}/${name}.png`, Buffer.from(result.data, 'base64')); };
 await send('Runtime.discardConsoleEntries'); await send('Runtime.enable'); await send('Network.enable'); await send('Page.enable');
+await send('Fetch.enable', { patterns: [{ urlPattern: '*/rest/v1/rpc/list_open_voice_lounges*', requestStage: 'Request' }] });
 try {
+  await send('Page.navigate', { url: `${base}/lounge` });
+  await waitFor("document.querySelectorAll('.lounge-open-card').length===3");
+  assert.equal(await evaluate("document.querySelectorAll('.lounge-open-card a').length"), 2, 'full rooms cannot be joined from the list');
+  assert.equal(await evaluate("document.querySelector('.lounge-open-card a').getAttribute('href')"), `/lounge/${openRooms[0].id}`);
+  roomResponse = [];
+  await evaluate("document.querySelector('.lounge-rooms-refresh').click()");
+  await waitFor("document.querySelector('.lounge-rooms-empty a')!==null");
+  roomResponseCode = 503;
+  await evaluate("document.querySelector('.lounge-rooms-refresh').click()");
+  await waitFor("document.querySelector('.lounge-open-rooms [role=alert]')!==null");
+  roomResponseCode = 200; roomResponse = openRooms;
+  await evaluate("document.querySelector('.lounge-rooms-refresh').click()");
+  await waitFor("document.querySelectorAll('.lounge-open-card').length===3");
   for (const width of [1440, 1024, 768, 390, 320]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
     await send('Page.navigate', { url: `${base}/lounge` });
     await waitFor("document.querySelectorAll('.lounge-host-option').length===4");
+    await waitFor("document.querySelectorAll('.lounge-open-card').length===3");
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `lobby overflow at ${width}`);
+    assert.equal(await evaluate("document.querySelector('.lounge-lobby').firstElementChild.className"), 'lounge-hero');
+    assert.equal(await evaluate("document.querySelector('.lounge-hero').nextElementSibling.className"), 'lounge-open-rooms');
+    assert.equal(await evaluate("document.querySelector('.lounge-invite')===null"), true);
+    assert.equal(await evaluate("document.querySelector('.lounge-selections .lounge-section-title span').textContent"), '01 · TALK ABOUT');
+    assert.match(await evaluate("document.querySelector('.lounge-topic-options').textContent"), /여행과 산행 풍경/);
+    assert.match(await evaluate("document.querySelector('.lounge-topic-options').textContent"), /먹거리와 맛집/);
+    assert.equal(await evaluate("document.querySelectorAll('.lounge-theme-options button').length"), 6);
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-theme-options')).gridTemplateColumns.split(' ').length"), width > 600 ? 3 : 2, 'three scenery cards per desktop row; readable mobile cards');
+    assert.equal(await evaluate("document.querySelectorAll('.lounge-host-option .lounge-host-photo img').length"), 4);
+    assert.equal(await evaluate("(async()=>{const images=[...document.querySelectorAll('.lounge-host-option .lounge-host-photo img')];await Promise.all(images.map(i=>i.decode()));return images.every(i=>i.naturalWidth===512);})()"), true, 'four generated portraits load');
+    assert.equal(await evaluate("document.querySelectorAll('.lounge-voice-preview').length"), 4);
+    assert.equal(await evaluate("(async()=>{const i=document.querySelector('.lounge-hero-visual img');await i.decode();return i.naturalWidth>=1200;})()"), true, 'club lounge hero photo loads');
+    assert.equal(await evaluate("document.querySelector('.lounge-hero h1').textContent"), '문득 사람과의 대화가 하고 싶은 순간이 찾아올 때...');
+    assert.equal(await evaluate("document.querySelector('.lounge-hero-visual').offsetWidth===document.querySelector('.lounge-hero').clientWidth"), true, 'photo covers the hero');
+    assert.equal(await evaluate("[...document.querySelectorAll('.lounge-host-option .lounge-host-photo')].every(p=>p.getBoundingClientRect().width>=104)"), true, 'enlarged host portraits');
+    assert.equal(await evaluate("document.querySelectorAll('.lounge-host-option strong')[3].textContent"), '발랄한 진행자');
     await screenshot(`lobby-${width}`);
     await send('Page.navigate', { url: `${base}/lounge/preview?host=ina&capacity=6` });
     await waitFor("document.querySelectorAll('.lounge-seat').length===6");
@@ -38,18 +78,50 @@ try {
     assert.equal(await evaluate("document.querySelectorAll('.lounge-seat.occupied').length"), 3);
     assert.match(await evaluate("document.querySelector('.lounge-preview-notice').textContent"), /실제 참가자/);
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-chat-panel')).display"), 'none', 'journal starts collapsed');
-    assert.equal(await evaluate("document.querySelector('.lounge-seats').getBoundingClientRect().top >= document.querySelector('.lounge-scene').getBoundingClientRect().bottom"), true, 'portraits stay below the view');
+    assert.ok(await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().height") >= (width > 800 ? 650 : width > 600 ? 590 : 540), 'immersive scenery height');
+    assert.equal(await evaluate("(()=>{const face=document.querySelector('.lounge-seat-avatar').getBoundingClientRect(),scene=document.querySelector('.lounge-scene').getBoundingClientRect(),intro=document.querySelector('.lounge-scene-intro').getBoundingClientRect();return face.top<scene.bottom&&face.top>intro.bottom+8;})()"), true, 'portraits overlap the softened lower scenery without covering its caption');
     await screenshot(`room-${width}`);
+    const sceneWidth = await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().width");
+    const scrollBefore = await evaluate('scrollY');
+    await evaluate("document.querySelector('.lounge-records-tab').click()");
+    await waitFor("document.querySelector('.lounge-records-tab').getAttribute('aria-expanded')==='true'");
+    assert.equal(await evaluate('scrollY'), scrollBefore, 'records open without scrolling away from the scenery');
+    assert.equal(await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().width"), sceneWidth, 'records do not resize the view');
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-chat-panel')).position"), 'fixed');
+    await waitFor("(()=>{const b=document.querySelector('.lounge-chat-panel').getBoundingClientRect();return b.right<=innerWidth+1&&b.left>=-1&&b.top>=-1&&b.bottom<=innerHeight+1;})()");
+    assert.equal(await evaluate("document.activeElement===document.querySelector('.lounge-chat-panel')"), true);
+    assert.ok(await evaluate("document.querySelectorAll('.lounge-chat-log article').length")>0, 'shared messages are visible');
+    await screenshot(`records-${width}`);
+    await evaluate("document.querySelector('.lounge-chat-panel').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
+    assert.equal(await evaluate("document.activeElement===document.querySelector('.lounge-records-tab')"), true, 'closing restores the side tab focus');
   }
-  for (const theme of ['rooftop', 'river', 'forest']) {
+  await send('Page.navigate', { url: `${base}/lounge` });
+  await waitFor("document.querySelectorAll('.lounge-voice-preview').length===4");
+  for (const file of ['host-witty-v1', 'host-empathetic-v1', 'host-lively-v1', 'host-bubbly-v1']) {
+    const duration = await evaluate(`new Promise((resolve,reject)=>{const a=new Audio('/lounge/${file}.mp3');a.onloadedmetadata=()=>resolve(a.duration);a.onerror=()=>reject(new Error('voice sample did not load'));a.load();})`);
+    assert.ok(duration > 3 && duration < 45, 'short Korean voice sample decodes');
+  }
+  await evaluate("window.hostSampleAudio=[];window.originalHostAudio=window.Audio;window.Audio=function(...args){const a=new window.originalHostAudio(...args);window.hostSampleAudio.push(a);return a;}");
+  await send('Runtime.evaluate', { expression: "document.querySelectorAll('.lounge-voice-preview')[0].click()", userGesture: true });
+  await waitFor("window.hostSampleAudio.length===1 && !window.hostSampleAudio[0].paused");
+  await send('Runtime.evaluate', { expression: "document.querySelectorAll('.lounge-voice-preview')[1].click()", userGesture: true });
+  await waitFor("window.hostSampleAudio.length===2 && !window.hostSampleAudio[1].paused");
+  assert.equal(await evaluate("window.hostSampleAudio[0].paused"), true, 'starting another style stops the previous sample');
+  assert.equal(await evaluate("document.querySelectorAll('.lounge-voice-preview[aria-pressed=true]').length"), 1);
+  await evaluate("document.querySelector('.lounge-preview-button').click()");
+  await waitFor("document.querySelector('.lounge-room-main')!==null");
+  assert.equal(await evaluate("window.hostSampleAudio[1].paused"), true, 'leaving the choices stops sample playback');
+  assert.match(await evaluate("document.querySelector('.lounge-moderator-avatar img').getAttribute('src')"), /host-witty-v2/);
+  await evaluate("window.Audio=window.originalHostAudio");
+  for (const [theme, asset] of [['rooftop', 'rooftop-city-v2'], ['river', 'river-v1'], ['forest', 'forest-v1'], ['hotel', 'hotel-lounge-v1'], ['cafe', 'rainy-cafe-v1'], ['seaside', 'seaside-terrace-v1']]) {
     for (const width of [1440, 390]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height:1000, deviceScaleFactor:1, mobile:false });
       await send('Page.navigate', {url:`${base}/lounge/preview?capacity=4&theme=${theme}`});
       await waitFor("document.querySelector('.lounge-room-main')!==null");
       assert.equal(await evaluate("document.querySelector('.lounge-room-main').dataset.theme"), theme);
-      assert.match(await evaluate("getComputedStyle(document.querySelector('.lounge-scene'),'::before').backgroundImage"), new RegExp(theme+'-v1.webp'));
+      assert.match(await evaluate("getComputedStyle(document.querySelector('.lounge-scene'),'::before').backgroundImage"), new RegExp(asset+'\\.webp'));
       assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
-      assert.equal(await evaluate(`(async()=>{const image=new Image();image.src='/lounge/${theme}-v1.webp';await image.decode();return image.naturalWidth>1000;})()`), true, 'background loads');
+      assert.equal(await evaluate(`(async()=>{const image=new Image();image.src='/lounge/${asset}.webp';await image.decode();return image.naturalWidth>1000;})()`), true, 'background loads');
       await screenshot(`theme-${theme}-${width}`);
     }
   }
@@ -82,7 +154,7 @@ try {
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-host-option').length===4");
   await evaluate("document.querySelectorAll('.lounge-host-option')[1].click(); document.querySelectorAll('.lounge-capacities button')[5].click(); document.querySelectorAll('.lounge-theme-options button')[1].click()");
-  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /김이나/);
+  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /공감하는 진행자/);
   await type('.lounge-custom-topic input', '퇴근 후 나만의 작은 즐거움');
   await evaluate("document.querySelector('.lounge-preview-button').click()");
   await waitFor("document.querySelector('.lounge-room-main')!==null");
@@ -141,5 +213,5 @@ try {
   await evaluate("document.querySelector('.auth-modal-header .icon-button').click()");
   assert.deepEqual(errors, []);
   assert.deepEqual(paidRequests, []);
-  console.log('PASS: 320–1440px, 1–6 seats, separated view and portraits, journal disclosure/focus/draft/Escape, speaker and host effects, avatars, reduced motion, repeated preview conversations, no paid preview requests or runtime errors.');
-} finally { socket.close(); }
+  console.log('PASS: 320–1440px, full photo hero, 1–6 seats with blended scenery, right-side records/focus/draft/Escape, speaker effects, avatars, reduced motion, repeated preview conversations, no paid preview requests or runtime errors.');
+} finally { await send('Fetch.disable'); socket.close(); }

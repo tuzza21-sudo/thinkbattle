@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeSession, LoungeSessionAction } from './loungeSession';
 
 export class LoungeApiError extends Error {
@@ -20,6 +20,7 @@ export async function loungeRpc<T>(name: string, args: Record<string, unknown>):
   return data as T;
 }
 export const createLounge = (persona: LoungeHostId, topic: string, capacity: number, nickname: string, theme: LoungeThemeId = 'rooftop') => loungeRpc<string>('create_voice_lounge', { p_persona: persona, p_topic: topic, p_capacity: capacity, p_nickname: nickname, p_theme: theme, p_study_required: loungeNeedsStudy(topic) });
+export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });
 export const postLoungeMessage = (id: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: id, p_text: text });

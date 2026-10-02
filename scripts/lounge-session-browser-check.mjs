@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const compile = path => ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-const code = { page: compile('../src/components/LoungePage.tsx') + '\nexports.TestRoom = LoungeRoomPage;', panel: compile('../src/components/LoungeSessionPanel.tsx'), session: compile('../src/lib/loungeSession.ts'), lounge: compile('../src/lib/lounge.ts'), audio: compile('../src/lib/useLoungeAudio.ts') };
+const code = { portrait: compile('../src/components/LoungeHostPortrait.tsx'), page: compile('../src/components/LoungePage.tsx') + '\nexports.TestRoom = LoungeRoomPage;', panel: compile('../src/components/LoungeSessionPanel.tsx'), session: compile('../src/lib/loungeSession.ts'), lounge: compile('../src/lib/lounge.ts'), audio: compile('../src/lib/useLoungeAudio.ts') };
 const targets = await (await fetch(`http://127.0.0.1:${process.env.LOUNGE_CDP_PORT || 9258}/json`)).json();
 const socket = new WebSocket(targets.find(t => t.type === 'page' && t.url.includes('5191')).webSocketDebuggerUrl);
 await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
@@ -22,8 +22,9 @@ try {
     const until = async check => { for(let i=0;i<160;i++) { if(check()) return; await wait(25); } throw new Error('Timed out in group session fixture'); };
     const check = (ok,message) => { if(!ok) throw new Error(message); };
     const sessionLib = evaluate(code.session), lounge = evaluate(code.lounge);
-    const reactRequire = name => name==='react' ? React : name==='react/jsx-runtime' ? JSX : name==='lucide-react' ? new Proxy({}, {get:()=>()=>null}) : name==='../lib/loungeSession' ? sessionLib : {};
+    const reactRequire = name => name==='react' ? React : name==='react/jsx-runtime' ? JSX : name==='lucide-react' ? new Proxy({}, {get:()=>()=>null}) : name==='../lib/loungeSession' ? sessionLib : name==='../lib/lounge' ? lounge : {};
     const panel = evaluate(code.panel,reactRequire);
+    const portrait = evaluate(code.portrait,reactRequire);
     const now = new Date().toISOString();
     let session = { room_id:'fixture',stage:0,state:'ready',speaker_id:'me',turn_id:'turn-a',turn_kind:'basic',round_order:['me','peer-a','peer-b'],completed:[],hand_queue:[],started_at:now,stage_started_at:now,turn_started_at:null,spoken_seconds:0,nudged:false,announced_turn:'turn-a',updated_at:now };
     const room = {id:'fixture',host_id:'me',host_persona:'ina',topic:'영화 호프',capacity:3,status:'active',guided_session:true,created_at:now,started_at:now,expires_at:new Date(Date.now()+3600000).toISOString(),ai_turns:1,last_ai_at:now};
@@ -57,7 +58,7 @@ try {
       const disconnect=React.useCallback(()=>{},[]),getSpeechActivity=React.useCallback(()=>({lastVoiceAt:0,recording:false,voicedMs:0}),[]);
       return {connected:ready,connecting:false,audioReady:ready,micOn:mic,connect,startMicrophone,disconnect,getSpeechActivity,speakers:[],aiSpeaking:false,participants:ready?session.round_order.map(id=>({id,name:id,muted:true})):[]};
     };
-    const page = evaluate(code.page,name=>name==='../lib/lounge'?lounge:name==='../lib/loungeApi'?api:name==='../lib/useLoungeAudio'?{useLoungeAudio:useAudio}:name==='./LoungeSessionPanel'?panel:name==='react-router-dom'?{Link:props=>React.createElement('a',props,props.children),useNavigate:()=>()=>{}}:reactRequire(name));
+    const page = evaluate(code.page,name=>name==='../lib/lounge'?lounge:name==='../lib/loungeApi'?api:name==='../lib/useLoungeAudio'?{useLoungeAudio:useAudio}:name==='./LoungeHostPortrait'?portrait:name==='./LoungeSessionPanel'?panel:name==='react-router-dom'?{Link:props=>React.createElement('a',props,props.children),useNavigate:()=>()=>{}}:reactRequire(name));
     const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
     root.render(React.createElement(React.StrictMode,null,React.createElement(page.TestRoom,{roomId:'fixture',user:{id:'me',nickname:'나'},onGuestRequest:async()=>{},onLoginRequest:()=>{}})));
     await until(()=>container.querySelector('.lounge-session-panel'));
@@ -73,7 +74,8 @@ try {
     click('다음 분께');await until(()=>session.speaker_id==='peer-b');await wait(50);
     click('다음 분께');await until(()=>session.speaker_id==='me'&&session.turn_kind==='extra');await wait(50);
     click('이번에는 패스');await until(()=>session.state==='between');await wait(50);
-    click('다음 이야기로');await until(()=>container.querySelector('.lounge-session-question').textContent.includes('첫인상'));
+    click('다음 이야기로');await until(()=>container.querySelector('.lounge-session-panel h3').textContent.includes('주제의 첫인상'));
+    check(container.querySelector('.lounge-session-question').textContent.includes('가장 먼저 어떤 느낌'),'First-impression question omitted the participant reaction');
     root.unmount();container.remove();
 
     // The actual audio hook is tested with synthetic tracks and recorder events.

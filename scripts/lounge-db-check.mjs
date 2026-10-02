@@ -231,5 +231,51 @@ try {
   assert.equal((await db.query('SELECT guided_session FROM voice_lounge_rooms WHERE id=$1', [soloGuided])).rows[0].guided_session, false, 'solo conversation stays free-form');
   await db.exec('DELETE FROM voice_lounge_rooms');
   assert.equal((await db.query('SELECT count(*)::int AS count FROM voice_lounge_sessions')).rows[0].count, 0, 'room cleanup also removes round state');
-  console.log('PASS: guided round-robin, hand FIFO, passes, rotated rounds, gentle warnings and long-turn handoff, late transcription attribution and stale AI cancellation; lounge upgrades, RLS, budgets and cleanup.');
+  const discoverySql = readFileSync(new URL('../supabase/migrations/20261002030000_voice_lounge_discovery_and_hotel.sql', import.meta.url), 'utf8');
+  await db.exec(discoverySql); await db.exec(discoverySql);
+  const hotel = (await asUser(0, "SELECT create_voice_lounge('ina','Hotel conversation',4,'Host','hotel',true) AS id")).rows[0].id;
+  assert.deepEqual((await asUser(0, 'SELECT theme,study_required,guided_session FROM voice_lounge_rooms WHERE id=$1', [hotel])).rows[0], { theme: 'hotel', study_required: true, guided_session: true }, 'hotel creation keeps research and guided sessions');
+  await asUser(1, "SELECT join_voice_lounge($1,'Guest')", [hotel]);
+  const listAnon = async () => {
+    await db.exec('SET ROLE anon');
+    try { return (await db.query('SELECT * FROM list_open_voice_lounges()')).rows; }
+    finally { await db.exec('RESET ROLE'); }
+  };
+  let listed = await listAnon();
+  assert.equal(listed.length, 1);
+  assert.deepEqual(Object.keys(listed[0]).sort(), ['id','topic','host_persona','theme','capacity','status','participant_count'].sort(), 'discovery reveals only allowed metadata');
+  assert.equal(listed[0].participant_count, 2);
+  assert.equal((await asUser(7, 'SELECT * FROM voice_lounge_rooms WHERE id=$1', [hotel])).rows.length, 0, 'listing does not open room details to outsiders');
+  assert.equal((await asUser(7, 'SELECT * FROM voice_lounge_members WHERE room_id=$1', [hotel])).rows.length, 0, 'member identities remain private');
+  await asUser(0, "SELECT create_voice_lounge('ina','Solo is private',1,'Host','hotel',false)");
+  assert.equal((await listAnon()).length, 1, 'solo rooms are never listed');
+  await db.query("UPDATE voice_lounge_members SET last_seen=now()-interval '3 minutes' WHERE room_id=$1 AND user_id=$2", [hotel, people[1]]);
+  assert.equal((await listAnon())[0].participant_count, 1, 'stale guests match join capacity cleanup');
+  await db.query("UPDATE voice_lounge_members SET last_seen=now()-interval '91 seconds' WHERE room_id=$1 AND user_id=$2", [hotel, people[0]]);
+  assert.equal((await listAnon()).length, 0, 'disconnected hosts hide abandoned rooms');
+  await db.query('UPDATE voice_lounge_members SET last_seen=now() WHERE room_id=$1', [hotel]);
+  await asUser(2, "SELECT join_voice_lounge($1,'Guest 2')", [hotel]);
+  await asUser(3, "SELECT join_voice_lounge($1,'Guest 3')", [hotel]);
+  assert.equal((await listAnon())[0].participant_count, 4, 'full rooms can be shown as full');
+  await asUser(0, "SELECT control_voice_lounge($1,'start')", [hotel]);
+  assert.equal((await listAnon())[0].status, 'active', 'ongoing rooms remain discoverable');
+  await db.query("UPDATE voice_lounge_rooms SET expires_at=now()-interval '1 second' WHERE id=$1", [hotel]);
+  assert.equal((await listAnon()).length, 0, 'expired rooms disappear');
+  await db.query("UPDATE voice_lounge_rooms SET expires_at=now()+interval '1 hour',status='ended' WHERE id=$1", [hotel]);
+  assert.equal((await listAnon()).length, 0, 'ended rooms disappear');
+  await assert.rejects(asUser(0, "SELECT create_voice_lounge('ina','Bad theme',4,'Host','unknown',false)"));
+  const newThemesSql = readFileSync(new URL('../supabase/migrations/20261002040000_voice_lounge_cafe_and_seaside.sql', import.meta.url), 'utf8');
+  await db.exec(newThemesSql); await db.exec(newThemesSql);
+  for (const theme of ['rooftop', 'river', 'forest', 'hotel', 'cafe', 'seaside']) {
+    const themed = (await asUser(0, "SELECT create_voice_lounge('ina','Scenery conversation',3,'Host',$1,true) AS id", [theme])).rows[0].id;
+    await asUser(1, "SELECT join_voice_lounge($1,'Guest')", [themed]);
+    assert.deepEqual((await asUser(1, 'SELECT theme,study_required,guided_session FROM voice_lounge_rooms WHERE id=$1', [themed])).rows[0], { theme, study_required: true, guided_session: true }, 'six themes are shared with members and preserve research and guided-session settings');
+    assert.equal((await listAnon()).find(room => room.id === themed)?.theme, theme, 'new scenery survives discovery');
+  }
+  const legacyCafe = (await asUser(0, "SELECT create_voice_lounge('ina','Legacy cafe',2,'Host','cafe') AS id")).rows[0].id;
+  assert.equal((await asUser(0, 'SELECT theme FROM voice_lounge_rooms WHERE id=$1', [legacyCafe])).rows[0].theme, 'cafe', 'five-argument creation also supports new scenery');
+  assert.equal((await db.query("SELECT has_function_privilege('anon','public.create_voice_lounge(text,text,integer,text,text)','EXECUTE') AS allowed")).rows[0].allowed, false, 'public discovery does not permit anonymous creation');
+  await assert.rejects(asUser(0, "SELECT create_voice_lounge('ina','Bad theme',4,'Host','unknown',false)"));
+  await assert.rejects(db.query("UPDATE voice_lounge_rooms SET theme='unknown' WHERE id=$1", [legacyCafe]), /voice_lounge_rooms_theme_check/);
+  console.log('PASS: six scenery upgrades including cafe/seaside, member and lobby metadata, room discovery privacy, stale/full/solo/ended rooms; guided turns, hand FIFO, passes, RLS, budgets and cleanup.');
 } finally { await db.close(); }

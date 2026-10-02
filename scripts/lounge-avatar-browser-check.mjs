@@ -5,6 +5,7 @@ import ts from 'typescript';
 const compile = path => ts.transpileModule(readFileSync(path,'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const authCode = compile('src/components/AuthModal.tsx');
 const editorCode = compile('src/components/LoungeAvatarEditor.tsx');
+const dialogCode = compile('src/components/LoungeAccountDialog.tsx');
 const targets = await (await fetch(`http://127.0.0.1:${process.env.LOUNGE_CDP_PORT || 9241}/json`)).json();
 const target = targets.find(target => target.type === 'page' && target.url.includes('5191'));
 assert.ok(target,'Open the local app on port 5191 in a CDP browser');
@@ -39,9 +40,10 @@ try {
     supabase.from=()=>{const query={update:()=>{calls.save++;return query;},eq:()=>query,select:()=>query,single:async()=>({data:{id:user.id},error:null})};return query;};
     supabase.storage.from=()=>({upload:async(path,blob)=>{calls.upload++;if(blob.type!=='image/webp'||path.split('/')[0]!==user.id)throw new Error('Only transformed image may be uploaded');if(failSave){failSave=false;return {error:{message:'mock save failure'}};}return {error:null};},createSignedUrl:async path=>({data:{signedUrl:supabase.supabaseUrl+'/storage/v1/object/sign/lounge-avatars/'+path+'?token=fixture'},error:null}),remove:async()=>({error:null})});
     const editor={};new Function('exports','require',${JSON.stringify(editorCode)})(editor,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/loungeAvatar'?actual:{});
+    const dialog={};new Function('exports','require',${JSON.stringify(dialogCode)})(dialog,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):{});
     class Confirmation extends Error{}
     const auth={signUpWithEmail:async()=>{calls.signup++;return user;},EmailConfirmationRequiredError:Confirmation};
-    const output={};new Function('exports','require',${JSON.stringify(authCode)})(output,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?auth:name==='./LoungeAvatarEditor'?editor:{});
+    const output={};new Function('exports','require',${JSON.stringify(authCode)})(output,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?auth:name==='./LoungeAvatarEditor'?editor:name==='./LoungeAccountDialog'?dialog:{});
     const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);
     root.render(React.createElement(React.StrictMode,null,React.createElement(output.AuthModal,{onClose:()=>calls.close++,onAuthenticated:value=>{calls.authenticated++;finalUser=value;}})));
     const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -65,7 +67,7 @@ try {
     if(container.querySelector('.auth-modal').scrollWidth>390)throw new Error('Mobile modal overflow');
     root.unmount();container.remove();
     const confirmAuth={...auth,signUpWithEmail:async()=>{throw new Confirmation();}};
-    const confirmOutput={};new Function('exports','require',${JSON.stringify(authCode)})(confirmOutput,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?confirmAuth:name==='./LoungeAvatarEditor'?editor:{});
+    const confirmOutput={};new Function('exports','require',${JSON.stringify(authCode)})(confirmOutput,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?confirmAuth:name==='./LoungeAvatarEditor'?editor:name==='./LoungeAccountDialog'?dialog:{});
     const check=document.createElement('div');document.body.appendChild(check);const checkRoot=createRoot(check);checkRoot.render(React.createElement(confirmOutput.AuthModal,{onClose:()=>{},onAuthenticated:()=>{throw new Error('Unverified signup must not authenticate');}}));
     await until(()=>check.querySelector('.auth-mode-tabs'));check.querySelectorAll('.auth-mode-tabs button')[1].click();await wait(30);
     check.querySelectorAll('.form-field input').forEach((input,i)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,values[i]);input.dispatchEvent(new Event('input',{bubbles:true}));});check.querySelector('.legal-consent-check input').click();await wait(20);check.querySelector('.btn-primary').click();await until(()=>check.textContent.includes('가입 확인 메일을 보냈어요'));

@@ -1,0 +1,109 @@
+.modal-overlay.lounge-account-overlay { padding:24px; background:#101914bd; backdrop-filter:blur(14px); z-index:120; overflow-y:auto; }
+.modal-content.auth-modal.lounge-account-dialog { --primary:#e6c994; --text-muted:#b7bcae; --text-light:#f4edde; width:min(920px,100%); max-width:920px; max-height:min(880px,calc(100dvh - 48px)); padding:0; margin:auto; display:grid; grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr); gap:0; overflow:auto; background:#263129; color:#f4edde; border:1px solid #f5e5c52b; border-radius:24px; box-shadow:0 28px 110px #0006; font-family:'Pretendard','Noto Sans KR',system-ui,sans-serif; animation:lounge-account-arrive .22s ease-out; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#899178 #263129; }
+.lounge-account-dialog *,.lounge-account-dialog *::before,.lounge-account-dialog *::after { box-sizing:border-box; }
+.lounge-account-dialog :where(button,input) { font:inherit; }
+.lounge-account-dialog :where(h2,h3,p) { margin:0; }
+.lounge-account-dialog button { cursor:pointer; transition:background .18s,border-color .18s; }
+.lounge-account-dialog button:disabled { cursor:default; opacity:.5; }
+.lounge-account-dialog :where(button,a,input,summary):focus-visible { outline:2px solid #e6c994; outline-offset:4px; }
+.lounge-account-scene { display:flex; flex-direction:column; min-width:0; background:#1d2921; border-right:1px solid #ffffff0c; }
+.lounge-account-view { position:relative; min-height:250px; flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:90px; padding:26px; isolation:isolate; }
+.lounge-account-view::before { content:''; z-index:-2; position:absolute; inset:0; background:url('/lounge/rooftop-city-v2.webp') 43% center/cover no-repeat; }
+.lounge-account-view::after { content:''; z-index:-1; position:absolute; inset:0; background:linear-gradient(180deg,#10251f70,transparent 40%,#1d2921); }
+.lounge-account-view>span { display:flex; align-items:center; gap:9px; font-size:15px; color:#fff4e0; text-shadow:0 1px 8px #0007; font-weight:600; }
+.lounge-account-view small { font-size:9px; letter-spacing:2px; color:#edcf9b; }
+.lounge-account-welcome { padding:5px 30px 30px; }
+.lounge-account-invitation { display:flex; align-items:center; gap:7px; color:#d5c6a5; font-size:11px; margin-bottom:20px; }
+.lounge-account-welcome h2 { color:#f3ead9; font-size:28px; font-weight:500; line-height:1.5; letter-spacing:-1px; }
+.lounge-account-welcome>p { margin-top:16px; font-size:12px; color:#b7bcae; line-height:1.9; white-space:pre-line; word-break:keep-all; }
+.lounge-account-scene-note { border-top:1px solid #e4d6b21c; margin-top:30px; padding-top:18px; display:flex; align-items:center; gap:8px; }
+.lounge-account-scene-note>span { flex-shrink:0; width:5px; height:5px; border-radius:50%; background:#d4c69d; }
+.lounge-account-scene-note p { color:#aeb7a7; font-size:10px; line-height:1.7; }
+.lounge-account-preview { display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; }
+.lounge-account-preview>span { display:grid; place-items:center; width:112px; aspect-ratio:1 / 1.1; border-radius:48% 48% 28% 28%; overflow:hidden; border:2px solid #e3d1a852; background:linear-gradient(145deg,#899177,#4a5c46); color:#fff4db; font-size:42px; }
+.lounge-account-preview img { width:100%; height:100%; object-fit:cover; }
+.lounge-account-preview small { color:#b4bdaa; font-size:10px; margin-top:3px; }
+.lounge-account-preview strong { color:#f0e6d2; font-size:20px; font-weight:500; overflow-wrap:anywhere; }
+.lounge-account-content { padding:32px; min-width:0; }
+.lounge-account-dialog .auth-modal-header { gap:14px; margin-bottom:24px; }
+.lounge-account-eyebrow { display:block; color:#dbc799; font-size:9px; font-weight:600; letter-spacing:1.6px; margin-bottom:12px; }
+.lounge-account-dialog .auth-modal-heading h2 { color:#f5ebd8; font-size:25px; line-height:1.4; font-weight:550; letter-spacing:-.8px; }
+.lounge-account-dialog .auth-modal-heading p { color:#b7bcae; font-size:12px; line-height:1.8; margin-top:9px; word-break:keep-all; }
+.lounge-account-dialog .lounge-account-close { flex-shrink:0; width:34px; height:34px; border:1px solid #ffffff1f; border-radius:50%; background:#ffffff04; color:#d0d1c0; }
+.lounge-account-dialog .lounge-account-close:hover { color:#f6e9c7; border-color:#d5bc8666; background:#ffffff0a; }
+.lounge-account-dialog .auth-mode-tabs.segmented-control { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:4px; gap:4px; border:1px solid #ffffff15; border-radius:12px; background:#14251b66; margin-bottom:20px; }
+.lounge-account-dialog .auth-mode-tabs button { background:transparent; color:#adb8a8; font-size:12px; font-weight:500; min-height:42px; padding:10px; border-radius:9px; }
+.lounge-account-dialog .auth-mode-tabs button.active { background:#cdb88b; color:#243127; font-weight:700; box-shadow:0 2px 8px #0002; }
+.lounge-account-dialog .social-login-row { gap:9px; }
+.lounge-account-dialog .lounge-social { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:11px 9px; border-radius:11px; font-size:12px; font-weight:600; border:1px solid #ffffff25; }
+.lounge-account-dialog .lounge-social.kakao { background:#f5de74; border-color:#f5de74; color:#312b1e; }
+.lounge-account-dialog .lounge-social.google { background:#f4f0e6; color:#3c4135; border-color:#f4f0e6; }
+.lounge-account-divider { display:flex; align-items:center; gap:12px; margin:20px 0; font-size:10px; color:#98a490; }
+.lounge-account-divider::before,.lounge-account-divider::after { content:''; height:1px; flex:1; background:#ffffff14; }
+.lounge-account-form { display:grid; gap:15px; }
+.lounge-account-dialog .form-field { gap:7px; font-weight:500; font-size:12px; color:#d7dbc9; min-width:0; }
+.lounge-account-dialog .form-field input { width:100%; min-width:0; padding:13px 14px; border:1px solid #ffffff21; border-radius:11px; background:#1c2b22; color:#f5eddb; font-size:14px; box-shadow:none; }
+.lounge-account-dialog .form-field input::placeholder { color:#8e9c88; font-size:12px; }
+.lounge-account-dialog .form-field input:focus { border-color:#dbc28e; outline:2px solid #dbc28e25; outline-offset:1px; box-shadow:none; }
+.lounge-account-dialog .form-field input:disabled { color:#a7b29f; background:#202d24; }
+.lounge-account-field-note { font-size:10px; line-height:1.6; color:#9fae98; font-weight:400; }
+.lounge-account-passwords { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.lounge-account-dialog .legal-consent-check,.lounge-account-dialog .avatar-photo-consent { display:flex; align-items:flex-start; gap:9px; color:#b6c0aa; font-size:11px; line-height:1.8; margin:0; font-weight:400; }
+.lounge-account-dialog .legal-consent-check { padding:0; border:0; border-radius:0; background:transparent; }
+.lounge-account-dialog :where(.legal-consent-check,.avatar-photo-consent) input { accent-color:#d1bb8c; flex-shrink:0; width:15px; height:15px; margin:3px 0 0; }
+.lounge-account-dialog a { color:#e4d5b4; text-underline-offset:3px; }
+.lounge-account-dialog .social-legal-note { color:#94a18a; font-size:10px; line-height:1.8; margin:12px 0 0; }
+.lounge-account-dialog .btn.lounge-account-submit { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:46px; padding:13px 18px; color:#243027; background:#e0c593; border:1px solid #e0c593; border-radius:11px; font-size:13px; font-weight:650; box-shadow:none; }
+.lounge-account-dialog .btn.lounge-account-submit:hover:not(:disabled) { background:#eddaad; border-color:#eddaad; transform:none; }
+.lounge-account-dialog .form-error { padding:11px 13px; color:#f1c0a8; background:#ad6e4818; border:1px solid #d5996c42; border-radius:10px; font-size:12px; line-height:1.7; margin:0; }
+.lounge-account-success { display:flex; align-items:center; gap:8px; color:#d1ddb4; font-size:12px; line-height:1.7; padding:10px 12px; border:1px solid #c6d49a26; border-radius:10px; background:#b8c9970a; }
+.lounge-account-photo-details { padding:13px; border:1px solid #ffffff18; border-radius:12px; background:#ffffff03; }
+.lounge-account-photo-details summary { cursor:pointer; color:#d6dbc8; font-size:12px; line-height:1.6; }
+.lounge-account-photo-details summary span { color:#97a58e; font-size:10px; margin-left:7px; }
+.lounge-account-photo-details[open] summary { margin-bottom:10px; }
+.lounge-account-dialog .avatar-signup-intro { color:#aebaa2; font-size:11px; line-height:1.8; }
+.lounge-account-dialog .avatar-photo-input>label { border-color:#c8ba984a; background:#18251c66; border-radius:12px; padding:12px; }
+.lounge-account-dialog .avatar-photo-input strong { color:#ebe3ce; font-size:12px; font-weight:500; }
+.lounge-account-dialog .avatar-photo-input small { color:#a9b49e; font-size:10px; }
+.lounge-account-dialog .avatar-photo-thumb { background:#dbc79a14; color:#d9c89e; }
+.lounge-account-dialog .avatar-text-button { color:#c7cdb8; font-size:11px; }
+.lounge-account-dialog .lounge-avatar-editor { background:#19291f66; border-color:#ffffff18; padding:18px; border-radius:15px; margin:22px 0 0; }
+.lounge-account-dialog .avatar-editor-heading>span { color:#d5c59e; font-size:9px; letter-spacing:1.3px; }
+.lounge-account-dialog .avatar-editor-heading h3 { color:#eee5d0; font-size:16px; font-weight:500; margin:10px 0 8px; }
+.lounge-account-dialog .avatar-editor-heading p,.lounge-account-dialog .avatar-result p { color:#b2bda7; font-size:11px; line-height:1.8; }
+.lounge-account-dialog .avatar-generate { background:#334733; color:#e2e8d1; border:1px solid #bdcda33b; border-radius:10px; padding:12px; font-size:12px; }
+.lounge-account-dialog .avatar-result .btn { color:#243027; background:#e0c593; border:1px solid #e0c593; padding:12px; border-radius:10px; font-size:12px; }
+.lounge-account-dialog .avatar-usage-note { color:#99a78f; font-size:10px; line-height:1.8; }
+.lounge-account-dialog .avatar-current,.lounge-account-dialog .avatar-result>img { border-radius:46% 46% 28% 28%; border:1px solid #e5d4a740; }
+.lounge-account-identity { display:flex; align-items:center; gap:10px; padding:12px 14px; background:#ffffff04; border:1px solid #ffffff14; border-radius:11px; margin-bottom:22px; color:#c3cbb6; }
+.lounge-account-identity>div { display:grid; gap:5px; min-width:0; }
+.lounge-account-identity small { color:#96a58c; font-size:10px; }
+.lounge-account-identity span { font-size:12px; overflow-wrap:anywhere; }
+.lounge-account-section-label { display:block; font-size:10px; letter-spacing:1px; color:#caba96; margin-bottom:15px; }
+.lounge-account-status { display:grid; gap:18px; }
+.lounge-account-mail-icon { width:58px; height:58px; display:grid; place-items:center; border:1px solid #dac29540; border-radius:18px; color:#e3cb9e; background:#dac2950b; }
+.lounge-account-status>p { color:#b7c2ab; font-size:13px; line-height:1.9; overflow-wrap:anywhere; }
+.lounge-account-status>p strong { color:#eee1c3; font-weight:500; }
+.lounge-account-dialog .avatar-onboarding-skip { margin-top:15px; }
+@keyframes lounge-account-arrive { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@media(max-width:700px) {
+  .modal-overlay.lounge-account-overlay { padding:12px; align-items:center; }
+  .modal-content.auth-modal.lounge-account-dialog { grid-template-columns:1fr; max-height:calc(100dvh - 24px); width:100%; border-radius:20px; }
+  .lounge-account-scene { position:relative; border-right:0; min-height:126px; display:block; }
+  .lounge-account-view { min-height:126px; padding:20px 22px; gap:38px; }
+  .lounge-account-view::before { background-position:center 42%; }
+  .lounge-account-view::after { background:linear-gradient(180deg,#10251f65,#1d29218c); }
+  .lounge-account-welcome { display:none; }
+  .lounge-account-content { padding:24px; }
+  .lounge-account-dialog .auth-modal-heading h2 { font-size:23px!important; }
+  .lounge-account-dialog .form-field input { font-size:16px; }
+}
+@media(max-width:380px) {
+  .modal-overlay.lounge-account-overlay { padding:8px; }
+  .modal-content.auth-modal.lounge-account-dialog { max-height:calc(100dvh - 16px); border-radius:17px; }
+  .lounge-account-content { padding:20px 17px; }
+  .lounge-account-dialog .auth-modal-heading h2 { font-size:21px!important; }
+  .lounge-account-passwords { grid-template-columns:1fr; }
+  .lounge-account-dialog .social-login-row { grid-template-columns:1fr; }
+}
+@media(prefers-reduced-motion:reduce) { .modal-content.auth-modal.lounge-account-dialog { animation:none; } .lounge-account-dialog button { transition:none; } }

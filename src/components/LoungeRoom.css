@@ -5,15 +5,19 @@
 .has-room .lounge-brand>svg { color:#d6c8a4; }
 .has-room .lounge-brand strong span { font-size:8px; letter-spacing:1.8px; }
 .has-room .lounge-beta { background:#c6a36c10; border-color:#c6a36c33; color:#d8bd96; }
-.has-room .lounge-room-main { --lounge-accent:#ead0a3; --lounge-surface:#242421; --lounge-scene-image:url('/lounge/rooftop-v1.webp'); max-width:1320px; padding:25px 40px 40px; }
+.has-room .lounge-room-main { --lounge-accent:#ead0a3; --lounge-surface:#242421; --lounge-scene-image:url('/lounge/rooftop-city-v2.webp'); max-width:1320px; padding:25px 40px 40px; }
 .lounge-room-main[data-theme=river] { --lounge-accent:#bdd4e3; --lounge-surface:#1d2931; --lounge-scene-image:url('/lounge/river-v1.webp'); }
 .lounge-room-main[data-theme=forest] { --lounge-accent:#d4dcaa; --lounge-surface:#28352c; --lounge-scene-image:url('/lounge/forest-v1.webp'); }
+.lounge-room-main[data-theme=hotel] { --lounge-accent:#e7c69c; --lounge-surface:#33291f; --lounge-scene-image:url('/lounge/hotel-lounge-v1.webp'); }
+.lounge-room-main[data-theme=cafe] { --lounge-accent:#e0c6aa; --lounge-surface:#302923; --lounge-scene-image:url('/lounge/rainy-cafe-v1.webp'); }
+.lounge-room-main[data-theme=seaside] { --lounge-accent:#c4dfdd; --lounge-surface:#253536; --lounge-scene-image:url('/lounge/seaside-terrace-v1.webp'); }
 .has-room .lounge-preview-notice { background:#ffffff04; border-color:#ffffff15; color:#c7cbb8; font-size:11px; }
 .has-room .lounge-conversation-layout { display:flex; flex-direction:column; gap:18px; }
 .has-room .lounge-stage { position:relative; padding:0; border-radius:24px; background:var(--lounge-surface); border:1px solid #ffffff18; overflow:hidden; box-shadow:0 24px 70px #00000020; }
-.lounge-scene { position:relative; display:flex; flex-direction:column; justify-content:space-between; gap:90px; min-height:370px; padding:29px 32px 48px; isolation:isolate; }
+.lounge-scene { position:relative; display:flex; flex-direction:column; justify-content:space-between; gap:90px; min-height:650px; padding:29px 32px 48px; isolation:isolate; }
 .lounge-scene::before { content:''; position:absolute; z-index:-2; inset:0; background:var(--lounge-scene-image) center 49%/cover no-repeat; }
 .lounge-scene::after { content:''; position:absolute; z-index:-1; inset:0; background:linear-gradient(180deg,#101b196e,transparent 44%,#17231b0d 65%,var(--lounge-surface)); pointer-events:none; }
+.lounge-scene-soften { position:absolute; z-index:-1; inset:auto 0 0; height:240px; pointer-events:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); mask-image:linear-gradient(transparent,#000 60%); -webkit-mask-image:linear-gradient(transparent,#000 60%); }
 .has-room .lounge-room-topline { align-items:flex-start; gap:24px; margin:0; }
 .has-room .lounge-room-topline>div:first-child { min-width:0; }
 .has-room .lounge-room-topline h1 { color:#fff8ea; font-size:28px; letter-spacing:-.8px; font-weight:550; text-shadow:0 2px 12px #0006; margin-top:10px; }
@@ -25,17 +29,18 @@
 .has-room .lounge-room-top-actions button { background:#15221a9c; color:#fff8e9; border-color:#ffffff40; border-radius:30px; padding:9px 12px; font-size:11px; }
 .has-room .lounge-room-top-actions button:hover { background:#283a2cd9; }
 .has-room .lounge-journal-toggle[aria-expanded=true] { border-color:var(--lounge-accent); }
-.lounge-scene-intro { max-width:580px; text-shadow:0 1px 6px #0009; }
+.lounge-scene-intro { max-width:580px; margin-bottom:110px; text-shadow:0 1px 6px #0009; }
 .lounge-scene-intro>span { font-size:9px; letter-spacing:2px; color:#fff0d5; }
 .lounge-scene-intro p { color:#fff5e4; font-size:12px; line-height:1.7; margin:9px 0 14px; }
 .has-room .lounge-stage-label { color:#f2eadb; font-size:10px; font-weight:500; letter-spacing:0; gap:7px; }
 .has-room .lounge-stage-label>span { margin-left:5px; background:#17201966; color:#fff5df; border:1px solid #ffffff30; border-radius:30px; font-size:9px; padding:4px 9px; }
-.lounge-conversation-space { padding:0 32px 27px; }
+.lounge-conversation-space { position:relative; z-index:1; margin-top:-104px; padding:0 32px 27px; }
 .lounge-table-topic { display:flex; flex-direction:column; align-items:center; text-align:center; gap:9px; max-width:760px; margin:0 auto 30px; }
 .lounge-table-topic>span { display:flex; align-items:center; gap:12px; color:var(--lounge-accent); font-size:9px; letter-spacing:2px; }
 .lounge-table-topic>span::before,.lounge-table-topic>span::after { content:''; width:36px; height:1px; background:var(--lounge-accent); opacity:.35; }
 .has-room .lounge-table-topic h2 { color:#f1e9d8; font-size:16px; line-height:1.7; font-weight:500; letter-spacing:-.3px; overflow-wrap:anywhere; }
 .has-room .lounge-seats { display:flex; justify-content:center; align-items:start; gap:clamp(20px,4vw,58px); margin:0 auto; max-width:1030px; }
+.has-room .lounge-conversation-space>.lounge-seats { margin-bottom:25px; }
 .has-room .lounge-seats.seats-1 { max-width:none; }
 .has-room .lounge-seat { --portrait-size:112px; position:relative; flex:0 1 128px; min-width:0; padding:0; border:0; background:none; box-shadow:none; backdrop-filter:none; }
 .has-room .lounge-seats.seats-1 .lounge-seat { --portrait-size:132px; flex-basis:160px; }
@@ -86,14 +91,18 @@
 .lounge-avatar-picker button { aspect-ratio:1; border-radius:50%; padding:0; border:2px solid transparent; background:none; }
 .lounge-avatar-picker button[aria-pressed=true] { border-color:var(--lounge-accent); box-shadow:0 0 0 3px #ffffff15; }
 .lounge-avatar-picker small { color:#b9bead; font-size:9px; }
-.has-room .lounge-chat-panel { width:100%; max-width:850px; align-self:center; background:var(--lounge-surface); border:1px solid #ffffff20; border-radius:20px; min-height:0; }
+.has-room .lounge-chat-panel { position:fixed; z-index:90; top:108px; right:40px; bottom:20px; width:min(420px,calc(100vw - 64px)); max-width:none; background:var(--lounge-surface); border:1px solid #ffffff30; border-radius:20px; min-height:0; box-shadow:-12px 12px 60px #0006; }
 .has-room .lounge-chat-panel[hidden] { display:none; }
+.has-room .lounge-chat-panel:focus { outline:none; }
+.lounge-records-tab { position:fixed; z-index:85; right:0; top:42%; display:flex; align-items:center; gap:9px; writing-mode:vertical-rl; padding:17px 12px; background:var(--lounge-surface); border:1px solid #ffffff35; border-right:0; border-radius:13px 0 0 13px; color:var(--lounge-accent); font-size:11px; box-shadow:-5px 4px 20px #0003; }
+.lounge-records-tab[aria-expanded=true] { background:var(--lounge-accent); color:var(--lounge-surface); }
+.has-room .lounge-chat-heading,.has-room .lounge-chat-intro,.has-room .lounge-chat-form,.has-room .lounge-chat-privacy { flex-shrink:0; }
 .has-room .lounge-chat-heading { padding:20px 22px 14px; border:0; color:var(--lounge-accent); }
 .has-room .lounge-chat-heading h2 { color:#f0e6d8; font-size:14px; }
 .has-room .lounge-chat-heading>span { color:var(--lounge-accent); border:1px solid #ffffff25; border-radius:20px; padding:4px 6px; }
 .lounge-journal-close { display:grid; place-items:center; width:32px; height:32px; padding:0; border:1px solid #ffffff20; border-radius:50%; background:#ffffff05; color:#e3e9d6; }
 .lounge-chat-intro { color:#bfc6b2; font-size:10px; padding:0 22px 17px; border-bottom:1px solid #ffffff0c; line-height:1.6; }
-.has-room .lounge-chat-log { padding:22px; max-height:440px; height:320px; }
+.has-room .lounge-chat-panel .lounge-chat-log { padding:22px; flex:1; min-height:0; max-height:none; height:auto; }
 .has-room .lounge-chat-avatar { width:36px; height:36px; background:#69735a; color:#e6d6ae; }
 .has-room .lounge-chat-avatar .initials { font-size:13px; }
 .has-room .lounge-chat-log strong { color:var(--lounge-accent); font-size:10px; margin-top:3px; }
@@ -117,12 +126,12 @@
   .has-room .lounge-room-top-actions { justify-content:flex-start; }
   .has-room .lounge-seats.seats-5,.has-room .lounge-seats.seats-6 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:26px 18px; max-width:560px; }
   .has-room .lounge-seat { --portrait-size:104px; }
-  .lounge-scene { min-height:340px; }
+  .lounge-scene { min-height:590px; }
 }
 @media(max-width:600px) {
   .has-room .lounge-room-main { padding:18px 14px 30px; }
   .has-room .lounge-stage { border-radius:20px; }
-  .lounge-scene { min-height:300px; padding:21px 20px 36px; gap:56px; }
+  .lounge-scene { min-height:540px; padding:21px 20px 36px; gap:56px; }
   .has-room .lounge-room-topline { flex-direction:column; gap:14px; }
   .has-room .lounge-room-topline h1 { font-size:23px; }
   .has-room .lounge-room-top-actions { width:100%; gap:6px; }
@@ -130,9 +139,11 @@
   .has-room .lounge-room-top-actions button { padding:8px; font-size:10px; }
   .has-room .lounge-room-top-actions button svg { width:14px; height:14px; }
   .lounge-scene-intro>span { font-size:8px; }
+  .lounge-scene-intro { margin-bottom:90px; }
   .lounge-scene-intro p { font-size:11px; margin:8px 0 12px; }
   .has-room .lounge-stage-label { font-size:9px; }
-  .lounge-conversation-space { padding:0 18px 23px; }
+  .lounge-scene-soften { height:210px; }
+  .lounge-conversation-space { margin-top:-84px; padding:0 18px 23px; }
   .lounge-table-topic { margin-bottom:24px; }
   .has-room .lounge-table-topic h2 { font-size:14px; }
   .has-room .lounge-seats,.has-room .lounge-seats.seats-5,.has-room .lounge-seats.seats-6 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:25px 16px; max-width:370px; }
@@ -157,7 +168,9 @@
   .lounge-avatar-picker>div { gap:6px; }
   .has-room .lounge-chat-heading { padding:17px 16px 12px; }
   .lounge-chat-intro { padding-inline:16px; }
-  .has-room .lounge-chat-log { height:280px; padding:18px 14px; }
+  .has-room .lounge-chat-panel { top:88px; right:14px; bottom:16px; width:calc(100vw - 28px); }
+  .has-room .lounge-chat-panel .lounge-chat-log { padding:18px 14px; }
+  .lounge-records-tab { top:auto; bottom:18px; right:12px; border-right:1px solid #ffffff35; border-radius:30px; writing-mode:horizontal-tb; padding:12px 15px; }
   .has-room .lounge-chat-form input { font-size:16px; }
   .has-room .lounge-brand strong span { display:none; }
   .has-room .lounge-header { height:72px; }

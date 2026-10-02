@@ -241,6 +241,48 @@ test('lounge client preserves non-retryable billing errors for the host schedule
     await assert.rejects(client.requestLoungeHost(roomId, 'opening'), error => error instanceof client.LoungeApiError && error.retryable === false && error.code === 'openai_credit_exhausted');
   });
 });
+test('stored host style controls both text and PCM/MP3 speech, including voice, prosody and speed', async () => {
+  for (const host of lounge.loungeHosts) {
+    for (const streaming of [false, true]) {
+      const spoken = '산행 뒤 먹은 만두가 가장 기억에 남았군요. 어떤 점이 좋았어요?';
+      let speechCalls = 0;
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '산행 뒤 먹은 한 끼', host_persona: host.id, memory: '', capacity: 1 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+        if (url.endsWith('/responses')) {
+          const body = JSON.parse(init.body);
+          assert.ok(body.instructions.includes(host.instruction), 'selected personality reaches the conversation model');
+          assert.doesNotMatch(body.instructions, /유재석|김이나/);
+          return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: spoken, memory: '' }) }] }] });
+        }
+        if (url.includes('finish_voice_lounge_host')) return result(true);
+        if (url.endsWith('/audio/speech')) {
+          const body = JSON.parse(init.body); speechCalls++;
+          assert.equal(body.voice, host.voice);
+          assert.equal(body.speed, host.speechSpeed);
+          assert.ok(body.instructions.includes(host.speechInstruction), 'voice delivery uses speech-specific directions');
+          assert.ok(!body.instructions.includes(host.instruction), 'conversation examples are not speech performance instructions');
+          assert.equal(body.input, spoken);
+          assert.equal(body.response_format, streaming ? 'pcm' : 'mp3');
+          return new Response(new Uint8Array([0, 128, 255, 127]));
+        }
+        throw new Error('Unexpected fetch');
+      }, async () => {
+        // A client-supplied persona cannot replace the room's selected host.
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: streaming, hostId: 'not-the-room-host' }));
+        assert.equal(response.status, 200);
+        if (streaming) {
+          const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+          assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+        } else assert.equal((await response.json()).text, spoken);
+        assert.equal(speechCalls, 1, 'one shared voice request serves the turn');
+      });
+    }
+  }
+});
+
 test('one host response serves six members; context is bounded and speech is generated once', async () => {
   const calls = [], long = '가'.repeat(2000);
   await run(async (url, init) => {

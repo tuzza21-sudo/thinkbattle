@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, User, Save } from 'lucide-react';
+import { Check, LoaderCircle, Mail, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
 import { LoungeAvatarEditor } from './LoungeAvatarEditor';
+import { LoungeAccountDialog } from './LoungeAccountDialog';
 
 interface ProfileModalProps {
   user: AppUser;
@@ -18,6 +19,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
   const [success, setSuccess] = useState(false);
 
   const handleSave = async () => {
+    if (loading) return;
     setError('');
     setSuccess(false);
     
@@ -76,61 +78,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
     }
   };
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content auth-modal" style={{ maxWidth: '450px', padding: '2rem' }}>
-        <div className="flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
-          <div>
-            <h2 style={{ color: 'var(--primary)', fontSize: '1.6rem', margin: 0 }}>
-              프로필 수정
-            </h2>
-            <p style={{ color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              {serviceName}에서 사용할 프로필 정보를 관리합니다.
-            </p>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label="닫기">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex flex-col gap-4" style={{ marginBottom: '1.5rem' }}>
-          <label className="form-field">
-            <span>계정 이메일</span>
-            <input 
-              value={user.email || '소셜 계정(이메일 정보 없음)'} 
-              disabled 
-              style={{ opacity: 0.6, cursor: 'not-allowed', backgroundColor: 'rgba(255,255,255,0.03)' }} 
-            />
-          </label>
-          <label className="form-field">
-            <span>닉네임</span>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <input 
-                value={nickname} 
-                onChange={e => setNickname(e.target.value)} 
-                placeholder="새 닉네임 입력" 
-                maxLength={20}
-                style={{ paddingLeft: '2.5rem', width: '100%' }}
-              />
-              <User size={16} style={{ position: 'absolute', left: '1rem', color: 'var(--text-muted)' }} />
-            </div>
-          </label>
-        </div>
-
-        {error && <div className="form-error" style={{ marginBottom: '1rem' }}>{error}</div>}
-        {success && <div style={{ color: 'var(--primary)', marginBottom: '1rem', fontSize: '0.9rem', textAlign: 'center', fontWeight: 'bold' }}>✓ 닉네임이 성공적으로 변경되었습니다!</div>}
-
-        <button 
-          className="btn btn-primary" 
-          style={{ width: '100%', padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }} 
-          onClick={handleSave} 
-          disabled={loading || success}
-        >
-          <Save size={16} />
-          {loading ? '저장 중...' : '변경 사항 저장'}
-        </button>
-        {!user.isAnonymous && <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />}
-      </div>
-    </div>
-  );
+  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '수다 라운지' ? '편한 이름과 나를 닮은 얼굴로, 내 대화석을 꾸며요.' : serviceName + '에서 사용할 이름과 라운지 아바타를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
+    <div className="lounge-account-identity"><Mail size={17} /><div><small>로그인 계정</small><span>{user.email || '소셜 계정 · 이메일 정보 없음'}</span></div></div>
+    <span className="lounge-account-section-label">01 · 대화에서 불릴 이름</span>
+    <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSave(); }} aria-busy={loading}>
+      <label className="form-field"><span>닉네임</span><input data-dialog-autofocus value={nickname} onChange={event => { setNickname(event.target.value); setSuccess(false); }} placeholder="새 닉네임 입력" maxLength={20} autoComplete="nickname" required disabled={loading} /><small className="lounge-account-field-note">실명 대신 편한 이름도 좋아요. 최대 20자.</small></label>
+      {error && <div className="form-error" role="alert">{error}</div>}
+      {success && <p className="lounge-account-success" role="status"><Check size={16} />이 이름으로 함께 이야기할게요. 저장했어요.</p>}
+      <button type="submit" className="btn btn-primary lounge-account-submit" disabled={loading || success}>{loading ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{loading ? '저장 중…' : success ? '저장했어요' : '변경 사항 저장'}</button>
+    </form>
+    {!user.isAnonymous && <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />}
+  </LoungeAccountDialog>;
 };
