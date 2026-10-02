@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test:coach": "node --test scripts/thinking-coach.test.mjs scripts/opening-draft.test.mjs",
     "test:session": "node --test scripts/live-session.test.mjs",
+    "test:lounge": "node --test scripts/lounge-api.test.mjs",
     "test:livekit": "node scripts/livekit-smoke-test.mjs",
     "preview": "vite preview"
   },

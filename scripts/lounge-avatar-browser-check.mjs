@@ -1,0 +1,80 @@
+// Real signup/editor components with local mocks. No real account or paid API calls.
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+const compile = path => ts.transpileModule(readFileSync(path,'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+const authCode = compile('src/components/AuthModal.tsx');
+const editorCode = compile('src/components/LoungeAvatarEditor.tsx');
+const targets = await (await fetch(`http://127.0.0.1:${process.env.LOUNGE_CDP_PORT || 9241}/json`)).json();
+const target = targets.find(target => target.type === 'page' && target.url.includes('5191'));
+assert.ok(target,'Open the local app on port 5191 in a CDP browser');
+const socket = new WebSocket(target.webSocketDebuggerUrl);
+await new Promise(resolve => socket.addEventListener('open',resolve,{once:true}));
+let id=0; const pending = new Map();
+socket.addEventListener('message',event=>{ const data=JSON.parse(event.data); if (!data.id) return; const task=pending.get(data.id); pending.delete(data.id); if(data.error) task.reject(new Error(JSON.stringify(data.error))); else task.resolve(data.result); });
+const send = (method,params={}) => new Promise((resolve,reject)=>{const next=++id; pending.set(next,{resolve,reject}); socket.send(JSON.stringify({id:next,method,params}));});
+try {
+  await send('Page.navigate',{url:'http://127.0.0.1:5191/lounge'});
+  await new Promise(resolve=>setTimeout(resolve,1500));
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:false});
+  const result=await send('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+    const ReactModule=await import('/node_modules/.vite/deps/react.js'); const React=ReactModule.default||ReactModule;
+    const JsxModule=await import('/node_modules/.vite/deps/react_jsx-runtime.js'); const JSX=JsxModule.default||JsxModule;
+    const DomModule=await import('/node_modules/.vite/deps/react-dom_client.js'); const {createRoot}=DomModule.default||DomModule;
+    const actual=await import('/src/lib/loungeAvatar.ts');
+    const {supabase}=await import('/src/lib/supabase.ts');
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=512;const ctx=canvas.getContext('2d');ctx.fillStyle='#8c9c76';ctx.fillRect(0,0,512,512);ctx.fillStyle='#ead7b9';ctx.beginPath();ctx.arc(256,230,130,0,Math.PI*2);ctx.fill();
+    const sample=canvas.toDataURL('image/png').split(',')[1];
+    const source=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg'));
+    const user={id:'00000000-0000-4000-8000-000000000001',email:'test@example.test',nickname:'테스트',provider:'email',isAnonymous:false,createdAt:new Date().toISOString()};
+    const calls={signup:0,generate:0,upload:0,save:0,authenticated:0,close:0};
+    let failGeneration=true,failSave=true,finalUser=null;
+    const previousFetch=window.fetch;window.fetch=async(url,init)=>{
+      if(url!=='/api/lounge-avatar') return previousFetch(url,init);
+      calls.generate++;const body=JSON.parse(init.body);if(body.mimeType!=='image/jpeg'||body.consent!==true)throw new Error('Normalization or consent failed');
+      if(failGeneration){failGeneration=false;return new Response(JSON.stringify({error:'테스트 연결 실패'}),{status:502});}
+      return new Response(JSON.stringify({image:sample,mimeType:'image/png'}),{status:200});
+    };
+    supabase.auth.getSession=async()=>({data:{session:{access_token:'fixture'}}});
+    supabase.from=()=>{const query={update:()=>{calls.save++;return query;},eq:()=>query,select:()=>query,single:async()=>({data:{id:user.id},error:null})};return query;};
+    supabase.storage.from=()=>({upload:async(path,blob)=>{calls.upload++;if(blob.type!=='image/webp'||path.split('/')[0]!==user.id)throw new Error('Only transformed image may be uploaded');if(failSave){failSave=false;return {error:{message:'mock save failure'}};}return {error:null};},createSignedUrl:async path=>({data:{signedUrl:supabase.supabaseUrl+'/storage/v1/object/sign/lounge-avatars/'+path+'?token=fixture'},error:null}),remove:async()=>({error:null})});
+    const editor={};new Function('exports','require',${JSON.stringify(editorCode)})(editor,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/loungeAvatar'?actual:{});
+    class Confirmation extends Error{}
+    const auth={signUpWithEmail:async()=>{calls.signup++;return user;},EmailConfirmationRequiredError:Confirmation};
+    const output={};new Function('exports','require',${JSON.stringify(authCode)})(output,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?auth:name==='./LoungeAvatarEditor'?editor:{});
+    const container=document.createElement('div');document.body.appendChild(container);const root=createRoot(container);
+    root.render(React.createElement(React.StrictMode,null,React.createElement(output.AuthModal,{onClose:()=>calls.close++,onAuthenticated:value=>{calls.authenticated++;finalUser=value;}})));
+    const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+    const until=async test=>{for(let i=0;i<150;i++){if(test())return;await wait(20);}throw new Error('Timed out: '+test);};
+    await until(()=>container.querySelector('.auth-mode-tabs'));
+    container.querySelectorAll('.auth-mode-tabs button')[1].click();await until(()=>container.querySelector('input[type=file]'));
+    const inputs=container.querySelectorAll('.form-field input');const values=['테스트','test@example.test','testing123','testing123'];inputs.forEach((input,i)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,values[i]);input.dispatchEvent(new Event('input',{bubbles:true}));});
+    const transfer=new DataTransfer();transfer.items.add(new File([source],'portrait.jpg',{type:'image/jpeg'}));container.querySelector('input[type=file]').files=transfer.files;container.querySelector('input[type=file]').dispatchEvent(new Event('change',{bubbles:true}));
+    container.querySelector('.legal-consent-check input').click();await wait(30);container.querySelector('.btn-primary').click();
+    await until(()=>container.querySelector('.lounge-avatar-editor'));
+    if(!container.querySelector('.avatar-generate').disabled)throw new Error('Consent must be required');
+    container.querySelector('.avatar-photo-consent input').click();await wait(20);container.querySelector('.avatar-generate').click();
+    await until(()=>container.querySelector('.form-error'));
+    if(calls.signup!==1||calls.authenticated!==0)throw new Error('Failed generation must keep the created account pending once');
+    container.querySelector('.avatar-generate').click();await until(()=>container.querySelector('.avatar-result img'));
+    if(calls.upload!==0)throw new Error('Preview must not upload before approval');
+    container.querySelector('.avatar-result button').click();await until(()=>container.querySelector('.form-error'));
+    if(calls.generate!==2)throw new Error('Failed save must reuse generated output');
+    container.querySelector('.avatar-result button').click();await until(()=>calls.authenticated===1);
+    if(!finalUser.loungeAvatarPath||!finalUser.loungeAvatarUrl)throw new Error('Approved avatar missing from profile');
+    if(container.querySelector('.auth-modal').scrollWidth>390)throw new Error('Mobile modal overflow');
+    root.unmount();container.remove();
+    const confirmAuth={...auth,signUpWithEmail:async()=>{throw new Confirmation();}};
+    const confirmOutput={};new Function('exports','require',${JSON.stringify(authCode)})(confirmOutput,name=>name==='react'?React:name==='react/jsx-runtime'?JSX:name==='lucide-react'?new Proxy({},{get:()=>()=>null}):name==='../lib/auth'?confirmAuth:name==='./LoungeAvatarEditor'?editor:{});
+    const check=document.createElement('div');document.body.appendChild(check);const checkRoot=createRoot(check);checkRoot.render(React.createElement(confirmOutput.AuthModal,{onClose:()=>{},onAuthenticated:()=>{throw new Error('Unverified signup must not authenticate');}}));
+    await until(()=>check.querySelector('.auth-mode-tabs'));check.querySelectorAll('.auth-mode-tabs button')[1].click();await wait(30);
+    check.querySelectorAll('.form-field input').forEach((input,i)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,values[i]);input.dispatchEvent(new Event('input',{bubbles:true}));});check.querySelector('.legal-consent-check input').click();await wait(20);check.querySelector('.btn-primary').click();await until(()=>check.textContent.includes('가입 확인 메일을 보냈어요'));
+    checkRoot.unmount();check.remove();window.fetch=previousFetch;
+    return {calls,confirmation:true};
+  })()`});
+  if(result.exceptionDetails)throw new Error(JSON.stringify(result.exceptionDetails));
+  assert.deepEqual(result.result.value.calls,{signup:1,generate:2,upload:2,save:1,authenticated:1,close:1});
+  assert.equal(result.result.value.confirmation,true);
+  console.log('Avatar browser: signup photo, explicit consent, preview, retries without duplicate signup or paid regeneration, WebP approval and email confirmation passed.');
+  await send('Page.navigate',{url:'http://127.0.0.1:5191/lounge'});
+}finally{socket.close();}

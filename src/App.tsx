@@ -3,7 +3,6 @@ import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import './App.css';
 import './components/HomeStudio.css';
 import './components/ServiceStudio.css';
-import { TrainingGatewayPage } from './components/TrainingGatewayPage';
 import { AuthModal } from './components/AuthModal';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
@@ -42,17 +41,48 @@ const SimulationHubPage = lazy(async () => ({ default: (await import('./componen
 const SimulationSessionPage = lazy(async () => ({ default: (await import('./components/SimulationSessionPage')).SimulationSessionPage }));
 const PersonalTrainingPage = lazy(async () => ({ default: (await import('./components/PersonalTrainingPage')).PersonalTrainingPage }));
 const LegalPage = lazy(async () => ({ default: (await import('./components/LegalPage')).LegalPage }));
+const LoungePage = lazy(async () => ({ default: (await import('./components/LoungePage')).LoungePage }));
 
 function App() {
   const { pathname } = useLocation();
   const normalizedPath = pathname.replace(/\/$/, '') || '/';
-  const isHomeRoute = ['/', '/debate', '/about', '/simulation'].includes(normalizedPath)
+  const isHomeRoute = ['/debate', '/about', '/simulation'].includes(normalizedPath)
     || normalizedPath.startsWith('/simulation/')
     || normalizedPath.startsWith('/battle/lobby/');
   const [user, setUser] = useState<AppUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [oauthError, setOAuthError] = useState<string | null>(() => getOAuthCallbackError());
   const [showAuthModal, setShowAuthModal] = useState(() => Boolean(oauthError));
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
+  useEffect(() => {
+    const pageTitles: Record<string, string> = {
+      '/lounge': '수다 라운지',
+      '/debate': '토론 훈련',
+      '/battle/new': 'AI 토론',
+      '/history': '훈련 기록',
+      '/argument-library': '논거 라이브러리',
+      '/about': '서비스 소개',
+      '/privacy': '개인정보 처리 안내',
+      '/terms': '이용약관',
+      '/institution': '기관 게시판',
+      '/institution/marketing': '기관 도입 안내',
+      '/institution/marketing-v2': '기관 도입 안내',
+      '/simulation': '페르소나 대화',
+      '/simulation/personalize': '맞춤 대화 훈련',
+      '/admin': '기관 관리',
+      '/super-admin': '서비스 관리',
+    };
+    const pageTitle = pageTitles[normalizedPath]
+      ?? (normalizedPath.startsWith('/lounge/') ? '수다 라운지'
+        : normalizedPath.startsWith('/battle/lobby/') ? '토론 대기실'
+        : normalizedPath.startsWith('/battle/live/') ? '실시간 토론'
+          : normalizedPath.startsWith('/simulation/') ? '페르소나 대화'
+            : normalizedPath.startsWith('/report/') ? '토론 리포트' : null);
+    document.title = normalizedPath === '/' || normalizedPath.startsWith('/lounge')
+      ? '수다 라운지 — 취향으로 이어지는 대화'
+      : pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
+  }, [normalizedPath]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -113,7 +143,8 @@ function App() {
     setUser(null);
   };
 
-  const requestLogin = useCallback(() => setShowAuthModal(true), []);
+  const requestLogin = useCallback(() => { setAuthMode('login'); setShowAuthModal(true); }, []);
+  const requestSignup = useCallback(() => { setAuthMode('signup'); setShowAuthModal(true); }, []);
   const requestGuest = useCallback(async () => {
     const guestUser = await signInAsGuest();
     setUser(guestUser);
@@ -134,7 +165,7 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<TrainingGatewayPage user={user} onLoginRequest={requestLogin} onGuestRequest={requestGuest} onLogout={handleLogout} />}
+          element={<Navigate to="/lounge" replace />}
         />
         <Route
           path="/debate"
@@ -150,6 +181,8 @@ function App() {
           element={requireAuth(<LiveDebateRoom user={user} onLoginRequest={requestLogin} />)}
         />
         <Route path="/history" element={requireAuth(<HistoryPage user={user} onLoginRequest={requestLogin} />)} />
+        <Route path="/lounge" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
         <Route path="/argument-library" element={requireAuth(<ArgumentLibraryPage />)} />
         <Route path="/about" element={<AboutPage />} />
@@ -177,6 +210,8 @@ function App() {
             setOAuthError(null);
           }}
           initialError={oauthError}
+          initialMode={authMode}
+          context={normalizedPath === '/' || normalizedPath.startsWith('/lounge') ? 'lounge' : 'training'}
           language="ko"
         />
       )}

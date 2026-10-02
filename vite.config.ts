@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import livekitTokenHandler from './api/livekit-token'
 import geminiHandler from './api/gemini/[...path]'
+import loungeHandler from './api/lounge'
+import loungeAvatarHandler from './api/lounge-avatar'
 
 const readRequestBody = (request: NodeJS.ReadableStream) => new Promise<Buffer>((resolve, reject) => {
   const chunks: Buffer[] = []
@@ -24,6 +26,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const serverEnvironmentKeys = [
     'GEMINI_API_KEY',
+    'OPENAI_API_KEY',
     'APP_ORIGIN',
     'LIVEKIT_URL',
     'LIVEKIT_API_KEY',
@@ -41,6 +44,69 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      {
+        name: 'thinkfit-lounge-avatar-dev',
+        configureServer(server) {
+          server.middlewares.use('/api/lounge-avatar', async (request, response) => {
+            try {
+              const body = await readRequestBody(request)
+              if (body.length > 2_000_000) { response.statusCode = 413; response.end(JSON.stringify({ error: '사진 용량이 너무 커요.' })); return }
+              const headers = toHeaders(request.headers)
+              const result = await loungeAvatarHandler(new Request(`${headers.get('x-forwarded-proto') || 'http'}://${headers.get('host') || 'localhost'}/api/lounge-avatar`, {
+                method: request.method, headers, body: body.length ? new Uint8Array(body) : undefined,
+              }))
+              response.statusCode = result.status
+              result.headers.forEach((value, key) => response.setHeader(key, value))
+              response.end(Buffer.from(await result.arrayBuffer()))
+            } catch {
+              response.statusCode = 500; response.setHeader('Content-Type', 'application/json')
+              response.end(JSON.stringify({ error: '사진 변환 요청을 처리하지 못했어요.' }))
+            }
+          })
+        },
+      },
+      {
+        name: 'thinkfit-lounge-dev',
+        configureServer(server) {
+          server.middlewares.use('/api/lounge', async (request, response) => {
+            try {
+              const body = await readRequestBody(request)
+              if (body.length > 1_500_000) { response.statusCode = 413; response.end(JSON.stringify({ error: '음성이 너무 길어요.' })); return }
+              const headers = toHeaders(request.headers)
+              const result = await loungeHandler(new Request(`${headers.get('x-forwarded-proto') || 'http'}://${headers.get('host') || 'localhost'}/api/lounge`, {
+                method: request.method, headers, body: body.length ? new Uint8Array(body) : undefined,
+              }))
+              response.statusCode = result.status
+              result.headers.forEach((value, key) => {
+                if (!['content-encoding', 'content-length', 'transfer-encoding'].includes(key.toLowerCase())) response.setHeader(key, value)
+              })
+              if (!result.body) { response.end(); return }
+              response.flushHeaders()
+              const reader = result.body.getReader()
+              const cancel = () => { void reader.cancel().catch(() => {}) }
+              response.once('close', cancel)
+              try {
+                while (!response.destroyed) {
+                  const { done, value } = await reader.read()
+                  if (done || response.destroyed) break
+                  if (!response.write(Buffer.from(value))) {
+                    await new Promise<void>(resolve => {
+                      const resume = () => { response.off('drain', resume); response.off('close', resume); resolve() }
+                      response.once('drain', resume); response.once('close', resume)
+                    })
+                  }
+                }
+                response.end()
+              } finally { response.off('close', cancel); await reader.cancel().catch(() => {}); reader.releaseLock() }
+            } catch {
+              if (response.headersSent) { response.destroy(); return }
+              response.statusCode = 500
+              response.setHeader('Content-Type', 'application/json')
+              response.end(JSON.stringify({ error: '라운지 요청을 처리하지 못했어요.' }))
+            }
+          })
+        },
+      },
       {
         name: 'thinkbattle-livekit-token-dev',
         configureServer(server) {

@@ -1,0 +1,22 @@
+.lounge-avatar-editor { padding: 1.2rem; border: 1px solid rgba(163,190,117,.22); border-radius: 18px; background: rgba(133,162,96,.06); margin: 1rem 0; }
+.avatar-editor-heading > span { display: flex; align-items: center; gap: 6px; font-size: .68rem; letter-spacing: .12em; color: var(--primary); }
+.avatar-editor-heading h3 { font-size: 1.1rem; margin: .5rem 0; }
+.avatar-editor-heading p, .avatar-result p { font-size: .85rem; line-height: 1.6; color: var(--text-muted); }
+.avatar-photo-input { margin: .8rem 0; min-width: 0; }
+.avatar-photo-input > label { display: flex; align-items: center; gap: .75rem; position: relative; padding: .8rem; border: 1px dashed rgba(157,182,136,.4); border-radius: 13px; cursor: pointer; overflow: hidden; }
+.avatar-photo-input > label > span:last-of-type { min-width: 0; }
+.avatar-photo-input strong { display: block; font-size: .9rem; }
+.avatar-photo-input small { display: block; overflow-wrap: anywhere; font-size: .72rem; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+.avatar-photo-input input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.avatar-photo-input label:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
+.avatar-photo-thumb { flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; color: var(--primary); background: rgba(127,154,91,.16); }
+.avatar-photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-text-button { border: 0; background: transparent; color: var(--text-muted); font-size: .75rem; padding: .5rem 0; cursor: pointer; }
+.avatar-photo-consent { display: flex; align-items: flex-start; gap: .65rem; font-size: .75rem; line-height: 1.65; color: var(--text-muted); }
+.avatar-photo-consent input { flex-shrink: 0; margin-top: 5px; accent-color: var(--primary); }
+.avatar-generate, .avatar-result .btn { display: flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; margin-top: 1rem; }
+.avatar-usage-note { display: block; color: var(--text-muted); font-size: .7rem; margin-top: .65rem; line-height: 1.5; }
+.avatar-result { text-align: center; margin-top: 1.3rem; }
+.avatar-result > img, .avatar-current { display: block; width: min(210px,100%); aspect-ratio: 1; object-fit: cover; border-radius: 25px; margin: 1rem auto; box-shadow: 0 10px 32px rgba(0,0,0,.15); }
+.avatar-signup-intro { font-size: .8rem; line-height: 1.6; color: var(--text-muted); margin: 0; }
+.avatar-onboarding-skip { width: 100%; margin-top: .5rem; }

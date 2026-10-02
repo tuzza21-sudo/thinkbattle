@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, X } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle } from '../lib/auth';
+import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle, EmailConfirmationRequiredError } from '../lib/auth';
 import type { AppUser } from '../types';
+import { AvatarPhotoInput, LoungeAvatarEditor } from './LoungeAvatarEditor';
 
 interface AuthModalProps {
   onClose: () => void;
   onAuthenticated: (user: AppUser) => void;
   initialError?: string | null;
+  initialMode?: 'login' | 'signup';
+  context?: 'lounge' | 'training';
   language?: 'ko' | 'en';
 }
 
@@ -54,9 +57,9 @@ const GoogleIcon: React.FC = () => (
   </svg>
 );
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, initialError = null, language = 'ko' }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, initialError = null, initialMode = 'login', context = 'training', language = 'ko' }) => {
   const isEnglish = language === 'en';
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -65,6 +68,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   const [error, setError] = useState(initialError || '');
 
   const [loading, setLoading] = useState(false);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [createdUser, setCreatedUser] = useState<AppUser | null>(null);
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const isSignup = mode === 'signup';
 
   const handleModeChange = (newMode: 'login' | 'signup') => {
@@ -74,6 +80,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
     setConfirmPassword('');
     setNickname('');
     setAcceptedTerms(false);
+    setPhoto(null);
+    setConfirmationSent(false);
   };
 
   const handleKakaoLogin = async () => {
@@ -126,14 +134,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
       const user = isSignup
         ? await signUpWithEmail(email, password, nickname)
         : await signInWithEmail(email, password);
-      onAuthenticated(user);
-      onClose();
+      if (isSignup && photo) setCreatedUser(user);
+      else { onAuthenticated(user); onClose(); }
     } catch (authError) {
-      setError(authError instanceof Error ? authError.message : isEnglish ? 'Authentication failed.' : '인증에 실패했습니다.');
+      if (authError instanceof EmailConfirmationRequiredError) setConfirmationSent(true);
+      else setError(authError instanceof Error ? authError.message : isEnglish ? 'Authentication failed.' : '인증에 실패했습니다.');
     } finally {
       setLoading(false);
     }
   };
+
+  const finish = (user: AppUser) => { onAuthenticated(user); onClose(); };
+  if (createdUser) return <div className="modal-overlay auth-modal-overlay"><div className="modal-content auth-modal"><div className="auth-modal-header"><div><h2>{isEnglish ? 'Welcome to the lounge' : '가입 완료! 이제 나를 닮은 아바타'}</h2><p className="avatar-signup-intro">{isEnglish ? 'Your account is ready. Review your avatar before using it.' : '계정이 만들어졌어요. 사진을 변환한 뒤 마음에 드는 결과를 적용하세요.'}</p></div><button type="button" className="icon-button" aria-label={isEnglish ? 'Close' : '닫기'} onClick={() => finish(createdUser)}><X size={20} /></button></div><LoungeAvatarEditor user={createdUser} initialFile={photo} language={language} onSaved={finish} /><button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Set up later in my profile' : '나중에 프로필에서 만들기'}</button></div></div>;
+
+  if (confirmationSent) return <div className="modal-overlay auth-modal-overlay"><div className="modal-content auth-modal"><h2>{isEnglish ? 'Check your email' : '가입 확인 메일을 보냈어요'}</h2><p className="avatar-signup-intro">{isEnglish ? 'Verify your email, then log in and create your avatar in your profile. Your photo has not been uploaded.' : '이메일 인증 후 로그인해 프로필 수정에서 아바타를 만들어 주세요. 첨부한 사진은 아직 전송하지 않았어요.'}</p><button type="button" className="btn btn-primary avatar-generate" onClick={() => handleModeChange('login')}>{isEnglish ? 'Back to login' : '로그인으로 돌아가기'}</button><button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={onClose}>{isEnglish ? 'Close' : '닫기'}</button></div></div>;
 
   return (
     <div className="modal-overlay auth-modal-overlay">
@@ -144,7 +158,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
               {isEnglish ? (isSignup ? 'Create account' : 'Log in') : (isSignup ? '회원가입' : '로그인')}
             </h2>
             <p style={{ color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              {isEnglish ? 'Save your debate records and feedback reports.' : '토론 기록과 최종 보고서를 계정에 저장합니다.'}
+              {context === 'lounge'
+                ? isEnglish ? 'Set up your profile and avatar, and join the conversation.' : '나만의 프로필과 아바타로, 함께 이야기를 나눠요.'
+                : isEnglish ? 'Save your debate records and feedback reports.' : '토론 기록과 최종 보고서를 계정에 저장합니다.'}
             </p>
           </div>
           <button className="icon-button" onClick={onClose} aria-label={isEnglish ? 'Close' : '닫기'}>
@@ -186,6 +202,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
                 <input type="checkbox" checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} />
                 <span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span>
               </label>
+              <div><p className="avatar-signup-intro">{isEnglish ? 'Lounge photo (optional). Create a lifelike avatar with Nano Banana 2 after signup.' : '라운지 사진 (선택). 가입 후 Nano Banana 2로 나를 닮은 아바타를 만들어요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></div>
             </>
           )}
         </div>

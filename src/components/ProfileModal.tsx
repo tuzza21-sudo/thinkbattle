@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { X, User, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
+import { LoungeAvatarEditor } from './LoungeAvatarEditor';
 
 interface ProfileModalProps {
   user: AppUser;
   onClose: () => void;
   onProfileUpdated: (updatedUser: AppUser) => void;
+  serviceName?: string;
 }
 
-export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onProfileUpdated }) => {
+export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onProfileUpdated, serviceName = '생각근육' }) => {
   const [nickname, setNickname] = useState(user.nickname);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -66,9 +68,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
       });
       
       setSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 1000);
     } catch (err) {
       console.error('Failed to update nickname:', err);
       setError(err instanceof Error ? err.message : '닉네임 수정에 실패했습니다.');
@@ -86,7 +85,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
               프로필 수정
             </h2>
             <p style={{ color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              ThinkFit에서 사용할 프로필 정보를 관리합니다.
+              {serviceName}에서 사용할 프로필 정보를 관리합니다.
             </p>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="닫기">
@@ -130,6 +129,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
           <Save size={16} />
           {loading ? '저장 중...' : '변경 사항 저장'}
         </button>
+        {!user.isAnonymous && <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />}
       </div>
     </div>
   );

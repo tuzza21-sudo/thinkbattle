@@ -1,6 +1,11 @@
 import { supabase } from './supabase';
 import type { AppUser } from '../types';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { loadLoungeAvatar } from './loungeAvatar';
+
+export class EmailConfirmationRequiredError extends Error {
+  constructor() { super('가입 확인 메일을 보냈어요. 이메일 인증 후 로그인해 프로필에서 사진을 변환해 주세요.'); }
+}
 
 type OAuthProvider = 'google' | 'kakao';
 type AppUserProvider = AppUser['provider'];
@@ -106,6 +111,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
       provider: profile.provider,
       isAnonymous: Boolean(user.is_anonymous),
       createdAt: profile.created_at,
+      ...await loadLoungeAvatar(profile.lounge_avatar_path),
     };
   } catch (e) {
     console.error('Failed to get current user:', e);
@@ -150,6 +156,8 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     throw new Error('회원가입에 실패했습니다.');
   }
 
+  if (!authData.session) throw new EmailConfirmationRequiredError();
+
   // DB 트리거(handle_new_user)가 프로필을 자동 생성하므로 조회만 수행
   // 트리거 실행 시간을 고려하여 짧은 대기 후 조회
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -172,6 +180,7 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     provider: profile.provider,
     isAnonymous: false,
     createdAt: profile.created_at,
+    ...await loadLoungeAvatar(profile.lounge_avatar_path),
   };
 };
 
@@ -204,6 +213,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     provider: profile.provider,
     isAnonymous: false,
     createdAt: profile.created_at,
+    ...await loadLoungeAvatar(profile.lounge_avatar_path),
   };
 };
 

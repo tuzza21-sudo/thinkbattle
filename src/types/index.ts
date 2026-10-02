@@ -17,6 +17,8 @@ export type AppUser = {
   provider: 'email' | 'kakao' | 'google' | 'anonymous';
   isAnonymous: boolean;
   createdAt: string;
+  loungeAvatarPath?: string;
+  loungeAvatarUrl?: string;
 };
 
 export type PersonaId = 'socrates' | 'jeong_yakyong' | 'kant' | 'nietzsche';

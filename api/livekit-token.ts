@@ -63,6 +63,19 @@ const getVoiceRoomAccess = async (authorization: string, roomName: string, userI
     apikey: supabaseAnonKey,
     Authorization: authorization,
   };
+  if (roomName.startsWith('lounge-')) {
+    const [roomResponse, memberResponse] = await Promise.all([
+      fetch(`${baseUrl}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomName)}&select=capacity,status,expires_at,created_at`, { headers: authHeaders }),
+      fetch(`${baseUrl}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomName)}&user_id=eq.${encodeURIComponent(userId)}&active=eq.true&select=user_id`, { headers: authHeaders }),
+    ]);
+    if (!roomResponse.ok || !memberResponse.ok) throw new Error('라운지 서버를 준비 중입니다. 화면 미리보기를 이용해 주세요.');
+    const rooms = await roomResponse.json() as Array<{ capacity: number; status: string; expires_at: string | null; created_at: string }>;
+    const members = await memberResponse.json() as Array<{ user_id: string }>;
+    const lounge = rooms[0];
+    if (!lounge || !members.length || lounge.status === 'ended'
+      || Date.parse(lounge.expires_at || lounge.created_at) + (lounge.expires_at ? 0 : 7_200_000) <= Date.now()) return null;
+    return { maxParticipants: Math.min(6, Math.max(1, Number(lounge.capacity))), position: null, role: 'lounge', phaseIds: [] };
+  }
   const [roomResponse, participantResponse] = await Promise.all([
     fetch(
       `${baseUrl}/rest/v1/live_debate_rooms?room_id=eq.${encodeURIComponent(roomName)}&select=voice_enabled,team_size,allow_moderator,status`,
@@ -129,7 +142,7 @@ const handleWebRequest = async (req: Request) => {
       roomName?: string;
     };
     const roomName = body.roomName?.trim();
-    if (!roomName || !/^debate-[a-zA-Z0-9_-]{8,80}$/.test(roomName)) {
+    if (!roomName || !/^(?:debate-[a-zA-Z0-9_-]{8,80}|lounge-[a-f0-9-]{36})$/.test(roomName)) {
       return jsonResponse({ error: '올바르지 않은 토론방입니다.' }, 400);
     }
     const roomAccess = await getVoiceRoomAccess(authorization, roomName, user.id);
@@ -155,7 +168,7 @@ const handleWebRequest = async (req: Request) => {
           maxParticipants: roomAccess.maxParticipants,
           emptyTimeout: 10 * 60,
           departureTimeout: 5 * 60,
-          metadata: JSON.stringify({ app: 'thinkbattle', mode: 'pvp', maxParticipants: roomAccess.maxParticipants }),
+          metadata: JSON.stringify({ app: 'thinkbattle', mode: roomName.startsWith('lounge-') ? 'lounge' : 'pvp', maxParticipants: roomAccess.maxParticipants }),
         });
       } catch (createError) {
         // Every lobby member requests a token at nearly the same moment. One
@@ -183,6 +196,7 @@ const handleWebRequest = async (req: Request) => {
       canPublish: true,
       canSubscribe: true,
       canPublishData: true,
+      canUpdateOwnMetadata: roomAccess.role === 'lounge',
     });
 
     return jsonResponse({
