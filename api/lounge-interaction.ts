@@ -1,5 +1,5 @@
 import { RoomServiceClient } from 'livekit-server-sdk';
-import { loungeInteractionInstructions, loungeInteractionSchema, readLoungeInteraction, type LoungeInteractionMember } from '../src/lib/loungeInteraction';
+import { loungeInteractionInstructions, loungeInteractionSchema, readLoungeInteraction, type LoungeInteractionMember } from '../src/lib/loungeInteraction.js';
 
 type NodeRequest = { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
 type NodeResponse = { statusCode: number; setHeader: (name: string, value: string) => void; end: (body?: Uint8Array | string) => void };

@@ -14,6 +14,12 @@
 
 2026-10-03 로컬 진단: `/api/lounge-interaction`의 실제 503 응답에서 `lounge_interaction_not_configured`, `retryable: false`를 확인했다. 클라이언트가 오류 코드·재시도 여부를 유지하도록 수정했으며, 해당 설정 오류를 받은 방에서는 주기적 동기화와 전사 이후 자동 검토 요청을 멈춘다. 설정 안내는 유지하고 일반 전사·사회자 대화는 계속할 수 있다. 일시적인 502 오류는 자동 재시도를 유지한다. 설정 후 새로고침하면 다시 확인한다. 모의 API 검사 47개와 실제 React 브라우저 검사에서 설정 오류 이후 요청 중단, 전사 유지, 일시 오류의 복구를 확인한다. 실제 보호 기능 활성화는 관리자 키 설정 후 확인해야 한다.
 
+## 도메인에서 500이 발생할 때
+
+2026-10-05 `www.thinkfit.kr/api/lounge-interaction`의 GET 요청에서도 Vercel의 `500 / FUNCTION_INVOCATION_FAILED`를 확인했다. 로컬에서 서버 코드를 ESM JavaScript로 컴파일해 실행하면 확장자 없는 `../src/lib/loungeInteraction` import가 `ERR_MODULE_NOT_FOUND`로 실패한다. API의 import를 `../src/lib/loungeInteraction.js`로 수정했고, 실제 Node 모듈 로딩 및 Vercel 요청 형식을 확인하는 회귀 검사를 추가했다.
+
+수정 코드를 Vercel에 재배포해야 도메인에 반영된다. 배포 후 인증 없는 GET은 `405`, POST는 `401` JSON 응답을 반환해야 한다. 로그인한 요청이 이후 `503 / lounge_interaction_not_configured`를 반환하면 위 서버 환경변수 설정을 별도로 확인한다. 이번 작업에서는 Vercel CLI 인증 토큰이 유효하지 않아 운영 로그 조회와 원격 배포를 완료하지 못했다.
+
 ## 대화 보호 규칙
 
 | 판정 | 동작 |

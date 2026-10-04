@@ -1,7 +1,45 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+test('the deployed ESM module loads and serves both Web and Vercel Node requests', async () => {
+  const workspace = fileURLToPath(new URL('../', import.meta.url));
+  const tempRoot = resolve(workspace, 'node_modules/.tmp');
+  mkdirSync(tempRoot, { recursive: true });
+  const directory = mkdtempSync(resolve(tempRoot, 'lounge-interaction-runtime-'));
+  try {
+    writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
+    for (const file of ['api/lounge-interaction.ts', 'src/lib/loungeInteraction.ts']) {
+      const target = resolve(directory, file.replace(/\.ts$/, '.js'));
+      mkdirSync(resolve(target, '..'), { recursive: true });
+      writeFileSync(target, ts.transpileModule(readFileSync(resolve(workspace, file), 'utf8'), {
+        compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext },
+      }).outputText);
+    }
+    // Real Node resolution catches imports that the CommonJS mocks and Vite accept.
+    const { default: handler } = await import(pathToFileURL(resolve(directory, 'api/lounge-interaction.js')).href);
+    const webResponse = await handler(new Request('https://app.test/api/lounge-interaction'));
+    assert.equal(webResponse.status, 405);
+    assert.equal((await handler(new Request('https://app.test/api/lounge-interaction', { method: 'POST' }))).status, 401);
+    const headers = {};
+    let body;
+    const nodeResponse = {
+      statusCode: 0,
+      setHeader: (name, value) => { headers[name] = value; },
+      end: value => { body = value; },
+    };
+    await handler({ method: 'GET', url: '/api/lounge-interaction', headers: { host: 'app.test' } }, nodeResponse);
+    assert.equal(nodeResponse.statusCode, 405);
+    assert.equal(headers['content-type'], 'application/json');
+    assert.equal(typeof JSON.parse(new TextDecoder().decode(body)).error, 'string');
+  } finally {
+    const location = relative(tempRoot, directory);
+    assert.ok(location && !location.startsWith('..') && !isAbsolute(location));
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 const compile = (path, require = () => {}) => {
   const exports = {};
   new Function('exports','require',ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{ compilerOptions:{target:ts.ScriptTarget.ES2023,module:ts.ModuleKind.CommonJS} }).outputText)(exports,require);
