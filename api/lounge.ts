@@ -12,9 +12,30 @@ class LoungeUpstreamError extends Error {
   code: string;
   retryable: boolean;
   retryAfterSeconds: number | undefined;
+  databaseCode?: string;
+  rpc?: string;
+  upstreamStatus?: number;
   constructor(message: string, status: number, code: string, retryable: boolean, retryAfterSeconds?: number) {
     super(message); this.status = status; this.code = code; this.retryable = retryable; this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+async function loungeRpcFailure(response: Response, rpc: string): Promise<LoungeUpstreamError> {
+  const payload = await response.json().catch(() => null) as { code?: unknown; message?: unknown } | null;
+  const code = typeof payload?.code === 'string' && /^(?:[A-Z0-9]{5}|PGRST\d{3})$/.test(payload.code) ? payload.code : undefined;
+  let failure: LoungeUpstreamError;
+  if (['PGRST202', 'PGRST203', '42883', '42703', '42P01'].includes(code || '')) {
+    failure = new LoungeUpstreamError('라운지 DB 함수나 테이블 설정을 확인해 주세요. 최신 라운지 마이그레이션 적용이 필요할 수 있어요.', 503, 'lounge_schema_not_ready', false);
+  } else if (response.status === 401) {
+    failure = new LoungeUpstreamError('로그인 세션을 확인해 주세요. 다시 로그인한 뒤 입장해 주세요.', 401, 'lounge_auth_failed', false);
+  } else if (response.status === 403 || code === '42501' || (code === 'P0001' && ['방 참가 권한이 없어요.', '진행 중인 방에서만 이야기할 수 있어요.', '진행 중인 방에서만 사회자를 부를 수 있어요.'].includes(String(payload?.message)))) {
+    failure = new LoungeUpstreamError('방이 종료되었거나 참가 권한이 없어요. 라운지에서 다시 입장해 주세요.', 403, 'lounge_access_denied', false);
+  } else {
+    failure = new LoungeUpstreamError('라운지 DB 요청을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_rpc_failed', true, 30);
+  }
+  // Keep machine diagnostics; never expose provider messages, details or request bodies.
+  failure.databaseCode = code; failure.rpc = rpc; failure.upstreamStatus = response.status;
+  return failure;
 }
 
 async function readJson<T>(response: Response, source: 'openai' | 'lounge'): Promise<T> {
@@ -56,7 +77,7 @@ export default async function handler(req: Request): Promise<Response> {
   const headers = { apikey: anon, Authorization: authorization, 'Content-Type': 'application/json' };
   const rpc = async <T,>(name: string, body: Record<string, unknown>, returnsVoid = false): Promise<T> => {
     const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers, body: JSON.stringify(body) });
-    if (!response.ok) throw new Error('라운지 참가 권한이나 서버 준비 상태를 확인해 주세요.');
+    if (!response.ok) throw await loungeRpcFailure(response, name);
     // PostgREST may return 204 with no body for a SQL function returning void.
     if (returnsVoid) return undefined as T;
     return readJson<T>(response, 'lounge');
@@ -314,7 +335,7 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
       return json({ text, audio: btoa(binary) });
     } catch { return json({ text, audioError: true }); }
   } catch (error) {
-    if (error instanceof LoungeUpstreamError) return json({ error: error.message, code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds }, error.status);
+    if (error instanceof LoungeUpstreamError) return json({ error: error.message, code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds, databaseCode: error.databaseCode, rpc: error.rpc, upstreamStatus: error.upstreamStatus }, error.status);
     return json({ error: error instanceof Error ? error.message : '라운지 연결을 다시 확인해 주세요.' }, 502);
   }
 }

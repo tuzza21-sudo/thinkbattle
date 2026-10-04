@@ -25,6 +25,50 @@ const run = async (mock, task) => {
   try { await task(); } finally { globalThis.fetch = originalFetch; for (const name of ['OPENAI_API_KEY','SUPABASE_URL','SUPABASE_ANON_KEY','APP_ORIGIN']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
 };
 
+test('RPC failures distinguish schema, authorization and transient DB errors without exposing provider details', async () => {
+  const cases = [
+    [404, 'PGRST202', 'private missing function detail', 503, 'lounge_schema_not_ready', false],
+    [400, '42703', 'private missing column detail', 503, 'lounge_schema_not_ready', false],
+    [401, 'PGRST301', 'private token detail', 401, 'lounge_auth_failed', false],
+    [403, '42501', 'private permission detail', 403, 'lounge_access_denied', false],
+    [400, 'P0001', '방 참가 권한이 없어요.', 403, 'lounge_access_denied', false],
+    [500, 'XX000', 'private database detail', 502, 'lounge_rpc_failed', true],
+    [502, undefined, 'private proxy detail', 502, 'lounge_rpc_failed', true],
+  ];
+  for (const [status, databaseCode, message, expectedStatus, code, retryable] of cases) {
+    await run(async url => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return databaseCode ? result({ code: databaseCode, message, details: 'private details' }, status) : new Response(message, { status });
+      throw new Error('Failed DB claims must not reach paid APIs');
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'opening' }));
+      assert.equal(response.status, expectedStatus);
+      const body = await response.json();
+      assert.equal(body.code, code); assert.equal(body.retryable, retryable);
+      assert.equal(body.databaseCode, databaseCode); assert.equal(body.rpc, 'claim_voice_lounge_host');
+      assert.equal(body.upstreamStatus, status);
+      assert.doesNotMatch(JSON.stringify(body), /private|test-key|test-anon/);
+    });
+  }
+});
+
+test('room loading treats an RLS-hidden or removed room as lost access instead of an invalid single-row response', async () => {
+  for (const visible of [false, true]) {
+    const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { from: table => {
+      const query = {
+        select() { return query; }, eq() { return query; }, order() { return query; }, limit() { return query; },
+        maybeSingle() { return Promise.resolve({ data: visible ? { id: roomId, status: 'lobby' } : null, error: null }); },
+        single() { throw new Error('Empty room results must not require a single row'); },
+        then(resolve) { return Promise.resolve({ data: [], error: null }).then(resolve); },
+      };
+      assert.ok(['voice_lounge_rooms', 'voice_lounge_members', 'voice_lounge_messages'].includes(table));
+      return query;
+    } } }));
+    if (visible) assert.equal((await client.loadLounge(roomId)).room.id, roomId);
+    else await assert.rejects(client.loadLounge(roomId), error => error instanceof client.LoungeApiError && error.code === 'lounge_access_denied' && error.retryable === false);
+  }
+});
+
 const researched = { title: 'Nocturnal Animals (2016)', confidence: 'verified', overview: '공식 소개 수준의 기본 설정', facts: ['확인된 제작 정보'], angles: ['인물의 선택을 보는 관점'], questions: ['첫 인상은 어땠나요?'], clarification: '' };
 const searchResponse = raw => ({ output: [
   { type: 'web_search_call', status: 'completed', action: { sources: [{ title: 'Official film page', url: 'https://film.test/official' }, { title: 'Unsafe', url: 'javascript:alert(1)' }] } },
@@ -1043,9 +1087,10 @@ test('a failed transcript write remains a failure and an audio ticket denial nev
       throw new Error('Unexpected fetch');
     }, async () => {
       const response = await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm' }));
-      assert.equal(response.status, denied ? 429 : 502);
+      assert.equal(response.status, denied ? 429 : 403);
       assert.equal(paid, denied ? 0 : 1);
       if (denied) assert.equal((await response.json()).retryAfterSeconds, 2);
+      else { const body = await response.json(); assert.equal(body.code, 'lounge_access_denied'); assert.equal(body.retryable, false); }
     });
   }
 });

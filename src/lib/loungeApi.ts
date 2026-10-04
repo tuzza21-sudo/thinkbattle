@@ -33,11 +33,12 @@ export const requestLoungeModerator = (id: string) => loungeRpc<void>('request_v
 export const controlLoungeSession = (id: string, action: LoungeSessionAction, turnId?: string, seconds = 0) => loungeRpc<LoungeSession>('control_voice_lounge_session', { p_room: id, p_action: action, p_turn: turnId ?? null, p_seconds: seconds });
 export async function loadLounge(id: string) {
   const results = await Promise.all([
-    supabase.from('voice_lounge_rooms').select('*').eq('id', id).single(),
+    supabase.from('voice_lounge_rooms').select('*').eq('id', id).maybeSingle(),
     supabase.from('voice_lounge_members').select('*').eq('room_id', id).eq('active', true),
     supabase.from('voice_lounge_messages').select('*').eq('room_id', id).order('id', { ascending: false }).limit(60),
   ]);
   for (const result of results) if (result.error) throw new Error(result.error.message);
+  if (!results[0].data) throw new LoungeApiError('대화방을 찾을 수 없거나 참가 권한이 없어요. 라운지에서 다시 입장해 주세요.', 'lounge_access_denied', false);
   const room = results[0].data as LoungeRoom;
   let session: LoungeSession | null = null;
   if (room.guided_session && room.status !== 'lobby') {

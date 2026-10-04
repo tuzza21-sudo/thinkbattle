@@ -458,12 +458,24 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const value = newerLoungeSession(current.current.session, incoming);
     current.current = { ...current.current, session: value }; setSession(value);
   }, []);
+  const disconnectUnavailableRoom = audio.disconnect;
+  const reportRoomError = useCallback((err: unknown) => {
+    if (!mounted.current || activeRoomId.current !== roomId) return;
+    setError(errorText(err));
+    if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') {
+      current.current = { ...current.current, room: null, session: null };
+      setRoom(null); setSession(null);
+      hostRequest.current?.abort(); disconnectUnavailableRoom();
+    }
+  }, [roomId, disconnectUnavailableRoom]);
   const refreshAfterMessage = useCallback(async () => {
-    const state = await loadLounge(roomId);
+    let state;
+    try { state = await loadLounge(roomId); }
+    catch (err) { reportRoomError(err); throw err; }
     if (!mounted.current || activeRoomId.current !== roomId) return;
     setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages);
     current.current = { ...current.current, room: state.room, messages: state.messages };
-  }, [roomId, applySession]);
+  }, [roomId, applySession, reportRoomError]);
   useEffect(() => { refreshAfterInput.current = refreshAfterMessage; }, [refreshAfterMessage]);
   useEffect(() => { if (audio.speakers.length && !audio.aiSpeaking) lastActivity.current = Date.now(); }, [audio.speakers, audio.aiSpeaking]);
   const ownRestricted = restrictedIds.includes(user?.id ?? '');
@@ -515,13 +527,18 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const refresh = async () => {
       if (refreshing) return; refreshing = true;
       try { const state = await loadLounge(roomId); if (!cancelled) { setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages); } }
-      catch (err) { if (!cancelled) setError(errorText(err)); }
+      catch (err) {
+        if (!cancelled) {
+          if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') joined = false;
+          reportRoomError(err);
+        }
+      }
       finally { refreshing = false; }
     };
     void joinLounge(roomId, userNickname).then(() => { if (!cancelled) { joined = true; void refresh(); } }).catch(err => { if (!cancelled) setError(errorText(err)); });
     const interval = setInterval(() => { if (joined) void refresh(); }, 1000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [roomId, userId, userNickname, retry, applySession]);
+  }, [roomId, userId, userNickname, retry, applySession, reportRoomError]);
   useEffect(() => {
     if (!audio.connected) return;
     void controlLounge(roomId, 'heartbeat').catch(err => setError(errorText(err)));

@@ -31,7 +31,7 @@ try {
     let session = { room_id:'fixture',stage:0,state:'ready',speaker_id:'me',turn_id:'turn-a',turn_kind:'basic',round_order:['me','peer-a','peer-b'],completed:[],hand_queue:[],started_at:now,stage_started_at:now,turn_started_at:null,spoken_seconds:0,nudged:false,announced_turn:'turn-a',updated_at:now };
     const room = {id:'fixture',host_id:'me',host_persona:'ina',topic:'영화 호프',capacity:3,status:'active',guided_session:true,created_at:now,started_at:now,expires_at:new Date(Date.now()+3600000).toISOString(),ai_turns:1,last_ai_at:now};
     let messages=[{id:1,user_id:'me',nickname:'나',kind:'human',text:'저는 주인공의 선택이 마음에 남았어요.'},{id:2,user_id:'peer-a',nickname:'친구',kind:'human',text:'저는 마지막 장면의 분위기가 인상적이었어요.'},{id:3,user_id:null,nickname:'사회자',kind:'host',text:'서로 다른 첫인상을 나눠 주세요.'}];
-    let floor, sequence=0, transcriptCallback, fixtureFlush=async()=>{};
+    let floor, sequence=0, transcriptCallback, fixtureFlush=async()=>{}, disconnects=0;
     const api = {
       syncLoungeSafety:async()=>({}), reviewLoungeInteraction:async()=>({}), releaseLoungeRestriction:async()=>({}), LoungeApiError: class extends Error {}, joinLounge:async()=>{}, controlLounge:async()=>{},
       loadLounge:async()=>({room:{...room},session:{...session},members:session.round_order.map(id=>({user_id:id,nickname:id==='me'?'나':id})),messages:[...messages]}),
@@ -58,7 +58,7 @@ try {
       floor=value;transcriptCallback=callback;
       const [ready,setReady]=React.useState(false),[mic,setMic]=React.useState(false);
       const connect=React.useCallback(async()=>setReady(true),[]),startMicrophone=React.useCallback(async()=>setMic(true),[]);
-      const disconnect=React.useCallback(()=>{},[]),getSpeechActivity=React.useCallback(()=>({lastVoiceAt:0,recording:false,voicedMs:0}),[]);
+      const disconnect=React.useCallback(()=>{disconnects++;},[]),getSpeechActivity=React.useCallback(()=>({lastVoiceAt:0,recording:false,voicedMs:0}),[]);
       return {connected:ready,connecting:false,audioReady:ready,micOn:mic,connect,startMicrophone,stopMicrophone:()=>setMic(false),stopHost:()=>{},flushUtterance:()=>fixtureFlush(),disconnect,getSpeechActivity,speakers:[],aiSpeaking:false,participants:ready?session.round_order.map(id=>({id,name:id,muted:true})):[]};
     };
     let createdArgs, navigated;
@@ -140,6 +140,27 @@ try {
     click('다음 이야기로');await until(()=>session.stage===2&&floor?.allowed===false);
     check(container.querySelector('.lounge-session-progress').textContent.includes('순서 발언'),'Next topic left all microphones open');
     root.unmount();container.remove();
+
+    const availableLoad=api.loadLounge;
+    let lostAccess=false, lostAccessCalls=0;
+    const beforeDisconnect=disconnects;
+    api.loadLounge=async()=>{
+      lostAccessCalls++;
+      if(lostAccess){const error=new api.LoungeApiError('대화방을 찾을 수 없거나 참가 권한이 없어요. 라운지에서 다시 입장해 주세요.');error.code='lounge_access_denied';error.retryable=false;throw error;}
+      return availableLoad();
+    };
+    const lostContainer=document.createElement('div');document.body.append(lostContainer);const lostRoot=createRoot(lostContainer);
+    try {
+      lostRoot.render(React.createElement(page.TestRoom,{roomId:'fixture',user:{id:'me',nickname:'나'},onGuestRequest:async()=>{},onLoginRequest:()=>{}}));
+      await until(()=>lostContainer.querySelector('.lounge-participant-log'));
+      lostAccess=true;
+      await until(()=>lostContainer.textContent.includes('대화방을 확인해 주세요'));
+      check(lostContainer.textContent.includes('라운지에서 다시 입장'),'Lost access kept the obsolete room screen');
+      check(disconnects>beforeDisconnect,'Lost access left voice connected');
+      const stoppedCalls=lostAccessCalls;
+      await wait(1200);
+      check(lostAccessCalls===stoppedCalls,'Lost access continued polling the hidden room');
+    } finally {lostRoot.unmount();lostContainer.remove();api.loadLounge=availableLoad;}
 
     // Deliberately keep moderation unresolved. Ordered STT, display and the
     // ending button must finish first; warnings and restrictions apply later.
