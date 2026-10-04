@@ -32,6 +32,7 @@ try {
     const room = {id:'fixture',host_id:'me',host_persona:'ina',topic:'영화 호프',capacity:3,status:'active',guided_session:true,created_at:now,started_at:now,expires_at:new Date(Date.now()+3600000).toISOString(),ai_turns:1,last_ai_at:now};
     let messages=[{id:1,user_id:'me',nickname:'나',kind:'human',text:'저는 주인공의 선택이 마음에 남았어요.'},{id:2,user_id:'peer-a',nickname:'친구',kind:'human',text:'저는 마지막 장면의 분위기가 인상적이었어요.'},{id:3,user_id:null,nickname:'사회자',kind:'host',text:'서로 다른 첫인상을 나눠 주세요.'}];
     let floor, sequence=0, transcriptCallback, fixtureFlush=async()=>{}, disconnects=0;
+    let speechActivity={lastVoiceAt:0,recording:false,voicedMs:0};
     const api = {
       syncLoungeSafety:async()=>({}), reviewLoungeInteraction:async()=>({}), releaseLoungeRestriction:async()=>({}), LoungeApiError: class extends Error {}, joinLounge:async()=>{}, controlLounge:async()=>{},
       loadLounge:async()=>({room:{...room},session:{...session},members:session.round_order.map(id=>({user_id:id,nickname:id==='me'?'나':id})),messages:[...messages]}),
@@ -58,7 +59,7 @@ try {
       floor=value;transcriptCallback=callback;
       const [ready,setReady]=React.useState(false),[mic,setMic]=React.useState(false);
       const connect=React.useCallback(async()=>setReady(true),[]),startMicrophone=React.useCallback(async()=>setMic(true),[]);
-      const disconnect=React.useCallback(()=>{disconnects++;},[]),getSpeechActivity=React.useCallback(()=>({lastVoiceAt:0,recording:false,voicedMs:0}),[]);
+      const disconnect=React.useCallback(()=>{disconnects++;},[]),getSpeechActivity=React.useCallback(()=>({...speechActivity}),[]);
       return {connected:ready,connecting:false,audioReady:ready,micOn:mic,connect,startMicrophone,stopMicrophone:()=>setMic(false),stopHost:()=>{},flushUtterance:()=>fixtureFlush(),disconnect,getSpeechActivity,speakers:[],aiSpeaking:false,participants:ready?session.round_order.map(id=>({id,name:id,muted:true})):[]};
     };
     let createdArgs, navigated;
@@ -99,7 +100,8 @@ try {
     check(floor.allowed===false,'Waiting microphone was open');
     check(container.querySelector('.lounge-participant-log article.self').textContent.includes('주인공의 선택'),'My speech missing from participant pane');
     check(container.querySelector('.lounge-participant-log').textContent.includes('마지막 장면'),'Other participant speech missing');
-    check(!container.querySelector('.lounge-participant-log').textContent.includes('서로 다른 첫인상'),'AI speech duplicated in participant pane');
+    check(container.querySelectorAll('.lounge-host-message').length===1,'AI speech was duplicated in the conversation');
+    check(!container.querySelector('.lounge-participant-controls .lounge-session-current'),'Current speaker was repeated below the profiles');
     messages.push({id:4,user_id:'peer-b',nickname:'다른 친구',kind:'human',text:'다른 분의 이야기를 듣고 다시 생각하게 됐어요.'});
     await until(()=>container.querySelector('.lounge-participant-log').textContent.includes('다시 생각하게'));
     const participantLog=container.querySelector('.lounge-participant-log');
@@ -112,11 +114,15 @@ try {
     messages.push({id:6,user_id:'peer-b',nickname:'다른 친구',kind:'human',text:'지난 발언을 읽는 동안 추가된 이야기예요.'});
     await until(()=>participantLog.textContent.includes('읽는 동안'));
     check(participantLog.scrollTop===0,'New speech interrupted reading earlier messages');
+    participantLog.scrollTo(0,participantLog.scrollHeight);participantLog.dispatchEvent(new Event('scroll'));
+    messages.push({id:7,user_id:null,nickname:'사회자',kind:'host',text:'새로운 사회자 응답도 대화 끝에 보여요.'});
+    await until(()=>participantLog.lastElementChild?.textContent.includes('새로운 사회자 응답'));
+    check(participantLog.scrollHeight-participantLog.scrollTop-participantLog.clientHeight<2,'AI response did not follow the conversation bottom');
     const click = text => {const button=[...container.querySelectorAll('.lounge-session-actions button')].find(b=>b.textContent.includes(text));check(button&&!button.disabled,'Missing or disabled button: '+text);button.click();};
     click('말하기');await until(()=>floor.allowed===true);check(floor.turnId===session.turn_id,'Microphone lacked a turn identifier');
     session={...session,nudged:true,spoken_seconds:121};await until(()=>container.querySelector('.lounge-session-nudge'));
     click('손들기');await until(()=>container.querySelector('[aria-label="손 내리기"]'));
-    check(container.querySelector('.lounge-participant-controls .lounge-session-queue-summary').textContent.includes('손들기 대기나'),'Hand queue missing below profiles');
+    check(container.querySelector('.lounge-participant-roster .lounge-session-queue-summary').textContent.includes('손들기 대기나'),'Hand queue missing beside profiles');
     click('이야기 마쳤어요');await until(()=>session.speaker_id==='peer-a'&&floor.allowed===false);
     check(container.querySelector('.lounge-session-queues').textContent.includes('추가 이야기 대기'),'Hand was missing from additional queue');
     click('다음 분께');await until(()=>session.speaker_id==='peer-b');await wait(50);
@@ -135,11 +141,31 @@ try {
     check(!container.querySelector('[aria-label="이야기 마쳤어요"]'),'Free conversation still required an end-speaking button');
     check(![...container.querySelectorAll('.lounge-session-actions button')].some(button=>button.textContent==='말하기'),'Free conversation still reserved a speaking turn');
     check(container.textContent.includes('AI의 답을 기다리지 않고'),'Free conversation guide missing');
-    check([...container.querySelectorAll('button')].some(button=>button.textContent.includes('사회자에게 도움 요청')),'Moderator request button missing');
+    check([...container.querySelectorAll('button')].some(button=>button.textContent.includes('사회자 도움')),'Moderator request button missing');
     check(container.querySelector('.lounge-session-progress').textContent.includes('자유 대화'),'Free phase was not identified');
     click('다음 이야기로');await until(()=>session.stage===2&&floor?.allowed===false);
     check(container.querySelector('.lounge-session-progress').textContent.includes('순서 발언'),'Next topic left all microphones open');
     root.unmount();container.remove();
+
+    // The room timer must keep an unstarted turn, then flush its speech and advance once.
+    const beforeAuto={...session};let autoFlushes=0;
+    session={...session,stage:0,state:'speaking',speaker_id:'me',turn_id:'auto-turn',turn_kind:'basic',round_order:['me','peer-a'],completed:[],hand_queue:[],nudged:false};
+    speechActivity={lastVoiceAt:Date.now()-20_000,recording:false,voicedMs:200};
+    fixtureFlush=async()=>{autoFlushes++;};
+    const autoContainer=document.createElement('div');document.body.append(autoContainer);const autoRoot=createRoot(autoContainer);
+    try {
+      autoRoot.render(React.createElement(page.TestRoom,{roomId:'fixture',user:{id:'me',nickname:'나'},onGuestRequest:async()=>{},onLoginRequest:()=>{}}));
+      await until(()=>autoContainer.querySelector('.lounge-seat.self.has-floor'));
+      await wait(1150);
+      check(session.turn_id==='auto-turn'&&autoFlushes===0,'Earlier speech ended an unstarted turn');
+      speechActivity={lastVoiceAt:Date.now(),recording:false,voicedMs:400};
+      await wait(1150);
+      check(session.turn_id==='auto-turn','New speech ended before ten seconds of silence');
+      speechActivity={...speechActivity,lastVoiceAt:Date.now()-10_000};
+      await until(()=>session.speaker_id==='peer-a');
+      check(autoFlushes===1,'Automatic finish did not flush exactly once');
+      await until(()=>autoContainer.querySelector('.lounge-seat.has-floor:not(.self)'));
+    } finally {autoRoot.unmount();autoContainer.remove();session=beforeAuto;speechActivity={lastVoiceAt:0,recording:false,voicedMs:0};fixtureFlush=async()=>{};}
 
     const availableLoad=api.loadLounge;
     let lostAccess=false, lostAccessCalls=0;
@@ -275,7 +301,7 @@ try {
     check(safetyContainer.querySelector('.lounge-mic-button').disabled,'Restricted microphone remained enabled');
     check(safetyContainer.querySelector('[aria-label="손들기 · 추가로 이야기할게요"]').disabled,'Restricted member could raise a hand');
     check(safetyContainer.querySelector('.lounge-session-question').textContent.includes('어떤 문장이'),'Directed question disappeared');
-    check(safetyContainer.querySelector('.lounge-session-current').textContent.includes('소연님의 질문에 답변'),'Question author missing');
+    check(safetyContainer.querySelector('.lounge-session-reply-context').textContent.includes('소연님의 질문에 답변'),'Question author missing');
     check(safetyContainer.querySelector('.lounge-session-queue-summary').textContent.includes('질문 답변 대기'),'Answer waiting list missing');
     safetyContainer.querySelector('.lounge-release-restriction').click();await until(()=>released==='me');
     safetyRoot.render(React.createElement(page.TestRoomView,{...safetyProps,members:safetyProps.members.map(m=>({...m,warnings:0,restrictedUntil:null}))}));
@@ -401,5 +427,5 @@ try {
   })()` });
   assert.equal(response.exceptionDetails, undefined, JSON.stringify(response.exceptionDetails));
   assert.deepEqual(response.result.value, {ui:true,microphones:true,lateCapture:true});
-  console.log('PASS: immediate transcripts, moderation, guided turns, microphones, TTS quiet-wait/resume, changed-turn cancellation, continuous-speech notice, buffered errors and immediate stop.');
+  console.log('PASS: ten-second automatic finish, unstarted turn protection, immediate transcripts, moderation, guided turns, microphones, TTS quiet-wait/resume, changed-turn cancellation, continuous-speech notice, buffered errors and immediate stop.');
 } finally {socket.close();}

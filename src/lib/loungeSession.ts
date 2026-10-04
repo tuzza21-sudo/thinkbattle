@@ -82,6 +82,11 @@ export type LoungeSession = {
 export type LoungeSessionAction = 'tick' | 'raise' | 'lower' | 'pass' | 'begin' | 'done' | 'yield' | 'next_stage' | 'activity';
 export const isLoungeFreeStage = (session?: LoungeSession | null) => session?.state === 'free';
 export const loungeStageNeedsOpening = (session: LoungeSession) => session.state !== 'finished' && session.announced_stage !== session.stage;
+export const loungeTurnSilenceMs = 10_000;
+export function shouldAutoFinishLoungeTurn(session: LoungeSession, speech: { voicedMs: number; lastVoiceAt: number; recording: boolean }, voicedAtStart: number, now = Date.now()) {
+  return session.state === 'speaking' && !isLoungeFreeStage(session) && speech.voicedMs > voicedAtStart
+    && speech.lastVoiceAt > 0 && !speech.recording && now - speech.lastVoiceAt >= loungeTurnSilenceMs;
+}
 export function loungeSessionPrompt(session: LoungeSession, questions?: string[], brief?: Pick<LoungeTopicBrief, 'category' | 'subcategory'> | null) {
   if (session.turn_kind === 'reply' && session.reply_question) return session.reply_question;
   const stages = loungeSessionStagesForTopic(brief);

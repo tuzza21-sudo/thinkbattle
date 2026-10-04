@@ -23,7 +23,11 @@ export const createLounge = async (persona: LoungeHostId, topic: string, capacit
   const title = topic.trim();
   if (!title || title.length > 160) throw new Error('대화할 주제를 1~160자로 직접 입력해 주세요.');
   const brief = topicBrief === undefined ? undefined : normalizeLoungeTopicBrief(topicBrief);
-  return loungeRpc<string>('create_voice_lounge', { p_persona: persona, p_topic: title, p_capacity: capacity, p_nickname: nickname, p_theme: theme, p_study_required: brief ? true : loungeNeedsStudy(title), ...(brief ? { p_topic_brief: brief } : {}) });
+  const studyRequired = Boolean(brief) || loungeNeedsStudy(title);
+  const id = await loungeRpc<string>('create_voice_lounge', { p_persona: persona, p_topic: title, p_capacity: capacity, p_nickname: nickname, p_theme: theme, p_study_required: studyRequired, ...(brief ? { p_topic_brief: brief } : {}) });
+  // Start while the creator enters the room; the room shares this in-flight request.
+  if (studyRequired) void prepareLoungeTopic(id).catch(() => {});
+  return id;
 };
 export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
@@ -86,4 +90,13 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
 export const requestLoungeHost = (roomId: string, reason: 'opening' | 'silence' | 'followup' | 'requested', signal?: AbortSignal) => apiRequest({ action: 'host', roomId, reason, stream: true }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
-export const prepareLoungeTopic = (roomId: string, signal?: AbortSignal) => apiRequest({ action: 'prepare', roomId }, signal) as Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>;
+const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
+export function prepareLoungeTopic(roomId: string) {
+  const pending = topicPreparations.get(roomId);
+  if (pending) return pending;
+  const preparation = (apiRequest({ action: 'prepare', roomId }) as Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>).finally(() => {
+    if (topicPreparations.get(roomId) === preparation) topicPreparations.delete(roomId);
+  });
+  topicPreparations.set(roomId, preparation);
+  return preparation;
+}

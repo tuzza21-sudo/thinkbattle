@@ -33,7 +33,7 @@ try {
       const dimensions = await evaluate(`(() => {
         const scene=document.querySelector('.lounge-scene').getBoundingClientRect();
         const host=document.querySelector('.lounge-moderator').getBoundingClientRect();
-        const people=document.querySelector('.lounge-participant-panel').getBoundingClientRect();
+        const people=document.querySelector('.lounge-participant-roster').getBoundingClientRect();
         const topicOnTop=document.querySelector('.lounge-table-topic').getBoundingClientRect().bottom<=host.top+1;
         const controls=document.querySelector('.lounge-participant-controls');
         controls.scrollIntoView({block:'nearest'});
@@ -61,14 +61,20 @@ try {
         assert.equal(dimensions.hostVisible, true, `host clipped at ${width}x${height}/${capacity}: ${JSON.stringify(dimensions)}`);
         assert.equal(dimensions.peopleOnRight, true);
       } else {
-        assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-conversation-space')).overflowY"),'auto');
+        assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-conversation-space')).overflowY"),'hidden');
         assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-host-bubble')).overflowY"),'visible', 'the full speech reads naturally without a nested scrollbar');
-        const sceneTop = await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().top");
-        await evaluate("document.querySelector('.lounge-conversation-space').scrollTo(0,10000)");
-        assert.ok(await evaluate("document.querySelector('.lounge-conversation-space').scrollTop") > 0, 'mobile content can scroll instead of being compressed');
-        assert.equal(await evaluate("document.querySelector('.lounge-scene').getBoundingClientRect().top"),sceneTop, 'the photo stays stationary while content scrolls');
-        await evaluate("document.querySelector('.lounge-conversation-space').scrollTo(0,0)");
       }
+      const scrollResult = await evaluate(`(() => {
+        const roster=document.querySelector('.lounge-participant-roster'),controls=document.querySelector('.lounge-participant-controls'),log=document.querySelector('.lounge-participant-log');
+        const before=[roster.getBoundingClientRect().top,controls.getBoundingClientRect().top];
+        const filler=document.createElement('p');filler.textContent='긴 대화 내용 '.repeat(500);log.append(filler);log.scrollTo(0,10000);
+        const result={scrolled:log.scrollTop>0,fixed:before.every((value,index)=>Math.abs(value-[roster.getBoundingClientRect().top,controls.getBoundingClientRect().top][index])<1),height:log.clientHeight};
+        filler.remove();log.scrollTo(0,0);return result;
+      })()`);
+      assert.equal(scrollResult.scrolled,true,'the conversation itself must scroll');
+      assert.equal(scrollResult.fixed,true,'profiles and microphone controls moved while the conversation scrolled');
+      if(scrollResult.height<=40) await screenshot('conversation-density-failure');
+      assert.ok(scrollResult.height>40,`conversation compressed at ${width}x${height}/${capacity}: ${JSON.stringify(scrollResult)}`);
       assert.equal(dimensions.topicOnTop, true);
       assert.equal(dimensions.controlsUnderProfiles,true,'microphone and hands sit below the participant profiles');
       assert.equal(dimensions.controlsUnderSpeech,true,'controls sit below the speech pane');
@@ -83,10 +89,26 @@ try {
       assert.equal(await evaluate("document.querySelector('.lounge-stage-composer,.lounge-write-button')"), null, 'text entry was removed');
       assert.equal(await evaluate("document.querySelector('[aria-label=\"발언 대기 명단\"]')!==null"), capacity > 1, 'group queues stay visible without expanding the guidance');
       assert.equal(await evaluate("document.querySelectorAll('.lounge-participant-log article').length"),capacity>1?2:0,'recent participant speech is visible without opening records');
+      if(capacity>1) {
+        assert.equal(await evaluate("document.querySelector('.lounge-session-actions button').textContent"),'말하기','speaking must be the first action');
+        assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-session-actions button')).backgroundColor"),'rgb(255, 223, 101)','speaking must be emphasized');
+      }
       if ([1440,390,320].includes(width)) await screenshot(`immersive-${capacity}-${width}`);
       cases++;
     }
   }
+  await send('Emulation.setDeviceMetricsOverride', { width:320, height:568, deviceScaleFactor:1, mobile:false });
+  await send('Page.navigate', { url:'http://127.0.0.1:5191/lounge/preview?theme=hotel&capacity=6' });
+  await waitFor("document.querySelectorAll('.lounge-seat').length===6");
+  await waitFor("document.querySelector('[aria-label=\"발언 효과 미리보기 일시정지\"]')!==null");
+  await evaluate("document.querySelector('[aria-label=\"발언 효과 미리보기 일시정지\"]').click()");
+  for(let i=0;i<2;i++) {
+    await waitFor("!document.querySelector('[aria-label=\"다음 분께 차례 넘기기\"]').disabled");
+    await evaluate("document.querySelector('[aria-label=\"다음 분께 차례 넘기기\"]').click()");
+    await waitFor(`document.querySelectorAll('.lounge-seat')[${i+1}].classList.contains('has-floor')`);
+  }
+  await waitFor(`(() => {const strip=document.querySelector('.lounge-seats').getBoundingClientRect(),seat=document.querySelector('.lounge-seat.has-floor').getBoundingClientRect();return seat.left>=strip.left-1&&seat.right<=strip.right+1;})()`);
+  assert.ok(await evaluate("document.querySelector('.lounge-seats').scrollLeft")>0,'current profile must follow a turn outside the visible strip');
   await send('Emulation.setDeviceMetricsOverride', { width:1440, height:900, deviceScaleFactor:1, mobile:false });
   for (const theme of ['rooftop','river','forest','hotel','cafe','seaside']) {
     await send('Page.navigate', { url:`http://127.0.0.1:5191/lounge/preview?theme=${theme}&capacity=4` });

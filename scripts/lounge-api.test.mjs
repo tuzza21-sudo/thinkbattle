@@ -84,6 +84,55 @@ test('custom topics enable study while preset topics preserve lightweight creati
   assert.equal(args[1].p_study_required, false);
 });
 
+test('creation starts research immediately and room entry shares the pending request', async () => {
+  let completeResearch, calls = 0;
+  const client = compile('../src/lib/loungeApi.ts', path => path.endsWith('/lounge') ? lounge : { supabase: {
+    rpc: async () => ({ data: roomId, error: null }),
+    auth: { getSession: async () => ({ data: { session: { access_token: 'session' } } }) },
+  } });
+  await run(async (url, init) => {
+    assert.equal(url, '/api/lounge');
+    assert.equal(JSON.parse(init.body).action, 'prepare'); calls++;
+    return new Promise(resolve => { completeResearch = () => resolve(result({ study: { title: 'Already prepared' } })); });
+  }, async () => {
+    assert.equal(await client.createLounge('ina', 'Research on creation', 3, 'Host', 'forest', topicBrief), roomId);
+    assert.equal(calls, 1, 'creation must not wait for audio connection or starting the room');
+    const first = client.prepareLoungeTopic(roomId), second = client.prepareLoungeTopic(roomId);
+    assert.equal(first, second); assert.equal(calls, 1);
+    completeResearch();
+    assert.equal((await first).study.title, 'Already prepared');
+  });
+});
+
+test('only the first paid host turn permits a pass reminder and research announcements are excluded', async () => {
+  for (const aiTurns of [1, 2, 12]) await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '독서', host_persona: 'ina', memory: '', capacity: 1, ai_turns: aiTurns }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      assert.equal(JSON.parse(body.input).first_host_turn, aiTurns === 1);
+      assert.match(body.instructions, aiTurns === 1 ? /이번 첫 인사에서만/ : /이번 발언에서는 패스 가능.*반복하지 않는다/);
+      assert.match(body.instructions, /진행 멘트를 말하지 않는다/);
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '기억에 남는 대목을 나눠요.', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+    throw new Error('Unexpected host call');
+  }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'opening' }))).status, 200); });
+});
+
+test('ten silent seconds end an actual utterance but never an unstarted turn, ongoing speech or free conversation', () => {
+  const current = { state: 'speaking' }, speech = { voicedMs: 1200, lastVoiceAt: 20_000, recording: false };
+  assert.equal(sessionLib.shouldAutoFinishLoungeTurn(current, speech, 1000, 29_999), false);
+  assert.equal(sessionLib.shouldAutoFinishLoungeTurn(current, speech, 1000, 30_000), true);
+  assert.equal(sessionLib.shouldAutoFinishLoungeTurn(current, speech, 1200, 30_000), false);
+  assert.equal(sessionLib.shouldAutoFinishLoungeTurn(current, { ...speech, recording: true }, 1000, 30_000), false);
+  for (const state of ['ready', 'free', 'between', 'finished']) assert.equal(sessionLib.shouldAutoFinishLoungeTurn({ state }, speech, 1000, 30_000), false);
+  assert.equal(sessionLib.shouldAutoFinishLoungeTurn(current, { ...speech, lastVoiceAt: 29_500 }, 1000, 30_000), false);
+});
+
 test('room creation requires a written topic and trims it before any RPC', async () => {
   const args = [];
   const client = compile('../src/lib/loungeApi.ts', path => path.endsWith('/lounge') ? lounge : { supabase: { rpc: async (_, value) => { args.push(value); return { data: roomId, error: null }; } } });

@@ -33,13 +33,13 @@ try {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const until = async check => { for (let i = 0; i < 100; i++) { if (check()) return; await wait(25); } throw new Error('Timed out in auto-start fixture'); };
     const results = [];
-    for (const scenario of ['normal', 'blocked', 'denied', 'connection-failure', 'ended', 'group', 'study', 'study-billing', 'join-failure', 'transcription-recovery', 'cooldown-recovery']) {
+    for (const scenario of ['normal', 'blocked', 'denied', 'connection-failure', 'ended', 'group', 'study', 'study-lobby', 'study-billing', 'join-failure', 'transcription-recovery', 'cooldown-recovery']) {
       const calls = { connect: 0, mic: 0, start: 0 };
       let preparationCalls = 0, hostCalls = 0;
       let loadCalls = 0, transcriptionCalls = 0, submitUtterance;
       const studying = scenario.startsWith('study');
       const brief = { title: '영화 자료', confidence: 'verified', overview: '스포일러 없는 소개', facts: ['확인된 작품 정보'], angles: ['해석 관점'], questions: ['첫 인상은 어땠나요?'], clarification: '', sources: [{title:'공식 소개',url:'https://film.test/'}] };
-      let state = { id: 'test-room', host_id: 'me', host_persona: 'ina', topic: 'Movie talk', study_required: studying, topic_study: null, capacity: scenario === 'group' ? 4 : 1, status: scenario === 'ended' ? 'ended' : 'lobby', ai_turns: 1, last_ai_at: new Date().toISOString(), created_at: new Date().toISOString(), started_at: null, expires_at: null };
+      let state = { id: 'test-room', host_id: 'me', host_persona: 'ina', topic: 'Movie talk', study_required: studying, topic_study: null, capacity: scenario === 'group' || scenario === 'study-lobby' ? 4 : 1, status: scenario === 'ended' ? 'ended' : 'lobby', ai_turns: 1, last_ai_at: new Date().toISOString(), created_at: new Date().toISOString(), started_at: null, expires_at: null };
       const api = {
         syncLoungeSafety:async()=>({}), reviewLoungeInteraction:async()=>({}), releaseLoungeRestriction:async()=>({}), LoungeApiError: class extends Error { constructor(message, code, retryable = false, retryAfterSeconds = 0) { super(message); this.code = code; this.retryable = retryable; this.retryAfterSeconds = retryAfterSeconds; } },
         joinLounge: async () => { if (scenario === 'join-failure') throw new Error('Room access refused'); },
@@ -63,7 +63,7 @@ try {
         const connect = React.useCallback(async () => {
           calls.connect++;
           if (scenario === 'connection-failure' && calls.connect === 1) { setAudio(previous => ({ ...previous, error: 'Connection failed' })); return; }
-          setAudio(previous => ({ ...previous, connected: true, audioReady: scenario !== 'blocked' }));
+          setAudio(previous => ({ ...previous, connected: true, audioReady: scenario !== 'blocked' && scenario !== 'study-lobby' }));
         }, []);
         const startMicrophone = React.useCallback(async () => { calls.mic++; setAudio(previous => ({ ...previous, micOn: scenario !== 'denied', error: scenario === 'denied' ? 'Microphone permission denied' : '' })); }, []);
         const enableAudio = React.useCallback(() => setAudio(previous => ({ ...previous, audioReady: true })), []);
@@ -98,7 +98,7 @@ try {
         if (calls.connect !== 1) throw new Error('Automatic connect retry loop');
         container.querySelector('.lounge-room-top-actions .lounge-connect-button').click();
         await until(() => calls.start === 1 && container.querySelector('.lounge-mic-button'));
-      } else if (scenario === 'group') {
+      } else if (scenario === 'group' || scenario === 'study-lobby') {
         await until(() => calls.mic === 1); await wait(100);
         if (!container.querySelector('.lounge-room-top-actions .lounge-start-button')) throw new Error('Group start button missing from header');
         if (!container.querySelector('.lounge-session-waiting .lounge-session-actions button:disabled')) throw new Error('Pre-session hand control missing');
@@ -115,14 +115,14 @@ try {
         if (transcriptionCalls !== 2) throw new Error('Missing transcription retry/recovery');
       }
       if (studying) {
-        container.querySelector('.lounge-ask-button').click();
-        await until(() => container.textContent.includes('주제 자료를 찾아보고'));
-        if (scenario === 'study') {
+        if (scenario === 'study' || scenario === 'study-lobby') {
           await until(() => container.querySelector('.lounge-study-notes'));
+          if (container.textContent.includes('주제 자료를 찾아보고')) throw new Error('Research progress announcement remains');
           container.querySelector('.lounge-study-notes summary').click();
           const source = container.querySelector('.lounge-study-notes a');
           if (source?.href !== 'https://film.test/' || source.target !== '_blank') throw new Error('Missing clickable study source');
-          await until(() => hostCalls === 1);
+          if (scenario === 'study') { container.querySelector('.lounge-ask-button').click(); await until(() => hostCalls === 1); }
+          else if (state.status !== 'lobby' || calls.start || hostCalls) throw new Error('Lobby research required active playback or speech');
         } else {
           await until(() => container.querySelector('.lounge-error')?.textContent.includes('크레딧'));
           if (hostCalls !== 0) throw new Error('Generated host speech after failed research');
@@ -144,6 +144,7 @@ try {
     { scenario: 'ended', connect: 0, mic: 0, start: 0, status: 'ended' },
     { scenario: 'group', connect: 1, mic: 1, start: 0, status: 'lobby' },
     { scenario: 'study', connect: 1, mic: 1, start: 1, status: 'active' },
+    { scenario: 'study-lobby', connect: 1, mic: 1, start: 0, status: 'lobby' },
     { scenario: 'study-billing', connect: 1, mic: 1, start: 1, status: 'active' },
     { scenario: 'join-failure', connect: 0, mic: 0, start: 0, status: 'lobby' },
     { scenario: 'transcription-recovery', connect: 1, mic: 1, start: 1, status: 'active' },
