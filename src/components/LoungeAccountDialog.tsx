@@ -41,7 +41,7 @@ export function LoungeAccountDialog({ title, description, eyebrow, children, onC
   return <div className="modal-overlay auth-modal-overlay lounge-account-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close.current(); }}>
     <section ref={dialog} className="modal-content auth-modal lounge-account-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1}>
       <aside className="lounge-account-scene" aria-label={en ? 'A seat in the lounge' : '라운지의 나만의 자리'}>
-        <div className="lounge-account-view"><span><Coffee size={18} /> {en ? 'Conversation lounge' : '수다 라운지'}</span><small>A LITTLE ROOM FOR YOU</small></div>
+        <div className="lounge-account-view"><span><Coffee size={18} /> {en ? 'Conversation lounge' : '대화 라운지'}</span><small>A LITTLE ROOM FOR YOU</small></div>
         <div className="lounge-account-welcome">
           {displayName ? <div className="lounge-account-preview"><span>{avatarUrl ? <img src={avatarUrl} alt="" /> : displayName.slice(0, 1)}</span><small>{en ? 'Your seat in the conversation' : '대화 속 나의 자리'}</small><strong>{displayName}</strong></div> : <><span className="lounge-account-invitation"><MessageCircle size={16} /> {en ? 'It starts with a conversation' : '취향에서 시작하는 사이'}</span><h2>{en ? <>A good view.<br />An even better conversation.</> : <>좋은 풍경 옆에,<br />좋은 대화 하나.</>}</h2><p>{en ? 'A film you loved. A thought that stayed. There is a seat for your story here.' : '좋아하는 영화, 마음에 남은 문장.\n당신의 이야기가 놓일 자리를 준비했어요.'}</p></>}
           <div className="lounge-account-scene-note"><span /><p>{en ? 'Take your time. Make yourself at home.' : '서두르지 않아도 괜찮아요. 편하게 머물러요.'}</p></div>

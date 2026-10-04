@@ -132,7 +132,7 @@ export const InstitutionTopicsPage = ({ user, onLoginRequest }: { user: AppUser 
       {/* Navigation */}
       <div className="flex justify-between items-center" style={{ padding: '1.5rem 0 0' }}>
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ gap: '0.5rem' }}>
-          <ArrowLeft size={16} /> ThinkFit
+          <ArrowLeft size={16} /> 생각근육
         </button>
         <div className="flex items-center gap-2" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button className="btn btn-secondary" onClick={() => navigate('/institution/marketing')}>

@@ -9,8 +9,8 @@
 .lounge-voice-preview[aria-pressed=true] { background:#425c44; color:#fff9e8; border-color:#425c44; }
 .lounge-voice-error { margin-top:10px!important; color:#914f27; font-size:11px; }
 .lounge-builder-host>.lounge-host-photo { width:52px; height:52px; }
-.has-room .lounge-stage .lounge-moderator { grid-template-columns:64px minmax(0,1fr) 24px; }
-.has-room .lounge-stage .lounge-moderator-avatar { width:62px; height:68px; border-radius:45% 45% 30% 30%; background:none; }
+.has-room .lounge-stage .lounge-moderator { grid-template-columns:var(--lounge-profile-size,82px) minmax(0,1fr) 24px; }
+.has-room .lounge-stage .lounge-moderator-avatar { width:var(--lounge-profile-size,82px); height:auto; aspect-ratio:1 / 1.08; border-radius:44% 44% 28% 28%; background:none; }
 .has-room .lounge-moderator-avatar .lounge-host-photo { width:100%; height:100%; border-radius:inherit; }
 .lounge-chat-avatar .lounge-host-photo { width:100%; height:100%; }
 .lounge-open-host { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--l-muted); margin-top:10px; }

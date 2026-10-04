@@ -129,7 +129,7 @@ export const SuperAdminDashboard = () => {
       <header className="admin-header">
         <div>
           <button className="btn btn-secondary" style={{ padding: '.45rem .7rem', marginBottom: '.7rem' }} onClick={() => navigate('/')}>
-            <ChevronLeft size={16} /> ThinkFit
+            <ChevronLeft size={16} /> 생각근육
           </button>
           <h1><ShieldCheck color="var(--primary)" style={{ verticalAlign: 'middle' }} /> 슈퍼 관리자</h1>
           <p className="admin-lead" style={{ margin: '.4rem 0 0' }}>전체 활동과 기관 게시판을 관리합니다.</p>
@@ -177,7 +177,7 @@ export const SuperAdminDashboard = () => {
               </div>
             </div>
             <p className="admin-lead">
-              소유자로 지정할 이메일은 ThinkFit 회원가입을 먼저 완료해야 합니다. 지정된 계정은 새로고침하거나 다시 로그인하면 기관 전용 게시판과 기관 관리자 화면을 사용할 수 있습니다.
+              소유자로 지정할 이메일은 생각근육 회원가입을 먼저 완료해야 합니다. 지정된 계정은 새로고침하거나 다시 로그인하면 기관 전용 게시판과 기관 관리자 화면을 사용할 수 있습니다.
             </p>
 
             {notice && (

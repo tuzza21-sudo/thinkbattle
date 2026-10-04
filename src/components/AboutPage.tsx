@@ -110,7 +110,7 @@ export const AboutPage = () => {
         </button>
         <button type="button" className="about-brand" onClick={() => navigate('/')}>
           <span><img src="/brand/thinkfit-mark.svg" alt="" /></span>
-          <div><strong>ThinkFit</strong><small>SERVICE INTRODUCTION</small></div>
+          <div><strong>생각근육 ThinkFit</strong></div>
         </button>
         <button type="button" className="about-header-cta" onClick={() => navigate('/')}>
           훈련 선택 <ArrowRight size={17} />
@@ -120,10 +120,10 @@ export const AboutPage = () => {
       <main>
         <section className="about-hero">
           <div className="about-hero-copy">
-            <span className="about-kicker"><Sparkles size={15} /> WHY THINKFIT</span>
+            <span className="about-kicker"><Sparkles size={15} /> 생각근육을 소개합니다</span>
             <h1>생각할 기회가 줄어든 시대,<br /><em>말하고 설득하는 힘</em>을 훈련합니다.</h1>
             <p>
-              ThinkFit은 정답을 보여주는 서비스가 아닙니다. 토론과 현실적인 페르소나 상황 속에서
+              생각근육 ThinkFit은 대화를 통해 사고력과 소통 능력을 기르는 서비스입니다. 토론과 현실적인 페르소나 상황 속에서
               사용자가 직접 생각하고, 말하고, 반응하도록 만드는 AI 커뮤니케이션 훈련 플랫폼입니다.
             </p>
             <div className="about-hero-actions">
@@ -141,10 +141,10 @@ export const AboutPage = () => {
             </div>
           </div>
 
-          <div className="about-hero-visual" aria-label="ThinkFit 훈련 방식">
+          <div className="about-hero-visual" aria-label="생각근육 훈련 방식">
             <div className="about-visual-top">
               <span><i /> TRAINING IN PROGRESS</span>
-              <small>THINKFIT LAB</small>
+              <small>생각근육 LAB</small>
             </div>
             <div className="about-dialogue">
               <div className="about-dialogue-avatar"><MessageSquareText size={24} /></div>
@@ -170,7 +170,7 @@ export const AboutPage = () => {
         <section className="about-section about-mission">
           <div className="about-section-heading">
             <span>OUR MISSION</span>
-            <h2>왜 ThinkFit이 필요한가</h2>
+            <h2>왜 생각근육이 필요한가</h2>
             <p>짧게 소비하는 정보는 넘치지만, 자신의 생각을 끝까지 말해볼 기회는 부족합니다.</p>
           </div>
           <div className="about-mission-grid">
@@ -248,7 +248,7 @@ export const AboutPage = () => {
         <footer className="about-business-footer">
           <div className="about-business-brand">
             <img src="/brand/thinkfit-mark.svg" alt="" />
-            <div><strong>ThinkFit</strong><span>생각과 대응을 단련하는 AI 훈련소</span></div>
+            <div><strong>생각근육 ThinkFit</strong><span>생각과 대응을 단련하는 AI 훈련소</span></div>
           </div>
           <div className="about-business-info">
             <p><span>대표</span> 최석빈 <i /> <span>사업자등록번호</span> 218-14-16906</p>
@@ -258,7 +258,7 @@ export const AboutPage = () => {
           <div className="about-business-links">
             <button type="button" onClick={() => navigate('/terms')}>이용약관</button>
             <button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button>
-            <span>© 2026 ThinkFit</span>
+            <span>© 2026 생각근육 ThinkFit</span>
           </div>
         </footer>
       </main>

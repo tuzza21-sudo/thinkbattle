@@ -142,7 +142,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
     if (!url) return;
     try {
       await shareReportToKakao({
-        title: 'ThinkFit 토론 결과',
+        title: '생각근육 토론 결과',
         description: `${playerA.name}의 논리력 점수: ${report.totalScore} / ${totalMax}`,
         url,
       });
@@ -154,7 +154,7 @@ export const ResultModal: React.FC<ResultModalProps> = ({ report, topic, playerA
 
   const handleDownloadPdf = () => {
     const previousTitle = document.title;
-    document.title = `ThinkFit 토론 보고서 - ${topic}`;
+    document.title = `생각근육 토론 보고서 - ${topic}`;
     window.print();
     window.setTimeout(() => {
       document.title = previousTitle;

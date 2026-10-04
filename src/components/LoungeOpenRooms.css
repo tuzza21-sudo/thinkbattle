@@ -42,3 +42,8 @@
   .lounge-rooms-empty p { font-size:11px; }
   .lounge-rooms-empty>a { margin-left:40px; }
 }
+.lounge-open-brief { margin: 8px 0; font-size: 11px; line-height: 1.6; }
+.lounge-open-brief summary { cursor: pointer; color: var(--l-muted); }
+.lounge-open-brief > div { padding: 10px 0 4px; max-height: 260px; overflow-y: auto; }
+.lounge-open-brief strong { font-size: 11px; color: var(--l-ink); }
+.lounge-open-brief p { margin: 4px 0 12px; color: var(--l-muted); white-space: pre-wrap; overflow-wrap: anywhere; }

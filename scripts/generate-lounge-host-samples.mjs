@@ -9,7 +9,10 @@ const source = await readFile(new URL('../src/lib/lounge.ts', import.meta.url), 
 const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2023 } }).outputText;
 const lounge = {};
 new Function('exports', output)(lounge);
-for (const host of lounge.loungeHosts) {
+const selectedHost = process.argv.find(argument => argument.startsWith('--host='))?.slice('--host='.length);
+const hosts = selectedHost ? lounge.loungeHosts.filter(host => host.id === selectedHost) : lounge.loungeHosts;
+if (!hosts.length) throw new Error('Unknown lounge host.');
+for (const host of hosts) {
   const file = new URL(`../public${host.voiceSample}`, import.meta.url);
   const exists = await access(file).then(() => true, () => false);
   if (exists && !process.argv.includes('--overwrite')) { console.log(`Reused ${host.id} sample`); continue; }

@@ -5,6 +5,7 @@ import { Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
 import { LoungeApiError } from './loungeApi';
 import { loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
+import { createLoungeTranscriptionQueue } from './loungeTranscription';
 
 export type VoiceParticipant = { id: string; name: string; muted: boolean; avatarIndex?: number; avatarUrl?: string };
 const readAvatarUrl = (metadata?: string) => { try { return safeLoungeAvatarUrl(JSON.parse(metadata || '{}').loungeAvatarUrl); } catch { return undefined; } };
@@ -14,7 +15,7 @@ const readAvatar = (metadata?: string) => {
     return Number.isInteger(value) && value >= 0 && value < 6 ? value as number : undefined;
   } catch { return undefined; }
 };
-export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (audio: Blob, turnId?: string) => Promise<void>, capacity = 4, floor?: { allowed: boolean; speakerId: string | null; turnId?: string }) {
+export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (audio: Blob, turnId?: string) => Promise<void>, capacity = 4, floor?: { allowed: boolean; speakerId: string | null; turnId?: string }, restrictedIds: string[] = []) {
   const roomRef = useRef<Room | null>(null);
   const microphone = useRef<LocalAudioTrack | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
@@ -22,12 +23,17 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const outputContext = useRef<AudioContext | null>(null);
   const speechActivity = useRef({ lastVoiceAt: 0, recording: false, voicedMs: 0 });
   const floorRef = useRef(floor);
+  const restrictedRef = useRef(new Set(restrictedIds));
+  const draining = useRef(false);
   const remoteMicrophones = useRef(new Map<HTMLMediaElement, string>());
+  const remoteHostAudio = useRef(new Set<HTMLMediaElement>());
   const recorder = useRef<MediaRecorder | null>(null);
   const frame = useRef(0);
   const elements = useRef(new Set<HTMLMediaElement>());
   const subscribedAudio = useRef(new Map<Track, HTMLMediaElement>());
   const callback = useRef(onUtterance);
+  const transcriptionQueue = useRef(createLoungeTranscriptionQueue());
+  const pendingTranscriptions = useRef(0);
   const hostIdRef = useRef(hostId);
   const aiSpeakingRef = useRef(false);
   const pending = useRef(false);
@@ -44,12 +50,27 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const [error, setError] = useState('');
   useEffect(() => { callback.current = onUtterance; hostIdRef.current = hostId; }, [onUtterance, hostId]);
   const floorAllowed = floor?.allowed, floorSpeaker = floor?.speakerId, floorTurn = floor?.turnId;
+  const restrictedKey = [...restrictedIds].sort().join(',');
   useEffect(() => {
     floorRef.current = floorAllowed === undefined ? undefined : { allowed: floorAllowed, speakerId: floorSpeaker ?? null, turnId: floorTurn };
+    restrictedRef.current = new Set(restrictedKey ? restrictedKey.split(',') : []);
     const track = microphone.current;
-    if (track) void (floorAllowed === false ? track.mute() : track.unmute());
-    for (const [element, owner] of remoteMicrophones.current) element.muted = floorAllowed !== undefined && owner !== floorSpeaker;
-  }, [floorAllowed, floorSpeaker, floorTurn]);
+    if (track) void (floorAllowed === false || restrictedRef.current.has(roomRef.current?.localParticipant.identity ?? '') ? track.mute() : track.unmute());
+    for (const [element, owner] of remoteMicrophones.current) element.muted = restrictedRef.current.has(owner) || (!remoteHostAudio.current.has(element) && floorAllowed !== undefined && owner !== floorSpeaker);
+  }, [floorAllowed, floorSpeaker, floorTurn, restrictedKey]);
+
+  const flushUtterance = useCallback(async () => {
+    draining.current = true;
+    const recording = recorder.current;
+    try {
+      if (recording?.state === 'recording') {
+        const stopped = new Promise<void>(resolve => recording.addEventListener('stop', () => resolve(), { once: true }));
+        recorder.current = null; recording.stop(); await stopped;
+      }
+      speechActivity.current.recording = false;
+      await transcriptionQueue.current.flush();
+    } finally { draining.current = false; }
+  }, []);
 
   const stopHost = useCallback(() => { playback.current?.finish(); }, []);
   const stopMicrophone = useCallback(() => {
@@ -73,6 +94,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     elements.current.forEach(element => element.remove()); elements.current.clear();
     subscribedAudio.current.clear();
     remoteMicrophones.current.clear();
+    remoteHostAudio.current.clear();
     aiSpeakingRef.current = false;
     setConnected(false); setAudioReady(false); setAiSpeaking(false); setHostText(''); setParticipants([]); setSpeakers([]);
   }, [stopHost, stopMicrophone]);
@@ -109,12 +131,15 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (subscribedAudio.current.has(track)) return;
         const element = track.attach(); elements.current.add(element);
         subscribedAudio.current.set(track, element);
-        if (publication.source === Track.Source.Microphone) { remoteMicrophones.current.set(element, participant.identity); element.muted = Boolean(floorRef.current && floorRef.current.speakerId !== participant.identity); }
+        const isHostAudio = participant.identity === hostIdRef.current && publication.source !== Track.Source.Microphone;
+        remoteMicrophones.current.set(element, participant.identity);
+        if (isHostAudio) remoteHostAudio.current.add(element);
+        element.muted = restrictedRef.current.has(participant.identity) || (!isHostAudio && Boolean(floorRef.current && floorRef.current.speakerId !== participant.identity));
         document.body.appendChild(element);
       });
       room.on(RoomEvent.TrackUnsubscribed, track => {
         subscribedAudio.current.delete(track);
-        track.detach().forEach(element => { elements.current.delete(element); remoteMicrophones.current.delete(element); element.remove(); });
+        track.detach().forEach(element => { elements.current.delete(element); remoteMicrophones.current.delete(element); remoteHostAudio.current.delete(element); element.remove(); });
       });
       room.on(RoomEvent.ParticipantConnected, sync); room.on(RoomEvent.ParticipantDisconnected, sync);
       room.on(RoomEvent.ParticipantMetadataChanged, sync);
@@ -145,7 +170,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   }, [roomId, disconnect, stopHost, stopMicrophone, enableAudio]);
 
   const startMicrophone = useCallback(async () => {
-    if (microphone.current || !roomRef.current || !connected || pending.current) return;
+    if (microphone.current || !roomRef.current || !connected || pending.current || restrictedRef.current.has(roomRef.current.localParticipant.identity)) return;
     pending.current = true;
     const room = roomRef.current;
     try {
@@ -177,7 +202,9 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
           const blob = new Blob(chunks, { type: next.mimeType });
           if (microphone.current !== track || speech.voicedFrames < 12 || blob.size < 300 || queued >= 3) return;
           queued += 1;
-          void callback.current(blob, turnId).catch(err => setError(err instanceof Error ? err.message : '음성 전사가 잠시 지연돼요.')).finally(() => { queued -= 1; });
+          pendingTranscriptions.current += 1;
+          void transcriptionQueue.current.enqueue(() => callback.current(blob, turnId), () => microphone.current === track)
+            .catch(err => setError(err instanceof Error ? err.message : '음성 전사가 잠시 지연돼요.')).finally(() => { queued -= 1; pendingTranscriptions.current -= 1; });
         };
         next.start();
       };
@@ -185,7 +212,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (microphone.current !== track) return;
         const now = performance.now(); analyser.getFloatTimeDomainData(values);
         const rms = Math.sqrt(values.reduce((sum, sample) => sum + sample * sample, 0) / values.length);
-        if (rms > 0.018 && !aiSpeakingRef.current && floorRef.current?.allowed !== false) {
+        if (rms > 0.018 && !draining.current && !restrictedRef.current.has(room.localParticipant.identity) && !aiSpeakingRef.current && floorRef.current?.allowed !== false) {
           speechActivity.current.voicedMs += Math.min(100, now - lastFrame);
           lastVoice = now;
           speechActivity.current.lastVoiceAt = Date.now();
@@ -193,7 +220,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
           if (utterance) utterance.voicedFrames += 1;
         }
         lastFrame = now;
-        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > 20_000 || aiSpeakingRef.current || floorRef.current?.allowed === false)) {
+        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > 20_000 || aiSpeakingRef.current || floorRef.current?.allowed === false || restrictedRef.current.has(room.localParticipant.identity))) {
           recorder.current.stop(); recorder.current = null;
         }
         speechActivity.current.recording = Boolean(recorder.current);
@@ -235,12 +262,12 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     } catch (err) { setError(err instanceof Error ? err.message : '사회자 음성을 재생하지 못했어요.'); }
   }, [stopHost]);
 
-  const playHostStream = useCallback(async (stream: ReadableStream<Uint8Array>, onFirstAudio: () => void, onTimings: (timings: Record<string, number>) => void, canStart: () => boolean) => {
+  const playHostStream = useCallback(async (stream: ReadableStream<Uint8Array>, onFirstAudio: () => void, onTimings: (timings: Record<string, number>) => void, canStart: () => boolean, canWait?: () => boolean) => {
     const room = roomRef.current;
     if (!room) { await stream.cancel(); return; }
     stopHost();
     const context = outputContext.current;
-    if (!context || context.state !== 'running') { await stream.cancel(); throw new Error('소리 켜기를 눌러 사회자 음성을 들어 주세요.'); }
+    if (!context) { await stream.cancel(); throw new LoungeApiError('소리 켜기를 눌러 사회자 음성을 들어 주세요.', 'lounge_audio_not_ready'); }
     const destination = context.createMediaStreamDestination();
     const track = new LocalAudioTrack(destination.stream.getAudioTracks()[0]);
     const queue = new PcmAudioQueue(context, [context.destination, destination]);
@@ -259,37 +286,58 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       if (playback.current?.finish === finish) playback.current = null;
     };
     playback.current = { finish };
+    let waitingSince: number | undefined;
+    const awaitStart = async () => {
+      while (!stopped && roomRef.current === room) {
+        // A changed turn/ended room is a cancellation; temporary microphone
+        // activity or an in-flight transcript is only a short postponement.
+        if (canWait && !canWait()) return false;
+        if (canStart()) return true;
+        if (!canWait) return false;
+        waitingSince ??= Date.now();
+        if (Date.now() - waitingSince >= 8000) throw new LoungeApiError('참가자의 발언이 이어져 사회자 음성을 재생하지 않았어요. 사회자의 글은 대화 기록에서 확인할 수 있어요.', 'lounge_audio_deferred');
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      return false;
+    };
     try {
       await context.resume();
+      if (context.state !== 'running') throw new LoungeApiError('소리 켜기를 눌러 사회자 음성을 들어 주세요.', 'lounge_audio_not_ready');
       await room.localParticipant.publishTrack(track, { name: 'ai-host', source: Track.Source.Unknown });
       if (stopped || roomRef.current !== room) return;
-      for await (const event of readLoungeStream(stream, cancelRead.signal)) {
-        if (stopped || roomRef.current !== room) break;
-        if (event.type === 'host') { currentText = event.text.slice(0, 600); setHostText(currentText); onTimings(event.timings); }
-        if (event.type === 'audio') {
-          if (first && !canStart()) return;
-          const binary = atob(event.audio);
-          const samples = pcm.decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
-          if (queue.push(samples) && first) {
-            first = false; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); onFirstAudio();
+      let streamError: unknown;
+      try {
+        for await (const event of readLoungeStream(stream, cancelRead.signal)) {
+          if (stopped || roomRef.current !== room) break;
+          if (event.type === 'host') { currentText = event.text.slice(0, 600); setHostText(currentText); onTimings(event.timings); }
+          if (event.type === 'audio') {
+            if (first && !await awaitStart()) return;
+            const binary = atob(event.audio);
+            const samples = pcm.decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
+            if (queue.push(samples) && first) {
+              first = false; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); onFirstAudio();
+            }
           }
         }
-      }
+        if (!stopped) pcm.finish();
+      } catch (err) { streamError = err; }
       if (!stopped) {
-        pcm.finish();
-        if (first && !canStart()) return;
+        if (first && !await awaitStart()) return;
         if (queue.finish() && first) {
           first = false; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); onFirstAudio();
         }
-        if (first) throw new LoungeApiError('사회자 음성이 비어 있어요. 글로 대화를 이어갈게요.', 'lounge_invalid_audio');
-        await queue.drain();
+        // A late network error must not discard audio already scheduled ahead
+        // of the playhead. Explicit stop/disconnect still cancels immediately.
+        if (!first) await queue.drain();
+        if (!stopped && streamError) throw streamError;
+        if (!stopped && first) throw new LoungeApiError('사회자 음성이 비어 있어요. 글로 대화를 이어갈게요.', 'lounge_invalid_audio');
       }
     } catch (err) { if (!stopped) throw err; }
     finally { finish(); }
   }, [stopHost]);
 
   useEffect(() => () => { disconnect(); }, [disconnect, roomId]);
-  const getSpeechActivity = useCallback(() => speechActivity.current, []);
+  const getSpeechActivity = useCallback(() => ({ ...speechActivity.current, transcribing: pendingTranscriptions.current > 0 }), []);
   const chooseAvatar = useCallback(async (index: number) => {
     const room = roomRef.current;
     if (!room || !Number.isInteger(index) || index < 0 || index >= 6) return;
@@ -301,5 +349,5 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   // AI audio is published by the human room owner's participant. It must not
   // light up that person's seat as if they were speaking into their microphone.
   const humanSpeakers = aiSpeaking ? speakers.filter(id => id !== hostId) : speakers;
-  return { connected, connecting, micOn, audioReady, aiSpeaking, hostText, participants, speakers: humanSpeakers, error, connect, enableAudio, disconnect, startMicrophone, stopMicrophone, playHost, playHostStream, stopHost, getSpeechActivity, chooseAvatar };
+  return { connected, connecting, micOn, audioReady, aiSpeaking, hostText, participants, speakers: humanSpeakers.filter(id => !restrictedIds.includes(id)), error, connect, enableAudio, disconnect, startMicrophone, stopMicrophone, flushUtterance, playHost, playHostStream, stopHost, getSpeechActivity, chooseAvatar };
 }

@@ -50,7 +50,7 @@ export const SimulationHubPage = ({ user, onLoginRequest }: SimulationHubPagePro
         <button type="button" className="simulation-back" onClick={() => navigate('/')}>
           <ArrowLeft size={18} /> 메인으로
         </button>
-        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><span>ThinkFit</span><small>CONVERSATION STUDIO</small></div>
+        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><div className="simulation-brand-name"><strong>생각근육 ThinkFit</strong></div></div>
         <div className="simulation-user">{user ? `${user.nickname}님` : '로그인 후 훈련 가능'}</div>
       </header>
 

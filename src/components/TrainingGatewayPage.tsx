@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, BookOpen, BrainCircuit, BriefcaseBusiness, Lightbulb, LogIn, LogOut, MessageSquareText, Sparkles, Swords, Target } from 'lucide-react';
+import { ArrowRight, BookOpen, BrainCircuit, BriefcaseBusiness, Coffee, Headphones, Lightbulb, LogIn, LogOut, MessageSquareText, Sparkles, Swords, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import './HomeStudio.css';
@@ -63,7 +63,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
       <header className="training-gateway-header">
         <div className="training-gateway-brand">
           <span><img src="/brand/thinkfit-mark.svg" alt="" /></span>
-          <div><strong>ThinkFit</strong><small>THINK · SPEAK · GROW</small></div>
+          <div><strong>생각근육 ThinkFit</strong></div>
         </div>
         <nav className="home-gateway-nav" aria-label="메인 메뉴"><a href="#training-options">훈련 둘러보기</a><button type="button" onClick={() => navigate('/about')}>서비스 소개</button>{user && <button type="button" onClick={() => navigate('/history')}>훈련 기록</button>}</nav>
         <div className="training-gateway-account">
@@ -83,7 +83,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
         <div className="home-welcome">
           <section className="training-gateway-intro">
             <span><Sparkles size={14} /> YOUR DAILY THINKING STUDIO</span>
-            <h1>생각의 힘을,<br /><em>매일 조금 더.</em></h1>
+            <h1>대화로 키우는<br /><em>생각근육</em></h1>
             <p>생각을 정리하고, 내 언어로 말하고, 새로운 관점을 만나세요.<br />한 번의 대화가 다음의 나를 조금 더 단단하게 만듭니다.</p>
             <a className="home-explore-link" href="#training-options">나에게 맞는 훈련 찾기 <ArrowRight size={16} /></a>
           </section>
@@ -127,8 +127,13 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
           })}
         </section>
 
+        <button type="button" className="home-lounge-entry" onClick={() => navigate('/lounge')}>
+          <span className="home-lounge-icon"><Coffee size={28} /></span>
+          <span className="home-lounge-copy"><small>NEW · 대화 라운지 테스트 오픈</small><strong>오늘은 그냥, 대화 나눌까요?</strong><span>AI 호스트와 친구 2~6명이 함께하는 가벼운 음성 대화. 점수 없이, 부담 없이.</span></span>
+          <span className="home-lounge-link"><Headphones size={17} /> 라운지 둘러보기 <ArrowRight size={18} /></span>
+        </button>
         <div className="training-gateway-note"><MessageSquareText size={15} /> 모든 훈련은 한국어로 진행됩니다.</div>
-        <section className="home-practice-principles" aria-label="ThinkFit의 훈련 방식">
+        <section className="home-practice-principles" aria-label="생각근육의 훈련 방식">
           <article><Lightbulb size={20} /><div><h3>생각할 방향을 발견하고</h3><p>토론의 주장 씨앗과 사고 질문으로 첫 문장의 막막함을 줄여보세요.</p></div></article>
           <article><MessageSquareText size={20} /><div><h3>내 언어로 직접 말하고</h3><p>글이나 목소리로 내 생각을 표현하고, 상대의 관점에 응답하세요.</p></div></article>
           <article><BookOpen size={20} /><div><h3>대화에서 다음을 배우세요</h3><p>훈련 후 피드백을 읽고, 다음 대화에서 시도할 한 가지를 찾아보세요.</p></div></article>
@@ -138,7 +143,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
       <footer className="training-gateway-footer">
         <div className="training-gateway-footer-brand">
           <img src="/brand/thinkfit-mark.svg" alt="" />
-          <div><strong>ThinkFit</strong><span>생각과 대응을 단련하는 AI 훈련소</span></div>
+          <div><strong>생각근육 ThinkFit</strong><span>생각과 대응을 단련하는 AI 훈련소</span></div>
         </div>
         <div className="training-gateway-footer-info">
           <p><span>대표</span> 최석빈 <i /> <span>사업자등록번호</span> 218-14-16906</p>
@@ -148,7 +153,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
         <div className="training-gateway-footer-links">
           <button type="button" onClick={() => navigate('/terms')}>이용약관</button>
           <button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button>
-          <span>© 2026 ThinkFit</span>
+          <span>© 2026 생각근육 ThinkFit</span>
         </div>
       </footer>
     </div>

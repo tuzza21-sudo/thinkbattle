@@ -66,15 +66,15 @@ const getVoiceRoomAccess = async (authorization: string, roomName: string, userI
   if (roomName.startsWith('lounge-')) {
     const [roomResponse, memberResponse] = await Promise.all([
       fetch(`${baseUrl}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomName)}&select=capacity,status,expires_at,created_at`, { headers: authHeaders }),
-      fetch(`${baseUrl}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomName)}&user_id=eq.${encodeURIComponent(userId)}&active=eq.true&select=user_id`, { headers: authHeaders }),
+      fetch(`${baseUrl}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomName)}&user_id=eq.${encodeURIComponent(userId)}&active=eq.true&select=user_id,speaking_restricted_until`, { headers: authHeaders }),
     ]);
     if (!roomResponse.ok || !memberResponse.ok) throw new Error('라운지 서버를 준비 중입니다. 화면 미리보기를 이용해 주세요.');
     const rooms = await roomResponse.json() as Array<{ capacity: number; status: string; expires_at: string | null; created_at: string }>;
-    const members = await memberResponse.json() as Array<{ user_id: string }>;
+    const members = await memberResponse.json() as Array<{ user_id: string; speaking_restricted_until?: string | null }>;
     const lounge = rooms[0];
     if (!lounge || !members.length || lounge.status === 'ended'
       || Date.parse(lounge.expires_at || lounge.created_at) + (lounge.expires_at ? 0 : 7_200_000) <= Date.now()) return null;
-    return { maxParticipants: Math.min(6, Math.max(1, Number(lounge.capacity))), position: null, role: 'lounge', phaseIds: [] };
+    return { maxParticipants: Math.min(6, Math.max(1, Number(lounge.capacity))), position: null, role: 'lounge', phaseIds: [], canPublish: !(Date.parse(members[0].speaking_restricted_until ?? '') > Date.now()) };
   }
   const [roomResponse, participantResponse] = await Promise.all([
     fetch(
@@ -193,7 +193,7 @@ const handleWebRequest = async (req: Request) => {
     accessToken.addGrant({
       room: roomName,
       roomJoin: true,
-      canPublish: true,
+      canPublish: roomAccess.role !== 'lounge' || roomAccess.canPublish !== false,
       canSubscribe: true,
       canPublishData: true,
       canUpdateOwnMetadata: roomAccess.role === 'lounge',

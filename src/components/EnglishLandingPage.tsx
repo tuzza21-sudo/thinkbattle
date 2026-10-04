@@ -118,7 +118,7 @@ export const EnglishLandingPage = ({ user, onLoginRequest, onLogout, onLanguageC
         <div className="flex justify-between items-center" style={{ gap: '1rem', flexWrap: 'wrap' }}>
           <div>
             <span style={{ color: 'var(--primary)', fontSize: '.78rem', fontWeight: 900, letterSpacing: '.08em' }}>ENGLISH DEBATE TRAINING</span>
-            <h1 style={{ margin: '.25rem 0 0', color: 'var(--primary)', fontSize: '2.35rem' }}>ThinkFit</h1>
+            <h1 style={{ margin: '.25rem 0 0', color: 'var(--primary)', fontSize: 'clamp(1.8rem, 5vw, 2.35rem)' }}>생각근육 ThinkFit</h1>
           </div>
           <nav className="card flex items-center gap-3" style={{ padding: '.75rem 1rem', flexWrap: 'wrap' }}>
             <button className="btn btn-secondary" onClick={() => onLanguageChange('ko')} aria-label="한국어 버전으로 전환">
@@ -183,7 +183,7 @@ export const EnglishLandingPage = ({ user, onLoginRequest, onLogout, onLanguageC
 
       {showCreateModal && <CreateBattleModal language="en" liveOnly={createLiveOnly} publicTopics={topics} onClose={() => setShowCreateModal(false)} onStart={startBattle} />}
       {showJoinModal && <JoinDebateModal language="en" onClose={() => setShowJoinModal(false)} onJoin={joinRoom} />}
-      <footer className="site-legal-footer"><span>© 2026 ThinkFit</span><button type="button" onClick={() => navigate('/terms')}>Terms</button><button type="button" onClick={() => navigate('/privacy')}>Privacy</button></footer>
+      <footer className="site-legal-footer"><span>© 2026 생각근육 ThinkFit</span><button type="button" onClick={() => navigate('/terms')}>Terms</button><button type="button" onClick={() => navigate('/privacy')}>Privacy</button></footer>
     </div>
   );
 };

@@ -360,7 +360,7 @@ export const DebateLobbyPage = ({ user, onLoginRequest }: DebateLobbyPageProps) 
     <main className="match-lobby">
       <nav className="match-lobby-nav" aria-label="대기실 메뉴">
         <button type="button" className="match-back" disabled={actionLoading} onClick={() => void exitLobby()}><ArrowLeft size={17} /> 토론 목록</button>
-        <span>ThinkFit <i /> 토론 대기실</span>
+        <span>생각근육 <i /> 토론 대기실</span>
         <button type="button" className="match-invite" onClick={() => void copyInvite()}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? '복사했어요' : '초대 링크 복사'}</button>
       </nav>
 

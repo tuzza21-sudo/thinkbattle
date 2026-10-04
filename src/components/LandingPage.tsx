@@ -316,7 +316,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
     <div className="debate-home-page page-scroll thinkfit-home">
       <header className="debate-home-header">
         <button type="button" className="debate-home-brand" onClick={() => navigate('/')} aria-label="훈련 선택으로 돌아가기">
-          <span><img src="/brand/thinkfit-mark.svg" alt="" /></span><div><strong>ThinkFit</strong><small>DEBATE STUDIO</small></div>
+          <span><img src="/brand/thinkfit-mark.svg" alt="" /></span><div><strong>생각근육 ThinkFit</strong></div>
         </button>
         <nav className="debate-home-nav" aria-label="토론 페이지 메뉴">
           <button type="button" onClick={() => navigate('/about')}><BookOpen size={16} /> 서비스 소개</button>
@@ -328,7 +328,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
             <button type="button" className="debate-home-login" onClick={onLoginRequest}><LogIn size={17} /> 회원가입 · 로그인</button>
           ) : user ? (
             <>
-              <button type="button" className="debate-home-profile" onClick={() => setShowProfileModal(true)} title="닉네임 변경"><span>{user.nickname.charAt(0)}</span>{user.nickname}<Edit2 size={13} /></button>
+              <button type="button" className="debate-home-profile" onClick={() => setShowProfileModal(true)} title="프로필 · 라운지 아바타 수정"><span>{user.loungeAvatarUrl ? <img src={user.loungeAvatarUrl} alt="내 라운지 아바타" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : user.nickname.charAt(0)}</span>{user.nickname}<Edit2 size={13} /></button>
               <button type="button" className="debate-home-logout" onClick={onLogout} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>
             </>
           ) : <button type="button" className="debate-home-login" onClick={onLoginRequest}><LogIn size={17} /> 로그인</button>}
@@ -929,7 +929,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
         user={user}
         onLoginRequest={onLoginRequest}
       />
-      <footer className="site-legal-footer"><span>© 2026 ThinkFit</span><button type="button" onClick={() => navigate('/terms')}>이용약관</button><button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button></footer>
+      <footer className="site-legal-footer"><span>© 2026 생각근육 ThinkFit</span><button type="button" onClick={() => navigate('/terms')}>이용약관</button><button type="button" onClick={() => navigate('/privacy')}>개인정보 처리 안내</button></footer>
     </div>
   );
 };

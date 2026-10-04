@@ -40,7 +40,7 @@ const slides: ProposalSlide[] = [
     id: 1,
     section: '도입 제안',
     title: '토론을 한 번의 행사에서\n측정 가능한 교육 과정으로',
-    lead: 'ThinkFit은 토론의 개설, 참여, 평가, 기록을 하나의 흐름으로 연결합니다. 기관은 토론을 더 자주 운영하고, 참여자의 변화를 같은 기준으로 확인할 수 있습니다.',
+    lead: '생각근육은 토론의 개설, 참여, 평가, 기록을 하나의 흐름으로 연결합니다. 기관은 토론을 더 자주 운영하고, 참여자의 변화를 같은 기준으로 확인할 수 있습니다.',
     icon: Building2,
     leftTitle: '기관이 겪는 현실적인 어려움',
     leftItems: [
@@ -48,7 +48,7 @@ const slides: ProposalSlide[] = [
       '여러 참여자의 발언을 같은 기준으로 평가하기 어렵습니다.',
       '활동이 끝나면 과정과 성과가 남지 않는 경우가 많습니다.',
     ],
-    rightTitle: 'ThinkFit이 연결하는 운영 흐름',
+    rightTitle: '생각근육이 연결하는 운영 흐름',
     rightItems: [
       '기관 전용 주제 설정과 실시간 토론방 개설',
       '발언 기록을 바탕으로 한 동일 루브릭 평가와 피드백',
@@ -74,7 +74,7 @@ const slides: ProposalSlide[] = [
       '일부 참여자에게 발언이 편중되기 쉽습니다.',
       '토론 단계와 역할을 매번 다시 안내해야 합니다.',
     ],
-    rightTitle: 'ThinkFit의 실시간 토론 환경',
+    rightTitle: '생각근육의 실시간 토론 환경',
     rightItems: [
       '음성 또는 텍스트 방식으로 사람 대 사람 토론방 개설',
       '찬성·반대 팀, 역할, 발언 단계와 제한 시간 설정',
@@ -169,9 +169,9 @@ const slides: ProposalSlide[] = [
     id: 6,
     section: '도입 전 판단 · 강점과 한계',
     title: '온라인 반복 훈련의 강점은 키우고\n현장 훈련의 역할은 남겨둡니다',
-    lead: 'ThinkFit은 오프라인 실전 교육을 대체하는 제품이 아닙니다. 토론을 자주 열고 같은 기준으로 관리하기 어려웠던 운영의 빈틈을 채우고, 비언어 표현과 현장 긴장감은 대면 훈련으로 완성하는 혼합형 훈련 도구입니다.',
+    lead: '생각근육은 오프라인 실전 교육을 대체하는 제품이 아닙니다. 토론을 자주 열고 같은 기준으로 관리하기 어려웠던 운영의 빈틈을 채우고, 비언어 표현과 현장 긴장감은 대면 훈련으로 완성하는 혼합형 훈련 도구입니다.',
     icon: ShieldCheck,
-    leftTitle: 'ThinkFit이 확실히 개선하는 영역',
+    leftTitle: '생각근육이 확실히 개선하는 영역',
     leftItems: [
       '시간과 장소의 제약을 낮춰 필요한 순간에 토론을 쉽게 개설합니다.',
       '반·강사·회차가 달라도 동일한 진행 구조와 평가 기준을 적용합니다.',
@@ -187,7 +187,7 @@ const slides: ProposalSlide[] = [
     ],
     outcomeTitle: '가장 효과적인 보완 운영 방식',
     outcomes: [
-      { title: '1. 사전 반복', description: 'ThinkFit에서 주장·근거·반론 구조를 충분히 연습합니다.' },
+      { title: '1. 사전 반복', description: '생각근육에서 주장·근거·반론 구조를 충분히 연습합니다.' },
       { title: '2. 대면 실전', description: '현장에서 제스처·시선·자세와 긴장 대응을 점검합니다.' },
       { title: '3. 지도자 코칭', description: '기록과 현장 관찰을 함께 보고 최종 피드백을 제공합니다.' },
       { title: '4. 재훈련', description: '확인된 약점을 다음 온라인 훈련 과제로 연결합니다.' },
@@ -250,7 +250,7 @@ export const B2BMarketingV2Page = () => {
           <div className="flex items-center gap-3">
             <span style={{ width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, color: '#fff', background: 'var(--primary)' }}><Presentation size={19} /></span>
             <div>
-              <strong style={{ display: 'block', color: 'var(--text-light)' }}>ThinkFit 기관 도입 제안</strong>
+              <strong style={{ display: 'block', color: 'var(--text-light)' }}>생각근육 기관 도입 제안</strong>
               <small style={{ color: 'var(--text-muted)' }}>토론 운영부터 평가와 기록까지</small>
             </div>
           </div>

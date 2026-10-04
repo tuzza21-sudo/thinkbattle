@@ -3,14 +3,14 @@ import fs from 'node:fs/promises';
 const port = process.env.LOUNGE_CDP_PORT || 9241;
 const base = process.env.LOUNGE_PREVIEW_URL || 'http://127.0.0.1:5191';
 const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
-const target = targets.find(item => item.type === 'page' && item.url.includes('5191'));
+const target = targets.find(item => item.type === 'page' && item.url.startsWith(base));
 if (!target) throw new Error('Open the local lounge in a Chrome CDP tab first.');
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }));
 let sequence = 0;
 const pending = new Map(), errors = [], paidRequests = [];
 const openRooms = [
-  { id: 'lounge-00000000-0000-4000-8000-000000000001', topic: '영화 호프를 보고 남은 이야기', host_persona: 'ina', theme: 'hotel', capacity: 4, status: 'lobby', participant_count: 2 },
+  { id: 'lounge-00000000-0000-4000-8000-000000000001', topic: '영화 호프를 보고 남은 이야기', host_persona: 'ina', theme: 'hotel', capacity: 4, status: 'lobby', participant_count: 2, topic_brief: { category: 'media', subcategory: 'film', work_title: '호프', creator: '테스트 감독', reason: '이야기를 다른 시선으로 이해하고 싶어서', discussion: '인물의 선택을 어떻게 생각하는지 함께 나눠요.' } },
   { id: 'lounge-00000000-0000-4000-8000-000000000002', topic: '여행과 산행에서 만난 멋진 풍경', host_persona: 'dodi', theme: 'forest', capacity: 6, status: 'active', participant_count: 3 },
   { id: 'lounge-00000000-0000-4000-8000-000000000003', topic: '한 번 더 가고 싶은 맛집과 먹거리', host_persona: 'jaeseok', theme: 'rooftop', capacity: 2, status: 'lobby', participant_count: 2 },
 ];
@@ -30,7 +30,7 @@ const send = (method, params = {}) => new Promise((resolve, reject) => { const i
 const evaluate = async expression => { const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value; };
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const waitFor = async expression => { for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(100); } throw new Error(`Timed out: ${expression}`); };
-const type = (selector, value) => evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)}); el.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+const type = (selector, value) => evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value').set.call(el,${JSON.stringify(value)}); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); })()`);
 const directory = 'node_modules/.cache/lounge-artifacts'; await fs.mkdir(directory, { recursive: true });
 const screenshot = async name => { const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }); await fs.writeFile(`${directory}/${name}.png`, Buffer.from(result.data, 'base64')); };
 await send('Runtime.discardConsoleEntries'); await send('Runtime.enable'); await send('Network.enable'); await send('Page.enable');
@@ -40,6 +40,10 @@ try {
   await waitFor("document.querySelectorAll('.lounge-open-card').length===3");
   assert.equal(await evaluate("document.querySelectorAll('.lounge-open-card a').length"), 2, 'full rooms cannot be joined from the list');
   assert.equal(await evaluate("document.querySelector('.lounge-open-card a').getAttribute('href')"), `/lounge/${openRooms[0].id}`);
+  await evaluate("document.querySelector('.lounge-open-brief summary').click()");
+  assert.equal(await evaluate("document.querySelector('.lounge-open-brief').open"), true);
+  assert.match(await evaluate("document.querySelector('.lounge-open-brief').textContent"), /다른 시선으로 이해/);
+  assert.match(await evaluate("document.querySelector('.lounge-open-brief').textContent"), /인물의 선택/);
   roomResponse = [];
   await evaluate("document.querySelector('.lounge-rooms-refresh').click()");
   await waitFor("document.querySelector('.lounge-rooms-empty a')!==null");
@@ -59,8 +63,26 @@ try {
     assert.equal(await evaluate("document.querySelector('.lounge-hero').nextElementSibling.className"), 'lounge-open-rooms');
     assert.equal(await evaluate("document.querySelector('.lounge-invite')===null"), true);
     assert.equal(await evaluate("document.querySelector('.lounge-selections .lounge-section-title span').textContent"), '01 · TALK ABOUT');
-    assert.match(await evaluate("document.querySelector('.lounge-topic-options').textContent"), /여행과 산행 풍경/);
-    assert.match(await evaluate("document.querySelector('.lounge-topic-options').textContent"), /먹거리와 맛집/);
+    assert.deepEqual(await evaluate("[...document.querySelectorAll('.lounge-topic-options strong')].map(el=>el.textContent)"), ['미디어 / 문화', '취미 / 소비', '연애 / 사랑', '커리어 / 진로', '재테크 / 경제', '사회 / 이슈']);
+    assert.equal(await evaluate("document.querySelector('.lounge-primary').disabled"), true);
+    await type('#lounge-topic-input', '책의 선택을 다르게 읽는 우리');
+    assert.equal(await evaluate("document.querySelector('.lounge-primary').disabled"), true, 'a title alone cannot create a structured room');
+    await type('#lounge-subtopic', 'book');
+    await waitFor("document.querySelector('label[for=lounge-creator]').textContent.includes('저자')");
+    await type('#lounge-work-title', '데미안'); await type('#lounge-creator', '헤르만 헤세');
+    await type('#lounge-topic-reason', '저자의 생각이 지금의 고민과 연결돼서');
+    assert.equal(await evaluate("document.querySelector('.lounge-primary').disabled"), true, 'discussion direction is also required');
+    await type('#lounge-topic-discussion', '나다운 삶은 어떻게 선택하는지 각자의 경험을 나눠요.');
+    await waitFor("!document.querySelector('.lounge-primary').disabled");
+    await type('#lounge-subtopic', 'show');
+    await waitFor("document.querySelector('#lounge-creator')===null");
+    assert.equal(await evaluate("document.querySelector('#lounge-work-title').value"), '', 'switching media subtypes clears old identifying metadata');
+    await type('#lounge-work-title', '흑백요리사');
+    await waitFor("!document.querySelector('.lounge-primary').disabled");
+    await evaluate("document.querySelectorAll('.lounge-topic-options button')[1].click()");
+    await waitFor("document.querySelector('#lounge-work-title')===null");
+    assert.deepEqual(await evaluate("[...document.querySelector('#lounge-subtopic').options].map(o=>o.textContent)"), ['여행 · 산행','쇼핑','먹거리 · 맛집','취미 · 기타 경험']);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `brief fields overflow at ${width}`);
     assert.equal(await evaluate("document.querySelectorAll('.lounge-theme-options button').length"), 6);
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.lounge-theme-options')).gridTemplateColumns.split(' ').length"), width > 600 ? 3 : 2, 'three scenery cards per desktop row; readable mobile cards');
     assert.equal(await evaluate("document.querySelectorAll('.lounge-host-option .lounge-host-photo img').length"), 4);
@@ -109,6 +131,8 @@ try {
   await waitFor("window.hostSampleAudio.length===2 && !window.hostSampleAudio[1].paused");
   assert.equal(await evaluate("window.hostSampleAudio[0].paused"), true, 'starting another style stops the previous sample');
   assert.equal(await evaluate("document.querySelectorAll('.lounge-voice-preview[aria-pressed=true]').length"), 1);
+  assert.equal(await evaluate("document.querySelector('.lounge-preview-button').disabled"), true, 'a category alone cannot start a conversation');
+  await type('.lounge-custom-topic input', '영화 호프를 보고 남은 이야기');
   await evaluate("document.querySelector('.lounge-preview-button').click()");
   await waitFor("document.querySelector('.lounge-room-main')!==null");
   assert.equal(await evaluate("window.hostSampleAudio[1].paused"), true, 'leaving the choices stops sample playback');
@@ -181,6 +205,7 @@ try {
   await evaluate("document.querySelector('.lounge-capacities button').click()");
   assert.match(await evaluate("document.querySelector('.lounge-primary').textContent"), /1:1/);
   assert.match(await evaluate("document.querySelector('.lounge-builder-footnote').textContent"), /입장하면 음성과 마이크/);
+  await type('.lounge-custom-topic input', '혼자 여행하며 만난 기억에 남는 풍경');
   await evaluate("document.querySelector('.lounge-preview-button').click()");
   await waitFor("document.querySelectorAll('.lounge-seat').length===1");
   assert.match(await evaluate("document.querySelector('.lounge-stage-label').textContent"), /AI와 1:1/);

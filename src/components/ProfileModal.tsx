@@ -78,7 +78,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
     }
   };
 
-  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '수다 라운지' ? '편한 이름과 나를 닮은 얼굴로, 내 대화석을 꾸며요.' : serviceName + '에서 사용할 이름과 라운지 아바타를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
+  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '대화 라운지' ? '편한 이름과 나를 닮은 얼굴로, 내 대화석을 꾸며요.' : serviceName + '에서 사용할 이름과 라운지 아바타를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
     <div className="lounge-account-identity"><Mail size={17} /><div><small>로그인 계정</small><span>{user.email || '소셜 계정 · 이메일 정보 없음'}</span></div></div>
     <span className="lounge-account-section-label">01 · 대화에서 불릴 이름</span>
     <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSave(); }} aria-busy={loading}>

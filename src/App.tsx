@@ -57,7 +57,7 @@ function App() {
 
   useEffect(() => {
     const pageTitles: Record<string, string> = {
-      '/lounge': '수다 라운지',
+      '/lounge': '대화 라운지',
       '/debate': '토론 훈련',
       '/battle/new': 'AI 토론',
       '/history': '훈련 기록',
@@ -74,13 +74,13 @@ function App() {
       '/super-admin': '서비스 관리',
     };
     const pageTitle = pageTitles[normalizedPath]
-      ?? (normalizedPath.startsWith('/lounge/') ? '수다 라운지'
+      ?? (normalizedPath.startsWith('/lounge/') ? '대화 라운지'
         : normalizedPath.startsWith('/battle/lobby/') ? '토론 대기실'
         : normalizedPath.startsWith('/battle/live/') ? '실시간 토론'
           : normalizedPath.startsWith('/simulation/') ? '페르소나 대화'
             : normalizedPath.startsWith('/report/') ? '토론 리포트' : null);
     document.title = normalizedPath === '/' || normalizedPath.startsWith('/lounge')
-      ? '수다 라운지 — 취향으로 이어지는 대화'
+      ? '대화 라운지 — 취향으로 이어지는 대화'
       : pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
   }, [normalizedPath]);
 

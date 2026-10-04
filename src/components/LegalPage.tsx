@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 type LegalPageProps = { kind: 'privacy' | 'terms' };
 
 const privacySections = [
+  ['라운지 프로필 사진', '선택한 본인 사진은 별도 동의 후 Google Gemini API로 전송해 아바타로 변환합니다. 서비스 저장소에는 원본 사진을 보관하지 않으며, 이용자가 승인한 아바타만 비공개 저장소에 보관합니다. 라운지 참가자는 최대 2시간 유효한 이미지 링크를 통해 아바타를 볼 수 있습니다. 사진 첨부 없이도 가입할 수 있습니다. 얼굴 특징을 살리는 아바타는 완전한 익명성을 보장하지 않습니다. Google의 사진 처리에는 해당 API 데이터 정책이 적용됩니다.'],
   ['처리 목적', '회원 식별과 계정 운영, 토론·상황극 훈련 제공, 음성 전달과 전사, 맞춤 질문 및 학습 리포트 생성, 서비스 안전성 확보와 문의 대응을 위해 개인정보를 처리합니다.'],
   ['처리 항목', '이메일·닉네임·로그인 정보, 이용자가 입력한 텍스트와 음성 발언·전사문, 훈련 설정·결과·이용 기록을 처리합니다. 이력서·경력·전공·활동 정보는 이용자가 맞춤 훈련을 선택한 경우에만 처리합니다. 주민등록번호, 상세 주소, 연락처 등 훈련에 불필요한 정보는 입력하지 마세요.'],
   ['보유 및 파기', '계정 정보와 훈련 기록은 회원 탈퇴 또는 삭제 요청 시까지 보관합니다. 음성 녹음은 기본 90일 동안 보관하며 저장 용량 정책에 따라 더 일찍 삭제될 수 있습니다. 보유 목적이 끝난 정보는 복구하기 어려운 방법으로 지체 없이 파기하되, 관계 법령에 따라 보존할 필요가 있는 경우에는 해당 기간 동안 분리 보관합니다.'],
@@ -14,7 +15,7 @@ const privacySections = [
 ];
 
 const termsSections = [
-  ['서비스의 목적', 'ThinkFit은 AI 스파링, 사람 간 토론, 상황별 시뮬레이션과 학습 리포트를 제공하는 사고력 훈련 서비스입니다. AI 결과는 학습 보조 자료이며 사실성·완전성이나 전문적 판단을 보장하지 않습니다.'],
+  ['서비스의 목적', '생각근육은 AI 스파링, 사람 간 토론, 상황별 시뮬레이션과 학습 리포트를 제공하는 사고력 훈련 서비스입니다. AI 결과는 학습 보조 자료이며 사실성·완전성이나 전문적 판단을 보장하지 않습니다.'],
   ['계정과 책임', '이용자는 정확한 계정 정보를 사용하고 로그인 수단을 안전하게 관리해야 합니다. 다른 사람의 계정을 사용하거나 서비스의 접근 제한을 우회해서는 안 됩니다.'],
   ['사람 간 토론 규칙', '참가자는 상대방의 동의와 존엄을 존중해야 하며 모욕, 협박, 혐오, 개인정보 노출, 불법 콘텐츠 공유를 해서는 안 됩니다. 음성방 입장 전 실시간 음성 전달과 자동 전사 방식을 확인해야 합니다.'],
   ['콘텐츠와 공개', '이용자는 자신이 작성하거나 발언한 콘텐츠에 필요한 권리를 보유해야 합니다. 토론 기록은 기본적으로 본인 계정에 저장되며, 보고서나 논증은 이용자가 별도로 공개 또는 공유한 경우에만 다른 사람에게 제공됩니다.'],
@@ -23,6 +24,7 @@ const termsSections = [
 ];
 
 const englishPrivacy = [
+  ['Lounge profile photos', 'With your separate consent, your selected photo is sent to the Google Gemini API to create an avatar. We do not store the original photo in our service storage. Only an avatar you approve is saved in private storage and shown to lounge participants using an image link valid for up to two hours. Adding a photo is optional. An avatar that preserves facial features does not guarantee anonymity. Google processing follows its API data policy.'],
   ['Purpose', 'We process personal information to operate accounts, provide debate and simulation training, deliver and transcribe speech, create personalised questions and learning reports, maintain service security, and answer enquiries.'],
   ['Data processed', 'We process email, nickname and sign-in information; text, recorded speech and transcripts submitted during training; training settings, results and basic activity records. Resume, career, major and activity information is processed only when you choose personalised training. Do not submit information unnecessary for training.'],
   ['Retention and deletion', 'Account information and training records are retained until account deletion or a deletion request. Voice recordings are normally retained for 90 days and may be removed earlier under the storage policy. Data is securely deleted when no longer needed unless retention is required by law.'],
@@ -33,7 +35,7 @@ const englishPrivacy = [
 ];
 
 const englishTerms = [
-  ['Purpose', 'ThinkFit is a training service for AI sparring, live debate, simulations and learning reports. AI output is educational assistance and is not guaranteed to be complete, accurate or professional advice.'],
+  ['Purpose', '생각근육 ThinkFit is a training service for AI sparring, live debate, simulations and learning reports. AI output is educational assistance and is not guaranteed to be complete, accurate or professional advice.'],
   ['Account responsibility', 'Keep your sign-in method secure and do not use another person’s account or bypass access controls.'],
   ['Live debate conduct', 'Respect every participant. Harassment, threats, hate, disclosure of personal information and unlawful content are prohibited. Voice debates use live audio delivery and automatic transcription.'],
   ['Content and sharing', 'You must have the right to use content you submit. Records are private to your account unless you deliberately publish an argument or create a report-sharing link.'],
@@ -55,7 +57,7 @@ export const LegalPage = ({ kind }: LegalPageProps) => {
     <main className="app-container page-scroll legal-page">
       <header className="legal-page-header">
         <button type="button" className="icon-button" onClick={() => navigate(-1)} aria-label={isEnglish ? 'Go back' : '뒤로 가기'}><ChevronLeft size={22} /></button>
-        <div><span><ShieldCheck size={16} /> THINKFIT TRUST CENTER</span><h1>{title}</h1><p>{isEnglish ? 'Effective 20 August 2026' : '시행일 2026년 8월 20일'}</p></div>
+        <div><span><ShieldCheck size={16} /> 생각근육 TRUST CENTER</span><h1>{title}</h1><p>{isEnglish ? 'Effective 20 August 2026' : '시행일 2026년 8월 20일'}</p></div>
       </header>
       <section className="legal-intro card">
         <strong>{isEnglish ? 'Please understand how your debate data is used before training.' : '훈련을 시작하기 전에 토론 데이터가 어떻게 처리되는지 확인해 주세요.'}</strong>

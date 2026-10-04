@@ -25,7 +25,7 @@ export function DebateStudioHeader({ battle, steps, currentIndex, remaining, ove
   const side = (own: boolean) => en ? ((own ? battle.userPosition : battle.aiPosition) === 'affirmative' ? 'Government' : 'Opposition') : getPositionLabel((own ? battle.userPosition : battle.aiPosition) ?? 'affirmative');
   return <>
     <header className="studio-topbar">
-      <div className="studio-brand-group"><Link className="studio-back" to="/debate" aria-label={en ? 'Back to debate lobby' : '토론 로비로 돌아가기'}><ArrowLeft size={18} /></Link><Link className="studio-brand" to="/debate"><img src="/brand/thinkfit-mark.svg" alt="" />ThinkFit<span>DEBATE STUDIO</span></Link></div>
+      <div className="studio-brand-group"><Link className="studio-back" to="/debate" aria-label={en ? 'Back to debate lobby' : '토론 로비로 돌아가기'}><ArrowLeft size={18} /></Link><Link className="studio-brand" to="/debate"><img src="/brand/thinkfit-mark.svg" alt="" /><div className="studio-brand-name"><strong>생각근육 ThinkFit</strong></div><span>DEBATE STUDIO</span></Link></div>
       <span className={`studio-session-status ${paused || battle.isFinished ? 'inactive' : ''}`}><i />{status}</span>
     </header>
     <div className="studio-topic-row">

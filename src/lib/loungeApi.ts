@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeSession, LoungeSessionAction } from './loungeSession';
 
 export class LoungeApiError extends Error {
@@ -19,16 +19,22 @@ export async function loungeRpc<T>(name: string, args: Record<string, unknown>):
   }
   return data as T;
 }
-export const createLounge = (persona: LoungeHostId, topic: string, capacity: number, nickname: string, theme: LoungeThemeId = 'rooftop') => loungeRpc<string>('create_voice_lounge', { p_persona: persona, p_topic: topic, p_capacity: capacity, p_nickname: nickname, p_theme: theme, p_study_required: loungeNeedsStudy(topic) });
+export const createLounge = async (persona: LoungeHostId, topic: string, capacity: number, nickname: string, theme: LoungeThemeId = 'rooftop', topicBrief?: LoungeTopicBrief) => {
+  const title = topic.trim();
+  if (!title || title.length > 160) throw new Error('대화할 주제를 1~160자로 직접 입력해 주세요.');
+  const brief = topicBrief === undefined ? undefined : normalizeLoungeTopicBrief(topicBrief);
+  return loungeRpc<string>('create_voice_lounge', { p_persona: persona, p_topic: title, p_capacity: capacity, p_nickname: nickname, p_theme: theme, p_study_required: brief ? true : loungeNeedsStudy(title), ...(brief ? { p_topic_brief: brief } : {}) });
+};
 export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });
 export const postLoungeMessage = (id: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: id, p_text: text });
+export const requestLoungeModerator = (id: string) => loungeRpc<void>('request_voice_lounge_moderator', { p_room: id });
 export const controlLoungeSession = (id: string, action: LoungeSessionAction, turnId?: string, seconds = 0) => loungeRpc<LoungeSession>('control_voice_lounge_session', { p_room: id, p_action: action, p_turn: turnId ?? null, p_seconds: seconds });
 export async function loadLounge(id: string) {
   const results = await Promise.all([
     supabase.from('voice_lounge_rooms').select('*').eq('id', id).single(),
-    supabase.from('voice_lounge_members').select('user_id,nickname,last_seen').eq('room_id', id).eq('active', true),
+    supabase.from('voice_lounge_members').select('*').eq('room_id', id).eq('active', true),
     supabase.from('voice_lounge_messages').select('*').eq('room_id', id).order('id', { ascending: false }).limit(60),
   ]);
   for (const result of results) if (result.error) throw new Error(result.error.message);
@@ -40,6 +46,23 @@ export async function loadLounge(id: string) {
     session = result.data as LoungeSession | null;
   }
   return { room, session, members: results[1].data as LoungeMember[], messages: (results[2].data as LoungeMessage[]).reverse() };
+}
+export async function reviewLoungeInteraction(roomId: string, messageId?: number) {
+  return interactionRequest({ roomId, action: 'review', ...(messageId ? { messageId } : {}) });
+}
+export const syncLoungeSafety = (roomId: string) => interactionRequest({ roomId, action: 'sync' });
+export const releaseLoungeRestriction = (roomId: string, targetId: string) => interactionRequest({ roomId, action: 'release', targetId });
+async function interactionRequest(body: Record<string, unknown>) {
+  const { data } = await supabase.auth.getSession();
+  const response = await fetch('/api/lounge-interaction', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body) });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload) throw new LoungeApiError(
+    typeof payload?.error === 'string' ? payload.error : 'AI 대화 보호 연결을 다시 확인해 주세요.',
+    typeof payload?.code === 'string' ? payload.code : `lounge_interaction_http_${response.status}`,
+    typeof payload?.retryable === 'boolean' ? payload.retryable : response.status === 429 || response.status >= 500,
+    typeof payload?.retryAfterSeconds === 'number' && payload.retryAfterSeconds > 0 ? payload.retryAfterSeconds : 60,
+  );
+  return payload as { skipped?: boolean; voiceSyncPending?: boolean; question_queued?: boolean };
 }
 async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
   const { data } = await supabase.auth.getSession();

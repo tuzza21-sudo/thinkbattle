@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { filmCard, filmMaterial, filmSource, filmStudyFixture } from './lounge-film-fixtures.mjs';
 const compile = (path, require = () => {}) => {
   const exports = {};
   new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require);
@@ -9,9 +10,11 @@ const compile = (path, require = () => {}) => {
 };
 const lounge = compile('../src/lib/lounge.ts');
 const study = compile('../src/lib/loungeStudy.ts');
+const filmStudy = compile('../src/lib/loungeFilmStudy.ts');
 const sessionLib = compile('../src/lib/loungeSession.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeSession') ? sessionLib : lounge).default;
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
+const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
 const result = (body, status = 200) => new Response(JSON.stringify(body), { status });
 const run = async (mock, task) => {
@@ -37,16 +40,72 @@ test('custom topics enable study while preset topics preserve lightweight creati
   assert.equal(args[1].p_study_required, false);
 });
 
+test('room creation requires a written topic and trims it before any RPC', async () => {
+  const args = [];
+  const client = compile('../src/lib/loungeApi.ts', path => path.endsWith('/lounge') ? lounge : { supabase: { rpc: async (_, value) => { args.push(value); return { data: roomId, error: null }; } } });
+  for (const topic of ['', '   ', '\n\t', 'a'.repeat(161)]) await assert.rejects(client.createLounge('ina', topic, 4, '나'), /직접 입력/);
+  assert.equal(args.length, 0, 'invalid topics cannot call room creation');
+  await client.createLounge('ina', '  영화 호프를 보고 남은 생각  ', 4, '나');
+  assert.equal(args[0].p_topic, '영화 호프를 보고 남은 생각');
+  assert.equal(args[0].p_study_required, true);
+});
+
+test('structured creation validates the host brief before any RPC and always prepares the topic', async () => {
+  const args = [];
+  const client = compile('../src/lib/loungeApi.ts', path => path.endsWith('/lounge') ? lounge : { supabase: { rpc: async (_, value) => { args.push(value); return { data: roomId, error: null }; } } });
+  for (const invalid of [null, {}, { ...topicBrief, reason: ' \n\t' }, { ...topicBrief, discussion: 'a'.repeat(601) }, { ...topicBrief, creator: '' }, { ...topicBrief, subcategory: 'travel' }, { ...topicBrief, reason: 5 }, { ...topicBrief, private_key: 'unexpected' }]) {
+    await assert.rejects(client.createLounge('ina', '직접 쓴 제목', 4, '나', 'river', invalid));
+  }
+  assert.equal(args.length, 0);
+  await client.createLounge('ina', lounge.loungeTopics[0].question, 4, '나', 'river', { ...topicBrief, work_title: ' Nocturnal Animals ', reason: ` ${topicBrief.reason}\n` });
+  assert.deepEqual(args[0].p_topic_brief, topicBrief);
+  assert.equal(args[0].p_study_required, true, 'even a previously lightweight title uses the explicit host brief');
+  for (const category of lounge.loungeTopics) for (const subtype of category.subtopics) {
+    const brief = { ...topicBrief, category: category.id, subcategory: subtype.id, ...(category.id !== 'media' ? { work_title: '', creator: '' } : subtype.id === 'show' ? { creator: '' } : {}) };
+    await client.createLounge('ina', '직접 쓴 제목', 4, '나', 'river', brief);
+    assert.deepEqual(args.at(-1).p_topic_brief, brief);
+  }
+});
+
+test('education preparation uses the host context, public research and age-aware discussion questions', async () => {
+  const brief = { category: 'education', subcategory: 'general', work_title: '', creator: '', reason: '초등학생 아이가 읽기를 어려워해요.', discussion: '부모가 도와본 경험과 독서 환경을 나눠요.' };
+  let searched = false;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_study')) return result({ state: 'claimed', ticket: 'study-ticket', topic: '아이의 독서 습관', topic_brief: brief });
+    if (url.endsWith('/responses')) {
+      searched = true;
+      const body = JSON.parse(init.body);
+      assert.deepEqual(JSON.parse(body.input).topic_brief, brief);
+      assert.equal(body.tool_choice, 'required');
+      assert.match(body.instructions, /교육부·교육청·공공 교육 연구기관/);
+      assert.match(body.instructions, /연령대·교육 단계/);
+      assert.match(body.instructions, /시도해 본 방법과 달라진 점/);
+      assert.match(body.instructions, /연구 사실, 전문가 해석, 개인 경험을 구분/);
+      assert.doesNotMatch(body.instructions, /작품명\+감독/);
+      return result(searchResponse({ ...researched, title: '아이의 독서 습관', questions: ['읽기가 어려웠던 구체적인 상황은 언제였나요?'] }));
+    }
+    if (url.includes('finish_voice_lounge_study')) return result(true);
+    throw new Error('Unexpected request in education study');
+  }, async () => {
+    const response = await handler(request({ action: 'prepare', roomId }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).study.title, '아이의 독서 습관');
+    assert.equal(searched, true);
+  });
+});
+
 test('topic study requires search, stores real source URLs, and does not transcribe or generate speech', async () => {
   const calls = [];
   await run(async (url, init) => {
     calls.push(url);
     if (url.includes('/auth/')) return result({ id: 'host' });
-    if (url.includes('claim_voice_lounge_study')) return result({ state: 'claimed', ticket: 'study-ticket', topic: '녹터널애니멀 영화' });
+    if (url.includes('claim_voice_lounge_study')) return result({ state: 'claimed', ticket: 'study-ticket', topic: '녹터널애니멀 영화', topic_brief: topicBrief });
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body);
       assert.deepEqual(body.tools, [{ type: 'web_search' }]); assert.equal(body.tool_choice, 'required');
       assert.equal(JSON.parse(body.input).topic, '녹터널애니멀 영화'); assert.equal(body.store, false);
+      assert.deepEqual(JSON.parse(body.input).topic_brief, topicBrief, 'study uses the persisted host purpose and identifying work metadata');
       assert.match(body.instructions, /결말·반전/); assert.match(body.instructions, /동명 작품/);
       return result(searchResponse({ ...researched, sources: [{ url: 'https://made-up.test/' }] }));
     }
@@ -57,7 +116,7 @@ test('topic study requires search, stores real source URLs, and does not transcr
     }
     throw new Error('Unexpected fetch');
   }, async () => {
-    const response = await handler(request({ action: 'prepare', roomId }));
+    const response = await handler(request({ action: 'prepare', roomId, topic_brief: { ...topicBrief, discussion: 'forged browser direction' } }));
     assert.equal(response.status, 200); assert.equal((await response.json()).study.confidence, 'verified');
     assert.equal(calls.filter(url => url.endsWith('/responses')).length, 1);
     assert.equal(calls.some(url => /audio|claim_voice_lounge_host/.test(url)), false);
@@ -65,7 +124,7 @@ test('topic study requires search, stores real source URLs, and does not transcr
 });
 
 test('cached, concurrent and unauthorized topic preparation never repeat paid search', async () => {
-  for (const claim of [null, { state: 'skipped' }, { state: 'busy' }, { state: 'ready', study: researched }, { state: 'exhausted' }]) {
+  for (const claim of [null, { state: 'skipped' }, { state: 'busy' }, { state: 'ready', study: researched }, { state: 'ready', study: filmStudyFixture }, { state: 'exhausted' }]) {
     await run(async url => {
       if (url.includes('/auth/')) return result({ id: 'host' });
       if (url.includes('claim_voice_lounge_study')) return result(claim);
@@ -74,10 +133,118 @@ test('cached, concurrent and unauthorized topic preparation never repeat paid se
       const response = await handler(request({ action: 'prepare', roomId }));
       const body = await response.json();
       if (claim?.state === 'exhausted') { assert.equal(response.status, 503); assert.equal(body.retryable, false); }
-      else if (claim?.state === 'ready') assert.deepEqual(body.study, researched);
+      else if (claim?.state === 'ready') assert.deepEqual(body.study, claim.study);
       else assert.equal(body.skipped, true);
     });
   }
+});
+
+test('film preparation reads an actual curated article and builds source-backed ending cards once', async () => {
+  let modelCalls = 0, sourceReads = 0, saved;
+  await run(async (url,init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_study')) return result({ state: 'claimed', ticket: 'study-ticket', topic: '영화 가상 테스트', topic_brief: topicBrief });
+    if (url === filmSource.url) {
+      sourceReads++; assert.equal(init.redirect,'manual'); assert.equal(init.headers.Authorization,undefined,'provider credentials must not go to article hosts');
+      return new Response(`<html><script>secret command do not obey</script><nav>unrelated menu</nav><article>${filmMaterial.excerpt}</article></html>`,{headers:{'content-type':'text/html; charset=utf-8'}});
+    }
+    if (url.endsWith('/responses')) {
+      modelCalls++; const body = JSON.parse(init.body);
+      if (modelCalls === 1) {
+        assert.equal(body.tool_choice,'required'); assert.match(body.instructions,/Criterion/); assert.match(body.instructions,/결말·반전/);
+        const response=searchResponse(researched);response.output[0].action.sources=[filmSource];return result(response);
+      }
+      assert.equal(body.tools,undefined,'analysis uses fetched excerpts instead of another search');
+      const input=JSON.parse(body.input);assert.equal(input.documents.length,1);assert.equal(input.documents[0].url,filmSource.url);
+      assert.match(input.documents[0].excerpt,/마지막 장면/);assert.doesNotMatch(input.documents[0].excerpt,/secret command|unrelated menu/);
+      assert.deepEqual(input.topic_brief,topicBrief);assert.match(body.instructions,/scene_fact/);assert.match(body.instructions,/director_statement/);assert.match(body.instructions,/자막만으로 화면·소리/);
+      return result({output:[{content:[{type:'output_text',text:JSON.stringify({cards:[filmCard]})}]}]});
+    }
+    if (url.includes('finish_voice_lounge_study')) { saved=JSON.parse(init.body).p_study;return result(true); }
+    throw new Error(`Unexpected route: ${url}`);
+  },async()=>{
+    const response=await handler(request({action:'prepare',roomId}));assert.equal(response.status,200);
+    assert.equal(modelCalls,2);assert.equal(sourceReads,1);assert.equal(saved.film_research.coverage,'scene_grounded');
+    assert.deepEqual(saved.film_research.cards,[filmCard]);assert.equal(saved.questions[0],filmCard.question);
+    assert.equal(saved.film_research.materials[0].excerpt,undefined,'raw copyrighted articles are not stored in room data');
+  });
+});
+
+test('inaccessible articles preserve a limited study without invented scene cards or a second paid call', async () => {
+  let modelCalls=0;
+  await run(async url=>{
+    if(url.includes('/auth/'))return result({id:'host'});
+    if(url.includes('claim_voice_lounge_study'))return result({state:'claimed',ticket:'study-ticket',topic:'영화 가상 테스트',topic_brief:topicBrief});
+    if(url===filmSource.url)return new Response('restricted',{status:403});
+    if(url.endsWith('/responses')){modelCalls++;const response=searchResponse(researched);response.output[0].action.sources=[filmSource];return result(response);}
+    if(url.includes('finish_voice_lounge_study'))return result(true);
+    throw new Error('Unexpected paid or unsafe request');
+  },async()=>{const response=await handler(request({action:'prepare',roomId}));const value=await response.json();assert.equal(response.status,200);assert.equal(modelCalls,1);assert.equal(value.study.film_research.coverage,'limited');assert.deepEqual(value.study.film_research.cards,[]);});
+});
+
+test('invalid film analysis releases its ticket and cannot cache invented evidence', async () => {
+  let modelCalls = 0, released = false;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_study')) return result({ state: 'claimed', ticket: 'study-ticket', topic: '영화 가상 테스트', topic_brief: topicBrief });
+    if (url === filmSource.url) return new Response(`<article>${filmMaterial.excerpt}</article>`, { headers: { 'content-type': 'text/html' } });
+    if (url.endsWith('/responses')) {
+      modelCalls++;
+      if (modelCalls === 1) {
+        const response = searchResponse(researched); response.output[0].action.sources = [filmSource]; return result(response);
+      }
+      const card = { ...filmCard, evidence: [{ kind: 'scene_fact', text: 'Invented scene', source_urls: ['https://invented.test/'] }] };
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ cards: [card] }) }] }] });
+    }
+    if (url.includes('fail_voice_lounge_study')) {
+      assert.equal(JSON.parse(init.body).p_ticket, 'study-ticket'); released = true; return new Response(null, { status: 204 });
+    }
+    throw new Error('Invalid evidence must never be saved');
+  }, async () => {
+    const response = await handler(request({ action: 'prepare', roomId }));
+    const body = await response.json();
+    assert.equal(response.status, 502); assert.equal(body.code, 'lounge_film_study_invalid');
+    assert.equal(body.retryable, true); assert.equal(modelCalls, 2); assert.equal(released, true);
+  });
+});
+
+test('source retrieval rejects arbitrary targets, credentials, list pages and unsafe redirects', async () => {
+  const previous=globalThis.fetch, visited=[];
+  globalThis.fetch=async(url,init)=>{visited.push(url);assert.equal(init.redirect,'manual');return new Response(null,{status:302,headers:{location:'http://127.0.0.1/private'}});};
+  try {
+    const documents=await filmStudy.fetchLoungeFilmMaterials([
+      {title:'Local',url:'https://127.0.0.1/private'}, {title:'False host',url:'https://criterion.com.evil.test/page'},
+      {title:'Credentials',url:'https://user:secret@www.criterion.com/current/posts/x'}, {title:'Port',url:'https://www.criterion.com:8443/current/posts/x'},
+      {title:'Index',url:'https://www.criterion.com/current/category/2-essays'},filmSource,
+    ],new AbortController().signal);
+    assert.deepEqual(visited,[filmSource.url]);assert.deepEqual(documents,[]);
+  } finally {globalThis.fetch=previous;}
+});
+
+test('scene cards reject fabricated source references, missing facts and falsely attributed interpretations', () => {
+  const baseline={...researched,sources:[filmSource]};
+  assert.deepEqual(filmStudy.readLoungeFilmCards({cards:[filmCard]},baseline,[filmMaterial]).film_research.cards,[filmCard]);
+  for(const card of [
+    {...filmCard,evidence:[{kind:'scene_fact',text:'a',source_urls:['https://invented.test/']}]},
+    {...filmCard,evidence:[{kind:'ai_inference',text:'a',source_urls:[]}]},
+    {...filmCard,interpretations:[{kind:'director_statement',text:'a',basis:'b',source_urls:[filmSource.url]},filmCard.interpretations[1]]},
+    {...filmCard,evidence:[null]}, {...filmCard,followups:[]}, {...filmCard,scene:'x'.repeat(241)},
+  ]) assert.throws(()=>filmStudy.readLoungeFilmCards({cards:[card]},baseline,[filmMaterial]));
+  assert.throws(()=>filmStudy.readLoungeFilmCards({cards:[filmCard,filmCard]},baseline,[filmMaterial]),/ungrounded/);
+});
+
+test('moderator receives persisted ending cards and followups without searching or fetching articles again', async () => {
+  await run(async(url,init)=>{
+    if(url.includes('/auth/'))return result({id:'host'});
+    if(url.includes('claim_voice_lounge_host'))return result('ticket');
+    if(url.includes('voice_lounge_rooms?'))return result([{topic:'영화 가상 테스트',host_persona:'ina',capacity:2,memory:'',topic_study:filmStudyFixture}]);
+    if(url.includes('voice_lounge_messages?'))return result([{kind:'human',nickname:'나',text:'저는 그 마지막 시선이 망설임으로 느껴졌어요.'}]);
+    if(url.includes('voice_lounge_members?'))return result([]);
+    if(url.endsWith('/responses')){const body=JSON.parse(init.body);assert.equal(body.tools,undefined);assert.deepEqual(JSON.parse(body.input).study.film_research,filmStudyFixture.film_research);assert.match(body.instructions,/실제 답변에 맞는 followups/);assert.match(body.instructions,/스포일러 동의를 다시 묻거나 결말 질문을 피하지 않는다/);return result({output:[{content:[{type:'output_text',text:JSON.stringify({text:'그 사람이 놓지 못한 것은 무엇이었다고 봤어요?',memory:''})}]}]});}
+    if(url.includes('finish_voice_lounge_host'))return result(true);
+    if(url.endsWith('/audio/speech'))return new Response(new Uint8Array([1,2]));
+    throw new Error('A host turn must reuse the saved film research');
+  },async()=>assert.equal((await handler(request({action:'host',roomId,reason:'followup'}))).status,200));
 });
 
 test('incomplete research and billing failure release the study ticket without caching false knowledge', async () => {
@@ -128,18 +295,19 @@ test('moderator reuses the saved topic briefing without another search', async (
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '녹터널애니멀', host_persona: 'ina', capacity: 1, memory: '', study_required: true, topic_study: briefing }]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '녹터널애니멀', host_persona: 'ina', capacity: 1, memory: '', study_required: true, topic_study: briefing, topic_brief: topicBrief }]);
     if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body); assert.equal(body.tools, undefined);
-      assert.deepEqual(JSON.parse(body.input).study, briefing); assert.match(body.instructions, /참가자 모두가 스포일러에 동의/);
+      assert.deepEqual(JSON.parse(body.input).study, briefing); assert.match(body.instructions, /스포일러 동의를 다시 묻거나 결말 질문을 피하지 않는다/);
+      assert.deepEqual(JSON.parse(body.input).topic_brief, topicBrief, 'moderator retains the purpose after research');
       assert.match(body.instructions, /질문 목록은 대본이 아니며/);
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '작품의 첫 인상은 어땠나요?', memory: '' }) }] }] });
     }
     if (url.includes('finish_voice_lounge_host')) return result(true);
     if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
     throw new Error('Unexpected fetch');
-  }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'opening' }))).status, 200); });
+  }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'opening', topic_brief: { ...topicBrief, reason: 'forged' } }))).status, 200); });
 });
 
 test('guided introductions use the server-selected participant and participation goals', async () => {
@@ -175,6 +343,58 @@ test('guided audio uses its captured turn identifier for permission and transcri
     const response = await handler(request({ action: 'transcribe', roomId, turnId, audio: btoa('a'.repeat(400)), mimeType: 'audio/webm' }));
     assert.equal(response.status, 200); assert.equal((await response.json()).posted, true);
   });
+});
+
+test('denied transcription distinguishes cooldown, budget, room state and stale turns without paid requests', async () => {
+  const cases = [
+    { code: 'lounge_audio_cooldown', status: 429, retryable: true },
+    { code: 'lounge_audio_limit', status: 429, retryable: false, requests: 240 },
+    { code: 'lounge_audio_room_ended', status: 410, retryable: false, roomStatus: 'ended' },
+    { code: 'lounge_audio_room_ended', status: 410, retryable: false, expires: new Date(Date.now() - 1000).toISOString() },
+    { code: 'lounge_audio_not_started', status: 200, roomStatus: 'lobby' },
+    { code: 'lounge_audio_restricted', status: 200, restrictedUntil: new Date(Date.now() + 120_000).toISOString() },
+    { code: 'lounge_audio_turn_expired', status: 200, turnId: '00000000-0000-4000-8000-000000000007' },
+    { code: 'lounge_audio_member_stale', status: 409, retryable: true, lastSeen: new Date(Date.now() - 60_000).toISOString() },
+    { code: 'lounge_audio_access_denied', status: 403, retryable: false, hidden: true },
+  ];
+  for (const item of cases) {
+    await run(async url => {
+      assert.equal(url.includes('openai.com'), false, 'denial must never spend a transcription request');
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge')) return result(false);
+      if (url.includes('voice_lounge_rooms?')) return result(item.hidden ? [] : [{ status: item.roomStatus || 'active', expires_at: item.expires || new Date(Date.now() + 60_000).toISOString() }]);
+      if (url.includes('voice_lounge_members?')) return result([{ active: true, audio_requests: item.requests || 1, last_seen: item.lastSeen || new Date().toISOString(), speaking_restricted_until: item.restrictedUntil }]);
+      if (url.includes('voice_lounge_session_turns?')) return result([]);
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const response = await handler(request({ action: 'transcribe', roomId, ...(item.turnId ? { turnId: item.turnId } : {}), audio: btoa('a'.repeat(400)), mimeType: 'audio/webm' }));
+      const body = await response.json();
+      assert.equal(response.status, item.status); assert.equal(body.code, item.code);
+      if (item.status === 200) { assert.equal(body.skipped, true); assert.equal(body.posted, false); }
+      else assert.equal(body.retryable, item.retryable);
+    });
+  }
+});
+
+test('recorded utterances stay ordered, respect cooldown, and skip canceled microphone work', async () => {
+  const { createLoungeTranscriptionQueue } = compile('../src/lib/loungeTranscription.ts');
+  let clock = 0, running = 0;
+  const starts = [], finished = [];
+  const queue = createLoungeTranscriptionQueue(() => clock, async ms => { clock += ms; });
+  const tasks = [0, 1, 2].map(index => queue.enqueue(async () => {
+    assert.equal(running++, 0, 'transcription requests cannot overlap'); starts.push(clock);
+    await Promise.resolve(); clock += 100; running--;
+    if (index === 0) throw new Error('Temporary failure');
+    finished.push(index);
+  }, () => true));
+  const outcome = await Promise.allSettled(tasks);
+  assert.equal(outcome[0].status, 'rejected'); assert.deepEqual(finished, [1, 2]);
+  assert.deepEqual(starts, [0, 2500, 5000]);
+  await queue.enqueue(async () => { throw new Error('Disconnected mic cannot submit'); }, () => false);
+  const canceledDuringWait = createLoungeTranscriptionQueue(() => 0, async () => { current = false; });
+  let current = true;
+  await canceledDuringWait.enqueue(async () => {}, () => current);
+  await canceledDuringWait.enqueue(async () => { throw new Error('Mic disconnected while waiting'); }, () => current);
 });
 
 test('stale session reads do not reopen an old floor and discussion questions do not repeat the first impression', () => {
@@ -329,6 +549,95 @@ test('a solo host turn uses one-to-one instructions and returns playable speech'
     assert.equal((await response.json()).audio, 'AQID');
   });
 });
+for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
+  test(`host uses ${mode} for ${count} present humans in a six-seat room and excludes stale members`, async () => {
+    let modelCalls = 0;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '책속으로', host_persona: 'ina', memory: '', capacity: 6 }]);
+      if (url.includes('voice_lounge_messages?')) return result([]);
+      if (url.includes('voice_lounge_members?')) return result([
+        ...Array.from({ length: count }, (_, index) => ({ user_id: `human-${index}`, nickname: `참가자${index}`, last_seen: new Date().toISOString() })),
+        { user_id: 'departed', nickname: '떠난 사람', last_seen: new Date(Date.now() - 120_000).toISOString() },
+      ]);
+      if (url.endsWith('/responses')) {
+        modelCalls++;
+        const payload = JSON.parse(init.body), context = JSON.parse(payload.input);
+        assert.equal(context.mode, mode);
+        assert.equal(context.participant_count, count);
+        assert.equal(context.members.length, count);
+        assert.ok(context.members.every(member => member.user_id !== 'departed'));
+        const roles = ['역할은 관심 있는 대화 상대다', '역할은 두 사람의 연결자다', '역할은 참여와 관점을 연결하는 그룹 사회자다'];
+        roles.forEach((role, index) => assert.equal(payload.instructions.includes(role), index === count - 1));
+        return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 생각이 남았나요?', memory: '' }) }] }] });
+      }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2, 3]));
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200);
+      assert.equal(modelCalls, 1, 'role selection needs no additional inference');
+    });
+  });
+}
+
+test('latest human utterances retain their conclusions and older context preserves both ends with attribution', async () => {
+  const speech = suffix => '앞부분'.repeat(290) + suffix;
+  const oldest = { id: 1, user_id: 'a', nickname: '가람', kind: 'human', text: speech('예전 생각의 결론') };
+  const previous = { id: 2, user_id: 'b', nickname: '나래', kind: 'human', text: speech('책의 화자를 믿기 어려워요') };
+  const latest = { id: 3, user_id: 'a', nickname: '가람', kind: 'human', text: speech('하지만 책임을 지는 선택은 이해돼요') };
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '책속으로', host_persona: 'ina', memory: '', capacity: 6 }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ nickname: '사회자', kind: 'host', text: '다른 생각도 있나요?' }, latest, previous, oldest]);
+    if (url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) {
+      const context = JSON.parse(JSON.parse(init.body).input);
+      assert.equal(context.recent[0].text.length, 300);
+      assert.ok(context.recent[0].text.startsWith(oldest.text.slice(0, 150)));
+      assert.ok(context.recent[0].text.endsWith('예전 생각의 결론'));
+      assert.deepEqual(context.recent.slice(1, 3), [previous, latest], 'latest two human turns are whole even when followed by an AI message');
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '책임에 대한 기준이 달랐군요.', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2, 3]));
+    throw new Error('Unexpected fetch');
+  }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200));
+});
+
+test('an explicit moderator request retains participant question context without taking over their answer', async () => {
+  const question = '나래님은 그 선택을 왜 이해한다고 보셨나요?';
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '책속으로', host_persona: 'ina', memory: '', capacity: 6, guided_session: true }]);
+    if (url.includes('voice_lounge_messages?')) return result([]);
+    if (url.includes('voice_lounge_members?')) return result([
+      { user_id: 'a', nickname: '가람', last_seen: new Date().toISOString() },
+      { user_id: 'b', nickname: '나래', last_seen: new Date().toISOString() },
+    ]);
+    if (url.includes('voice_lounge_sessions?')) return result([{ stage: 3, state: 'ready', speaker_id: 'b', turn_kind: 'reply', reply_from: 'a', reply_question: question }]);
+    if (url.endsWith('/responses')) {
+      const payload = JSON.parse(init.body), context = JSON.parse(payload.input);
+      assert.equal(context.mode, 'pair');
+      assert.equal(context.session.kind, 'reply');
+      assert.equal(context.session.stage_index, 3);
+      assert.equal(context.session.target_user_id, 'b');
+      assert.equal(context.session.target_name, '나래');
+      assert.equal(context.session.reply_from, '가람');
+      assert.equal(context.session.question, question);
+      assert.match(payload.instructions, /AI가 대신 답하거나 다시 질문을 전달하지 않는다/);
+      assert.match(payload.instructions, /매 발언에 답하지 않는다/);
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: question, memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2, 3]));
+    throw new Error('Unexpected fetch');
+  }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'requested' }))).status, 200));
+});
+
 test('transcription is gated and attributed through the authenticated member RPC', async () => {
   let paid = 0, posted = false;
   await run(async (url, init) => {
@@ -364,6 +673,72 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
 });
 
+test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
+  const now=Date.now();
+  const room={status:'active',capacity:3,ai_turns:2,last_ai_at:new Date(now-100_000).toISOString(),started_at:new Date(now-120_000).toISOString()};
+  const messages=[{id:1,kind:'host',created_at:room.last_ai_at},{id:2,kind:'human',text:'소연님, 어떻게 생각해요?',created_at:new Date(now-5000).toISOString()}];
+  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-31_000),null);
+  assert.equal(lounge.nextLoungeHostReason(room,[{...messages[0]},{...messages[1],created_at:new Date(now-20_000).toISOString()}],now,now-20_000,now-31_000),null);
+  const quiet=[messages[0],{...messages[1],created_at:new Date(now-31_000).toISOString()}];
+  assert.equal(lounge.nextLoungeHostReason(room,quiet,now,now-31_000,now-31_000),'silence');
+  assert.equal(lounge.nextLoungeHostReason({...room,moderator_requested_at:new Date(now-2000).toISOString()},messages,now,now-5000,now-31_000),'requested');
+  assert.equal(lounge.nextLoungeHostReason({...room,moderator_requested_at:new Date(now-2000).toISOString()},messages,now,now-500,now-31_000),null);
+  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-6000,now-4000,now-1200,1),'followup','a group room with just one present human becomes an AI conversation');
+  assert.equal(sessionLib.loungeStageNeedsOpening({stage:0,announced_stage:0,turn_id:'next-person'}),false);
+  assert.equal(sessionLib.loungeStageNeedsOpening({stage:1,announced_stage:0}),true);
+  assert.equal(sessionLib.loungeStageNeedsOpening({stage:3,announced_stage:1}),true);
+  assert.equal(sessionLib.loungeStageNeedsOpening({stage:5,announced_stage:1}),true);
+});
+
+test('free discussion admits a requested AI response and keeps every-turn silence in its prompt', async () => {
+  await run(async(url,init)=>{
+    if(url.includes('/auth/'))return result({id:'host'});
+    if(url.includes('claim_voice_lounge_host')){assert.equal(JSON.parse(init.body).p_reason,'requested');return result('ticket');}
+    if(url.includes('voice_lounge_rooms?'))return result([{topic:'책 이야기',host_persona:'ina',memory:'',capacity:3,guided_session:true}]);
+    if(url.includes('voice_lounge_messages?'))return result([{nickname:'소연',kind:'human',text:'사회자, 이 인물의 선택은 어떻게 생각해?'}]);
+    if(url.includes('voice_lounge_members?'))return result([{user_id:'a',nickname:'민수',last_seen:''},{user_id:'b',nickname:'소연',last_seen:''}]);
+    if(url.includes('voice_lounge_sessions?'))return result([{stage:2,state:'free',turn_kind:'basic',speaker_id:null}]);
+    if(url.endsWith('/responses')){const body=JSON.parse(init.body);assert.equal(JSON.parse(body.input).reason,'requested');assert.match(body.instructions,/참가자의 발언 종료는 사회자에게 답변하라는 요청이 아니다/);assert.match(body.instructions,/매 발언에 답하지 않는다/);return result({output:[{content:[{type:'output_text',text:JSON.stringify({text:'저는 그 선택이 책임과 자유 사이의 갈등으로 읽혀요.',memory:''})}]}]});}
+    if(url.includes('finish_voice_lounge_host'))return result(true);
+    if(url.endsWith('/audio/speech'))return new Response(new Uint8Array([0,32]));
+    throw new Error('Unexpected fetch');
+  },async()=>assert.equal((await handler(request({action:'host',roomId,reason:'requested'}))).status,200));
+});
+
+test('moderator context follows the stored category instead of a shared film discussion outline', async () => {
+  for (const [category, subcategory, title] of [
+    ['media', 'film', '기억에 남는 장면'], ['media', 'book', '마음에 남은 문장과 대목'],
+    ['hobby', 'general', '나의 경험과 발견'], ['love', 'general', '마음이 어려웠던 상황'],
+    ['career', 'general', '일하며 겪은 경험'], ['finance', 'general', '투자·소비 경험 돌아보기'],
+    ['education', 'general', '실제 육아·교육 경험'],
+  ]) {
+    const brief = { category, subcategory, work_title: category === 'media' ? '작품' : '', creator: category === 'media' ? '창작자' : '', reason: '서로의 경험을 듣고 싶어서', discussion: '다른 생각과 선택 기준을 나눠요.' };
+    let checked = false;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '오늘 함께 이야기할 주제', topic_brief: brief, host_persona: 'ina', memory: '', capacity: 3, guided_session: true }]);
+      if (url.includes('voice_lounge_messages?')) return result([]);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'a', nickname: '가람', last_seen: '' }, { user_id: 'b', nickname: '나래', last_seen: '' }]);
+      if (url.includes('voice_lounge_sessions?')) return result([{ stage: 2, state: 'free', turn_kind: 'basic', speaker_id: null }]);
+      if (url.endsWith('/responses')) {
+        const body = JSON.parse(init.body), context = JSON.parse(body.input);
+        assert.equal(context.session.stage, title);
+        assert.equal(context.topic_brief.category, category);
+        if (category !== 'media') assert.doesNotMatch(context.session.question, /장면|대사|결말|반전/);
+        if (subcategory === 'book') assert.match(context.session.question, /문장|대목/);
+        assert.match(body.instructions, /대본에 맞추려고 끊지 않는다/);
+        checked = true;
+        return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '함께 나누고 싶은 경험이 있나요?', memory: '' }) }] }] });
+      }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+      throw new Error('Unexpected fetch');
+    }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'requested', topic_brief: topicBrief }))).status, 200));
+    assert.ok(checked, `${category}/${subcategory} did not reach the moderator`);
+  }
+});
+
 test('host PCM packets arrive before upstream completion and cancelling stops the paid stream', async () => {
   let upstream, cancelled = false, paid = 0;
   await run(async (url, init) => {
@@ -393,6 +768,115 @@ test('host PCM packets arrive before upstream completion and cancelling stops th
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(cancelled, true); assert.equal(paid, 1);
   });
+});
+
+test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
+  const originalTimeout = AbortSignal.timeout;
+  const deadlines = [];
+  AbortSignal.timeout = milliseconds => { const controller = new AbortController(); deadlines.push({ milliseconds, controller }); return controller.signal; };
+  const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 600);
+  let speechSignal, speechDeadline, upstream;
+  try {
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text, memory: '' }) }] }] });
+      if (url.includes('finish_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_text, text); return result(true); }
+      if (url.endsWith('/audio/speech')) {
+        assert.equal(JSON.parse(init.body).input, text);
+        speechSignal = init.signal; speechDeadline = deadlines.at(-1);
+        return new Response(new ReadableStream({ start(controller) { upstream = controller; speechSignal.addEventListener('abort', () => controller.error(speechSignal.reason), { once: true }); } }));
+      }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      const eventsPromise = response.text();
+      // Advance only the TTS deadline virtually, not wall time or completed RPCs.
+      if (speechDeadline.milliseconds <= 25_001) speechDeadline.controller.abort(new DOMException('deadline', 'TimeoutError'));
+      assert.equal(speechSignal.aborted, false, 'long speech was cancelled after just 25 seconds');
+      for (let index = 0; index < 256; index++) upstream.enqueue(new Uint8Array(16_384));
+      upstream.close();
+      const events = (await eventsPromise).trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(events[0].text, text); assert.equal(events.at(-1).type, 'done');
+      assert.equal(events.some(event => event.type === 'error'), false);
+      assert.equal(events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0), 4_194_304);
+    });
+  } finally { AbortSignal.timeout = originalTimeout; }
+});
+
+test('speech still cancels an oversized PCM response with an explicit error code', async () => {
+  let cancelled = false;
+  await run(async url => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '안녕하세요?', memory: '' }) }] }] });
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(12_000_000)); }, cancel() { cancelled = true; } }));
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(events.map(event => event.type), ['host', 'error']);
+    assert.equal(events[1].code, 'lounge_audio_too_long'); assert.equal(cancelled, true);
+  });
+});
+
+test('a transient TTS failure before the first audio retries the same saved text once without regenerating it', async () => {
+  for (const firstFailure of [
+    () => result({ error: { code: 'server_error' } }, 503),
+    () => new Response(new Uint8Array()),
+    () => new Response(new ReadableStream({ pull() { throw new TypeError('socket closed before audio'); } })),
+  ]) {
+    let models = 0, saves = 0, speech = 0; const inputs = [];
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) { models++; return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '마지막 선택은 어떻게 느꼈어요?', memory: '' }) }] }] }); }
+      if (url.includes('finish_voice_lounge_host')) { saves++; return result(true); }
+      if (url.endsWith('/audio/speech')) { speech++; inputs.push(JSON.parse(init.body)); return speech === 1 ? firstFailure() : new Response(new Uint8Array([0, 32, 0, 32])); }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+      assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+      assert.equal(models, 1); assert.equal(saves, 1); assert.equal(speech, 2);
+      assert.deepEqual(inputs[0], inputs[1], 'TTS recovery must preserve text, voice and persona');
+    });
+  }
+});
+
+test('TTS recovery is bounded and never repeats already transmitted syllables or immediate rate limits', async () => {
+  for (const failure of ['empty', 'partial', 'rate_limit']) {
+    let speech = 0;
+    await run(async url => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '마지막 선택은 어떻게 느꼈어요?', memory: '' }) }] }] });
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) {
+        speech++;
+        if (failure === 'empty') return new Response(new Uint8Array());
+        if (failure === 'rate_limit') return result({ error: { code: 'rate_limit_exceeded' } }, 429);
+        let sent = false;
+        return new Response(new ReadableStream({ pull(controller) { if (!sent) { sent = true; controller.enqueue(new Uint8Array([0, 32, 0, 32])); } else controller.error(new TypeError('socket closed after audio')); } }));
+      }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(events.at(-1).type, 'error'); assert.equal(events.some(event => event.type === 'done'), false);
+      assert.equal(speech, failure === 'empty' ? 2 : 1);
+      assert.equal(events.filter(event => event.type === 'audio').length, failure === 'partial' ? 1 : 0);
+    });
+  }
 });
 
 test('stream failures preserve billing metadata after host text is saved', async () => {
@@ -552,6 +1036,8 @@ test('a failed transcript write remains a failure and an audio ticket denial nev
     await run(async url => {
       if (url.includes('/auth/')) return result({ id: 'guest' });
       if (url.includes('claim_voice_lounge_audio')) return result(!denied);
+      if (url.includes('voice_lounge_rooms?')) return result([{ status: 'active', expires_at: new Date(Date.now() + 60_000).toISOString() }]);
+      if (url.includes('voice_lounge_members?')) return result([{ active: true, audio_requests: 1, last_seen: new Date().toISOString() }]);
       if (url.endsWith('/audio/transcriptions')) { paid++; return result({ text: '영화 이야기' }); }
       if (url.includes('post_voice_lounge_message')) return new Response(null, { status: 403 });
       throw new Error('Unexpected fetch');
@@ -559,7 +1045,7 @@ test('a failed transcript write remains a failure and an audio ticket denial nev
       const response = await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm' }));
       assert.equal(response.status, denied ? 429 : 502);
       assert.equal(paid, denied ? 0 : 1);
-      if (denied) assert.equal((await response.json()).retryAfterSeconds, 5);
+      if (denied) assert.equal((await response.json()).retryAfterSeconds, 2);
     });
   }
 });
@@ -567,7 +1053,7 @@ test('LiveKit creates a room with one seat for solo and six seats for a group', 
   const originalEnv = { ...process.env };
   process.env.LIVEKIT_URL = 'wss://voice.test'; process.env.LIVEKIT_API_KEY = 'test-key'; process.env.LIVEKIT_API_SECRET = 'test-secret';
   try {
-    for (const capacity of [1, 6]) {
+    for (const [capacity, restrictedUntil] of [[1, null], [6, null], [6, '2099-01-01'], [6, '2000-01-01']]) {
       let roomOptions, grantOptions;
       const tokenHandler = compile('../api/livekit-token.ts', () => ({
         RoomServiceClient: class { async listRooms() { return []; } async createRoom(options) { roomOptions = options; } },
@@ -576,13 +1062,15 @@ test('LiveKit creates a room with one seat for solo and six seats for a group', 
       await run(async url => {
         if (url.includes('/auth/')) return result({ id: 'host', user_metadata: { nickname: '나' } });
         if (url.includes('voice_lounge_rooms?')) return result([{ capacity, status: 'lobby', expires_at: null, created_at: new Date().toISOString() }]);
-        if (url.includes('voice_lounge_members?')) return result([{ user_id: 'host' }]);
+        if (url.includes('voice_lounge_members?')) return result([{ user_id: 'host', speaking_restricted_until: restrictedUntil }]);
         throw new Error('Unexpected fetch');
       }, async () => {
         const response = await tokenHandler(new Request('https://app.test/api/livekit-token', { method: 'POST', headers: { Authorization: 'Bearer example', 'Content-Type': 'application/json' }, body: JSON.stringify({ roomName: roomId }) }));
         assert.equal(response.status, 200);
         assert.equal(roomOptions.maxParticipants, capacity);
         assert.equal(grantOptions.canUpdateOwnMetadata, true, 'lounge members must be able to share their selected avatar');
+        assert.equal(grantOptions.canPublish, restrictedUntil !== '2099-01-01', 'new tokens respect a restriction and its expiry');
+        assert.equal(grantOptions.canSubscribe, true, 'restricted members can still listen');
       });
     }
   } finally {

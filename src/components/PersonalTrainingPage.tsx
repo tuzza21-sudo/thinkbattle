@@ -156,7 +156,7 @@ export const PersonalTrainingPage = ({ user }: PersonalTrainingPageProps) => {
     <div className="personal-training-page">
       <header className="simulation-header">
         <button type="button" className="simulation-back" onClick={() => navigate('/simulation')}><ArrowLeft size={18} /> 상황극 목록</button>
-        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><span>ThinkFit</span> Personal Lab</div>
+        <div className="simulation-brand"><img src="/brand/thinkfit-mark.svg" alt="" /><div className="simulation-brand-name"><strong>생각근육 ThinkFit</strong></div></div>
         <div className="simulation-user">{user.nickname}님의 맞춤 훈련</div>
       </header>
 

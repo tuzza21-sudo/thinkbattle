@@ -299,7 +299,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ user, onLoginRequest }
               <section className="history-detail history-report-detail">
                 <header className="history-report-hero">
                   <div className="history-report-hero-copy">
-                    <span className="history-report-eyebrow"><Award size={16} /> THINKFIT 성장 리포트</span>
+                    <span className="history-report-eyebrow"><Award size={16} /> 생각근육 성장 리포트</span>
                     <h2>{selectedRecord.topic}</h2>
                     <div className="history-report-meta">
                       <span>{selectedRecord.matchType}</span>

@@ -175,7 +175,7 @@ export const AdminDashboard = () => {
       {/* Top Header Navigation */}
       <div style={{ padding: '1.5rem 0 0' }}>
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ gap: '0.5rem' }}>
-          <ArrowLeft size={16} /> ThinkFit
+          <ArrowLeft size={16} /> 생각근육
         </button>
       </div>
 

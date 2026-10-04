@@ -59,7 +59,7 @@ const slides: ProposalSlide[] = [
     id: 2,
     section: 'SOLUTION · 반응하는 AI 페르소나',
     title: '답변을 외우는 대신\n상대의 반응에 대응합니다',
-    lead: 'ThinkFit의 AI 페르소나는 정해진 질문만 읽지 않습니다. 학습자의 답변을 듣고 모호한 지점, 모순, 빠진 근거를 찾아 다음 질문을 이어갑니다.',
+    lead: '생각근육의 AI 페르소나는 정해진 질문만 읽지 않습니다. 학습자의 답변을 듣고 모호한 지점, 모순, 빠진 근거를 찾아 다음 질문을 이어갑니다.',
     icon: Bot,
     signals: [
       { label: '상대 반응', value: '실시간', description: '답변에 따라 질문 변화' },
@@ -147,7 +147,7 @@ const slides: ProposalSlide[] = [
     id: 6,
     section: 'ADOPTION · 작게 검증하는 도입',
     title: '한 개 과정에서 시작하고\n대면 코칭으로 완성하십시오',
-    lead: 'ThinkFit은 지도자를 대체하지 않습니다. 온라인에서는 말의 구조와 대응을 반복하고, 대면에서는 시선·제스처·자세와 현장 긴장감을 코칭할 때 가장 효과적입니다.',
+    lead: '생각근육은 지도자를 대체하지 않습니다. 온라인에서는 말의 구조와 대응을 반복하고, 대면에서는 시선·제스처·자세와 현장 긴장감을 코칭할 때 가장 효과적입니다.',
     icon: Building2,
     signals: [
       { label: '시작 범위', value: '1개 과정', description: '작은 파일럿부터 검증' },
@@ -164,7 +164,7 @@ const slides: ProposalSlide[] = [
       { title: '2. 혼합 훈련', eyebrow: 'PRACTICE', description: 'AI 반복 훈련과 지도자의 대면 피드백을 연결합니다.', icon: Bot },
       { title: '3. 효과 검토', eyebrow: 'VALIDATE', description: '결과 보고서와 현장 반응을 보고 확대 여부를 판단합니다.', icon: ClipboardCheck },
     ],
-    note: '제스처·시선·자세·태도와 실제 현장의 긴장감은 온라인만으로 충분히 평가하기 어렵습니다. ThinkFit은 이 한계를 숨기지 않고, 귀한 대면 시간을 고차원 코칭에 집중하도록 기본기 반복을 맡습니다.',
+    note: '제스처·시선·자세·태도와 실제 현장의 긴장감은 온라인만으로 충분히 평가하기 어렵습니다. 생각근육은 이 한계를 숨기지 않고, 귀한 대면 시간을 고차원 코칭에 집중하도록 기본기 반복을 맡습니다.',
   },
 ];
 
@@ -184,7 +184,7 @@ export const B2BMarketingPage: React.FC = () => {
           <ArrowLeft size={16} /> 기관 페이지로 돌아가기
         </button>
         <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-          <span className="badge" style={{ color: '#fff', background: 'var(--primary)', border: 0, fontWeight: 800 }}>THINKFIT B2B</span>
+          <span className="badge" style={{ color: '#fff', background: 'var(--primary)', border: 0, fontWeight: 800 }}>생각근육 B2B</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '.88rem' }}>대학 취업센터·직업훈련기관 도입 제안</span>
         </div>
       </nav>
@@ -229,7 +229,7 @@ export const B2BMarketingPage: React.FC = () => {
           </section>
 
           <section>
-            <h2 style={{ margin: '0 0 .75rem', color: 'var(--text-muted)', fontSize: '.8rem', letterSpacing: '.06em' }}>WHY THINKFIT</h2>
+            <h2 style={{ margin: '0 0 .75rem', color: 'var(--text-muted)', fontSize: '.8rem', letterSpacing: '.06em' }}>생각근육을 소개합니다</h2>
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))' }}>
               {slide.points.map(point => {
                 const PointIcon = point.icon;

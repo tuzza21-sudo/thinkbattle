@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/lounge-interaction.ts": { "maxDuration": 60 }
+  },
   "rewrites": [
     {
       "source": "/api/gemini/:path*",

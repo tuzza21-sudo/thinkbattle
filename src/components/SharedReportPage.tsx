@@ -96,7 +96,7 @@ export const SharedReportPage: React.FC = () => {
         <header className="report-hero shared-report-hero">
           <div className="report-hero-bg" />
           <div className="report-hero-content">
-            <span className="shared-report-eyebrow"><Trophy size={15} /> THINKFIT · 공개 결과 리포트</span>
+            <span className="shared-report-eyebrow"><Trophy size={15} /> 생각근육 · 공개 결과 리포트</span>
             <div className="report-trophy-ring shared-report-ring">
               <svg viewBox="0 0 120 120" className="report-ring-svg" aria-label={`종합 등급 ${grade.label}`}>
                 <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border-color)" strokeWidth="7" opacity="0.35" />
@@ -203,7 +203,7 @@ export const SharedReportPage: React.FC = () => {
           </section>
         )}
 
-        <footer className="shared-report-footer"><Share2 size={15} /> ThinkFit에서 나의 토론 역량과 성장을 확인해 보세요.</footer>
+        <footer className="shared-report-footer"><Share2 size={15} /> 생각근육에서 나의 토론 역량과 성장을 확인해 보세요.</footer>
       </article>
     </main>
   );

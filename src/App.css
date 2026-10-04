@@ -1494,3 +1494,11 @@
   .personal-inline-fields { grid-template-columns: 1fr; }
   .personal-difficulty > div { grid-template-columns: 1fr; }
 }
+.simulation-brand-name,
+.studio-brand-name { line-height: 1.2; white-space: nowrap; }
+.simulation-brand-name > strong,
+.studio-brand-name > strong { color: var(--text-light); font-size: 1.4rem; font-weight: 800; letter-spacing: -.025em; }
+@media (max-width: 600px) {
+  .simulation-brand-name > strong,
+  .studio-brand-name > strong { font-size: 1.2rem; }
+}

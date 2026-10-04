@@ -152,7 +152,7 @@ export const FlexibleDebateRoom = ({ room, user }: { room: LiveDebateRoomSummary
   const coachStage = phase?.stageId === 'opening' ? 'opening' as const : phase?.stageId === 'cross-question' ? (phase.position === me?.position ? 'cross_question' as const : 'cross_answer' as const) : 'rebuttal' as const;
   const totals = getSessionTotals(config);
   return <main className="flex-debate">
-    <nav><button onClick={() => navigate('/debate')}><ArrowLeft size={16} />토론 목록</button><span>ThinkFit · {room.teamSize}:{room.teamSize} 토론</span><span className={stale ? 'sync-lost' : ''}>{stale ? '연결 확인 중' : '진행 동기화됨'}</span></nav>
+    <nav><button onClick={() => navigate('/debate')}><ArrowLeft size={16} />토론 목록</button><span>생각근육 · {room.teamSize}:{room.teamSize} 토론</span><span className={stale ? 'sync-lost' : ''}>{stale ? '연결 확인 중' : '진행 동기화됨'}</span></nav>
     <header className="flex-debate-heading"><div><small>함께 생각하고, 근거로 이야기하기</small><h1>{room.topic}</h1></div><span>{config.progressionMode === 'automatic' ? '자동진행' : '진행자 진행'} · 예정 {clock(totals.totalSeconds)}{totals.strategySeconds ? ' (작전시간 포함)' : ''}</span></header>
     <ol className="flex-stage-track">{SESSION_STAGES.filter(stage => config.stages.some(item => item.id === stage.id && item.enabled)).map((stage, index) => <li key={stage.id} aria-current={phase?.stageId === stage.id ? 'step' : undefined}><span>{index + 1}</span>{stage.label}</li>)}</ol>
     {(error || syncError || audio.error) && <div className="flex-error" role="alert">{error || syncError || audio.error}<button onClick={() => { setError(''); void refresh(); }}>다시 확인</button></div>}

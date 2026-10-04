@@ -20,8 +20,8 @@
 .thinkfit-home :is(.about-header, .about-page main) { width: min(1280px, calc(100% - 64px)); }
 .thinkfit-home .about-header { min-height: 84px; border-color: var(--border-color); }
 .thinkfit-home .about-brand > span { width: 32px; height: 32px; }
-.thinkfit-home .about-brand strong { color: var(--text-light); font-size: 1.2rem; }
-.thinkfit-home .about-brand small { color: var(--text-muted); font-size: .54rem; font-weight: 650; }
+.thinkfit-home .about-brand strong { color: var(--text-light); font-size: 1.4rem; white-space: nowrap; }
+.thinkfit-home .about-brand small { color: var(--text-muted); font-size: .65rem; font-weight: 650; letter-spacing: .03em; }
 .thinkfit-home :is(.about-back, .about-header-cta, .about-cta button) { color: var(--text-main); border: 1px solid var(--border-color); background: white; }
 .thinkfit-home :is(.about-back, .about-header-cta, .about-cta button):hover { color: var(--primary); border-color: #c9c5e7; background: var(--studio-soft); }
 .thinkfit-home .about-hero { min-height: 0; padding: clamp(3rem, 6vw, 5.5rem) 0; gap: clamp(2rem, 5vw, 5rem); }
@@ -78,7 +78,7 @@
 .thinkfit-home .about-cta button:first-child { color: white; background: var(--primary); border-color: var(--primary); }
 .thinkfit-home .about-cta button:first-child:hover { background: var(--primary-hover); }
 .thinkfit-home .about-business-footer { color: var(--text-muted); border-color: var(--border-color); }
-.thinkfit-home .about-business-brand strong { color: var(--text-light); }
+.thinkfit-home .about-business-brand strong { color: var(--text-light); font-size: 1.2rem; }
 .thinkfit-home :is(.about-business-info p span, .about-business-info a, .about-business-links button, .about-business-links span) { color: var(--text-muted); }
 .thinkfit-home :is(.about-business-info a, .about-business-links button):hover { color: var(--primary); }
 
@@ -216,6 +216,11 @@
 }
 @media (max-width: 600px) {
   .thinkfit-home :is(.about-header, .about-page main, .personal-training-page > .simulation-header, .debate-lobby-page) { width: calc(100% - 32px); }
+  .thinkfit-home .about-header { grid-template-columns: 1fr auto; gap: .65rem; padding-block: .9rem; }
+  .thinkfit-home .about-brand { grid-column: 1 / -1; order: -1; }
+  .thinkfit-home .about-brand > div { display: grid; }
+  .thinkfit-home .about-brand strong { font-size: 1.2rem; }
+  .thinkfit-home .personal-training-page > .simulation-header { flex-wrap: wrap; gap: .5rem; padding-block: .8rem; }
   .thinkfit-home .about-hero { padding: 2.5rem 0; }
   .thinkfit-home .about-hero-copy h1 { font-size: 2.5rem; }
   .thinkfit-home .about-hero-copy > p { font-size: .84rem; }

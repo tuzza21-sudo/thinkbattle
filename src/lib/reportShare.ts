@@ -78,7 +78,7 @@ export const downloadReportImage = async ({ topic, score, maxScore, grade }: { t
     <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071426"/><stop offset="1" stop-color="#111b3d"/></linearGradient></defs>
     <rect width="1080" height="1350" fill="url(#bg)"/>
     <rect x="60" y="60" width="960" height="1230" rx="44" fill="#111c34" stroke="#2d476f" stroke-width="2"/>
-    <text x="60" y="125" fill="#4fd1ff" font-size="28" font-weight="700">THINKFIT · 공개 토론 리포트</text>
+    <text x="60" y="125" fill="#4fd1ff" font-size="28" font-weight="700">생각근육 · 공개 토론 리포트</text>
     ${topicLines}
     <circle cx="540" cy="535" r="190" fill="none" stroke="#243b61" stroke-width="20"/>
     <circle cx="540" cy="535" r="190" fill="none" stroke="#4fd1ff" stroke-width="20" stroke-linecap="round" stroke-dasharray="900 1200" transform="rotate(-90 540 535)"/>
@@ -151,7 +151,7 @@ export const downloadSocialSummaryImage = async ({
     </defs>
     <rect width="1080" height="1350" fill="url(#bg)"/>
     <rect x="54" y="48" width="972" height="1254" rx="42" fill="#101d35" stroke="#35527c" stroke-width="2"/>
-    <text x="108" y="112" fill="#4fd1ff" font-size="25" font-weight="800" letter-spacing="3">THINKFIT · DEBATE SUMMARY</text>
+    <text x="108" y="112" fill="#4fd1ff" font-size="25" font-weight="800" letter-spacing="3">생각근육 · 토론 리포트</text>
     ${topicLines.map((line, index) => `<text x="108" y="${180 + index * 45}" fill="#f4f7fb" font-size="34" font-weight="800">${escapeXml(line)}</text>`).join('')}
     <rect x="108" y="${250 + topicLines.length * 22}" width="864" height="2" fill="#35527c"/>
     <circle cx="540" cy="420" r="102" fill="#132744" stroke="url(#score)" stroke-width="10"/>
@@ -164,7 +164,7 @@ export const downloadSocialSummaryImage = async ({
     ${feedbackLines.map((line, index) => `<text x="138" y="${724 + index * 30}" fill="#e8edf7" font-size="24">${escapeXml(line)}</text>`).join('')}
     <text x="108" y="790" fill="#c9d5e7" font-size="24" font-weight="800">평가 항목별 점수</text>
     ${categoryRows}
-    <text x="540" y="1256" fill="#4fd1ff" font-size="22" font-weight="800" text-anchor="middle">THINKFIT · 생각을 구조화하는 토론 훈련</text>
+    <text x="540" y="1256" fill="#4fd1ff" font-size="22" font-weight="800" text-anchor="middle">생각근육 · 생각을 구조화하는 토론 훈련</text>
   </svg>`;
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   const image = new Image();
