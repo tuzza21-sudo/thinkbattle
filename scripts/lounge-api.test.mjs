@@ -96,6 +96,7 @@ test('creation starts research immediately and room entry shares the pending req
     return new Promise(resolve => { completeResearch = () => resolve(result({ study: { title: 'Already prepared' } })); });
   }, async () => {
     assert.equal(await client.createLounge('ina', 'Research on creation', 3, 'Host', 'forest', topicBrief), roomId);
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(calls, 1, 'creation must not wait for audio connection or starting the room');
     const first = client.prepareLoungeTopic(roomId), second = client.prepareLoungeTopic(roomId);
     assert.equal(first, second); assert.equal(calls, 1);
@@ -571,6 +572,57 @@ test('browser network failures are retryable while deliberate cancellation is pr
   });
   const rpcClient = compile('../src/lib/loungeApi.ts', () => ({ supabase: { rpc: async () => ({data:null,error:{message:'TypeError: Failed to fetch'}}) } }));
   await assert.rejects(rpcClient.joinLounge(roomId,'나'), error => error.code === 'lounge_network_error' && error.retryable);
+});
+
+test('starting a captured turn retries once after a lost reply without repeating other mutations', async () => {
+  for (const action of ['begin','done','pass','yield','next_stage']) {
+    const calls=[];
+    const state={state:'speaking',turn_started_at:'unchanged'};
+    const client=compile('../src/lib/loungeApi.ts',()=>({supabase:{rpc:async(name,args)=>{
+      calls.push({name,args});
+      if(calls.length===1)return {data:null,error:{message:'TypeError: Failed to fetch'}};
+      return {data:state,error:null};
+    }}}));
+    if(action==='begin') {
+      assert.deepEqual(await client.controlLoungeSession(roomId,action,'captured-turn'),state);
+      assert.equal(calls.length,2);assert.deepEqual(calls[0],calls[1]);
+    } else {
+      await assert.rejects(client.controlLoungeSession(roomId,action,'captured-turn'),error=>error.code==='lounge_network_error');
+      assert.equal(calls.length,1);
+    }
+  }
+});
+
+test('voice token connection recovers once and preserves authorization failures',async()=>{
+  const client=compile('../src/lib/loungeApi.ts',()=>({supabase:{auth:{getSession:async()=>({data:{session:{access_token:'test'}}})}}}));
+  let calls=0;
+  await run(async(url,init)=>{
+    assert.equal(url,'/api/livekit-token');assert.equal(JSON.parse(init.body).roomName,roomId);
+    calls++;if(calls===1)throw new TypeError('Failed to fetch');
+    return result({url:'wss://voice.test',token:'voice-token'});
+  },async()=>{assert.deepEqual(await client.requestLoungeVoiceToken(roomId),{url:'wss://voice.test',token:'voice-token'});assert.equal(calls,2);});
+  for(const status of [401,403,502]) {
+    calls=0;
+    await run(async()=>{calls++;return result({error:'Voice access refused'},status);},async()=>{
+      await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code===`lounge_voice_http_${status}`&&error.retryable===(status===502));
+      assert.equal(calls,1);
+    });
+  }
+  calls=0;
+  await run(async()=>{calls++;throw new TypeError('Failed to fetch');},async()=>{
+    await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code==='lounge_network_error'&&error.message.startsWith('음성 서버'));
+    assert.equal(calls,2);
+  });
+  await run(async()=>result({url:'wss://voice.test'}),async()=>{await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code==='lounge_voice_invalid_response');});
+});
+
+test('session refresh and interrupted response bodies identify the failing connection',async()=>{
+  const client=compile('../src/lib/loungeApi.ts',()=>({supabase:{auth:{getSession:async()=>{throw new TypeError('Failed to fetch');}}}}));
+  await assert.rejects(client.requestLoungeHost(roomId,'opening'),error=>error.code==='lounge_network_error'&&error.message.startsWith('로그인 서버'));
+  const stream=compile('../src/lib/loungeStream.ts',()=>client);
+  await assert.rejects(async()=>{
+    for await(const event of stream.readLoungeStream(new ReadableStream({start(controller){controller.error(new TypeError('Failed to fetch'));}})))void event;
+  },error=>error.code==='lounge_network_error'&&error.message.startsWith('사회자 음성 서버'));
 });
 test('stored host style controls both text and PCM/MP3 speech, including voice, prosody and speed', async () => {
   for (const host of lounge.loungeHosts) {

@@ -1,4 +1,4 @@
-import { LoungeApiError } from './loungeApi';
+import { LoungeApiError, loungeConnectionError } from './loungeApi';
 
 export type LoungeStreamEvent =
   | { type: 'host'; text: string; timings: Record<string, number> }
@@ -34,7 +34,8 @@ export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, sign
       if (pending.length > 256_000) throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
       if (chunk.done && !done) throw new LoungeApiError('사회자 음성 연결이 중간에 끊겼어요. 다시 시도해 주세요.', 'lounge_stream_interrupted');
     }
-  } finally { signal?.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  } catch (error) { if (signal?.aborted) throw error; throw loungeConnectionError(error, '사회자 음성 서버'); }
+  finally { signal?.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 
 // PCM16 is mono, little endian, 24 kHz. Preserve an odd trailing byte across packets.

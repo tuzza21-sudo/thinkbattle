@@ -406,6 +406,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const audioBlocked = useRef(false);
   const nextAudioAttempt = useRef(0);
   const transcribing = useRef(0);
+  const roomNetworkError = useRef<string | null>(null);
+  const clearRoomNetworkError = useCallback(() => {
+    const message = roomNetworkError.current;
+    if (!message) return;
+    roomNetworkError.current = null;
+    setError(previous => previous === message ? '' : previous);
+  }, []);
   const [interactionError, setInteractionError] = useState('');
   const interactionBlockedRoom = useRef<string | null>(null);
   const reportInteractionError = useCallback((err: unknown) => {
@@ -480,6 +487,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const reportRoomError = useCallback((err: unknown) => {
     if (!mounted.current || activeRoomId.current !== roomId) return;
     setError(errorText(err));
+    if (err instanceof LoungeApiError && err.code === 'lounge_network_error') roomNetworkError.current = err.message;
     if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') {
       current.current = { ...current.current, room: null, session: null };
       setRoom(null); setSession(null);
@@ -491,9 +499,10 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     try { state = await loadLounge(roomId); }
     catch (err) { reportRoomError(err); throw err; }
     if (!mounted.current || activeRoomId.current !== roomId) return;
+    clearRoomNetworkError();
     setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages);
     current.current = { ...current.current, room: state.room, messages: state.messages };
-  }, [roomId, applySession, reportRoomError]);
+  }, [roomId, applySession, reportRoomError, clearRoomNetworkError]);
   useEffect(() => { refreshAfterInput.current = refreshAfterMessage; }, [refreshAfterMessage]);
   const studyRoomEnded = room?.status === 'ended';
   useEffect(() => {
@@ -565,7 +574,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     let cancelled = false, refreshing = false, joined = false;
     const refresh = async () => {
       if (refreshing) return; refreshing = true;
-      try { const state = await loadLounge(roomId); if (!cancelled) { setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages); } }
+      try { const state = await loadLounge(roomId); if (!cancelled) { clearRoomNetworkError(); setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages); } }
       catch (err) {
         if (!cancelled) {
           if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') joined = false;
@@ -577,7 +586,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     void joinLounge(roomId, userNickname).then(() => { if (!cancelled) { joined = true; void refresh(); } }).catch(err => { if (!cancelled) setError(errorText(err)); });
     const interval = setInterval(() => { if (joined) void refresh(); }, 1000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [roomId, userId, userNickname, retry, applySession, reportRoomError]);
+  }, [roomId, userId, userNickname, retry, applySession, reportRoomError, clearRoomNetworkError]);
   useEffect(() => {
     if (!audio.connected) return;
     void controlLounge(roomId, 'heartbeat').catch(err => setError(errorText(err)));

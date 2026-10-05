@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLocalAudioTrack, LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client';
 import { supabase } from './supabase';
 import { Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
-import { LoungeApiError } from './loungeApi';
+import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from './loungeApi';
 import { loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
 import { createLoungeTranscriptionQueue } from './loungeTranscription';
@@ -113,10 +113,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     pending.current = true; const generation = version.current;
     setConnecting(true); setError('');
     try {
-      const { data } = await supabase.auth.getSession();
-      const response = await fetch('/api/livekit-token', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify({ roomName: roomId }) });
-      const credentials = await response.json();
-      if (!response.ok) throw new Error(credentials.error || '음성 연결에 실패했어요.');
+      const credentials = await requestLoungeVoiceToken(roomId);
       if (generation !== version.current) return;
       const room = new Room({ adaptiveStream: true }); roomRef.current = room;
       // Match TTS PCM to avoid independently resampling every network packet.
@@ -165,7 +162,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (loungeAvatarUrl || avatar !== undefined) await room.localParticipant.setMetadata(JSON.stringify({ ...JSON.parse(room.localParticipant.metadata || '{}'), loungeAvatar: avatar, loungeAvatarUrl }));
       } catch { /* Avatar preferences must never prevent voice connection. */ }
       setConnected(true); sync(); enableAudio();
-    } catch (err) { disconnect(); setError(err instanceof Error ? err.message : '음성 연결에 실패했어요.'); }
+    } catch (err) { disconnect(); const failure = loungeConnectionError(err, '음성 서버'); setError(failure instanceof Error ? failure.message : '음성 연결에 실패했어요.'); }
     finally { pending.current = false; setConnecting(false); }
   }, [roomId, disconnect, stopHost, stopMicrophone, enableAudio]);
 

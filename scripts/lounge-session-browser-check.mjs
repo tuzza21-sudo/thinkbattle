@@ -117,7 +117,7 @@ try {
     participantLog.scrollTo(0,participantLog.scrollHeight);participantLog.dispatchEvent(new Event('scroll'));
     messages.push({id:7,user_id:null,nickname:'사회자',kind:'host',text:'새로운 사회자 응답도 대화 끝에 보여요.'});
     await until(()=>participantLog.lastElementChild?.textContent.includes('새로운 사회자 응답'));
-    check(participantLog.scrollHeight-participantLog.scrollTop-participantLog.clientHeight<2,'AI response did not follow the conversation bottom');
+    await until(()=>participantLog.scrollHeight-participantLog.scrollTop-participantLog.clientHeight<2);
     const click = text => {const button=[...container.querySelectorAll('.lounge-session-actions button')].find(b=>b.textContent.includes(text));check(button&&!button.disabled,'Missing or disabled button: '+text);button.click();};
     click('말하기');await until(()=>floor.allowed===true);check(floor.turnId===session.turn_id,'Microphone lacked a turn identifier');
     session={...session,nudged:true,spoken_seconds:121};await until(()=>container.querySelector('.lounge-session-nudge'));
@@ -166,6 +166,28 @@ try {
       check(autoFlushes===1,'Automatic finish did not flush exactly once');
       await until(()=>autoContainer.querySelector('.lounge-seat.has-floor:not(.self)'));
     } finally {autoRoot.unmount();autoContainer.remove();session=beforeAuto;speechActivity={lastVoiceAt:0,recording:false,voicedMs:0};fixtureFlush=async()=>{};}
+
+    const recoveredLoad=api.loadLounge;let pollingFailure='';
+    const recoveryContainer=document.createElement('div');document.body.append(recoveryContainer);const recoveryRoot=createRoot(recoveryContainer);
+    api.loadLounge=async()=>{
+      if(pollingFailure){const error=new api.LoungeApiError(pollingFailure==='network'?'대화방 상태 서버 연결이 끊겼어요.':'다른 서버 설정 오류');error.code=pollingFailure==='network'?'lounge_network_error':'server_configuration_error';throw error;}
+      return recoveredLoad();
+    };
+    try {
+      recoveryRoot.render(React.createElement(page.TestRoom,{roomId:'fixture',user:{id:'me',nickname:'나'},onGuestRequest:async()=>{},onLoginRequest:()=>{}}));
+      await until(()=>recoveryContainer.querySelector('.lounge-participant-log'));
+      pollingFailure='network';
+      await until(()=>recoveryContainer.querySelector('.lounge-error')?.textContent.includes('연결이 끊겼어요'));
+      pollingFailure='';
+      await until(()=>!recoveryContainer.querySelector('.lounge-error'));
+      pollingFailure='network';
+      await until(()=>recoveryContainer.querySelector('.lounge-error')?.textContent.includes('연결이 끊겼어요'));
+      pollingFailure='configuration';
+      await until(()=>recoveryContainer.querySelector('.lounge-error')?.textContent.includes('다른 서버 설정 오류'));
+      pollingFailure='';messages.push({id:8,user_id:null,nickname:'사회자',kind:'host',text:'재연결 뒤 받은 대화'});
+      await until(()=>recoveryContainer.querySelector('.lounge-participant-log')?.textContent.includes('재연결 뒤 받은 대화'));
+      check(recoveryContainer.querySelector('.lounge-error')?.textContent.includes('다른 서버 설정 오류'),'Network recovery erased a different server failure');
+    } finally {recoveryRoot.unmount();recoveryContainer.remove();api.loadLounge=recoveredLoad;}
 
     const availableLoad=api.loadLounge;
     let lostAccess=false, lostAccessCalls=0;
@@ -351,12 +373,14 @@ try {
     const supabase={auth:{getSession:async()=>({data:{session:{access_token:'test'}}})},from:()=>({select:()=>({eq:()=>({single:async()=>({data:null})})})})};
     const captions=[];
     try {
-      globalThis.AudioContext=FakeAudioContext;globalThis.MediaRecorder=FakeRecorder;globalThis.fetch=async()=>new Response(JSON.stringify({url:'wss://mock',token:'test'}));
-      const streamApi=evaluate(code.audioApi),streamModule=evaluate(code.stream,()=>streamApi);
+      let voiceTokenCalls=0;
+      globalThis.AudioContext=FakeAudioContext;globalThis.MediaRecorder=FakeRecorder;globalThis.fetch=async()=>{voiceTokenCalls++;if(voiceTokenCalls===1)throw new TypeError('Failed to fetch');return new Response(JSON.stringify({url:'wss://mock',token:'test'}));};
+      const streamApi=evaluate(code.audioApi,name=>name==='./supabase'?{supabase}:{}),streamModule=evaluate(code.stream,()=>streamApi);
       const audioModule=evaluate(code.audio,name=>name==='react'?React:name==='livekit-client'?client:name==='./supabase'?{supabase}:name==='./lounge'?lounge:name==='./loungeStream'?streamModule:name==='./loungeTranscription'?evaluate(code.transcription):name==='./loungeAvatar'?{loadLoungeAvatar:async()=>({}),safeLoungeAvatarUrl:()=>undefined}:name==='./loungeApi'?streamApi:{});
       const audioContainer=document.createElement('div');document.body.append(audioContainer);const audioRoot=createRoot(audioContainer);
       function AudioFixture({allowed,speakerId,turnId,restricted=[]}) {hook=audioModule.useLoungeAudio('fixture','host',async(blob,turn)=>{await wait(30);captions.push(turn);},3,allowed===undefined?undefined:{allowed,speakerId,turnId},restricted);return null;}
       audioRoot.render(React.createElement(AudioFixture,{allowed:false,speakerId:null,turnId:'turn-a'}));await until(()=>hook);await hook.connect();await until(()=>hook.connected);await hook.startMicrophone();await until(()=>hook.micOn);
+      check(voiceTokenCalls===2&&!hook.error,'Temporary voice token failure did not recover cleanly');
       check(tracks[0].muted,'Actual waiting microphone was not muted');
       const remote={kind:'audio',attach:()=>document.createElement('audio'),detach:()=>[]};
       liveRoom.emit('TrackSubscribed',remote,{source:'microphone'},{identity:'peer'});
