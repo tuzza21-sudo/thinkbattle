@@ -713,7 +713,7 @@ test('a solo host turn uses one-to-one instructions and returns playable speech'
   });
 });
 for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
-  test(`host uses ${mode} for ${count} present humans in a six-seat room and excludes stale members`, async () => {
+  test(`host uses ${mode} for ${count} active memberships in a six-seat room even when browsers are suspended`, async () => {
     let modelCalls = 0;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -721,8 +721,7 @@ for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '책속으로', host_persona: 'ina', memory: '', capacity: 6 }]);
       if (url.includes('voice_lounge_messages?')) return result([]);
       if (url.includes('voice_lounge_members?')) return result([
-        ...Array.from({ length: count }, (_, index) => ({ user_id: `human-${index}`, nickname: `참가자${index}`, last_seen: new Date().toISOString() })),
-        { user_id: 'departed', nickname: '떠난 사람', last_seen: new Date(Date.now() - 120_000).toISOString() },
+        ...Array.from({ length: count }, (_, index) => ({ user_id: `human-${index}`, nickname: `참가자${index}`, last_seen: new Date(Date.now() - (index+1)*120_000).toISOString() })),
       ]);
       if (url.endsWith('/responses')) {
         modelCalls++;
@@ -730,7 +729,7 @@ for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
         assert.equal(context.mode, mode);
         assert.equal(context.participant_count, count);
         assert.equal(context.members.length, count);
-        assert.ok(context.members.every(member => member.user_id !== 'departed'));
+        assert.ok(context.members.every(member => member.user_id.startsWith('human-')));
         const roles = ['역할은 관심 있는 대화 상대다', '역할은 두 사람의 연결자다', '역할은 참여와 관점을 연결하는 그룹 사회자다'];
         roles.forEach((role, index) => assert.equal(payload.instructions.includes(role), index === count - 1));
         return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 생각이 남았나요?', memory: '' }) }] }] });
@@ -866,6 +865,53 @@ test('free discussion admits a requested AI response and keeps every-turn silenc
     if(url.endsWith('/audio/speech'))return new Response(new Uint8Array([0,32]));
     throw new Error('Unexpected fetch');
   },async()=>assert.equal((await handler(request({action:'host',roomId,reason:'requested'}))).status,200));
+});
+
+test('guided moderator summarizes the entire round and announces its ending with the next topic', async () => {
+  for (const reason of ['round_summary','free_ending']) {
+    let wholeRoundRead=false;
+    await run(async(url,init)=>{
+      if(url.includes('/auth/'))return result({id:'host'});
+      if(url.includes('claim_voice_lounge_host')){assert.equal(JSON.parse(init.body).p_reason,reason);return result('ticket');}
+      if(url.includes('voice_lounge_rooms?'))return result([{topic:'책 이야기',host_persona:'ina',memory:'',capacity:3,guided_session:true,topic_brief:topicBrief}]);
+      if(url.includes('voice_lounge_sessions?'))return result([{stage:2,state:reason==='round_summary'?'summarizing':'free',turn_kind:'basic',speaker_id:null,stage_started_at:'2026-10-05T00:00:00Z',free_ends_at:'2026-10-05T00:07:00Z'}]);
+      if(url.includes('voice_lounge_session_turns?'))return result([{id:'round-a'},{id:'round-b'}]);
+      if(url.includes('voice_lounge_messages?')) {
+        if(url.includes('kind=eq.human')) {
+          wholeRoundRead=true;assert.match(url,/created_at=gte/);assert.match(url,/order=id.asc/);
+          return result([{user_id:'a',nickname:'민수',text:'앞부분에서 말한 책임에 관한 의견.',turn_id:'round-a'},{user_id:'b',nickname:'소연',text:'자유를 선택할 권리가 중요해요.',turn_id:'round-b'},{user_id:'a',nickname:'민수',text:'그 선택이 타인에게 미친 영향도 봐야 해요.'},{user_id:'c',nickname:'지우',text:'전 단계에서 늦게 도착한 전사.',turn_id:'previous-round'}]);
+        }
+        return result([{nickname:'소연',kind:'human',text:'가장 최근에 나온 짧은 의견.'}]);
+      }
+      if(url.includes('voice_lounge_members?'))return result([{user_id:'a',nickname:'민수',last_seen:'2026-10-04T00:00:00Z'},{user_id:'b',nickname:'소연',last_seen:''},{user_id:'c',nickname:'지우',last_seen:''}]);
+      if(url.endsWith('/responses')) {
+        const body=JSON.parse(init.body),context=JSON.parse(body.input);
+        assert.equal(context.reason,reason);assert.equal(context.session.next_stage,'인물의 선택과 나의 해석');
+        assert.match(body.instructions,/확인된 배경과 정확한 발언 구분/);
+        if(reason==='round_summary') {
+          assert.ok(wholeRoundRead);assert.equal(context.session.phase,'summary');assert.equal(context.round_speeches.length,2);
+          assert.match(context.round_speeches[0].text,/앞부분에서 말한 책임/);assert.match(context.round_speeches[0].text,/타인에게 미친 영향/);
+          assert.equal(context.round_speeches[0].nickname,'민수');assert.equal(context.round_speeches[1].nickname,'소연');
+          assert.match(body.instructions,/말하지 않은 사람의 의견을 만들거나/);assert.match(body.instructions,/서로 다른 두 발언자를 연결하는 질문 하나/);
+        } else {assert.equal(wholeRoundRead,false);assert.match(body.instructions,/곧 자유 대화를 마치고 session.next_stage/);}
+        return result({output:[{content:[{type:'output_text',text:JSON.stringify({text:'두 관점을 이어서 자유롭게 나눠 주세요.',memory:''})}]}]});
+      }
+      if(url.includes('finish_voice_lounge_host'))return result(true);
+      if(url.endsWith('/audio/speech'))return new Response(new Uint8Array([0,32]));
+      throw new Error('Unexpected fetch');
+    },async()=>assert.equal((await handler(request({action:'host',roomId,reason}))).status,200));
+  }
+});
+
+test('guided host scheduling prioritizes one summary and a thirty-second ending notice',()=>{
+  const now=Date.now(), session={stage:2,state:'free',announced_stage:2,stage_started_at:new Date(now-60_000).toISOString(),free_started_at:new Date(now-10_000).toISOString(),free_ends_at:new Date(now+30_000).toISOString(),free_warning_announced_stage:1};
+  assert.equal(sessionLib.loungeSessionHostReason(session,now-1),null);
+  assert.equal(sessionLib.loungeSessionHostReason(session,now),'free_ending');
+  assert.equal(sessionLib.loungeSessionHostReason({...session,free_warning_announced_stage:2},now),null);
+  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'summarizing'},now),'round_summary');
+  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'speaking'},now),null);
+  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'ready',announced_stage:1},now),'opening');
+  assert.equal(sessionLib.loungeFreeEndsAt({...session,free_ends_at:null}),Date.parse(session.stage_started_at)+420_000);
 });
 
 test('moderator context follows the stored category instead of a shared film discussion outline', async () => {

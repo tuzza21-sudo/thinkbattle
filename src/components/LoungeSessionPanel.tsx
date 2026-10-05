@@ -1,16 +1,19 @@
 import { useState, type ReactNode } from 'react';
 import { Check, Hand, Mic, SkipForward } from 'lucide-react';
-import { isLoungeFreeStage, loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
+import { isLoungeFreeStage, loungeFreeEndsAt, loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import type { LoungeTopicBrief } from '../lib/lounge';
 
-type Props = { session: LoungeSession; userId: string; names: Record<string, string>; questions?: string[]; topicBrief?: LoungeTopicBrief | null; isHost: boolean; blocked: boolean; restricted?: boolean; onAction: (action: LoungeSessionAction) => Promise<void>; mode?: 'all' | 'context' | 'controls' | 'status'; microphoneControl?: ReactNode; assistanceControl?: ReactNode };
-export function LoungeSessionPanel({ session, userId, names, questions, topicBrief, isHost, blocked, restricted, onAction, mode = 'all', microphoneControl, assistanceControl }: Props) {
+type Props = { session: LoungeSession; now?: number; userId: string; names: Record<string, string>; questions?: string[]; topicBrief?: LoungeTopicBrief | null; isHost: boolean; blocked: boolean; restricted?: boolean; onAction: (action: LoungeSessionAction) => Promise<void>; mode?: 'all' | 'context' | 'controls' | 'status'; microphoneControl?: ReactNode; assistanceControl?: ReactNode };
+export function LoungeSessionPanel({ session, now = Date.parse(session.updated_at), userId, names, questions, topicBrief, isHost, blocked, restricted, onAction, mode = 'all', microphoneControl, assistanceControl }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const mine = session.speaker_id === userId;
   const raised = session.hand_queue.includes(userId);
   const finished = session.state === 'finished';
   const free = isLoungeFreeStage(session);
+  const summarizing = session.state === 'summarizing';
+  const ending = free && (loungeFreeEndsAt(session) ?? Infinity) - now <= 30_000;
+  const phase = summarizing ? '사회자 정리' : free ? ending ? '자유 대화 마무리' : '자유 대화' : '순서 발언';
   const stages = loungeSessionStagesForTopic(topicBrief);
   const act = async (action: LoungeSessionAction) => {
     if (busy) return;
@@ -28,10 +31,10 @@ export function LoungeSessionPanel({ session, userId, names, questions, topicBri
     {!finished && <>
       {mode !== 'context' && <>
       {mode === 'all' && <div className={`lounge-session-current ${mine && !free ? 'is-my-turn' : ''}`} role="status" aria-atomic="true">
-        <small className="lounge-session-progress">{stages[session.stage].title} · {session.stage + 1} / {stages.length} · {free ? '자유 대화' : '순서 발언'}</small>
-        {free ? <><strong>지금은 자유 대화</strong><span>AI의 답을 기다리지 않고 서로 이야기해 주세요.</span></> : session.speaker_id ? <><strong><Mic size={18} />{mine ? `지금 내 차례 · ${names[session.speaker_id] || '나'}` : `${names[session.speaker_id] || '참가자'}님의 차례`}</strong><span>{session.turn_kind === 'reply' ? `${names[session.reply_from ?? ''] || '참가자'}님의 질문에 답변 · 패스 가능` : session.turn_kind === 'extra' ? '손들기로 이어가는 이야기' : session.state === 'speaking' ? '편하게 이야기하는 중' : '준비되면 말하기를 눌러 주세요'}</span></> : <><strong>다음 이야기를 기다려요</strong><span>추가로 나눌 이야기가 있으면 손을 들어 주세요.</span></>}
+        <small className="lounge-session-progress">{stages[session.stage].title} · {session.stage + 1} / {stages.length} · {phase}</small>
+        {summarizing ? <><strong>사회자가 이야기를 정리해요</strong><span>서로의 관점을 연결한 뒤 자유 대화로 이어져요.</span></> : free ? <><strong>{ending ? '곧 다음 이야기로 넘어가요' : '지금은 자유 대화'}</strong><span>{ending ? '나누던 이야기와 남은 질문을 정리해 주세요.' : '서로 바로 질문하고 답하며 이야기해 주세요.'}</span></> : session.speaker_id ? <><strong><Mic size={18} />{mine ? `지금 내 차례 · ${names[session.speaker_id] || '나'}` : `${names[session.speaker_id] || '참가자'}님의 차례`}</strong><span>{session.turn_kind === 'reply' ? `${names[session.reply_from ?? ''] || '참가자'}님의 질문에 답변 · 패스 가능` : session.turn_kind === 'extra' ? '손들기로 이어가는 이야기' : session.state === 'speaking' ? '편하게 이야기하는 중' : '준비되면 말하기를 눌러 주세요'}</span></> : <><strong>다음 이야기를 기다려요</strong><span>추가로 나눌 이야기가 있으면 손을 들어 주세요.</span></>}
       </div>}
-      {mode === 'status' && <small className="lounge-session-progress" role="status">{stages[session.stage].title} · {session.stage + 1} / {stages.length} · {free ? '자유 대화' : '순서 발언'}</small>}
+      {mode === 'status' && <small className="lounge-session-progress" role="status">{stages[session.stage].title} · {session.stage + 1} / {stages.length} · {phase}</small>}
       {mode !== 'status' && <div className="lounge-session-actions">
         {!free && session.state === 'speaking' && mine ? <button type="button" className="primary" disabled={busy} onClick={() => void act('done')} aria-label="이야기 마쳤어요"><Check size={16} /><span className="lounge-action-full">이야기 마쳤어요</span><span className="lounge-action-short" aria-hidden="true">마치기</span></button>
           : !free && <button type="button" className="primary" disabled={!mine || session.state !== 'ready' || busy || blocked} onClick={() => void act('begin')}><Mic size={16} />말하기</button>}
@@ -39,7 +42,7 @@ export function LoungeSessionPanel({ session, userId, names, questions, topicBri
         <button type="button" disabled={busy || (restricted && !raised)} aria-pressed={raised} onClick={() => void act(raised ? 'lower' : 'raise')} aria-label={raised ? '손 내리기' : '손들기 · 추가로 이야기할게요'}><Hand size={16} /><span className="lounge-action-full">{raised ? '손 내리기' : '손들기'}</span><span className="lounge-action-short" aria-hidden="true">{raised ? '손 내리기' : '손들기'}</span></button>
         {!free && (mine || !session.completed.includes(userId)) && <button type="button" disabled={busy || (mine && blocked)} onClick={() => void act('pass')} aria-label="이번에는 패스"><SkipForward size={16} /><span className="lounge-action-full">이번에는 패스</span><span className="lounge-action-short" aria-hidden="true">패스</span></button>}
         {!free && isHost && session.speaker_id && <button type="button" className="host-control" disabled={busy || blocked} onClick={() => void act('yield')} aria-label="다음 분께 차례 넘기기"><span className="lounge-action-full">다음 분께 차례 넘기기</span><span className="lounge-action-short" aria-hidden="true">다음 차례</span></button>}
-        {isHost && (free || (session.state === 'between' && !base.length && !session.hand_queue.length && !replies.length)) && <button type="button" disabled={busy || blocked} onClick={() => void act('next_stage')}>{session.stage === 5 ? '대화 마무리하기' : '다음 이야기로'}</button>}
+        {isHost && (free || (session.state === 'between' && !base.length && !session.hand_queue.length && !replies.length)) && <button type="button" disabled={busy || blocked || ending} onClick={() => void act('next_stage')}>{session.stage === 5 ? '대화 마무리하기' : ending ? '다음 이야기 준비 중' : '다음 이야기로'}</button>}
         {assistanceControl}
       </div>}
       {mode !== 'controls' && <div className="lounge-session-queue-summary" aria-label="발언 대기 명단" aria-live="polite">

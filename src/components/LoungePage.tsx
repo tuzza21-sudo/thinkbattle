@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Coffee, Copy, Hand, Headphones, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
@@ -6,7 +6,7 @@ import { getCurrentUser } from '../lib/auth';
 import { getLoungeHost, getLoungeTheme, getLoungeTopic, loungeThemes, loungeTopics, normalizeLoungeTopicBrief, loungeMinimumParticipants, loungeHostCooldownMs, nextLoungeHostReason, previewHostReply, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
 import { LoungeApiError, controlLounge, controlLoungeSession, createLounge, joinLounge, loadLounge, prepareLoungeTopic, requestLoungeHost, requestLoungeModerator, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
-import { isLoungeFreeStage, loungeStageNeedsOpening, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
+import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
 import { LoungeOpenRooms } from './LoungeOpenRooms';
 import { LoungeHostOptions } from './LoungeHostOptions';
@@ -191,7 +191,7 @@ function RoomView(props: RoomViewProps) {
   const participantSeats = useRef<HTMLDivElement>(null);
   const followParticipantLog = useRef(true);
   const latestParticipantMessageId = participantMessages.at(-1)?.id;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = participantLog.current;
     if (element && followParticipantLog.current) element.scrollTo({ top: element.scrollHeight, behavior: 'auto' });
   }, [latestParticipantMessageId, latestHost?.id, props.liveHostText]);
@@ -241,7 +241,7 @@ function RoomView(props: RoomViewProps) {
     else setJournalOpen(true);
   };
   const sessionProps = props.session && props.currentUserId && props.onSessionAction ? {
-    session: props.session, userId: props.currentUserId,
+    session: props.session, now: props.now, userId: props.currentUserId,
     names: props.sessionNames ?? Object.fromEntries(props.members.map(member => [member.id, member.name])),
     questions: props.study?.questions, topicBrief: props.topicBrief, isHost: props.isHost,
     blocked: props.pending || props.aiSpeaking || restricted, restricted, onAction: props.onSessionAction,
@@ -394,6 +394,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const autoMicAttempted = useRef(false);
   const autoStartAttempted = useRef(false);
   const busy = useRef(false);
+  const openingFree = useRef(false);
   const mounted = useRef(true);
   const activeRoomId = useRef(roomId);
   const lastActivity = useRef(0);
@@ -477,6 +478,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   }, [roomId, reviewAfterInput]);
   const restrictedIds = restrictedLoungeMembers(members, clock);
   const audio = useLoungeAudio(roomId, room?.host_id ?? '', transcript, room?.capacity, room?.guided_session && !isLoungeFreeStage(session) ? { allowed: session?.speaker_id === user?.id && session?.state === 'speaking', speakerId: session?.state === 'speaking' ? session.speaker_id : null, turnId: session?.turn_id } : undefined, restrictedIds);
+  const voiceProfiles = useRef(new Map<string, (typeof audio.participants)[number]>());
+  useEffect(() => { for (const participant of audio.participants) voiceProfiles.current.set(participant.id, participant); }, [audio.participants]);
   const current = useRef({ room, session, messages, audio, isHost, restrictedIds });
   useEffect(() => { current.current = { room, session, messages, audio, isHost, restrictedIds }; }, [room, session, messages, audio, isHost, restrictedIds]);
   const applySession = useCallback((incoming: LoungeSession | null) => {
@@ -588,11 +591,33 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     return () => { cancelled = true; clearInterval(interval); };
   }, [roomId, userId, userNickname, retry, applySession, reportRoomError, clearRoomNetworkError]);
   useEffect(() => {
-    if (!audio.connected) return;
-    void controlLounge(roomId, 'heartbeat').catch(err => setError(errorText(err)));
-    const interval = setInterval(() => { void controlLounge(roomId, 'heartbeat').catch(err => setError(errorText(err))); }, 15_000);
-    return () => clearInterval(interval);
-  }, [audio.connected, roomId]);
+    if (!room?.status || room.status === 'ended' || !userId) return;
+    let cancelled = false, running = false;
+    const heartbeat = async () => {
+      if (running || cancelled) return;
+      running = true;
+      try { await controlLounge(roomId, 'heartbeat'); }
+      catch (err) { if (!cancelled) reportRoomError(err); }
+      finally { running = false; }
+    };
+    const resume = async () => {
+      if (document.visibilityState === 'hidden' || cancelled) return;
+      await heartbeat();
+      if (cancelled) return;
+      try { await refreshAfterMessage(); }
+      catch { return; }
+      const latest = current.current;
+      if (!cancelled && latest.room?.status !== 'ended' && !latest.audio.connected && !latest.audio.connecting) await latest.audio.connect();
+      else if (!cancelled && latest.audio.connected) latest.audio.enableAudio();
+    };
+    const onResume = () => { void resume(); };
+    void heartbeat();
+    const interval = setInterval(() => { void heartbeat(); }, 15_000);
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('pageshow', onResume);
+    window.addEventListener('online', onResume);
+    return () => { cancelled = true; clearInterval(interval); document.removeEventListener('visibilitychange', onResume); window.removeEventListener('pageshow', onResume); window.removeEventListener('online', onResume); };
+  }, [roomId, room?.status, userId, reportRoomError, refreshAfterMessage]);
   useEffect(() => { const interval = setInterval(() => setClock(Date.now()), 1000); return () => clearInterval(interval); }, []);
   const ended = room?.status === 'ended' || Boolean(room?.expires_at && Date.parse(room.expires_at) <= clock);
   const disconnectAudio = audio.disconnect;
@@ -638,7 +663,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const tick = async () => {
       if (running) return; running = true;
       const state = current.current, speech = state.audio.getSpeechActivity();
-      if (isLoungeFreeStage(state.session) && (busy.current || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording || speech.transcribing || Date.now() - speech.lastVoiceAt < 1500)) { running = false; return; }
+      if ((isLoungeFreeStage(state.session) || state.session?.state === 'summarizing') && (busy.current || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording || speech.transcribing || Date.now() - speech.lastVoiceAt < 1500)) { running = false; return; }
       try { await sessionAction('tick'); } catch (err) { if (mounted.current) setError(errorText(err)); } finally { running = false; }
     };
     const kickoff = setTimeout(() => void tick(), 0);
@@ -684,13 +709,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     return () => clearTimeout(timer);
   }, [room, roomId, isHost, audio.connected, audio.audioReady, micPrepared, ended, refreshAfterMessage]);
 
-  const hostTurn = useCallback(async (reason: 'opening' | 'silence' | 'followup' | 'requested') => {
+  const hostTurn = useCallback(async (reason: LoungeHostReason) => {
     const state = current.current;
     if (state.room && state.restrictedIds.includes(state.room.host_id)) return;
     const speech = state.audio.getSpeechActivity();
     if (busy.current || transcribing.current || speech.transcribing || !state.isHost || !state.audio.connected || !state.audio.audioReady || state.room?.status !== 'active' || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording) return;
     if (state.room.capacity === 1 && (Date.now() - Math.max(lastActivity.current, speech.lastVoiceAt) < 2000 || Date.now() - inputReadyAt.current < 1000 || Date.now() - lastHostEnded.current < 3000)) return;
-    if (state.room.guided_session && !['ready', 'free'].includes(state.session?.state ?? '')) return;
+    if (state.room.guided_session && !['ready', 'summarizing', 'free'].includes(state.session?.state ?? '')) return;
     if (state.room.study_required && !state.room.topic_study) return;
     if (Date.now() - lastAttempt.current < (state.audio.participants.length === 1 ? 5000 : state.room.guided_session ? 10_000 : loungeHostCooldownMs(state.room.capacity))) return;
     const requestAt = state.room.moderator_requested_at;
@@ -701,16 +726,18 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const controller = new AbortController(); hostRequest.current = controller;
     const started = performance.now();
     let spoke = false;
+    let summarySaved = false;
     try {
       const response = await requestLoungeHost(roomId, reason, controller.signal);
       if (!mounted.current || controller.signal.aborted) { await response.stream?.cancel(); return; }
+      summarySaved = reason === 'round_summary' && !response.skipped;
       if (!response.skipped) setError('');
       if (response.stream) {
         const guided = state.room.guided_session;
         const canWaitForAudio = () => {
           const latest = current.current;
           return mounted.current && !controller.signal.aborted && latest.audio.connected && !latest.restrictedIds.includes(latest.room?.host_id ?? '') && latest.room?.status === 'active'
-            && (!guided || (latest.session?.turn_id === state.session?.turn_id && ['ready','free'].includes(latest.session?.state ?? '')));
+            && (!guided || (latest.session?.turn_id === state.session?.turn_id && ['ready','summarizing','free'].includes(latest.session?.state ?? '')));
         };
         if (!canWaitForAudio()) { await response.stream.cancel(); return; }
         let timings: Record<string, number> = {};
@@ -720,7 +747,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           console.info('[Lounge latency]', { ...timings, firstAudioMs: Math.round(performance.now() - started) });
         }, value => { timings = value; }, () => {
           const latest = current.current, activity = latest.audio.getSpeechActivity();
-          return !controller.signal.aborted && !latest.audio.speakers.length && !activity.recording && !activity.transcribing && latest.room?.status === 'active' && (!latest.room.guided_session || (latest.session?.turn_id === state.session?.turn_id && ['ready','free'].includes(latest.session?.state ?? ''))) && Date.now() - Math.max(lastActivity.current, activity.lastVoiceAt) >= 2000;
+          return !controller.signal.aborted && !latest.audio.speakers.length && !activity.recording && !activity.transcribing && latest.room?.status === 'active' && (!latest.room.guided_session || (latest.session?.turn_id === state.session?.turn_id && ['ready','summarizing','free'].includes(latest.session?.state ?? ''))) && Date.now() - Math.max(lastActivity.current, activity.lastVoiceAt) >= 2000;
         }, canWaitForAudio);
         if (mounted.current) await refreshAfterMessage();
       }
@@ -734,17 +761,31 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       }
       if (mounted.current) setError(errorText(err));
     }
-    finally { if (spoke) lastHostEnded.current = Date.now(); if (hostRequest.current === controller) hostRequest.current = null; busy.current = false; if (mounted.current) setPending(false); }
-  }, [roomId, refreshAfterMessage]);
+    finally {
+      if (summarySaved && mounted.current && !controller.signal.aborted && current.current.session?.turn_id === state.session?.turn_id) {
+        try { await sessionAction('open_free'); } catch (err) { reportRoomError(err); }
+      }
+      if (spoke) lastHostEnded.current = Date.now(); if (hostRequest.current === controller) hostRequest.current = null; busy.current = false; if (mounted.current) setPending(false);
+    }
+  }, [roomId, refreshAfterMessage, sessionAction, reportRoomError]);
   useEffect(() => {
     const interval = setInterval(() => {
       const state = current.current;
       const speech = state.audio.getSpeechActivity();
       if (!state.isHost || !state.room || !state.audio.connected || !state.audio.audioReady || !micPrepared || speech.recording || speech.transcribing || state.audio.participants.length < 1 || state.audio.aiSpeaking || state.audio.speakers.length) return;
       if (state.room.guided_session) {
-        if (!state.session || !['ready','free'].includes(state.session.state)) return;
-        if (state.room.moderator_requested_at) void hostTurn('requested');
-        else if (loungeStageNeedsOpening(state.session)) void hostTurn('opening');
+        if (!state.session || !['ready','summarizing','free'].includes(state.session.state)) return;
+        // A committed summary can survive a suspended/lost playback request.
+        if (state.session.state === 'summarizing' && state.session.summary_announced_stage === state.session.stage) {
+          if (!busy.current && !openingFree.current) {
+            openingFree.current = true;
+            void sessionAction('open_free').catch(reportRoomError).finally(() => { openingFree.current = false; });
+          }
+          return;
+        }
+        const scheduled = loungeSessionHostReason(state.session);
+        if (scheduled) void hostTurn(scheduled);
+        else if (state.room.moderator_requested_at) void hostTurn('requested');
         else if (isLoungeFreeStage(state.session)) {
           const reason = nextLoungeHostReason(state.room, state.messages, Date.now(), Math.max(lastActivity.current, speech.lastVoiceAt), lastAttempt.current, lastHostEnded.current, inputReadyAt.current, state.audio.participants.length);
           if (reason === 'silence' || reason === 'requested' || (reason === 'followup' && state.audio.participants.length === 1)) void hostTurn(reason);
@@ -755,7 +796,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (reason) void hostTurn(reason);
     }, room?.capacity === 1 || room?.guided_session ? 500 : 3000);
     return () => clearInterval(interval);
-  }, [hostTurn, room?.capacity, room?.guided_session, micPrepared]);
+  }, [hostTurn, room?.capacity, room?.guided_session, micPrepared, sessionAction, reportRoomError]);
   const askModerator = async () => {
     if (room?.capacity === 1) { await hostTurn('requested'); return; }
     try { await requestLoungeModerator(roomId); await refreshAfterMessage(); }
@@ -768,6 +809,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   if (!user) return <main className="lounge-join-gate"><span>☕</span><h1>친구들과 가볍게 이야기해요.</h1><p>이름을 준비하고 대화방에 들어갈게요.</p><button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 참여하기 <ArrowRight size={17} /></button><button className="lounge-preview-button" type="button" onClick={onLoginRequest}>로그인해서 참여하기</button>{error && <p className="lounge-error" role="alert">{error}</p>}</main>;
   if (!room) return <main className="lounge-join-gate"><Coffee size={42} /><h1>{error ? '대화방을 확인해 주세요' : '친구들의 자리를 준비해요…'}</h1>{error && <><p className="lounge-error" role="alert">{error}</p><button type="button" className="lounge-preview-button" onClick={() => { setError(''); setRetry(value => value + 1); }}><RefreshCw size={16} /> 다시 확인하기</button><Link to="/lounge">라운지로 돌아가기</Link></>}</main>;
   const remaining = room.expires_at ? Math.max(0, Math.ceil((Date.parse(room.expires_at) - clock) / 1000)) : 3600;
-  const seats = audio.participants.map(participant => ({ ...participant, name: members.find(member => member.user_id === participant.id)?.nickname ?? participant.name }));
+  const seats = members.map(member => {
+    const voice = audio.participants.find(participant => participant.id === member.user_id);
+    return { ...(voice ?? voiceProfiles.current.get(member.user_id)), id: member.user_id, name: member.nickname, muted: voice?.muted ?? true };
+  });
   return <RoomView now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={room.theme} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} onAvatarChoice={audio.connected ? audio.chooseAvatar : undefined} topic={room.topic} topicBrief={room.topic_brief} capacity={room.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost} error={error || transcriptError || interactionError || audio.error} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={() => void askModerator()} onStart={() => void action('start')} onLeave={() => { if (isHost && !ended && !window.confirm(room.capacity === 1 ? 'AI와의 대화를 마칠까요?' : '나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} />;
 }

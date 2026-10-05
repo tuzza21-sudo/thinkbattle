@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
-import type { LoungeSession, LoungeSessionAction } from './loungeSession';
+import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 
 export class LoungeApiError extends Error {
   code: string | undefined;
@@ -141,7 +141,7 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
-export const requestLoungeHost = (roomId: string, reason: 'opening' | 'silence' | 'followup' | 'requested', signal?: AbortSignal) => apiRequest({ action: 'host', roomId, reason, stream: true }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal) => apiRequest({ action: 'host', roomId, reason, stream: true }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {
   const pending = topicPreparations.get(roomId);

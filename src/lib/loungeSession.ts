@@ -69,7 +69,7 @@ export function loungeSessionStagesForTopic(brief?: Pick<LoungeTopicBrief, 'cate
   return loungeSessionStages.map((stage, index) => ({ ...stage, ...(index >= 1 && index <= 4 ? steps?.[index - 1] : undefined) }));
 }
 export type LoungeSession = {
-  room_id: string; stage: number; state: 'ready' | 'speaking' | 'between' | 'free' | 'finished';
+  room_id: string; stage: number; state: 'ready' | 'speaking' | 'between' | 'summarizing' | 'free' | 'finished';
   speaker_id: string | null; turn_id: string; turn_kind: 'basic' | 'extra' | 'reply';
   reply_queue?: Array<{ target: string; from: string; question: string; source_turn: string; stage: number }>;
   reply_question?: string | null; reply_from?: string | null;
@@ -78,10 +78,25 @@ export type LoungeSession = {
   spoken_seconds: number; nudged: boolean; announced_turn: string | null; announced_stage?: number;
   between_since: string | null; updated_at: string;
   free_started_at?: string | null;
+  free_ends_at?: string | null; summary_announced_stage?: number; free_warning_announced_stage?: number;
 };
-export type LoungeSessionAction = 'tick' | 'raise' | 'lower' | 'pass' | 'begin' | 'done' | 'yield' | 'next_stage' | 'activity';
+export type LoungeHostReason = 'opening' | 'silence' | 'followup' | 'requested' | 'round_summary' | 'free_ending';
+export type LoungeSessionAction = 'tick' | 'raise' | 'lower' | 'pass' | 'begin' | 'done' | 'yield' | 'next_stage' | 'activity' | 'open_free';
 export const isLoungeFreeStage = (session?: LoungeSession | null) => session?.state === 'free';
 export const loungeStageNeedsOpening = (session: LoungeSession) => session.state !== 'finished' && session.announced_stage !== session.stage;
+export function loungeFreeEndsAt(session: LoungeSession) {
+  if (session.state !== 'free' || !session.free_started_at) return null;
+  if (session.free_ends_at) return Date.parse(session.free_ends_at);
+  const budget = loungeSessionStages[session.stage]?.minutes * 60_000;
+  return Math.max(Date.parse(session.stage_started_at) + budget, Date.parse(session.free_started_at) + 60_000);
+}
+export function loungeSessionHostReason(session: LoungeSession, now = Date.now()): LoungeHostReason | null {
+  if (session.state === 'summarizing') return session.summary_announced_stage === session.stage ? null : 'round_summary';
+  if (!['ready', 'free'].includes(session.state)) return null;
+  const end = loungeFreeEndsAt(session);
+  if (end !== null && now >= end - 30_000 && session.free_warning_announced_stage !== session.stage) return 'free_ending';
+  return loungeStageNeedsOpening(session) ? 'opening' : null;
+}
 export const loungeTurnSilenceMs = 10_000;
 export function shouldAutoFinishLoungeTurn(session: LoungeSession, speech: { voicedMs: number; lastVoiceAt: number; recording: boolean }, voicedAtStart: number, now = Date.now()) {
   return session.state === 'speaking' && !isLoungeFreeStage(session) && speech.voicedMs > voicedAtStart

@@ -23,7 +23,8 @@ try {
   await db.exec(`CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY); CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     GRANT USAGE ON SCHEMA auth TO authenticated,anon,service_role;`);
-  for(const file of (await readdir('supabase/migrations')).filter(file=>file.includes('voice_lounge')).sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
+  // Historical upgrade contract; newer presence/moderation behavior has its own SQL fixture.
+  for(const file of (await readdir('supabase/migrations')).filter(file=>file.includes('voice_lounge')&&file<='20261004040000_voice_lounge_round_then_free.sql').sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
   for(const id of ids) await db.query('insert into auth.users values($1)',[id]);
   await as(ids[0]); room=(await one("select create_voice_lounge('ina','책에 대한 서로 다른 생각',3,'민수','river',false) as id")).id;
   for(const [index,id] of ids.entries()) if(index){await as(id); await db.query('select join_voice_lounge($1,$2)',[room,['민수','소연','지우'][index]]);}

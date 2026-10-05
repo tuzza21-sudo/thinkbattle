@@ -18,6 +18,7 @@ const readAvatar = (metadata?: string) => {
 export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (audio: Blob, turnId?: string) => Promise<void>, capacity = 4, floor?: { allowed: boolean; speakerId: string | null; turnId?: string }, restrictedIds: string[] = []) {
   const roomRef = useRef<Room | null>(null);
   const microphone = useRef<LocalAudioTrack | null>(null);
+  const microphoneWanted = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
   const releaseMicAnalysis = useRef<(() => void) | null>(null);
   const outputContext = useRef<AudioContext | null>(null);
@@ -73,7 +74,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   }, []);
 
   const stopHost = useCallback(() => { playback.current?.finish(); }, []);
-  const stopMicrophone = useCallback(() => {
+  const releaseMicrophone = useCallback(() => {
     cancelAnimationFrame(frame.current);
     if (recorder.current?.state === 'recording') recorder.current.stop();
     recorder.current = null;
@@ -84,6 +85,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     if (audioContext.current !== outputContext.current) void audioContext.current?.close(); audioContext.current = null;
     setMicOn(false);
   }, []);
+  const stopMicrophone = useCallback(() => { microphoneWanted.current = false; releaseMicrophone(); }, [releaseMicrophone]);
 
   const disconnect = useCallback(() => {
     version.current += 1;
@@ -149,9 +151,13 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (participant?.identity !== hostIdRef.current) return;
         try { const data = JSON.parse(new TextDecoder().decode(payload)); if (data.type === 'lounge-ai') { aiSpeakingRef.current = Boolean(data.speaking); setAiSpeaking(Boolean(data.speaking)); if (typeof data.text === 'string') setHostText(data.text.slice(0, 600)); } } catch { /* Ignore other room packets. */ }
       });
-      room.on(RoomEvent.Reconnecting, () => { stopHost(); stopMicrophone(); setConnected(false); });
+      room.on(RoomEvent.Reconnecting, () => { stopHost(); releaseMicrophone(); setConnected(false); });
       room.on(RoomEvent.Reconnected, () => { setConnected(true); sync(); });
-      room.on(RoomEvent.Disconnected, () => { if (roomRef.current === room) disconnect(); });
+      room.on(RoomEvent.Disconnected, () => {
+        if (roomRef.current !== room) return;
+        const resumeMicrophone = microphoneWanted.current;
+        disconnect(); microphoneWanted.current = resumeMicrophone;
+      });
       await room.connect(credentials.url, credentials.token);
       if (generation !== version.current) { await room.disconnect(); return; }
       try {
@@ -162,13 +168,19 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (loungeAvatarUrl || avatar !== undefined) await room.localParticipant.setMetadata(JSON.stringify({ ...JSON.parse(room.localParticipant.metadata || '{}'), loungeAvatar: avatar, loungeAvatarUrl }));
       } catch { /* Avatar preferences must never prevent voice connection. */ }
       setConnected(true); sync(); enableAudio();
-    } catch (err) { disconnect(); const failure = loungeConnectionError(err, '음성 서버'); setError(failure instanceof Error ? failure.message : '음성 연결에 실패했어요.'); }
+    } catch (err) {
+      if (generation !== version.current) return;
+      const resumeMicrophone = microphoneWanted.current;
+      disconnect(); microphoneWanted.current = resumeMicrophone;
+      const failure = loungeConnectionError(err, '음성 서버'); setError(failure instanceof Error ? failure.message : '음성 연결에 실패했어요.');
+    }
     finally { pending.current = false; setConnecting(false); }
-  }, [roomId, disconnect, stopHost, stopMicrophone, enableAudio]);
+  }, [roomId, disconnect, stopHost, releaseMicrophone, enableAudio]);
 
   const startMicrophone = useCallback(async () => {
     if (microphone.current || !roomRef.current || !connected || pending.current || restrictedRef.current.has(roomRef.current.localParticipant.identity)) return;
     pending.current = true;
+    microphoneWanted.current = true;
     const room = roomRef.current;
     try {
       const track = await createLocalAudioTrack({ echoCancellation: true, noiseSuppression: true, autoGainControl: true });
@@ -227,6 +239,11 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     } catch (err) { stopMicrophone(); setError(err instanceof Error && err.name === 'NotAllowedError' ? '마이크 권한이 꺼져 있어요. 브라우저에서 허용하거나 글로 이야기해 주세요.' : err instanceof Error ? err.message : '마이크 권한을 확인해 주세요.'); }
     finally { pending.current = false; }
   }, [connected, stopMicrophone, enableAudio, capacity]);
+  useEffect(() => {
+    if (!connected || !microphoneWanted.current) return;
+    const timer = setTimeout(() => { void startMicrophone(); }, 0);
+    return () => clearTimeout(timer);
+  }, [connected, startMicrophone]);
 
   const playHost = useCallback(async (base64: string) => {
     const room = roomRef.current; if (!room) return;
