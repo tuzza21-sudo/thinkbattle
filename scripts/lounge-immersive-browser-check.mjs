@@ -78,6 +78,8 @@ try {
       assert.equal(dimensions.topicOnTop, true);
       assert.equal(dimensions.controlsUnderProfiles,true,'microphone and hands sit below the participant profiles');
       assert.equal(dimensions.controlsUnderSpeech,true,'controls sit below the speech pane');
+      assert.equal(await evaluate("document.querySelector('.lounge-participant-log .lounge-session-heading,.lounge-participant-log .lounge-session-current,.lounge-participant-log .lounge-session-queue-summary,.lounge-participant-log .lounge-session-panel h3')"),null,'conversation repeats the stage or turn indicators');
+      assert.ok(await evaluate("document.querySelector('.lounge-participant-speech').getBoundingClientRect().left<=document.querySelector('.lounge-moderator').getBoundingClientRect().left"),'desktop conversation must use the space below all profiles too');
       assert.equal(dimensions.micWithHands,true,'microphone and hands share one action row');
       assert.equal(dimensions.transparentMic,true,'microphone button stays transparent');
       assert.equal(dimensions.noFooter,true,'no bottom control box remains');

@@ -11,9 +11,23 @@ export class LoungeApiError extends Error {
   }
 }
 
+function connectionError(error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '';
+  return /failed to fetch|fetch failed|networkerror|network request failed|load failed/i.test(message)
+    ? new LoungeApiError('서버 연결이 끊겼어요. 인터넷 연결을 확인한 뒤 잠시 후 다시 시도해 주세요.', 'lounge_network_error', true, 10)
+    : error;
+}
+
+async function loungeFetch(url: string, init: RequestInit) {
+  try { return await fetch(url, init); }
+  catch (error) { if (init.signal?.aborted) throw error; throw connectionError(error); }
+}
+
 export async function loungeRpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(name, args);
   if (error) {
+    const connection = connectionError(error);
+    if (connection instanceof LoungeApiError) throw connection;
     if (/schema cache|does not exist|Could not find/i.test(error.message)) throw new Error('라운지 서버를 준비 중입니다. 먼저 화면 미리보기로 둘러보세요.');
     throw new Error(error.message);
   }
@@ -41,13 +55,13 @@ export async function loadLounge(id: string) {
     supabase.from('voice_lounge_members').select('*').eq('room_id', id).eq('active', true),
     supabase.from('voice_lounge_messages').select('*').eq('room_id', id).order('id', { ascending: false }).limit(60),
   ]);
-  for (const result of results) if (result.error) throw new Error(result.error.message);
+  for (const result of results) if (result.error) throw connectionError(new Error(result.error.message));
   if (!results[0].data) throw new LoungeApiError('대화방을 찾을 수 없거나 참가 권한이 없어요. 라운지에서 다시 입장해 주세요.', 'lounge_access_denied', false);
   const room = results[0].data as LoungeRoom;
   let session: LoungeSession | null = null;
   if (room.guided_session && room.status !== 'lobby') {
     const result = await supabase.from('voice_lounge_sessions').select('*').eq('room_id', id).maybeSingle();
-    if (result.error) throw new Error(result.error.message);
+    if (result.error) throw connectionError(new Error(result.error.message));
     session = result.data as LoungeSession | null;
   }
   return { room, session, members: results[1].data as LoungeMember[], messages: (results[2].data as LoungeMessage[]).reverse() };
@@ -59,7 +73,7 @@ export const syncLoungeSafety = (roomId: string) => interactionRequest({ roomId,
 export const releaseLoungeRestriction = (roomId: string, targetId: string) => interactionRequest({ roomId, action: 'release', targetId });
 async function interactionRequest(body: Record<string, unknown>) {
   const { data } = await supabase.auth.getSession();
-  const response = await fetch('/api/lounge-interaction', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body) });
+  const response = await loungeFetch('/api/lounge-interaction', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload) throw new LoungeApiError(
     typeof payload?.error === 'string' ? payload.error : 'AI 대화 보호 연결을 다시 확인해 주세요.',
@@ -71,7 +85,7 @@ async function interactionRequest(body: Record<string, unknown>) {
 }
 async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
   const { data } = await supabase.auth.getSession();
-  const response = await fetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body), signal });
+  const response = await loungeFetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: JSON.stringify(body), signal });
   if (response.ok && streaming && response.headers.get('content-type')?.includes('application/x-ndjson') && response.body) return { stream: response.body };
   const payload = await response.json().catch(() => null);
   const headerDelay = Number(response.headers.get('retry-after'));

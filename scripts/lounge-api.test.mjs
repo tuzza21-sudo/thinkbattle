@@ -554,6 +554,24 @@ test('lounge client preserves non-retryable billing errors for the host schedule
     await assert.rejects(client.requestLoungeHost(roomId, 'opening'), error => error instanceof client.LoungeApiError && error.retryable === false && error.code === 'openai_credit_exhausted');
   });
 });
+
+test('browser network failures are retryable while deliberate cancellation is preserved', async () => {
+  const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }) } } }));
+  for (const message of ['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.']) {
+    await run(async () => { throw new TypeError(message); }, async () => {
+      for (const operation of [() => client.requestLoungeHost(roomId, 'opening'), () => client.prepareLoungeTopic(roomId), () => client.syncLoungeSafety(roomId)]) {
+        await assert.rejects(operation(), error => error instanceof client.LoungeApiError && error.code === 'lounge_network_error' && error.retryable && error.retryAfterSeconds === 10 && /인터넷 연결/.test(error.message));
+      }
+    });
+  }
+  const controller = new AbortController();controller.abort();
+  const cancellation = new DOMException('Cancelled by leaving the room', 'AbortError');
+  await run(async () => { throw cancellation; }, async () => {
+    await assert.rejects(client.requestLoungeHost(roomId, 'opening', controller.signal), error => error === cancellation);
+  });
+  const rpcClient = compile('../src/lib/loungeApi.ts', () => ({ supabase: { rpc: async () => ({data:null,error:{message:'TypeError: Failed to fetch'}}) } }));
+  await assert.rejects(rpcClient.joinLounge(roomId,'나'), error => error.code === 'lounge_network_error' && error.retryable);
+});
 test('stored host style controls both text and PCM/MP3 speech, including voice, prosody and speed', async () => {
   for (const host of lounge.loungeHosts) {
     for (const streaming of [false, true]) {

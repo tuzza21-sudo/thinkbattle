@@ -518,13 +518,15 @@
 .has-room .lounge-scene-heading { padding:0; gap:8px; }
 .has-room .lounge-table-topic h2 { margin:0; }
 .has-room .lounge-host-column { align-self:start; }
-.has-room .lounge-conversation-space { grid-template-columns:180px minmax(0,1fr); gap:20px; }
+.has-room .lounge-conversation-space { grid-template-columns:120px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr) auto; gap:10px 20px; overflow:hidden; }
 .has-room .lounge-place-view { display:none; }
-.has-room .lounge-participant-panel { grid-column:2; }
-.has-room .lounge-moderator { display:flex; flex-direction:column; text-align:center; }
+.has-room .lounge-host-column { grid-column:1; grid-row:1; gap:4px; }
+.has-room .lounge-moderator { display:flex; flex-direction:column; text-align:center; padding:4px 0; gap:6px; }
 .has-room .lounge-moderator-info { text-align:center; }
-.has-room .lounge-participant-panel { display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:10px; overflow:hidden; padding:0; }
-.has-room .lounge-participant-roster { gap:6px; }
+.has-room .lounge-moderator-caption,.has-room .lounge-moderator>.lounge-voice-bars { display:none; }
+.has-room .lounge-room-main,.has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:64px; }
+.has-room .lounge-participant-panel { display:contents; }
+.has-room .lounge-participant-roster { grid-column:2; grid-row:1; gap:6px; min-width:0; overflow:hidden; }
 .has-room .lounge-participant-roster .lounge-seats { display:flex; gap:12px; max-height:none; overflow-x:auto; overflow-y:hidden; align-items:flex-start; }
 .has-room .lounge-participant-roster .lounge-seat-avatar { height:calc(var(--portrait-size) * 1.08); flex-shrink:0; margin:0 auto; }
 .has-room .lounge-participant-roster .lounge-seat,.has-room .lounge-participant-roster .lounge-seats.seats-1 .lounge-seat { --portrait-size:64px; flex:0 0 86px; }
@@ -537,7 +539,7 @@
 .has-room .lounge-participant-roster { position:relative; }
 .has-room .lounge-participant-heading b { margin-left:auto; }
 .has-room .lounge-seats { overflow-y:visible; }
-.has-room .lounge-participant-speech { min-height:0; margin:0; padding-top:8px; overflow:hidden; }
+.has-room .lounge-participant-speech { grid-column:1 / -1; grid-row:2; min-height:0; margin:0; padding-top:8px; overflow:hidden; }
 .has-room .lounge-participant-speech h2 { margin:0; font-size:11px; line-height:1.5; }
 .has-room .lounge-participant-log { min-height:0; max-height:none; flex:1; overflow-y:auto; overflow-x:hidden; }
 .has-room .lounge-host-message { margin-bottom:14px; }
@@ -545,7 +547,7 @@
 .has-room .lounge-host-message>strong>span { font-size:9px; font-weight:500; color:#ede3ce; }
 .has-room .lounge-host-bubble { max-height:none; overflow:visible; padding:6px 8px; }
 .has-room .lounge-guidance { overflow:visible; margin-bottom:12px; }
-.has-room .lounge-participant-controls { padding-top:8px; border-top:1px solid #ffffff26; }
+.has-room .lounge-participant-controls { grid-column:1 / -1; grid-row:3; padding-top:8px; padding-bottom:max(2px,env(safe-area-inset-bottom)); border-top:1px solid #ffffff26; }
 .has-room .lounge-participant-controls .lounge-voice-controls { display:flex; flex-direction:column; gap:6px; align-items:stretch; }
 .has-room .lounge-participant-controls .session-controls { display:block; margin:0; }
 .has-room .lounge-participant-controls .lounge-room-controls { order:2; justify-content:flex-end; margin:0; padding:0; border:0; }
@@ -607,7 +609,7 @@
   .has-room .lounge-guidance .lounge-session-question { font-size:12px; }
 }
 @media(max-width:760px) and (max-height:700px) {
-  .has-room .lounge-room-main { --lounge-profile-size:48px; }
+  .has-room .lounge-room-main,.has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:48px; }
   .has-room .lounge-conversation-space { grid-template-columns:60px minmax(0,1fr); gap:5px 8px; }
   .has-room .lounge-seat,.has-room .lounge-seats.seats-1 .lounge-seat { flex-basis:64px; }
   .has-room .lounge-participant-roster .lounge-seat,.has-room .lounge-participant-roster .lounge-seats.seats-1 .lounge-seat { flex-basis:64px; }

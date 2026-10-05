@@ -21,8 +21,8 @@ export function LoungeSessionPanel({ session, userId, names, questions, topicBri
   const replies = session.reply_queue ?? [];
   return <section className={`lounge-session-panel session-${mode}`} aria-label={mode === 'context' ? '오늘의 대화 안내' : '대화 순서와 손들기'}>
     {mode !== 'controls' && mode !== 'status' && <>
-    <div className="lounge-session-heading"><span>함께 나누는 시간 · 약 30분</span><small>{session.stage + 1} / {stages.length} 단계</small></div>
-    <h3>{finished ? '함께 이야기해 줘서 고마워요' : stages[session.stage].title}</h3>
+    {mode === 'all' && <><div className="lounge-session-heading"><span>함께 나누는 시간 · 약 30분</span><small>{session.stage + 1} / {stages.length} 단계</small></div>
+    <h3>{finished ? '함께 이야기해 줘서 고마워요' : stages[session.stage].title}</h3></>}
     <p className="lounge-session-question">{finished ? '오늘 나눈 서로 다른 생각을 천천히 돌아보세요.' : loungeSessionPrompt(session, questions, topicBrief)}</p>
     {!finished && session.turn_kind === 'reply' && <p className="lounge-session-reply-context">{names[session.reply_from ?? ''] || '참가자'}님의 질문에 답변</p>}</>}
     {!finished && <>
@@ -49,7 +49,7 @@ export function LoungeSessionPanel({ session, userId, names, questions, topicBri
       </div>}
       {mode !== 'status' && mine && session.nudged && <p className="lounge-session-nudge" role="status">다른 분의 생각도 들어볼까요? 지금 이야기를 천천히 마무리해 주세요. 이어서 나눌 말은 손들기로 다시 기다릴 수 있어요.</p>}
       </>}
-      {mode !== 'controls' && mode !== 'status' && <details className="lounge-session-more"><summary>다음 차례와 대화 안내</summary>{(base.length > 0 || session.hand_queue.length > 0) && <div className="lounge-session-queues">
+      {mode !== 'controls' && mode !== 'status' && <details className="lounge-session-more"><summary>{mode === 'context' ? '대화 안내' : '다음 차례와 대화 안내'}</summary>{mode === 'all' && (base.length > 0 || session.hand_queue.length > 0) && <div className="lounge-session-queues">
         {base.length > 0 && <div><span>다음 기본 차례</span><ol>{base.map(id => <li key={id}>{id === userId ? '나' : names[id] || '참가자'}</li>)}</ol></div>}
         {session.hand_queue.length > 0 && <div><span><Hand size={13} /> 추가 이야기 대기</span><ol>{session.hand_queue.map(id => <li key={id}>{id === userId ? '나' : names[id] || '참가자'}</li>)}</ol></div>}
       </div>}

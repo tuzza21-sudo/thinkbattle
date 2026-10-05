@@ -124,11 +124,11 @@ try {
     click('손들기');await until(()=>container.querySelector('[aria-label="손 내리기"]'));
     check(container.querySelector('.lounge-participant-roster .lounge-session-queue-summary').textContent.includes('손들기 대기나'),'Hand queue missing beside profiles');
     click('이야기 마쳤어요');await until(()=>session.speaker_id==='peer-a'&&floor.allowed===false);
-    check(container.querySelector('.lounge-session-queues').textContent.includes('추가 이야기 대기'),'Hand was missing from additional queue');
+    check(container.querySelector('.lounge-participant-roster .lounge-session-queue-summary').textContent.includes('손들기 대기나'),'Hand was missing from the fixed queue');
     click('다음 분께');await until(()=>session.speaker_id==='peer-b');await wait(50);
     click('다음 분께');await until(()=>session.speaker_id==='me'&&session.turn_kind==='extra');await wait(50);
     click('이번에는 패스');await until(()=>session.state==='between');await wait(50);
-    click('다음 이야기로');await until(()=>container.querySelector('.lounge-session-panel h3').textContent.includes('주제의 첫인상'));
+    click('다음 이야기로');await until(()=>container.querySelector('.lounge-session-progress').textContent.includes('주제의 첫인상'));
     check(container.querySelector('.lounge-session-question').textContent.includes('가장 먼저 어떤 느낌'),'First-impression question omitted the participant reaction');
     await until(()=>floor?.allowed===false);
     check(container.querySelector('.lounge-session-progress').textContent.includes('순서 발언'),'New topic did not begin with a basic round');
@@ -319,7 +319,7 @@ try {
         session:{...safetyProps.session,stage:2,state:'free',speaker_id:null,turn_kind:'basic',reply_question:null},
         members:safetyProps.members.map(m=>({...m,warnings:0,restrictedUntil:null})),
       }));
-      await until(()=>safetyContainer.querySelector('.lounge-session-panel h3')?.textContent===title);
+      await until(()=>safetyContainer.querySelector('.lounge-session-progress')?.textContent.includes(title));
       check(safetyContainer.querySelector('.lounge-session-progress').textContent.includes(title),'Room progress did not receive the selected topic');
       if(category!=='media') check(!/장면|대사|결말|반전/.test(safetyContainer.querySelector('.lounge-session-question').textContent),'Non-media room still asked a film question');
       check(!safetyContainer.querySelector('.lounge-seat.has-floor'),'Topic-specific free discussion reserved a floor');
