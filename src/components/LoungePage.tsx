@@ -318,7 +318,9 @@ function LoungePreview() {
   const host = getLoungeHost(params.get('host') ?? 'jaeseok');
   const topic = params.get('topic')?.slice(0, 160) || loungeTopics[0].question;
   const capacity = Math.min(6, Math.max(1, Math.trunc(Number(params.get('capacity'))) || 4));
-  const opening = `${capacity === 1 ? '오늘은 둘이 편하게' : '오늘은 함께'} “${topic}” 이야기를 나눠요. 먼저 떠오르는 경험이나 궁금한 점이 있나요? 편하게 패스해도 좋아요.`;
+  const opening = capacity === 1
+    ? `반가워요. “${topic}” 하면 가장 먼저 어떤 생각이 떠올라요?`
+    : `오늘은 함께 “${topic}” 이야기를 나눠요. 먼저 떠오르는 경험이나 궁금한 점이 있나요? 편하게 패스해도 좋아요.`;
   const [messages, setMessages] = useState<LoungeMessage[]>(() => [
     { id: 1, room_id: 'preview', user_id: null, nickname: host.name, kind: 'host', text: opening, created_at: new Date().toISOString() },
     ...(capacity > 1 ? [{ id: 2, room_id: 'preview', user_id: 'demo-soyeon', nickname: '소연 · 예시', kind: 'human' as const, text: '같은 경험도 누구와 함께하느냐에 따라 다르게 남더라고요.', created_at: new Date().toISOString() }] : []),

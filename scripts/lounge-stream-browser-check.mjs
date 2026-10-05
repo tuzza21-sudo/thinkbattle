@@ -17,7 +17,7 @@ socket.addEventListener('message', event => {
 const send = (method, params) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
 try {
   const response = await send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
-    const { Pcm16Decoder, PcmAudioQueue, readLoungeStream } = await import('/src/lib/loungeStream.ts?check=' + Date.now());
+    const { createLoungeHostOutput, Pcm16Decoder, PcmAudioQueue, readLoungeStream } = await import('/src/lib/loungeStream.ts?check=' + Date.now());
     const context = new AudioContext({sampleRate: 24000}); await context.resume();
     const decoder = new Pcm16Decoder();
     const queue = new PcmAudioQueue(context, [context.destination]);
@@ -90,9 +90,28 @@ try {
     const intactOnset = startupHeld && secondHeld && biggestError<.00001;
     jitterQueue.stop();
     if (!intactOnset) throw new Error(JSON.stringify({startupHeld,secondHeld,biggestError,starts,onset,firstActual:jitterAudio[onset+240],firstExpected:original[240]}));
-    return { playedBeforeComplete, completed, cancelled, smoothEdges, continuousJoin, intactOnset };
+    // Render the same boosted voice into the local and broadcast paths. Quiet
+    // speech must become louder, while sustained loud input stays below full scale.
+    const voiceContext = new OfflineAudioContext(2, 48000, 24000);
+    const merger = voiceContext.createChannelMerger(2);
+    const local = voiceContext.createGain(), broadcast = voiceContext.createGain();
+    local.connect(merger,0,0);broadcast.connect(merger,0,1);merger.connect(voiceContext.destination);
+    const output = createLoungeHostOutput(voiceContext,[local,broadcast]);
+    const voice = voiceContext.createBufferSource(), buffer = voiceContext.createBuffer(1,48000,24000);
+    const samples=buffer.getChannelData(0);
+    for(let i=0;i<samples.length;i++) samples[i]=Math.sin(i*2*Math.PI*440/24000)*(i<24000?.05:.8);
+    voice.buffer=buffer;voice.connect(output.input);voice.start();
+    const voiceAudio=await voiceContext.startRendering(),localSamples=voiceAudio.getChannelData(0),broadcastSamples=voiceAudio.getChannelData(1);
+    let quietPeak=0,loudPeak=0,sharedError=0;
+    for(let i=12000;i<23000;i++) quietPeak=Math.max(quietPeak,Math.abs(localSamples[i]));
+    for(let i=36000;i<47000;i++) loudPeak=Math.max(loudPeak,Math.abs(localSamples[i]));
+    for(let i=0;i<48000;i++) sharedError=Math.max(sharedError,Math.abs(localSamples[i]-broadcastSamples[i]));
+    const boostedVoice=quietPeak>=.09&&loudPeak<1&&sharedError<.00001;
+    if(!boostedVoice)throw new Error(JSON.stringify({quietPeak,loudPeak,sharedError}));
+    output.disconnect();
+    return { playedBeforeComplete, completed, cancelled, smoothEdges, continuousJoin, intactOnset, boostedVoice };
   })()` });
   assert.equal(response.exceptionDetails, undefined, JSON.stringify(response.exceptionDetails));
-  assert.deepEqual(response.result.value, { playedBeforeComplete: true, completed: true, cancelled: true, smoothEdges:true, continuousJoin:true, intactOnset:true });
-  console.log('PASS: real Web Audio preserves the onset under delayed packets without duplicate samples or gaps; streaming and cancellation remain intact.');
+  assert.deepEqual(response.result.value, { playedBeforeComplete: true, completed: true, cancelled: true, smoothEdges:true, continuousJoin:true, intactOnset:true, boostedVoice:true });
+  console.log('PASS: real Web Audio boosts quiet voice on both playback paths, controls loud peaks, and preserves streaming onset and cancellation.');
 } finally { socket.close(); }

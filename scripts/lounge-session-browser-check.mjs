@@ -13,6 +13,7 @@ const pending = new Map();
 socket.addEventListener('message', event => { const m = JSON.parse(event.data); if (!m.id) return; const task = pending.get(m.id); pending.delete(m.id); if (m.error) task.reject(new Error(JSON.stringify(m.error))); else task.resolve(m.result); });
 const send = (method, params) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, { resolve, reject }); socket.send(JSON.stringify({ id, method, params })); });
 try {
+  await send('Page.bringToFront');
   const response = await send('Runtime.evaluate', { awaitPromise: true, returnByValue: true, expression: `(async () => {
     const ReactModule = await import('/node_modules/.vite/deps/react.js'), React = ReactModule.default || ReactModule;
     const JSXModule = await import('/node_modules/.vite/deps/react_jsx-runtime.js'), JSX = JSXModule.default || JSXModule;
@@ -391,14 +392,16 @@ try {
       createMediaStreamDestination(){return {stream:{getAudioTracks:()=>[mediaTrack]}};}
       createAnalyser(){return {fftSize:1024,disconnect(){},getFloatTimeDomainData(values){values.fill(.1);}};}
       createGain(){return {connect(){},disconnect(){},gain:{setValueAtTime(){},linearRampToValueAtTime(){},cancelScheduledValues(){}}};}
+      createDynamicsCompressor(){const parameter=()=>({setValueAtTime(){}});return {connect(){},disconnect(){},threshold:parameter(),knee:parameter(),ratio:parameter(),attack:parameter(),release:parameter()};}
       createBuffer(_,size,rate){const samples=new Float32Array(size);return {duration:size/rate,getChannelData:()=>samples};}
       createBufferSource(){const context=this;return {connect(){},disconnect(){},stop(){clearTimeout(this.timer);this.stopped=true;},start(time){scheduled.push(this);this.timer=setTimeout(()=>{this.ended=true;this.onended?.();},Math.max(0,time-context.currentTime)*1000+this.buffer.duration*1000);}};}
     }
     class FakeRecorder extends EventTarget {static isTypeSupported(){return true;} state='inactive';mimeType='audio/webm'; start(){this.state='recording';} stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['x'.repeat(400)])});this.onstop?.();this.dispatchEvent(new Event('stop'));} }
     class FakeTrack {mediaStreamTrack=mediaTrack;muted=false;muteCalls=0;unmuteCalls=0;async mute(){this.muted=true;this.muteCalls++;}async unmute(){this.muted=false;this.unmuteCalls++;}stop(){} }
     class FakeRoom {
+      canPlaybackAudio=true;blockAudio=false;
       remoteParticipants=new Map();handlers={};localParticipant={identity:'me',name:'Me',isMicrophoneEnabled:true,metadata:'{}',publishTrack:async()=>{},unpublishTrack:async()=>{},publishData:async()=>{},setMetadata:async()=>{}};
-      constructor(){liveRoom=this;} on(name,callback){(this.handlers[name]||=[]).push(callback);}emit(name,...args){for(const cb of this.handlers[name]||[])cb(...args);}async connect(){}async disconnect(){}async startAudio(){}
+      constructor(){liveRoom=this;} on(name,callback){(this.handlers[name]||=[]).push(callback);}emit(name,...args){for(const cb of this.handlers[name]||[])cb(...args);}async connect(){}async disconnect(){}async startAudio(){if(this.blockAudio)throw new Error('Autoplay blocked');this.canPlaybackAudio=true;this.emit('AudioPlaybackStatusChanged',true);}
     }
     const events=new Proxy({},{get:(_,name)=>name});
     const client={Room:FakeRoom,RoomEvent:events,Track:{Kind:{Audio:'audio'},Source:{Microphone:'microphone',Unknown:'unknown'}},LocalAudioTrack:FakeTrack,createLocalAudioTrack:async()=>{const track=new FakeTrack();tracks.push(track);return track;}};
@@ -413,6 +416,11 @@ try {
       function AudioFixture({allowed,speakerId,turnId,restricted=[]}) {hook=audioModule.useLoungeAudio('fixture','host',async(blob,turn)=>{await wait(30);captions.push(turn);},3,allowed===undefined?undefined:{allowed,speakerId,turnId},restricted);return null;}
       audioRoot.render(React.createElement(AudioFixture,{allowed:false,speakerId:null,turnId:'turn-a'}));await until(()=>hook);await hook.connect();await until(()=>hook.connected);await hook.startMicrophone();await until(()=>hook.micOn);
       check(voiceTokenCalls===2&&!hook.error,'Temporary voice token failure did not recover cleanly');
+      await until(()=>hook.audioReady);
+      liveRoom.canPlaybackAudio=false;liveRoom.emit('AudioPlaybackStatusChanged',false);await until(()=>!hook.audioReady);
+      liveRoom.blockAudio=true;hook.enableAudio();await wait(30);
+      check(!hook.audioReady,'Resuming local Web Audio hid a blocked remote playback path');
+      liveRoom.blockAudio=false;hook.enableAudio();await until(()=>hook.audioReady);
       check(tracks[0].muted,'Actual waiting microphone was not muted');
       const remote={kind:'audio',attach:()=>document.createElement('audio'),detach:()=>[]};
       liveRoom.emit('TrackSubscribed',remote,{source:'microphone'},{identity:'peer'});

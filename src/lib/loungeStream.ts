@@ -57,6 +57,22 @@ export class Pcm16Decoder {
   }
 }
 
+// Boost quiet TTS by 6 dB before both local playback and the shared LiveKit
+// track. Compress loud peaks so the gain does not simply clip the waveform.
+export function createLoungeHostOutput(context: AudioContext, destinations: AudioNode[]) {
+  const gain = context.createGain();
+  gain.gain.setValueAtTime(2, context.currentTime);
+  const compressor = context.createDynamicsCompressor();
+  compressor.threshold.setValueAtTime(-6, context.currentTime);
+  compressor.knee.setValueAtTime(6, context.currentTime);
+  compressor.ratio.setValueAtTime(12, context.currentTime);
+  compressor.attack.setValueAtTime(0.003, context.currentTime);
+  compressor.release.setValueAtTime(0.12, context.currentTime);
+  gain.connect(compressor);
+  destinations.forEach(destination => compressor.connect(destination));
+  return { input: gain, disconnect: () => { gain.disconnect(); compressor.disconnect(); } };
+}
+
 // Buffer the onset and recover from jitter without replaying consumed samples.
 export class PcmAudioQueue {
   private sources = new Set<AudioBufferSourceNode>();

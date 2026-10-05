@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLocalAudioTrack, LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client';
 import { supabase } from './supabase';
-import { Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
+import { createLoungeHostOutput, Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
 import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from './loungeApi';
 import { loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
@@ -22,6 +22,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const audioContext = useRef<AudioContext | null>(null);
   const releaseMicAnalysis = useRef<(() => void) | null>(null);
   const outputContext = useRef<AudioContext | null>(null);
+  const remotePlaybackBlocked = useRef(false);
   const speechActivity = useRef({ lastVoiceAt: 0, recording: false, voicedMs: 0 });
   const floorRef = useRef(floor);
   const restrictedRef = useRef(new Set(restrictedIds));
@@ -98,6 +99,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     remoteMicrophones.current.clear();
     remoteHostAudio.current.clear();
     aiSpeakingRef.current = false;
+    remotePlaybackBlocked.current = false;
     setConnected(false); setAudioReady(false); setAiSpeaking(false); setHostText(''); setParticipants([]); setSpeakers([]);
   }, [stopHost, stopMicrophone]);
 
@@ -105,9 +107,14 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     const context = outputContext.current;
     if (!context) return;
     // Run resume synchronously when this is invoked by a permission fallback button.
-    void context.resume().then(() => { if (outputContext.current === context) setAudioReady(context.state === 'running'); }).catch(() => { if (outputContext.current === context) setAudioReady(false); });
     const room = roomRef.current;
-    void room?.startAudio().catch(() => { if (roomRef.current === room) setAudioReady(false); });
+    // Both playback paths must succeed. A resumed Web Audio context must not
+    // hide a mobile autoplay failure on a remote participant's audio element.
+    void Promise.allSettled([context.resume(), room?.startAudio()]).then(results => {
+      if (outputContext.current !== context || roomRef.current !== room) return;
+      remotePlaybackBlocked.current = results.some(result => result.status === 'rejected') || room?.canPlaybackAudio === false;
+      setAudioReady(context.state === 'running' && !remotePlaybackBlocked.current);
+    });
   }, []);
 
   const connect = useCallback(async () => {
@@ -122,7 +129,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       let context: AudioContext;
       try { context = new AudioContext({ sampleRate: 24_000 }); } catch { context = new AudioContext(); }
       outputContext.current = context;
-      context.onstatechange = () => { if (outputContext.current === context) setAudioReady(context.state === 'running'); };
+      context.onstatechange = () => { if (outputContext.current === context) setAudioReady(context.state === 'running' && !remotePlaybackBlocked.current); };
       const sync = () => setParticipants([room.localParticipant, ...room.remoteParticipants.values()].map(participant => ({ id: participant.identity, name: participant.name || '친구', muted: !participant.isMicrophoneEnabled, avatarIndex: readAvatar(participant.metadata), avatarUrl: readAvatarUrl(participant.metadata) })));
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         if (track.kind !== Track.Kind.Audio) return;
@@ -131,6 +138,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         const element = track.attach(); elements.current.add(element);
         subscribedAudio.current.set(track, element);
         const isHostAudio = participant.identity === hostIdRef.current && publication.source !== Track.Source.Microphone;
+        element.volume = 1;
+        element.setAttribute('playsinline', '');
         remoteMicrophones.current.set(element, participant.identity);
         if (isHostAudio) remoteHostAudio.current.add(element);
         element.muted = restrictedRef.current.has(participant.identity) || (!isHostAudio && Boolean(floorRef.current && floorRef.current.speakerId !== participant.identity));
@@ -145,7 +154,11 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       room.on(RoomEvent.ParticipantDisconnected, participant => { if (participant.identity === hostIdRef.current) { aiSpeakingRef.current = false; setAiSpeaking(false); } });
       room.on(RoomEvent.TrackMuted, sync); room.on(RoomEvent.TrackUnmuted, sync);
       room.on(RoomEvent.LocalTrackPublished, sync); room.on(RoomEvent.LocalTrackUnpublished, sync);
-      room.on(RoomEvent.AudioPlaybackStatusChanged, permitted => { if (roomRef.current === room) setAudioReady(Boolean(permitted) && context.state === 'running'); });
+      room.on(RoomEvent.AudioPlaybackStatusChanged, permitted => {
+        if (roomRef.current !== room) return;
+        remotePlaybackBlocked.current = !permitted;
+        setAudioReady(Boolean(permitted) && context.state === 'running');
+      });
       room.on(RoomEvent.ActiveSpeakersChanged, active => setSpeakers(active.map(participant => participant.identity)));
       room.on(RoomEvent.DataReceived, (payload, participant) => {
         if (participant?.identity !== hostIdRef.current) return;
@@ -257,16 +270,19 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       if (roomRef.current !== room) return;
       const destination = context.createMediaStreamDestination();
       const source = context.createBufferSource(); source.buffer = buffer;
-      source.connect(context.destination); source.connect(destination);
+      const output = createLoungeHostOutput(context, [context.destination, destination]);
+      source.connect(output.input);
       const track = new LocalAudioTrack(destination.stream.getAudioTracks()[0]);
-      await room.localParticipant.publishTrack(track, { name: 'ai-host', source: Track.Source.Unknown });
-      if (roomRef.current !== room) { track.stop(); return; }
+      try { await room.localParticipant.publishTrack(track, { name: 'ai-host', source: Track.Source.Unknown }); }
+      catch (err) { source.disconnect(); output.disconnect(); track.stop(); throw err; }
+      if (roomRef.current !== room) { source.disconnect(); output.disconnect(); track.stop(); return; }
       await new Promise<void>(resolve => {
         let finished = false;
         const announce = (speaking: boolean) => { void room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'lounge-ai', speaking })), { reliable: true }).catch(() => {}); };
         const finish = () => {
           if (finished) return; finished = true;
           source.onended = null; try { source.stop(); } catch { /* May already be stopped. */ }
+          source.disconnect(); output.disconnect();
           announce(false); aiSpeakingRef.current = false; setAiSpeaking(false);
           void room.localParticipant.unpublishTrack(track); track.stop(); playback.current = null; resolve();
         };
@@ -284,7 +300,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     if (!context) { await stream.cancel(); throw new LoungeApiError('소리 켜기를 눌러 사회자 음성을 들어 주세요.', 'lounge_audio_not_ready'); }
     const destination = context.createMediaStreamDestination();
     const track = new LocalAudioTrack(destination.stream.getAudioTracks()[0]);
-    const queue = new PcmAudioQueue(context, [context.destination, destination]);
+    const output = createLoungeHostOutput(context, [context.destination, destination]);
+    const queue = new PcmAudioQueue(context, [output.input]);
     const pcm = new Pcm16Decoder();
     const cancelRead = new AbortController();
     let stopped = false, first = true;
@@ -293,7 +310,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     const finish = () => {
       if (stopped) return; stopped = true;
       cancelRead.abort();
-      queue.stop(); announce(false); aiSpeakingRef.current = false; setAiSpeaking(false);
+      queue.stop(); output.disconnect(); announce(false); aiSpeakingRef.current = false; setAiSpeaking(false);
       void room.localParticipant.unpublishTrack(track).catch(() => {}); track.stop();
       // The reader owns a lock while consuming; cancelling the stream aborts fetch via the caller.
       if (!stream.locked) void stream.cancel().catch(() => {});

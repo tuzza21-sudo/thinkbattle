@@ -105,12 +105,13 @@ test('creation starts research immediately and room entry shares the pending req
   });
 });
 
-test('only the first paid host turn permits a pass reminder and research announcements are excluded', async () => {
+test('only the first group host turn permits a pass reminder and research announcements are excluded', async () => {
   for (const aiTurns of [1, 2, 12]) await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '독서', host_persona: 'ina', memory: '', capacity: 1, ai_turns: aiTurns }]);
-    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '독서', host_persona: 'ina', memory: '', capacity: 2, ai_turns: aiTurns }]);
+    if (url.includes('voice_lounge_messages?')) return result([]);
+    if (url.includes('voice_lounge_members?')) return result([{ nickname: '가람' }, { nickname: '나래' }]);
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body);
       assert.equal(JSON.parse(body.input).first_host_turn, aiTurns === 1);
@@ -122,6 +123,34 @@ test('only the first paid host turn permits a pass reminder and research announc
     if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
     throw new Error('Unexpected host call');
   }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'opening' }))).status, 200); });
+});
+
+test('solo starts and continues a brief conversation without group introductions or pass instructions', async () => {
+  for (const host of lounge.loungeHosts) for (const [reason, aiTurns] of [['opening', 1], ['followup', 2], ['requested', 3]]) {
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화 이야기', host_persona: host.id, memory: '', capacity: 1, ai_turns: aiTurns, topic_brief: topicBrief }]);
+      if (url.includes('voice_lounge_messages?')) return result([]);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'host', nickname: '나' }]);
+      if (url.endsWith('/responses')) {
+        const payload = JSON.parse(init.body);
+        assert.equal(JSON.parse(payload.input).mode, 'solo');
+        assert.deepEqual(JSON.parse(payload.input).topic_brief, topicBrief);
+        assert.ok(payload.instructions.includes(host.instruction));
+        assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
+        assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
+        assert.match(payload.instructions, /가벼운 인사와 방 소개의 관심사에 맞는 질문 하나/);
+        assert.match(payload.instructions, /매번 질문으로 끝내지 않는다/);
+        assert.match(payload.instructions, /첫 인사에도 패스나 진행 방식 안내를 넣지 않는다/);
+        assert.doesNotMatch(payload.instructions, /4~6문장|1:1에서도 준비된 주제 배경|이번 첫 인사에서만 발언하기 싫으면/);
+        return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그 선택이 마음에 걸렸어요?', memory: '' }) }] }] });
+      }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+      throw new Error('Unexpected solo call');
+    }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason }))).status, 200); });
+  }
 });
 
 test('ten silent seconds end an actual utterance but never an unstarted turn, ongoing speech or free conversation', () => {
