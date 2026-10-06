@@ -851,6 +851,29 @@ test('transcription is gated and attributed through the authenticated member RPC
     assert.equal(response.status, 200); assert.equal(paid, 1); assert.equal(posted, true);
   });
 });
+test('a transcript saved inside the two-second message gap is retried once instead of failing the speaker', async () => {
+  for (const [rejections, expected] of [[1, 200], [2, 429]]) {
+    let paid = 0, posts = 0;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'guest' });
+      if (url.includes('claim_voice_lounge_audio')) return result(true);
+      if (url.endsWith('/audio/transcriptions')) { paid++; return result({ text: '이어서 말씀드리면요' }); }
+      if (url.includes('post_voice_lounge_message')) {
+        posts++;
+        return posts <= rejections ? result({ code: 'P0001', message: '조금만 천천히 이야기해 주세요.' }, 400) : new Response(null, { status: 204 });
+      }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const response = await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm;codecs=opus' }));
+      assert.equal(response.status, expected);
+      const body = await response.json();
+      if (expected === 200) assert.equal(body.posted, true);
+      else { assert.equal(body.code, 'lounge_message_too_fast'); assert.equal(body.retryable, true); assert.ok(body.retryAfterSeconds <= 3); }
+      assert.equal(paid, 1, 'the paid transcription is never repeated');
+      assert.equal(posts, 2, 'saving is attempted at most twice');
+    });
+  }
+});
 test('cost estimate counts aggregate speaking minutes instead of room duration per participant', () => {
   const cost = lounge.estimateLoungeCost(55);
   assert.ok(Math.abs(cost.total - .3084) < .000001);

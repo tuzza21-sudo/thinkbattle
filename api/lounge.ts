@@ -26,6 +26,9 @@ async function loungeRpcFailure(response: Response, rpc: string): Promise<Lounge
   let failure: LoungeUpstreamError;
   if (['PGRST202', 'PGRST203', '42883', '42703', '42P01'].includes(code || '')) {
     failure = new LoungeUpstreamError('라운지 DB 함수나 테이블 설정을 확인해 주세요. 최신 라운지 마이그레이션 적용이 필요할 수 있어요.', 503, 'lounge_schema_not_ready', false);
+  } else if (code === 'P0001' && payload?.message === '조금만 천천히 이야기해 주세요.') {
+    // Two transcripts from one speaker landed inside the database's two-second gap.
+    failure = new LoungeUpstreamError('발언이 연달아 들어와 잠깐 기다리고 있어요. 곧 이어서 기록할게요.', 429, 'lounge_message_too_fast', true, 2);
   } else if (response.status === 401) {
     failure = new LoungeUpstreamError('로그인 세션을 확인해 주세요. 다시 로그인한 뒤 입장해 주세요.', 401, 'lounge_auth_failed', false);
   } else if (response.status === 403 || code === '42501' || (code === 'P0001' && ['방 참가 권한이 없어요.', '진행 중인 방에서만 이야기할 수 있어요.', '진행 중인 방에서만 사회자를 부를 수 있어요.'].includes(String(payload?.message)))) {
@@ -181,7 +184,17 @@ export default async function handler(req: Request): Promise<Response> {
       form.append('model', 'gpt-4o-mini-transcribe'); form.append('language', 'ko');
       const result = await readJson<{ text: string }>(await openai('audio/transcriptions', form), 'openai');
       if (typeof result?.text !== 'string') throw new LoungeUpstreamError('AI 서버에서 전사 결과를 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 60);
-      if (result.text.trim()) await rpc<void>(turnId ? 'post_voice_lounge_turn_message' : 'post_voice_lounge_message', { p_room: roomId, p_text: result.text.trim().slice(0, 1200), ...(turnId ? { p_turn: turnId } : {}) }, true);
+      if (result.text.trim()) {
+        const post = () => rpc<void>(turnId ? 'post_voice_lounge_turn_message' : 'post_voice_lounge_message', { p_room: roomId, p_text: result.text.trim().slice(0, 1200), ...(turnId ? { p_turn: turnId } : {}) }, true);
+        // Transcription latency varies, so two chunks can be saved less than two seconds apart.
+        // Keep the paid transcript: wait out the gap and save it once more.
+        try { await post(); }
+        catch (error) {
+          if (!(error instanceof LoungeUpstreamError) || error.code !== 'lounge_message_too_fast') throw error;
+          await new Promise(resolve => setTimeout(resolve, 2100));
+          await post();
+        }
+      }
       return json({ ok: true, posted: Boolean(result.text.trim()) });
     }
 
