@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 
 export class LoungeApiError extends Error {
@@ -75,7 +75,7 @@ export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_v
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });
 export const postLoungeMessage = (id: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: id, p_text: text });
-export const requestLoungeModerator = (id: string) => loungeRpc<void>('request_voice_lounge_moderator', { p_room: id });
+export const requestLoungeModerator = (id: string, kind: Exclude<LoungeHelpKind, 'direct'> = 'spark') => loungeRpc<void>('request_voice_lounge_moderator', { p_room: id, p_kind: kind });
 export async function controlLoungeSession(id: string, action: LoungeSessionAction, turnId?: string, seconds = 0) {
   const args = { p_room: id, p_action: action, p_turn: turnId ?? null, p_seconds: seconds };
   try { return await loungeRpc<LoungeSession>('control_voice_lounge_session', args); }
@@ -141,7 +141,7 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
-export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal) => apiRequest({ action: 'host', roomId, reason, stream: true }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {
   const pending = topicPreparations.get(roomId);

@@ -1,13 +1,17 @@
 import type { LoungeTopicBrief } from './lounge';
 
+// 0 introductions and 5 closing are rounds. 1 is the first topic (one round for
+// 3+ people), and 1-4 are topic cards for free conversation with no timer.
 export const loungeSessionStages = [
-  { title: '서로 알아가기', prompt: '이 대화에 참여한 이유나, 오늘 대화를 통해 얻고 싶은 것을 편하게 이야기해 주세요.', minutes: 3 },
-  { title: '주제의 첫인상', prompt: '오늘 주제를 떠올리면 가장 먼저 어떤 느낌이 드나요? 아직 경험하지 않았다면 궁금한 점을 나눠 주세요.', minutes: 4 },
-  { title: '경험과 궁금한 점 나누기', prompt: '오늘 주제와 관련해 직접 겪은 일이나 궁금한 점이 있나요? 나누고 싶은 만큼 편하게 이야기해 주세요.', minutes: 7 },
-  { title: '서로 다른 생각 나누기', prompt: '이 주제에서 함께 더 살펴보고 싶은 점이나, 선택할 때 중요하게 생각하는 기준은 무엇인가요?', minutes: 6 },
-  { title: '서로의 경험 이어가기', prompt: '다른 분의 이야기를 듣고 새로 떠오른 생각이나 자신의 경험과 연결되는 부분이 있나요?', minutes: 6 },
-  { title: '오늘의 이야기 마무리', prompt: '오늘 얻은 생각이나 아직 남아 있는 질문을 한마디씩 나눠 주세요.', minutes: 4 },
+  { title: '서로 알아가기', prompt: '불리고 싶은 이름과 오늘 이 이야기에 끌린 이유를 가볍게 한두 마디로 나눠 주세요.' },
+  { title: '주제의 첫인상', prompt: '오늘 주제를 떠올리면 가장 먼저 어떤 느낌이 드나요? 아직 경험하지 않았다면 궁금한 점을 나눠 주세요.' },
+  { title: '경험과 궁금한 점 나누기', prompt: '오늘 주제와 관련해 직접 겪은 일이나 궁금한 점이 있나요? 나누고 싶은 만큼 편하게 이야기해 주세요.' },
+  { title: '서로 다른 생각 나누기', prompt: '이 주제에서 함께 더 살펴보고 싶은 점이나, 선택할 때 중요하게 생각하는 기준은 무엇인가요?' },
+  { title: '서로의 경험 이어가기', prompt: '다른 분의 이야기를 듣고 새로 떠오른 생각이나 자신의 경험과 연결되는 부분이 있나요?' },
+  { title: '오늘의 이야기 마무리', prompt: '오늘 얻은 생각이나 아직 남아 있는 질문을 한마디씩 나눠 주세요.' },
 ] as const;
+/** Stages the AI announces. Topic cards 2-4 are shown on screen only. */
+export const loungeAnnouncedStages: readonly number[] = [0, 1, 5];
 
 type TopicSteps = readonly [
   { title: string; prompt: string }, { title: string; prompt: string },
@@ -78,23 +82,14 @@ export type LoungeSession = {
   spoken_seconds: number; nudged: boolean; announced_turn: string | null; announced_stage?: number;
   between_since: string | null; updated_at: string;
   free_started_at?: string | null;
-  free_ends_at?: string | null; summary_announced_stage?: number; free_warning_announced_stage?: number;
 };
-export type LoungeHostReason = 'opening' | 'silence' | 'followup' | 'requested' | 'round_summary' | 'free_ending';
-export type LoungeSessionAction = 'tick' | 'raise' | 'lower' | 'pass' | 'begin' | 'done' | 'yield' | 'next_stage' | 'activity' | 'open_free';
+export type LoungeHostReason = 'opening' | 'silence' | 'followup' | 'requested';
+export type LoungeSessionAction = 'tick' | 'raise' | 'lower' | 'pass' | 'begin' | 'done' | 'yield' | 'next_stage' | 'wrap_up' | 'activity';
 export const isLoungeFreeStage = (session?: LoungeSession | null) => session?.state === 'free';
-export const loungeStageNeedsOpening = (session: LoungeSession) => session.state !== 'finished' && session.announced_stage !== session.stage;
-export function loungeFreeEndsAt(session: LoungeSession) {
-  if (session.state !== 'free' || !session.free_started_at) return null;
-  if (session.free_ends_at) return Date.parse(session.free_ends_at);
-  const budget = loungeSessionStages[session.stage]?.minutes * 60_000;
-  return Math.max(Date.parse(session.stage_started_at) + budget, Date.parse(session.free_started_at) + 60_000);
-}
-export function loungeSessionHostReason(session: LoungeSession, now = Date.now()): LoungeHostReason | null {
-  if (session.state === 'summarizing') return session.summary_announced_stage === session.stage ? null : 'round_summary';
+export const loungeStageNeedsOpening = (session: LoungeSession) => session.state !== 'finished' && loungeAnnouncedStages.includes(session.stage) && session.announced_stage !== session.stage;
+/** The only scheduled AI speech: a short announcement at the start, first topic and closing. */
+export function loungeSessionHostReason(session: LoungeSession): LoungeHostReason | null {
   if (!['ready', 'free'].includes(session.state)) return null;
-  const end = loungeFreeEndsAt(session);
-  if (end !== null && now >= end - 30_000 && session.free_warning_announced_stage !== session.stage) return 'free_ending';
   return loungeStageNeedsOpening(session) ? 'opening' : null;
 }
 export const loungeTurnSilenceMs = 10_000;

@@ -33,28 +33,20 @@ try {
     const room = {id:'fixture',host_id:'me',host_persona:'ina',topic:'영화 호프',capacity:3,status:'active',guided_session:true,created_at:now,started_at:now,expires_at:new Date(Date.now()+3600000).toISOString(),ai_turns:1,last_ai_at:now};
     let messages=[{id:1,user_id:'me',nickname:'나',kind:'human',text:'저는 주인공의 선택이 마음에 남았어요.'},{id:2,user_id:'peer-a',nickname:'친구',kind:'human',text:'저는 마지막 장면의 분위기가 인상적이었어요.'},{id:3,user_id:null,nickname:'사회자',kind:'host',text:'서로 다른 첫인상을 나눠 주세요.'}];
     let floor, sequence=0, transcriptCallback, fixtureFlush=async()=>{}, disconnects=0;
-    let voiceLost=false, hiddenPeers=[], reconnects=0, heartbeats=0, releaseSummary, releaseSummaryAudio;
-    const hostReasons=[];
+    let voiceLost=false, hiddenPeers=[], reconnects=0, heartbeats=0;
+    const hostReasons=[], helpKinds=[];
     let speechActivity={lastVoiceAt:0,recording:false,voicedMs:0};
     const api = {
       syncLoungeSafety:async()=>({}), reviewLoungeInteraction:async()=>({}), releaseLoungeRestriction:async()=>({}), LoungeApiError: class extends Error {}, joinLounge:async()=>{}, controlLounge:async(_,action)=>{if(action==='heartbeat')heartbeats++;},
       loadLounge:async()=>({room:{...room},session:{...session},members:session.round_order.map(id=>({user_id:id,nickname:id==='me'?'나':id})),messages:[...messages]}),
-      requestLoungeHost:async(_,reason)=>{
-        hostReasons.push(reason);
-        if(reason==='round_summary'){
-          await new Promise(resolve=>{releaseSummary=resolve;});
-          session={...session,summary_announced_stage:session.stage};
-          return {skipped:false,audio:'fixture-summary-audio'};
-        }
-        if(reason==='free_ending'){session={...session,free_warning_announced_stage:session.stage};return {skipped:false};}
-        return {skipped:true};
-      },
+      requestLoungeHost:async(_,reason)=>{hostReasons.push(reason);return {skipped:true};},
+      requestLoungeModerator:async(_,kind)=>{helpKinds.push(kind);},
       controlLoungeSession:async(id,action,turn)=> {
         if(['begin','done','pass','yield'].includes(action)) check(turn===session.turn_id,'Action used a stale turn');
         session={...session,completed:[...session.completed],hand_queue:[...session.hand_queue]};
         if(action==='raise'&&!session.hand_queue.includes('me')) session.hand_queue.push('me');
         if(action==='lower') session.hand_queue=session.hand_queue.filter(id=>id!=='me');
-        if(action==='open_free'&&session.state==='summarizing'&&session.summary_announced_stage===session.stage){session.state='free';session.free_started_at=new Date().toISOString();session.free_ends_at=new Date(Date.now()+240_000).toISOString();}
+        check(action!=='open_free','Retired summary acknowledgement was sent');
         if(action==='begin') session.state='speaking';
         if(['done','pass','yield'].includes(action)) {
           if(session.turn_kind==='basic') session.completed.push(session.speaker_id);
@@ -62,10 +54,15 @@ try {
           session.speaker_id=session.round_order.find(id=>!session.completed.includes(id))||null;
           session.turn_kind='basic';
           if(!session.speaker_id&&session.hand_queue.length&&![1,2,3,4].includes(session.stage)) {session.speaker_id=session.hand_queue.shift();session.turn_kind='extra';}
-          session.state=session.speaker_id?'ready':[1,2,3,4].includes(session.stage)?'summarizing':'between';session.turn_id='turn-'+(++sequence);session.announced_turn=session.turn_id;session.nudged=false;
+          // A completed topic round goes straight to free conversation; there is no AI summary state.
+          session.state=session.speaker_id?'ready':[1,2,3,4].includes(session.stage)?'free':'between';session.turn_id='turn-'+(++sequence);session.announced_turn=session.turn_id;session.nudged=false;
+          if(session.state==='free') session.free_started_at=new Date().toISOString();
         }
-        if(action==='next_stage'&&session.state==='free') session.free_ends_at=new Date(Date.now()+30_000).toISOString();
-        else if(action==='next_stage'||(action==='tick'&&session.state==='free'&&session.free_warning_announced_stage===session.stage&&Date.now()>=Date.parse(session.free_ends_at))) {session.stage++;session.completed=[];session.speaker_id='me';session.state='ready';session.turn_id='turn-'+(++sequence);session.announced_turn=session.turn_id;session.announced_stage=session.stage;}
+        const closingRound=()=>{session.stage=5;session.completed=[];session.hand_queue=[];session.speaker_id='me';session.turn_kind='basic';session.state='ready';session.turn_id='turn-'+(++sequence);session.announced_turn=session.turn_id;session.announced_stage=session.stage;};
+        if(session.state==='free'&&action==='next_stage'){if(session.stage<4){session.stage++;session.turn_id='turn-'+(++sequence);}else closingRound();}
+        else if(session.state==='free'&&action==='wrap_up') closingRound();
+        else if(action==='next_stage') {session.stage++;session.completed=[];session.speaker_id='me';session.state='ready';session.turn_id='turn-'+(++sequence);session.announced_turn=session.turn_id;session.announced_stage=session.stage;}
+        check(session.free_ends_at===undefined,'Free conversation received a deadline');
         return {...session};
       },
     };
@@ -74,7 +71,7 @@ try {
       const [ready,setReady]=React.useState(false),[mic,setMic]=React.useState(false);
       const connect=React.useCallback(async()=>{voiceLost=false;reconnects++;setReady(true);},[]),startMicrophone=React.useCallback(async()=>setMic(true),[]);
       const disconnect=React.useCallback(()=>{disconnects++;},[]),getSpeechActivity=React.useCallback(()=>({...speechActivity}),[]);
-      return {connected:ready&&!voiceLost,connecting:false,audioReady:ready,micOn:mic,connect,enableAudio:()=>{},startMicrophone,playHost:async()=>new Promise(resolve=>{releaseSummaryAudio=resolve;}),stopMicrophone:()=>setMic(false),stopHost:()=>{},flushUtterance:()=>fixtureFlush(),disconnect,getSpeechActivity,speakers:[],aiSpeaking:false,participants:ready&&!voiceLost?session.round_order.filter(id=>!hiddenPeers.includes(id)).map(id=>({id,name:id,muted:true})):[]};
+      return {connected:ready&&!voiceLost,connecting:false,audioReady:ready,micOn:mic,connect,enableAudio:()=>{},startMicrophone,playHost:async()=>{},stopMicrophone:()=>setMic(false),stopHost:()=>{},flushUtterance:()=>fixtureFlush(),disconnect,getSpeechActivity,speakers:[],aiSpeaking:false,participants:ready&&!voiceLost?session.round_order.filter(id=>!hiddenPeers.includes(id)).map(id=>({id,name:id,muted:true})):[]};
     };
     let createdArgs, navigated;
     api.createLounge=async(...args)=>{createdArgs=args;return 'created-fixture';};
@@ -109,8 +106,8 @@ try {
     const container=document.createElement('div');document.body.append(container);const root=createRoot(container);
     root.render(React.createElement(React.StrictMode,null,React.createElement(page.TestRoom,{roomId:'fixture',user:{id:'me',nickname:'나'},onGuestRequest:async()=>{},onLoginRequest:()=>{}})));
     await until(()=>container.querySelector('.lounge-session-panel'));
-    check(container.textContent.includes('참여한 이유'),'Introduction omitted participation reason');
-    check(container.textContent.includes('얻고 싶은'),'Introduction omitted participant goals');
+    check(container.textContent.includes('불리고 싶은 이름'),'Introduction omitted a light self-introduction');
+    check(container.textContent.includes('끌린 이유'),'Introduction omitted why the topic drew people in');
     check(floor.allowed===false,'Waiting microphone was open');
     check(container.querySelector('.lounge-participant-log article.self').textContent.includes('주인공의 선택'),'My speech missing from participant pane');
     check(container.querySelector('.lounge-participant-log').textContent.includes('마지막 장면'),'Other participant speech missing');
@@ -150,19 +147,19 @@ try {
     click('말하기');await until(()=>floor.allowed===true);
     click('이야기 마쳤어요');await until(()=>session.speaker_id==='peer-a'&&floor.allowed===false);
     click('다음 분께');await until(()=>session.speaker_id==='peer-b');await wait(50);
-    click('다음 분께');await until(()=>session.state==='summarizing');
-    await until(()=>container.querySelector('.lounge-session-progress').textContent.includes('사회자 정리'));
-    check(floor?.allowed===false&&!container.querySelector('.lounge-seat.has-floor'),'Summary opened a microphone before the moderator finished');
-    await until(()=>releaseSummary);releaseSummary();await until(()=>releaseSummaryAudio);
-    await wait(250);check(session.state==='summarizing'&&floor?.allowed===false,'Summary text opened microphones while its audio was still playing');
-    releaseSummaryAudio();await until(()=>session.state==='free');
+    click('다음 분께');await until(()=>session.state==='free');
     await until(()=>floor===undefined);
-    check(hostReasons.filter(reason=>reason==='round_summary').length===1,'Moderator summary repeated');
+    check(!hostReasons.some(reason=>['round_summary','free_ending','followup'].includes(reason)),'AI recapped or followed up between people');
     check(!container.querySelector('[aria-label="이야기 마쳤어요"]'),'Free conversation still required an end-speaking button');
     check(![...container.querySelectorAll('.lounge-session-actions button')].some(button=>button.textContent==='말하기'),'Free conversation still reserved a speaking turn');
     check(container.textContent.includes('바로 질문하거나 답할 수 있어요'),'Free conversation guide missing');
-    check([...container.querySelectorAll('button')].some(button=>button.textContent.includes('사회자 도움')),'Moderator request button missing');
-    check(container.querySelector('.lounge-session-progress').textContent.includes('자유 대화'),'Free phase was not identified');
+    check(container.querySelector('.lounge-session-progress').textContent.includes('자유 대화 · 이야기 카드 1/4'),'Free phase or topic card was not identified');
+    const helpButton=[...container.querySelectorAll('.lounge-ask-button')].find(button=>button.textContent.includes('AI 도움'));
+    check(helpButton&&helpButton.getAttribute('aria-expanded')==='false','AI help button missing');
+    helpButton.click();await until(()=>container.querySelector('.lounge-help-menu'));
+    check([...container.querySelectorAll('.lounge-help-menu button')].map(button=>button.querySelector('strong').textContent).join('|')==='말문 열어줘|질문 하나|다른 화제|지금까지 정리','Help kinds missing');
+    [...container.querySelectorAll('.lounge-help-menu button')].find(button=>button.textContent.includes('질문 하나')).click();
+    await until(()=>helpKinds.includes('question')&&!container.querySelector('.lounge-help-menu'));
     hiddenPeers=['peer-a'];voiceLost=true;
     await until(()=>container.querySelector('.lounge-connect-button'));
     check(container.querySelectorAll('.lounge-seat.occupied').length===3,'Voice suspension removed registered participant profiles');
@@ -172,12 +169,12 @@ try {
     await until(()=>!container.querySelector('.lounge-connect-button'));
     check(container.querySelectorAll('.lounge-seat.occupied').length===3,'Remote background participant vanished after local recovery');
     hiddenPeers=[];
-    click('다음 이야기로');await until(()=>container.querySelector('.lounge-session-progress').textContent.includes('자유 대화 마무리'));
-    check(session.stage===1&&session.state==='free','Manual next topic skipped the ending announcement');
-    for(let i=0;i<600&&!hostReasons.includes('free_ending');i++)await wait(25);
-    check(hostReasons.filter(reason=>reason==='free_ending').length===1,'Ending announcement did not occur exactly once');
-    session.free_ends_at=new Date(Date.now()-1000).toISOString();await until(()=>session.stage===2&&floor?.allowed===false);
-    check(container.querySelector('.lounge-session-progress').textContent.includes('순서 발언'),'Next topic left all microphones open');
+    const openings=hostReasons.filter(reason=>reason==='opening').length;
+    click('다음 이야기 카드');await until(()=>container.querySelector('.lounge-session-progress').textContent.includes('이야기 카드 2/4'));
+    check(session.stage===2&&session.state==='free'&&floor===undefined,'A new topic card reserved turns or closed microphones');
+    await wait(700);check(hostReasons.filter(reason=>reason==='opening').length===openings,'The AI announced a topic card');
+    click('마무리하기');await until(()=>session.stage===5&&floor?.allowed===false);
+    check(container.querySelector('.lounge-session-progress').textContent.includes('순서 발언'),'Closing did not give everyone a final turn');
     root.unmount();container.remove();
 
     // The room timer must keep an unstarted turn, then flush its speech and advance once.
@@ -503,5 +500,5 @@ try {
   })()` });
   assert.equal(response.exceptionDetails, undefined, JSON.stringify(response.exceptionDetails));
   assert.deepEqual(response.result.value, {ui:true,microphones:true,lateCapture:true});
-  console.log('PASS: background profile retention, foreground voice recovery, microphone intent, summary-before-free, ending announcement, ten-second automatic finish, immediate transcripts, moderation, guided turns and TTS recovery/cancellation.');
+  console.log('PASS: background profile retention, foreground voice recovery, microphone intent, round-then-free without AI summaries, screen-only topic cards, host-led closing round, typed AI help requests, ten-second automatic finish, immediate transcripts, moderation, guided turns and TTS recovery/cancellation.');
 } finally {socket.close();}

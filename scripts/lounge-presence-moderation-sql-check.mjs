@@ -17,7 +17,8 @@ try {
   await db.exec(`CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY); CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     GRANT USAGE ON SCHEMA auth TO authenticated,anon,service_role;`);
-  for(const file of (await readdir('supabase/migrations')).filter(file=>file.includes('voice_lounge')).sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
+  // Validates the 2026-10-05 flow as released; later migrations have their own checks.
+  for(const file of (await readdir('supabase/migrations')).filter(file=>file.includes('voice_lounge')&&file<='20261005000000_voice_lounge_presence_and_moderation.sql').sort()) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
   for(const id of ids) await db.query('insert into auth.users values($1)',[id]);
   await as(ids[0]); room=(await one("select create_voice_lounge('ina','서로의 경험과 기준',3,'민수','river',false) as id")).id;
   for(const [i,id] of ids.entries()) if(i&&i<3){await as(id);await db.query('select join_voice_lounge($1,$2)',[room,['민수','소연','지우'][i]]);}

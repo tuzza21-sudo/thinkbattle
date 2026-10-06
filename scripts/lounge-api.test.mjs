@@ -115,7 +115,9 @@ test('only the first group host turn permits a pass reminder and research announ
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body);
       assert.equal(JSON.parse(body.input).first_host_turn, aiTurns === 1);
-      assert.match(body.instructions, aiTurns === 1 ? /이번 첫 인사에서만/ : /이번 발언에서는 패스 가능.*반복하지 않는다/);
+      assert.match(body.instructions, aiTurns === 1 ? /이번 첫 인사에서만/ : /첫 인사는 이미 끝났다\. 패스 가능.*반복하지 않는다/);
+      assert.match(body.instructions, /2~3문장, 180자 이내/);
+      assert.doesNotMatch(body.instructions, /4~6문장|round_summary|free_ending/);
       assert.match(body.instructions, /진행 멘트를 말하지 않는다/);
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '기억에 남는 대목을 나눠요.', memory: '' }) }] }] });
     }
@@ -137,7 +139,11 @@ test('solo starts and continues a brief conversation without group introductions
         const payload = JSON.parse(init.body);
         assert.equal(JSON.parse(payload.input).mode, 'solo');
         assert.deepEqual(JSON.parse(payload.input).topic_brief, topicBrief);
-        assert.ok(payload.instructions.includes(host.instruction));
+        assert.ok(payload.instructions.includes(host.companion), 'solo uses the conversation-partner style');
+        assert.ok(!payload.instructions.includes(host.instruction), 'moderator techniques do not turn a conversation into an interview');
+        assert.equal(JSON.parse(payload.input).request_kind, reason === 'requested' ? 'topic' : undefined, 'the solo button asks for a new topic');
+        assert.match(payload.instructions, /request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다/);
+        assert.doesNotMatch(payload.instructions, /AI 도우미/);
         assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
         assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
         assert.match(payload.instructions, /가벼운 인사와 방 소개의 관심사에 맞는 질문 하나/);
@@ -444,7 +450,8 @@ test('guided introductions use the server-selected participant and participation
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body), context = JSON.parse(body.input);
       assert.equal(context.session.target_user_id, 'member-2'); assert.equal(context.session.target_name, '지우');
-      assert.match(context.session.question, /참여한 이유/); assert.match(context.session.question, /얻고 싶은/);
+      assert.match(context.session.question, /불리고 싶은 이름/); assert.match(context.session.question, /끌린 이유/);
+      assert.match(body.instructions, /reason=opening이고 stage_index=0이면 첫 인사다/);
       assert.match(body.instructions, /임의로 다른 사람을 지목/);
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '지우님, 오늘 대화에서 얻고 싶은 것은 무엇인가요? 패스해도 좋아요.', memory: '' }) }] }] });
     }
@@ -665,7 +672,7 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
         if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
         if (url.endsWith('/responses')) {
           const body = JSON.parse(init.body);
-          assert.ok(body.instructions.includes(host.instruction), 'selected personality reaches the conversation model');
+          assert.ok(body.instructions.includes(host.companion), 'selected personality reaches the conversation model');
           assert.doesNotMatch(body.instructions, /유재석|김이나/);
           return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: spoken, memory: '' }) }] }] });
         }
@@ -675,7 +682,7 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
           assert.equal(body.voice, host.voice);
           assert.equal(body.speed, host.speechSpeed);
           assert.ok(body.instructions.includes(host.speechInstruction), 'voice delivery uses speech-specific directions');
-          assert.ok(!body.instructions.includes(host.instruction), 'conversation examples are not speech performance instructions');
+          assert.ok(!body.instructions.includes(host.instruction) && !body.instructions.includes(host.companion), 'conversation examples are not speech performance instructions');
           assert.equal(body.input, spoken);
           assert.equal(body.response_format, streaming ? 'pcm' : 'mp3');
           return new Response(new Uint8Array([0, 128, 255, 127]));
@@ -741,8 +748,8 @@ test('a solo host turn uses one-to-one instructions and returns playable speech'
     assert.equal((await response.json()).audio, 'AQID');
   });
 });
-for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
-  test(`host uses ${mode} for ${count} active memberships in a six-seat room even when browsers are suspended`, async () => {
+for (const [count, mode] of [[1, 'pair'], [2, 'pair'], [3, 'group']]) {
+  test(`a six-seat room keeps the light ${mode} assistant role with ${count} active memberships, even when browsers are suspended`, async () => {
     let modelCalls = 0;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -759,15 +766,17 @@ for (const [count, mode] of [[1, 'solo'], [2, 'pair'], [3, 'group']]) {
         assert.equal(context.participant_count, count);
         assert.equal(context.members.length, count);
         assert.ok(context.members.every(member => member.user_id.startsWith('human-')));
-        const roles = ['역할은 관심 있는 대화 상대다', '역할은 두 사람의 연결자다', '역할은 참여와 관점을 연결하는 그룹 사회자다'];
-        roles.forEach((role, index) => assert.equal(payload.instructions.includes(role), index === count - 1));
+        // A group room never turns into an AI conversation because others are briefly away.
+        assert.ok(payload.instructions.includes('사람끼리 이야기하는 방의 AI 도우미'));
+        assert.ok(!payload.instructions.includes('대화 상대다. 진행자나 인터뷰어가 아니다'));
+        assert.match(payload.instructions, new RegExp(`현재 사람 ${count}명이 함께 있다`));
         return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 생각이 남았나요?', memory: '' }) }] }] });
       }
       if (url.includes('finish_voice_lounge_host')) return result(true);
       if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2, 3]));
       throw new Error('Unexpected fetch');
     }, async () => {
-      assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200);
+      assert.equal((await handler(request({ action: 'host', roomId, reason: 'requested' }))).status, 200);
       assert.equal(modelCalls, 1, 'role selection needs no additional inference');
     });
   });
@@ -866,19 +875,29 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
 
 test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
   const now=Date.now();
-  const room={status:'active',capacity:3,ai_turns:2,last_ai_at:new Date(now-100_000).toISOString(),started_at:new Date(now-120_000).toISOString()};
+  const room={status:'active',capacity:3,ai_turns:2,last_ai_at:new Date(now-130_000).toISOString(),started_at:new Date(now-200_000).toISOString()};
   const messages=[{id:1,kind:'host',created_at:room.last_ai_at},{id:2,kind:'human',text:'소연님, 어떻게 생각해요?',created_at:new Date(now-5000).toISOString()}];
-  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-31_000),null);
-  assert.equal(lounge.nextLoungeHostReason(room,[{...messages[0]},{...messages[1],created_at:new Date(now-20_000).toISOString()}],now,now-20_000,now-31_000),null);
-  const quiet=[messages[0],{...messages[1],created_at:new Date(now-31_000).toISOString()}];
-  assert.equal(lounge.nextLoungeHostReason(room,quiet,now,now-31_000,now-31_000),'silence');
+  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-31_000),null,'a question to another person is for that person');
+  const quietFor=ms=>[messages[0],{...messages[1],created_at:new Date(now-ms).toISOString()}];
+  assert.equal(lounge.nextLoungeHostReason(room,quietFor(31_000),now,now-31_000,now-31_000),null,'thirty seconds is still thinking time');
+  assert.equal(lounge.nextLoungeHostReason(room,quietFor(41_000),now,now-41_000,now-41_000),'silence');
+  assert.equal(lounge.nextLoungeHostReason({...room,last_ai_at:new Date(now-90_000).toISOString()},quietFor(41_000),now,now-41_000,now-41_000),null,'two minutes between silence prompts');
+  assert.equal(lounge.nextLoungeHostReason(room,[{...messages[1],id:1,created_at:new Date(now-60_000).toISOString()},{id:2,kind:'host',created_at:room.last_ai_at}],now,now-60_000,now-41_000),null,'never twice into the same silence');
   assert.equal(lounge.nextLoungeHostReason({...room,moderator_requested_at:new Date(now-2000).toISOString()},messages,now,now-5000,now-31_000),'requested');
-  assert.equal(lounge.nextLoungeHostReason({...room,moderator_requested_at:new Date(now-2000).toISOString()},messages,now,now-500,now-31_000),null);
-  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-6000,now-4000,now-1200,1),'followup','a group room with just one present human becomes an AI conversation');
+  assert.equal(lounge.nextLoungeHostReason({...room,moderator_requested_at:new Date(now-2000).toISOString()},messages,now,now-500,now-31_000),null,'a request waits for the speaker to finish');
+  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-5000,now-11_000,now-4000,now-1200),null,'a group room with one present human still never replies to each utterance');
+  assert.equal(lounge.loungeHostCooldownMs(3),10_000);
   assert.equal(sessionLib.loungeStageNeedsOpening({stage:0,announced_stage:0,turn_id:'next-person'}),false);
   assert.equal(sessionLib.loungeStageNeedsOpening({stage:1,announced_stage:0}),true);
-  assert.equal(sessionLib.loungeStageNeedsOpening({stage:3,announced_stage:1}),true);
+  assert.equal(sessionLib.loungeStageNeedsOpening({stage:3,announced_stage:1}),false,'topic cards are not announced by the AI');
   assert.equal(sessionLib.loungeStageNeedsOpening({stage:5,announced_stage:1}),true);
+});
+
+test('one-to-one never prompts on its own while the person is quiet', () => {
+  const now=Date.now();
+  const room={status:'active',capacity:1,ai_turns:3,last_ai_at:new Date(now-300_000).toISOString(),started_at:new Date(now-400_000).toISOString()};
+  const messages=[{id:1,kind:'human',created_at:new Date(now-310_000).toISOString()},{id:2,kind:'host',created_at:room.last_ai_at}];
+  assert.equal(lounge.nextLoungeHostReason(room,messages,now,now-300_000,now-300_000,now-300_000,now-300_000),null);
 });
 
 test('free discussion admits a requested AI response and keeps every-turn silence in its prompt', async () => {
@@ -896,51 +915,69 @@ test('free discussion admits a requested AI response and keeps every-turn silenc
   },async()=>assert.equal((await handler(request({action:'host',roomId,reason:'requested'}))).status,200));
 });
 
-test('guided moderator summarizes the entire round and announces its ending with the next topic', async () => {
-  for (const reason of ['round_summary','free_ending']) {
-    let wholeRoundRead=false;
-    await run(async(url,init)=>{
-      if(url.includes('/auth/'))return result({id:'host'});
-      if(url.includes('claim_voice_lounge_host')){assert.equal(JSON.parse(init.body).p_reason,reason);return result('ticket');}
-      if(url.includes('voice_lounge_rooms?'))return result([{topic:'책 이야기',host_persona:'ina',memory:'',capacity:3,guided_session:true,topic_brief:topicBrief}]);
-      if(url.includes('voice_lounge_sessions?'))return result([{stage:2,state:reason==='round_summary'?'summarizing':'free',turn_kind:'basic',speaker_id:null,stage_started_at:'2026-10-05T00:00:00Z',free_ends_at:'2026-10-05T00:07:00Z'}]);
-      if(url.includes('voice_lounge_session_turns?'))return result([{id:'round-a'},{id:'round-b'}]);
-      if(url.includes('voice_lounge_messages?')) {
-        if(url.includes('kind=eq.human')) {
-          wholeRoundRead=true;assert.match(url,/created_at=gte/);assert.match(url,/order=id.asc/);
-          return result([{user_id:'a',nickname:'민수',text:'앞부분에서 말한 책임에 관한 의견.',turn_id:'round-a'},{user_id:'b',nickname:'소연',text:'자유를 선택할 권리가 중요해요.',turn_id:'round-b'},{user_id:'a',nickname:'민수',text:'그 선택이 타인에게 미친 영향도 봐야 해요.'},{user_id:'c',nickname:'지우',text:'전 단계에서 늦게 도착한 전사.',turn_id:'previous-round'}]);
-        }
-        return result([{nickname:'소연',kind:'human',text:'가장 최근에 나온 짧은 의견.'}]);
-      }
-      if(url.includes('voice_lounge_members?'))return result([{user_id:'a',nickname:'민수',last_seen:'2026-10-04T00:00:00Z'},{user_id:'b',nickname:'소연',last_seen:''},{user_id:'c',nickname:'지우',last_seen:''}]);
-      if(url.endsWith('/responses')) {
-        const body=JSON.parse(init.body),context=JSON.parse(body.input);
-        assert.equal(context.reason,reason);assert.equal(context.session.next_stage,'인물의 선택과 나의 해석');
-        assert.match(body.instructions,/확인된 배경과 정확한 발언 구분/);
-        if(reason==='round_summary') {
-          assert.ok(wholeRoundRead);assert.equal(context.session.phase,'summary');assert.equal(context.round_speeches.length,2);
-          assert.match(context.round_speeches[0].text,/앞부분에서 말한 책임/);assert.match(context.round_speeches[0].text,/타인에게 미친 영향/);
-          assert.equal(context.round_speeches[0].nickname,'민수');assert.equal(context.round_speeches[1].nickname,'소연');
-          assert.match(body.instructions,/말하지 않은 사람의 의견을 만들거나/);assert.match(body.instructions,/서로 다른 두 발언자를 연결하는 질문 하나/);
-        } else {assert.equal(wholeRoundRead,false);assert.match(body.instructions,/곧 자유 대화를 마치고 session.next_stage/);}
-        return result({output:[{content:[{type:'output_text',text:JSON.stringify({text:'두 관점을 이어서 자유롭게 나눠 주세요.',memory:''})}]}]});
-      }
-      if(url.includes('finish_voice_lounge_host'))return result(true);
-      if(url.endsWith('/audio/speech'))return new Response(new Uint8Array([0,32]));
-      throw new Error('Unexpected fetch');
-    },async()=>assert.equal((await handler(request({action:'host',roomId,reason}))).status,200));
+test('retired AI summaries and timed ending notices are rejected before any paid or database call', async () => {
+  for (const reason of ['round_summary', 'free_ending']) {
+    let calls = 0;
+    await run(async url => { if (!url.includes('/auth/')) calls++; return result({ id: 'host' }); }, async () => {
+      assert.equal((await handler(request({ action: 'host', roomId, reason }))).status, 400);
+    });
+    assert.equal(calls, 0);
   }
+  let calls = 0;
+  await run(async url => { if (!url.includes('/auth/')) calls++; return result({ id: 'host' }); }, async () => {
+    assert.equal((await handler(request({ action: 'host', roomId, reason: 'requested', requestKind: 'lecture' }))).status, 400);
+  });
+  assert.equal(calls, 0, 'an unknown help kind never claims a turn');
 });
 
-test('guided host scheduling prioritizes one summary and a thirty-second ending notice',()=>{
-  const now=Date.now(), session={stage:2,state:'free',announced_stage:2,stage_started_at:new Date(now-60_000).toISOString(),free_started_at:new Date(now-10_000).toISOString(),free_ends_at:new Date(now+30_000).toISOString(),free_warning_announced_stage:1};
-  assert.equal(sessionLib.loungeSessionHostReason(session,now-1),null);
-  assert.equal(sessionLib.loungeSessionHostReason(session,now),'free_ending');
-  assert.equal(sessionLib.loungeSessionHostReason({...session,free_warning_announced_stage:2},now),null);
-  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'summarizing'},now),'round_summary');
-  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'speaking'},now),null);
-  assert.equal(sessionLib.loungeSessionHostReason({...session,state:'ready',announced_stage:1},now),'opening');
-  assert.equal(sessionLib.loungeFreeEndsAt({...session,free_ends_at:null}),Date.parse(session.stage_started_at)+420_000);
+test('group help follows the requested kind and each scheduled announcement stays short', async () => {
+  const cases = [
+    { reason: 'requested', kind: undefined, stored: 'summary', expect: 'summary', session: { stage: 2, state: 'free' } },
+    { reason: 'requested', kind: 'question', stored: 'spark', expect: 'question', session: { stage: 3, state: 'free' } },
+    { reason: 'requested', kind: undefined, stored: 'direct', expect: 'direct', session: { stage: 2, state: 'free' } },
+    { reason: 'opening', session: { stage: 1, state: 'ready', speaker_id: 'b' }, rule: /stage_index=1이면 자기소개에서 이어지는 첫 이야기다. 1~2문장, 150자 이내/ },
+    { reason: 'opening', session: { stage: 5, state: 'ready', speaker_id: 'a' }, rule: /stage_index=5이면 마무리다. 1~2문장, 120자 이내/ },
+    { reason: 'silence', session: { stage: 2, state: 'free' }, rule: /reason=silence이면 사람들이 대화를 이어 가다 길게 멈춘 상황이다. 재촉하지 않는 한 문장, 100자 이내/ },
+  ];
+  for (const item of cases) await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_reason, item.reason); return result('ticket'); }
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /moderator_request_kind/); return result([{ topic: '책 이야기', host_persona: 'sunny', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
+    if (url.includes('voice_lounge_sessions?')) return result([{ turn_kind: 'basic', speaker_id: null, ...item.session }]);
+    if (url.includes('voice_lounge_messages?')) { assert.doesNotMatch(url, /kind=eq.human/, 'no whole-round summary read'); return result([{ nickname: '소연', kind: 'human', text: '저는 결말이 좋았어요.' }]); }
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'a', nickname: '민수', last_seen: '' }, { user_id: 'b', nickname: '소연', last_seen: '' }, { user_id: 'c', nickname: '지우', last_seen: '' }]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body), context = JSON.parse(body.input);
+      assert.equal(context.mode, 'group'); assert.equal(context.request_kind, item.expect);
+      assert.equal(context.round_speeches, undefined); assert.equal(context.session.next_stage, undefined);
+      assert.ok(['round', 'free'].includes(context.session.phase));
+      assert.match(body.instructions, /사람끼리 대화하는 방에서는 매 발언에 답하지 않는다/);
+      assert.match(body.instructions, /질문은 많아야 하나다/);
+      assert.match(body.instructions, /조용한 사람에게 답을 요구하지 않는다/);
+      assert.match(body.instructions, /- summary: 지금까지 나온 서로 다른 생각 2~3가지를 실제 발언만으로 짧게 묶는다/);
+      assert.match(body.instructions, /- direct: 누군가 AI를 직접 불러 물었다/);
+      assert.doesNotMatch(body.instructions, /round_summary|free_ending|4~9문장|4~6문장/);
+      if (item.rule) assert.match(body.instructions, item.rule);
+      assert.ok(body.max_output_tokens <= 700);
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '다른 장면도 떠오르세요?', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+    throw new Error('Unexpected fetch');
+  }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: item.reason, ...(item.kind ? { requestKind: item.kind } : {}) }))).status, 200));
+});
+
+test('guided scheduling announces only the greeting, the first topic and the closing', () => {
+  const session = { stage: 2, state: 'free', announced_stage: 1, stage_started_at: new Date(Date.now() - 3_600_000).toISOString() };
+  assert.equal(sessionLib.loungeSessionHostReason(session), null, 'topic cards and time never trigger AI speech');
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 1, state: 'free', announced_stage: 0 }), 'opening');
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 1, announced_stage: 1 }), null);
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 0, state: 'ready', announced_stage: -1 }), 'opening');
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 5, state: 'ready' }), 'opening');
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 5, state: 'speaking' }), null);
+  assert.equal(sessionLib.loungeSessionHostReason({ ...session, state: 'summarizing' }), null);
+  assert.deepEqual([...sessionLib.loungeAnnouncedStages], [0, 1, 5]);
+  assert.deepEqual(lounge.loungeHelpOptions.map(option => option.kind), ['spark', 'question', 'topic', 'summary']);
 });
 
 test('moderator context follows the stored category instead of a shared film discussion outline', async () => {

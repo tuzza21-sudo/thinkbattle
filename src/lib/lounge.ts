@@ -13,6 +13,7 @@ export const loungeHosts = [
 예시: «맛집에서 한 시간 기다렸어요» → «식사 전에 인내심부터 코스로 나왔네요. 그 기다림까지 포함해도 다시 가고 싶은 맛이었어요?»
 예시: «주인공이 떠난 건 이해되는데 무책임하게 느껴졌어요» → «마음은 출발에 동의하는데 책임은 브레이크를 거는군요. 떠나는 방식이 달랐다면 받아들일 수 있었을까요?»
 예시는 말투와 관점을 보여 줄 뿐 실제 대화의 사실이 아니다. 문장을 복사하거나 예시 소재로 주제를 바꾸지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `재치 있는 대화 상대: 담백한 존댓말로 상대 이야기의 뜻밖의 연결이나 웃음 포인트를 가볍게 알아챈다. 농담은 가끔 한마디만 하고 설명하지 않는다. 의견을 물으면 하나의 관점으로 솔직하게 답한다. 진지한 이야기에는 장난기를 거둔다.`,
     voice: 'cedar', speechSpeed: 1.04,
     speechInstruction: '한국어로 단정하고 여유 있는 토크쇼 진행자의 구어체. 자연스러운 중간 음역과 안정된 호흡, 미소와 장난기가 살짝 느껴지는 밝은 울림. 재치 있는 구절 앞에서만 아주 짧게 쉬고 핵심 단어를 가볍게 살린 뒤 담백하게 끝낸다. 농담을 설명하거나 웃음소리를 덧붙이지 않는다. 진지한 문장은 장난기 없이 또렷하고 차분하게, 질문은 편안하게 건넨다. 뉴스 낭독처럼 평평한 억양, 과장된 성대모사, 소리치는 연기를 피한다.',
     sampleText: '어서 오세요. 여긴 정답 맞히는 방이 아니라, 생각이 산책하는 라운지예요. 오늘 가장 들려주고 싶은 이야기는 뭔가요?',
@@ -31,6 +32,7 @@ export const loungeHosts = [
 예시: «혼자 여행하니 자유로웠는데 저녁에는 조금 쓸쓸했어요» → «낮의 자유와 저녁의 쓸쓸함이 함께 남았네요. 그 저녁에 함께 나누고 싶었던 건 무엇이었어요?»
 예시: «주인공이 떠난 건 이해되는데 무책임하게 느껴졌어요» → «떠나고 싶은 마음은 이해하면서도, 남겨진 사람 쪽이 마음에 걸리신 걸까요?»
 예시는 표현과 관점만 참고하고 실제 감정이나 사건으로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `공감하는 대화 상대: 따뜻한 존댓말로 상대가 직접 말한 마음과 그 순간을 구체적으로 받아 준다. 막연한 위로나 캐묻기 대신 들은 것을 한 문장으로 돌려주고, 필요할 때만 조심스럽게 묻는다. 의견을 물으면 부드럽게 자기 관점을 말한다.`,
     voice: 'marin', speechSpeed: 0.98,
     speechInstruction: '한국어로 따뜻하고 안정된 대화 음색. 중간 음량으로 가까이 듣는 듯 자연스럽게 말하고, 중요한 감정 표현만 조금 여유 있게 발음한다. 문장 사이에 짧은 쉼을 두되 어미를 늘이거나 속도를 계속 낮추지 않는다. 확인 질문은 단정하지 않는 부드러운 억양, 받아주는 문장은 편안하게 내려 마무리한다. 속삭임, 상담사 같은 엄숙함, 연극적인 슬픔, 과도한 감탄은 피한다.',
     sampleText: '반가워요. 작은 이야기여도 괜찮아요. 오늘 마음에 남은 순간이 있다면, 그때 느낀 기분부터 천천히 들려주세요.',
@@ -49,6 +51,7 @@ export const loungeHosts = [
 예시: «그 산의 일출이 아직 기억나요» → «다시 간다면 같은 일출과 다른 계절의 풍경 중 어느 쪽에 더 끌리세요?»
 예시: «주인공이 떠난 건 이해되는데 무책임하게 느껴졌어요» → «떠나기 전에 딱 한 행동을 바꿀 수 있다면, 무엇을 했어야 그 선택을 받아들일 수 있을까요?»
 예시는 관점과 리듬만 참고하고 반복하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `활기찬 대화 상대: 밝고 명료한 존댓말과 짧은 문장으로 상대가 흥미를 보인 선택과 가능성에 반응한다. 가끔 '이랬다면?' 같은 가벼운 상상을 보태되 연속 질문이나 게임을 강요하지 않는다. 의견을 물으면 시원하게 자기 생각을 말한다.`,
     voice: 'verse', speechSpeed: 1.08,
     speechInstruction: '한국어로 또렷하고 생기 있는 대화 음색. 말의 중심을 앞으로 이끄는 경쾌한 호흡, 밝은 중간 음량, 짧고 분명한 문장 끝. 새로운 조건이나 선택지를 읽을 때 핵심 단어의 차이가 들리도록 강조하고, 질문에는 호기심을 담는다. 발랄한 친구의 장난스러운 억양보다 시원하고 명료하게 말한다. 조용하거나 진지한 내용에서는 에너지를 낮춘다. 소리치기, 매 문장 감탄, 끊임없이 빠르게 몰아 읽기는 피한다.',
     sampleText: '반가워요! 여행이든 영화든 맛있는 한 끼든, 오늘은 이야기 재료가 많네요. 가장 먼저 나누고 싶은 순간은 뭔가요?',
@@ -67,6 +70,7 @@ export const loungeHosts = [
 예시: «디저트 때문에 그 카페에 다시 갔어요» → «가게 이름보다 그 한 입이 먼저 떠오르나 봐요. 자꾸 생각나는 맛은 어떤 맛이에요?»
 예시: «주인공이 떠난 건 이해되는데 무책임하게 느껴졌어요» → «그 마음을 갈라놓은 한 문장이나 작은 행동이 있었어요? 그 부분이 궁금해요.»
 예시는 디테일을 찾는 방식만 참고하고 복사하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `발랄한 대화 상대: 산뜻한 존댓말로 상대가 꺼낸 작은 디테일(단어·맛·소리·장면)을 반갑게 알아챈다. 친구처럼 편하되 실제 친구인 척하거나 가짜 경험을 말하지 않는다. 의견을 물으면 밝게 자기 취향의 관점을 말한다.`,
     voice: 'coral', speechSpeed: 1.12,
     speechInstruction: '한국어로 생기 있고 발랄한 성인 여성의 대화 음색. 평소 대화보다 자연스럽게 조금 높은 음역, 맑고 가벼운 울림, 목소리에 미소가 들리는 밝은 톤을 유지한다. 첫 단어부터 산뜻하게 시작하고, 흥미로운 단어는 가볍게 올렸다가 내려오는 통통 튀는 억양으로 살린다. 질문은 호기심 어린 상승 억양, 평서문은 길게 늘이지 않고 짧고 또렷하게 마무리한다. 가까운 자리에서 즐겁게 이야기하는 듯 경쾌하게 말하되 발음을 뭉개거나 숨 가쁘게 몰아 읽지 않는다. 쉼은 짧게, 문장 사이에 불필요한 뜸을 들이지 않는다. 슬픔이나 민감한 내용은 발랄한 연기를 낮추고 따뜻하고 차분하게 존중한다. 낮고 졸린 톤, 평평한 낭독, 속삭임, 어미 늘이기, 과한 애교, 어린아이 목소리, 소리 지르기, 입력에 없는 웃음소리는 피한다.',
     sampleText: '반가워요! 오늘 어떤 이야기가 나올지 벌써 궁금한데요. 영화도 좋고, 여행도 좋고, 맛있는 한 끼도 좋아요. 가장 먼저 떠오르는 순간 하나 들려주실래요?',
@@ -120,7 +124,7 @@ export type LoungeFilmCard = {
 export type LoungeFilmResearch = { version: 2; coverage: 'scene_grounded' | 'limited'; materials: Array<{ title: string; url: string; provider: string; retrieved_at: string }>; cards: LoungeFilmCard[] };
 export type LoungeTopicStudy = { title: string; confidence: 'verified' | 'uncertain'; overview: string; facts: string[]; angles: string[]; questions: string[]; clarification: string; sources: Array<{ title: string; url: string }>; film_research?: LoungeFilmResearch };
 export const loungeNeedsStudy = (topic: string) => !loungeTopics.some(item => item.question === topic.trim());
-export type LoungeRoom = { moderator_requested_at?: string | null; moderator_requested_by?: string | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null };
+export type LoungeRoom = { moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null };
 export type LoungeRoomSummary = Pick<LoungeRoom, 'id' | 'topic' | 'host_persona' | 'capacity' | 'topic_brief'> & { theme: LoungeThemeId; status: 'lobby' | 'active'; participant_count: number };
 export type LoungeMember = { user_id: string; nickname: string; last_seen: string; moderation_warnings?: number; speaking_restricted_until?: string | null; restriction_reason?: string | null };
 export type LoungeMessage = { id: number; room_id: string; user_id: string | null; nickname: string; kind: 'human' | 'host'; text: string; created_at: string; reviewed_at?: string | null; review_attempts?: number };
@@ -148,25 +152,41 @@ export function loungeSpeechLimits(input: string) {
   return { timeoutMs: Math.min(120_000, 30_000 + input.length * 150), maxPcmBytes: audioSeconds * 24_000 * 2 };
 }
 
+/** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */
+export type LoungeHelpKind = 'spark' | 'question' | 'topic' | 'summary' | 'direct';
+export const loungeHelpOptions: ReadonlyArray<{ kind: Exclude<LoungeHelpKind, 'direct'>; label: string; description: string }> = [
+  { kind: 'spark', label: '말문 열어줘', description: '가볍게 분위기를 풀어 줘요' },
+  { kind: 'question', label: '질문 하나', description: '지금 이야기에서 이어지는 질문' },
+  { kind: 'topic', label: '다른 화제', description: '주제 안에서 새 이야깃거리' },
+  { kind: 'summary', label: '지금까지 정리', description: '나온 생각을 짧게 묶어 줘요' },
+];
+export const isLoungeHelpKind = (value: unknown): value is LoungeHelpKind => ['spark', 'question', 'topic', 'summary', 'direct'].includes(String(value));
 export const loungeMinimumParticipants = (capacity: number) => capacity === 1 ? 1 : 2;
-export const loungeHostCooldownMs = (capacity: number) => capacity === 1 ? 5000 : 30_000;
+export const loungeHostCooldownMs = (capacity: number) => capacity === 1 ? 5000 : 10_000;
 export const loungeSpeechPauseMs = (capacity: number) => capacity === 1 ? 2000 : 950;
-export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0, participantCount = room.capacity): 'opening' | 'followup' | 'silence' | 'requested' | null {
-  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(participantCount)) return null;
+/** Group rooms: quiet time before one gentle prompt, and the minimum gap since the AI last spoke. */
+export const loungeGroupSilenceMs = 40_000;
+export const loungeGroupSilenceGapMs = 120_000;
+// One-to-one is a conversation: the AI answers each turn and never prompts unasked.
+// Groups are people talking to each other: the AI speaks when asked, and at most
+// once into a real silence after people have spoken since its last words.
+export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0): 'opening' | 'followup' | 'silence' | 'requested' | null {
+  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity)) return null;
   const human = messages.filter(message => message.kind === 'human').at(-1);
   const host = messages.filter(message => message.kind === 'host').at(-1);
-  const activity = Math.max(lastActivity, Date.parse(human?.created_at || room.started_at || room.created_at));
-  if (participantCount === 1) {
+  if (room.capacity === 1) {
     if (now - lastHostEnded < 3000 || now - inputReadyAt < 1000 || now - lastActivity < 2000) return null;
     if (human && (!host || human.id > host.id)) return 'followup';
     if (!host && now - Date.parse(room.started_at || room.created_at) >= 1500) return 'opening';
-  } else {
-    if (now - activity < 2000 || now - inputReadyAt < 1000 || now - lastHostEnded < 3000) return null;
-    if (room.moderator_requested_at) return 'requested';
-    if (!host) return 'opening';
+    return null;
   }
+  const activity = Math.max(lastActivity, Date.parse(human?.created_at || room.started_at || room.created_at));
+  if (now - activity < 2000 || now - inputReadyAt < 1000 || now - lastHostEnded < 3000) return null;
+  if (room.moderator_requested_at) return 'requested';
+  if (!host) return 'opening';
+  const spokenSinceAI = Boolean(human && human.id > host.id);
   const sinceAI = now - Date.parse(room.last_ai_at || room.started_at || room.created_at);
-  if (now - activity >= (participantCount === 1 ? 12_000 : 30_000) && sinceAI >= (participantCount === 1 ? 45_000 : 90_000)) return 'silence';
+  if (spokenSinceAI && now - activity >= loungeGroupSilenceMs && sinceAI >= loungeGroupSilenceGapMs) return 'silence';
   return null;
 }
 

@@ -8,6 +8,9 @@ import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
 import { createLoungeTranscriptionQueue } from './loungeTranscription';
 
 export type VoiceParticipant = { id: string; name: string; muted: boolean; avatarIndex?: number; avatarUrl?: string };
+// A person's sustained voice stops the AI. The device that plays the AI locally
+// hears its own output, so it needs a louder voice than a remote listener.
+export const loungeBargeIn = { remoteRms: 0.06, localPlaybackRms: 0.09, sustainMs: 400 };
 const readAvatarUrl = (metadata?: string) => { try { return safeLoungeAvatarUrl(JSON.parse(metadata || '{}').loungeAvatarUrl); } catch { return undefined; } };
 const readAvatar = (metadata?: string) => {
   try {
@@ -161,8 +164,12 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       });
       room.on(RoomEvent.ActiveSpeakersChanged, active => setSpeakers(active.map(participant => participant.identity)));
       room.on(RoomEvent.DataReceived, (payload, participant) => {
+        let data;
+        try { data = JSON.parse(new TextDecoder().decode(payload)); } catch { return; /* Ignore other room packets. */ }
+        // A participant started talking over the AI: the broadcasting device stops it.
+        if (data?.type === 'lounge-barge-in') { if (participant && !restrictedRef.current.has(participant.identity)) playback.current?.finish(); return; }
         if (participant?.identity !== hostIdRef.current) return;
-        try { const data = JSON.parse(new TextDecoder().decode(payload)); if (data.type === 'lounge-ai') { aiSpeakingRef.current = Boolean(data.speaking); setAiSpeaking(Boolean(data.speaking)); if (typeof data.text === 'string') setHostText(data.text.slice(0, 600)); } } catch { /* Ignore other room packets. */ }
+        if (data?.type === 'lounge-ai') { aiSpeakingRef.current = Boolean(data.speaking); setAiSpeaking(Boolean(data.speaking)); if (typeof data.text === 'string') setHostText(data.text.slice(0, 600)); }
       });
       room.on(RoomEvent.Reconnecting, () => { stopHost(); releaseMicrophone(); setConnected(false); });
       room.on(RoomEvent.Reconnected, () => { setConnected(true); sync(); });
@@ -209,7 +216,13 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const input = context.createMediaStreamSource(stream); const analyser = context.createAnalyser(); analyser.fftSize = 1024; input.connect(analyser);
       releaseMicAnalysis.current = () => { input.disconnect(); analyser.disconnect(); };
       const values = new Float32Array(analyser.fftSize);
-      let started = 0, lastVoice = 0, lastFrame = performance.now();
+      let started = 0, lastVoice = 0, lastFrame = performance.now(), bargeMs = 0;
+      const interruptHost = () => {
+        // Record this person right away; the AI audio stops locally or on the broadcasting device.
+        aiSpeakingRef.current = false;
+        if (playback.current) { playback.current.finish(); return; }
+        void room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'lounge-barge-in' })), { reliable: true }).catch(() => {});
+      };
       let utterance: { voicedFrames: number } | null = null;
       let queued = 0;
       const format = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(type => MediaRecorder.isTypeSupported(type));
@@ -234,15 +247,23 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (microphone.current !== track) return;
         const now = performance.now(); analyser.getFloatTimeDomainData(values);
         const rms = Math.sqrt(values.reduce((sum, sample) => sum + sample * sample, 0) / values.length);
-        if (rms > 0.018 && !draining.current && !restrictedRef.current.has(room.localParticipant.identity) && !aiSpeakingRef.current && floorRef.current?.allowed !== false) {
-          speechActivity.current.voicedMs += Math.min(100, now - lastFrame);
+        const mayTalk = !draining.current && !restrictedRef.current.has(room.localParticipant.identity) && floorRef.current?.allowed !== false;
+        const elapsed = Math.min(100, now - lastFrame);
+        if (aiSpeakingRef.current && mayTalk) {
+          const threshold = playback.current ? loungeBargeIn.localPlaybackRms : loungeBargeIn.remoteRms;
+          bargeMs = rms > threshold ? bargeMs + elapsed : Math.max(0, bargeMs - elapsed);
+          if (bargeMs >= loungeBargeIn.sustainMs) { bargeMs = 0; interruptHost(); }
+        } else bargeMs = 0;
+        if (rms > 0.018 && mayTalk && !aiSpeakingRef.current) {
+          speechActivity.current.voicedMs += elapsed;
           lastVoice = now;
           speechActivity.current.lastVoiceAt = Date.now();
           if (!recorder.current) begin(now);
           if (utterance) utterance.voicedFrames += 1;
         }
         lastFrame = now;
-        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > 20_000 || aiSpeakingRef.current || floorRef.current?.allowed === false || restrictedRef.current.has(room.localParticipant.identity))) {
+        // AI speech no longer cuts a person off mid-sentence; their pause ends the recording.
+        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > 20_000 || floorRef.current?.allowed === false || restrictedRef.current.has(room.localParticipant.identity))) {
           recorder.current.stop(); recorder.current = null;
         }
         speechActivity.current.recording = Boolean(recorder.current);
