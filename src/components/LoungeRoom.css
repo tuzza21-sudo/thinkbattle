@@ -642,11 +642,11 @@
 
 /* Conversation bubbles: sized to their text and opaque enough to read over any scene. The moderator speaks on the left,
    people on the right. A person's bubble is no wider than the area their portraits occupy (at least 360px). */
-/* Clear frosted glass: a faint tint and a strong blur let the scene show through; light text with a soft shadow stays readable. */
-.has-room .lounge-room-main { --lounge-bubble-host:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.06)),rgba(14,14,20,.3); --lounge-bubble-person:linear-gradient(135deg,rgba(255,238,214,.22),rgba(255,255,255,.06)),rgba(14,14,20,.32); --lounge-bubble-self:linear-gradient(135deg,color-mix(in srgb,var(--lounge-accent) 40%,transparent),rgba(255,255,255,.06)),rgba(14,14,20,.3); --lounge-bubble-line:rgba(255,255,255,.34); --lounge-bubble-blur:blur(20px) saturate(1.5); --lounge-bubble-text:#fffaf0; --lounge-bubble-text-shadow:0 1px 2px rgba(0,0,0,.6),0 0 10px rgba(0,0,0,.35); }
+/* Light translucent glass: about half white with a strong blur, so the scene shows through and dark text reads on every theme (measured for all six scenes). */
+.has-room .lounge-room-main { --lounge-bubble-host:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.46)); --lounge-bubble-person:linear-gradient(135deg,rgba(255,243,224,.62),rgba(255,250,240,.46)); --lounge-bubble-self:linear-gradient(135deg,color-mix(in srgb,var(--lounge-accent) 60%,rgba(255,255,255,.45)),rgba(255,255,255,.46)); --lounge-bubble-line:rgba(255,255,255,.6); --lounge-bubble-blur:blur(18px) saturate(1.4); --lounge-bubble-text:#14110c; --lounge-bubble-text-shadow:0 0 6px rgba(255,255,255,.6); }
 .has-room .lounge-participant-log { position:relative; display:flex; flex-direction:column; gap:12px; }
 .has-room .lounge-participant-log.spotlight::after { content:''; flex:0 0 38vh; }
-.has-room .lounge-participant-log.spotlight { -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 30px); mask-image:linear-gradient(to bottom,transparent 0,#000 30px); }
+/* No mask on the log: a masked ancestor stops the bubbles' backdrop blur from reaching the scene. */
 .has-room .lounge-participant-log>* { flex-shrink:0; }
 .has-room .lounge-participant-log .lounge-guidance:not(:empty) * { color:inherit; text-shadow:none; }
 .has-room .lounge-participant-log .lounge-guidance:not(:empty) a { text-decoration:underline; }
