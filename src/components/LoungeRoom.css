@@ -642,8 +642,8 @@
 
 /* Conversation bubbles: sized to their text and opaque enough to read over any scene. The moderator speaks on the left,
    people on the right. A person's bubble is no wider than the area their portraits occupy (at least 360px). */
-/* Light translucent glass: about a third white with a strong blur, so the scene shows through and dark text reads on every theme (measured for all six scenes). */
-.has-room .lounge-room-main { --lounge-bubble-host:linear-gradient(135deg,rgba(255,255,255,.46),rgba(255,255,255,.32)); --lounge-bubble-person:linear-gradient(135deg,rgba(255,243,224,.48),rgba(255,250,240,.32)); --lounge-bubble-self:linear-gradient(135deg,color-mix(in srgb,var(--lounge-accent) 55%,rgba(255,255,255,.3)),rgba(255,255,255,.32)); --lounge-bubble-line:rgba(255,255,255,.55); --lounge-bubble-blur:blur(18px) saturate(1.4); --lounge-bubble-text:#17140f; --lounge-bubble-text-shadow:0 0 8px rgba(255,255,255,.5); }
+/* Light translucent glass: about half white with a strong blur, so the scene shows through and dark text reads on every theme (measured for all six scenes). */
+.has-room .lounge-room-main { --lounge-bubble-host:linear-gradient(135deg,rgba(255,255,255,.6),rgba(255,255,255,.46)); --lounge-bubble-person:linear-gradient(135deg,rgba(255,243,224,.62),rgba(255,250,240,.46)); --lounge-bubble-self:linear-gradient(135deg,color-mix(in srgb,var(--lounge-accent) 60%,rgba(255,255,255,.45)),rgba(255,255,255,.46)); --lounge-bubble-line:rgba(255,255,255,.6); --lounge-bubble-blur:blur(18px) saturate(1.4); --lounge-bubble-text:#14110c; --lounge-bubble-text-shadow:0 0 6px rgba(255,255,255,.6); }
 .has-room .lounge-participant-log { position:relative; display:flex; flex-direction:column; gap:12px; }
 .has-room .lounge-participant-log.spotlight::after { content:''; flex:0 0 38vh; }
 /* No mask on the log: a masked ancestor stops the bubbles' backdrop blur from reaching the scene. */
