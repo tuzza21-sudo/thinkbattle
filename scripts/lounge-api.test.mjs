@@ -796,6 +796,64 @@ test('a relationship character reads stored state, classifies events in the same
   }));
 });
 
+// One relationship turn with the given latest user message; returns what the model was sent.
+async function relationshipModelInput(userText, { reason = 'followup', row = velvetRow, requestKind, env = {} } = {}) {
+  let sent;
+  const saved = process.env.LOUNGE_STYLE_EXAMPLES;
+  if (env.LOUNGE_STYLE_EXAMPLES === undefined) delete process.env.LOUNGE_STYLE_EXAMPLES; else process.env.LOUNGE_STYLE_EXAMPLES = env.LOUNGE_STYLE_EXAMPLES;
+  try {
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ host_persona: row.character_id })]);
+      if (url.includes('voice_lounge_messages?')) return result(userText ? [{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: userText }] : []);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+      if (url.endsWith('/responses')) { sent = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] }); }
+      if (url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge_relationship')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason, ...(requestKind ? { requestKind } : {}) }))).status, 200); }));
+  } finally { if (saved === undefined) delete process.env.LOUNGE_STYLE_EXAMPLES; else process.env.LOUNGE_STYLE_EXAMPLES = saved; }
+  return { body: sent, context: JSON.parse(sent.input) };
+}
+
+test("a one-to-one relationship turn is sent a few example dialogues in the character's own voice, with rules for using them", async () => {
+  const { body, context } = await relationshipModelInput('그건 네 해석이고, 난 다르게 봐.');
+  const shown = context.relationship.style_examples;
+  assert.ok(shown.length >= 3 && shown.length <= 5, `${shown.length} examples`);
+  for (const item of shown) { assert.equal(typeof item.situation, 'string'); assert.ok(item.dialogue.length >= 1 && item.dialogue.every(turn => turn.user && turn.reply)); }
+  assert.doesNotMatch(JSON.stringify(shown), /INTRIGUED|DISMISSIVE|stage|score/);
+  assert.match(body.instructions, /style_examples가 있으면/);
+  assert.match(body.instructions, /같은 시작 말을 반복하지 않는다/);
+});
+
+test('the example dialogues follow the situation: hardship, questions about being an AI, the first greeting and topic requests', async () => {
+  const crisis = (await relationshipModelInput('솔직히 사라지고 싶어.')).context.relationship.style_examples;
+  assert.match(crisis[0].dialogue[0].reply, /109|가까운 사람|전문가/, 'a hardship example comes first');
+  const identity = (await relationshipModelInput('너 사람인 척하는 AI지?')).context.relationship.style_examples;
+  assert.match(identity[0].dialogue[0].reply, /AI/);
+  const opening = (await relationshipModelInput(undefined, { reason: 'opening' })).context.relationship.style_examples;
+  assert.match(opening[0].dialogue[0].user, /입장|찾아왔다/);
+  const topic = (await relationshipModelInput(undefined, { reason: 'requested', requestKind: 'topic' })).context.relationship.style_examples;
+  assert.match(topic[0].dialogue[0].user, /화제/);
+});
+
+test('examples about earlier conversations are only sent to someone who has memories with the character', async () => {
+  const noMemories = { ...velvetRow, stage: 'DRAWN_IN', memories: [] };
+  const without = (await relationshipModelInput('오늘은 왜 먼저 말을 걸었어?', { row: noMemories })).context.relationship.style_examples;
+  assert.ok(!JSON.stringify(without).includes('네 다음 답이 궁금하긴'), 'a memory-based reply is not shown without memories');
+  const withMemories = (await relationshipModelInput(undefined, { row: { ...velvetRow, stage: 'DRAWN_IN' }, reason: 'opening' })).context.relationship.style_examples;
+  assert.match(withMemories[0].dialogue[0].user, /다시 찾아왔다/);
+});
+
+test('LOUNGE_STYLE_EXAMPLES=off removes the examples without touching anything else', async () => {
+  const { body, context } = await relationshipModelInput('그건 네 해석이고, 난 다르게 봐.', { env: { LOUNGE_STYLE_EXAMPLES: 'off' } });
+  assert.equal(context.relationship.style_examples, undefined);
+  assert.equal(context.relationship.stage.id, 'INTRIGUED'); assert.ok(context.relationship.memories.length > 0);
+  assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
+});
+
 test('relationship scores do not move without a new user turn, and a storage failure never blocks the reply', async () => {
   let saved;
   await withServiceKey(() => run(async (url, init) => {

@@ -2,7 +2,7 @@ import { getLoungeHost, isLoungeHelpKind, loungeSpeechLimits, loungeSpeechReques
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, type RelationshipRow } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, selectStyleExamples, styleExamplesForPrompt, type RelationshipRow } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -331,10 +331,16 @@ export default async function handler(req: Request): Promise<Response> {
     const fullHumanMessages = new Set(recent.filter(message => message.kind === 'human').slice(-2));
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
+    // A few example dialogues in the character's own voice for this stage and situation. LOUNGE_STYLE_EXAMPLES=off turns them off.
+    const latestHuman = recent.at(-1)?.kind === 'human' ? recent.at(-1)?.text : undefined;
+    const styleExamples = relationship && process.env.LOUNGE_STYLE_EXAMPLES !== 'off' ? selectStyleExamples({
+      characterId: relationship.config.characterId, stageIds: relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id), stage: relationship.record.stage,
+      recentEvents: relationship.record.recentEvents, hasMemory: relationship.record.memories.length > 0, userText: latestHuman, reason: String(body.reason), requestKind, turnCount: relationship.record.turnCount,
+    }) : [];
     const context = { mode, participant_count: participantCount, topic: room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members, reason: body.reason, request_kind: requestKind,
-      ...(relationship ? { relationship: relationshipPromptContext(relationship.record, relationship.config, relationship.mood) } : {}),
+      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(styleExamples.length ? { style_examples: styleExamplesForPrompt(styleExamples) } : {}) } } : {}),
       recent: recent.map(message => ({ ...message, text: fullHumanMessages.has(message) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
