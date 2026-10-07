@@ -11,7 +11,7 @@ let sequence = 0;
 const pending = new Map(), errors = [], paidRequests = [];
 const openRooms = [
   { id: 'lounge-00000000-0000-4000-8000-000000000001', topic: '영화 호프를 보고 남은 이야기', host_persona: 'ina', theme: 'hotel', capacity: 4, status: 'lobby', participant_count: 2, topic_brief: { category: 'media', subcategory: 'film', work_title: '호프', creator: '테스트 감독', reason: '이야기를 다른 시선으로 이해하고 싶어서', discussion: '인물의 선택을 어떻게 생각하는지 함께 나눠요.' } },
-  { id: 'lounge-00000000-0000-4000-8000-000000000002', topic: '여행과 산행에서 만난 멋진 풍경', host_persona: 'dodi', theme: 'forest', capacity: 6, status: 'active', participant_count: 3 },
+  { id: 'lounge-00000000-0000-4000-8000-000000000002', topic: '여행과 산행에서 만난 멋진 풍경', host_persona: 'ina', theme: 'forest', capacity: 6, status: 'active', participant_count: 3 },
   { id: 'lounge-00000000-0000-4000-8000-000000000003', topic: '한 번 더 가고 싶은 맛집과 먹거리', host_persona: 'jaeseok', theme: 'rooftop', capacity: 2, status: 'lobby', participant_count: 2 },
 ];
 let roomResponse = openRooms, roomResponseCode = 200;
@@ -119,8 +119,8 @@ try {
     assert.equal(await evaluate("document.activeElement===document.querySelector('.lounge-journal-toggle')"), true, 'closing restores record button focus');
   }
   await send('Page.navigate', { url: `${base}/lounge` });
-  await waitFor("document.querySelectorAll('.lounge-voice-preview').length===4");
-  for (const file of ['host-witty-v1', 'host-empathetic-v1', 'host-lively-v1', 'host-bubbly-v1']) {
+  await waitFor("document.querySelectorAll('.lounge-voice-preview').length===6");
+  for (const file of ['host-witty-v1', 'host-empathetic-v1', 'host-auditor-v1', 'host-closer-v1', 'host-velvet-v1', 'host-trickster-v1']) {
     const duration = await evaluate(`new Promise((resolve,reject)=>{const a=new Audio('/lounge/${file}.mp3');a.onloadedmetadata=()=>resolve(a.duration);a.onerror=()=>reject(new Error('voice sample did not load'));a.load();})`);
     assert.ok(duration > 3 && duration < 45, 'short Korean voice sample decodes');
   }
@@ -165,12 +165,7 @@ try {
   assert.match(await evaluate("document.querySelector('.lounge-seat.speaking').textContent"), /지금 이야기 중/);
   await evaluate("document.querySelector('.lounge-on-air button').click()");
   await waitFor("document.querySelectorAll('.lounge-seat.speaking,.lounge-moderator.speaking').length===0");
-  await evaluate("document.querySelector('.lounge-avatar-toggle').click()");
-  await waitFor("document.querySelectorAll('.lounge-avatar-picker button').length===6");
-  await evaluate("document.querySelectorAll('.lounge-avatar-picker button')[4].click()");
-  await waitFor("document.querySelector('.lounge-avatar-picker')===null");
-  assert.equal(await evaluate("document.querySelector('.lounge-seat.self .lounge-portrait-sprite').style.left"), '-100%');
-  assert.equal(await evaluate("document.querySelector('.lounge-seat.self .lounge-portrait-sprite').style.transform"), 'translateY(-50%)');
+  assert.equal(await evaluate("document.querySelector('.lounge-avatar-toggle')===null"), true, 'avatars are chosen in the profile, not in the room');
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await evaluate("document.querySelector('.lounge-on-air button').click()");
   await waitFor("document.querySelector('.lounge-seat.speaking,.lounge-moderator.speaking')!==null");
@@ -179,7 +174,7 @@ try {
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-host-option').length===4");
   await evaluate("document.querySelectorAll('.lounge-host-option')[1].click(); document.querySelectorAll('.lounge-capacities button')[5].click(); document.querySelectorAll('.lounge-theme-options button')[1].click()");
-  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /공감하는 진행자/);
+  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /다정한 등대지기/);
   await type('.lounge-custom-topic input', '퇴근 후 나만의 작은 즐거움');
   await evaluate("document.querySelector('.lounge-preview-button').click()");
   await waitFor("document.querySelector('.lounge-room-main')!==null");

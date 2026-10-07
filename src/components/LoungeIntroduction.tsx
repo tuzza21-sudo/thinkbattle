@@ -12,7 +12,7 @@ function IntroductionScene({ theme, topic, quote, reply }: { theme: 'rooftop' | 
     <img className="lounge-intro-scene-photo" src={theme === 'hotel' ? '/lounge/hotel-lounge-v1.webp' : '/lounge/rooftop-city-v2.webp'} alt={theme === 'hotel' ? '따뜻한 조명의 호텔 라운지' : '도시의 밤 풍경이 펼쳐진 루프탑 라운지'} loading="lazy" />
     <div className="lounge-intro-demo-heading"><span>오늘의 이야기 · 화면 예시</span><strong>{topic}</strong></div>
     <div className="lounge-intro-demo-conversation">
-      <div className="lounge-intro-demo-host"><div className="lounge-intro-demo-host-profile"><img src="/lounge/host-witty-v2.webp" alt="가상의 AI 진행자" loading="lazy" /><div><strong>재치 있는 진행자</strong><span>AI 사회자 · 합성 이미지</span></div></div><p>{quote}</p></div>
+      <div className="lounge-intro-demo-host"><div className="lounge-intro-demo-host-profile"><img src="/lounge/host-witty-v2.webp" alt="가상의 AI 진행자" loading="lazy" /><div><strong>유쾌한 재담꾼</strong><span>AI 사회자 · 합성 이미지</span></div></div><p>{quote}</p></div>
       <div className="lounge-intro-demo-participants"><span className="lounge-intro-demo-label"><Users size={12} />함께하는 사람들</span><div className="lounge-intro-demo-portraits">{[0, 3, 2].map((index, seat) => <span key={index}><IntroductionAvatar index={index} /><small>{['나', '산책', '여운'][seat]}</small></span>)}</div><div className="lounge-intro-demo-reply"><span>나의 이야기</span><p>{reply}</p></div><div className="lounge-intro-demo-controls"><span><Mic size={11} />마이크</span><span><Hand size={11} />손들기</span><span>패스</span></div></div>
     </div>
   </div>;

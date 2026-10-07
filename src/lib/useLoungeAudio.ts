@@ -18,7 +18,8 @@ const readAvatar = (metadata?: string) => {
     return Number.isInteger(value) && value >= 0 && value < 6 ? value as number : undefined;
   } catch { return undefined; }
 };
-export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (audio: Blob, turnId?: string) => Promise<void>, capacity = 4, floor?: { allowed: boolean; speakerId: string | null; turnId?: string }, restrictedIds: string[] = []) {
+export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (audio: Blob, turnId?: string) => Promise<void>, capacity = 4, floor?: { allowed: boolean; speakerId: string | null; turnId?: string }, restrictedIds: string[] = [], hostLoudness = 1) {
+  const hostLoudnessRef = useRef(hostLoudness);
   const roomRef = useRef<Room | null>(null);
   const microphone = useRef<LocalAudioTrack | null>(null);
   const microphoneWanted = useRef(false);
@@ -53,7 +54,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const [participants, setParticipants] = useState<VoiceParticipant[]>([]);
   const [speakers, setSpeakers] = useState<string[]>([]);
   const [error, setError] = useState('');
-  useEffect(() => { callback.current = onUtterance; hostIdRef.current = hostId; }, [onUtterance, hostId]);
+  useEffect(() => { callback.current = onUtterance; hostIdRef.current = hostId; hostLoudnessRef.current = hostLoudness; }, [onUtterance, hostId, hostLoudness]);
   const floorAllowed = floor?.allowed, floorSpeaker = floor?.speakerId, floorTurn = floor?.turnId;
   const restrictedKey = [...restrictedIds].sort().join(',');
   useEffect(() => {
@@ -291,7 +292,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       if (roomRef.current !== room) return;
       const destination = context.createMediaStreamDestination();
       const source = context.createBufferSource(); source.buffer = buffer;
-      const output = createLoungeHostOutput(context, [context.destination, destination]);
+      const output = createLoungeHostOutput(context, [context.destination, destination], hostLoudnessRef.current);
       source.connect(output.input);
       const track = new LocalAudioTrack(destination.stream.getAudioTracks()[0]);
       try { await room.localParticipant.publishTrack(track, { name: 'ai-host', source: Track.Source.Unknown }); }
@@ -321,7 +322,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     if (!context) { await stream.cancel(); throw new LoungeApiError('소리 켜기를 눌러 사회자 음성을 들어 주세요.', 'lounge_audio_not_ready'); }
     const destination = context.createMediaStreamDestination();
     const track = new LocalAudioTrack(destination.stream.getAudioTracks()[0]);
-    const output = createLoungeHostOutput(context, [context.destination, destination]);
+    const output = createLoungeHostOutput(context, [context.destination, destination], hostLoudnessRef.current);
     const queue = new PcmAudioQueue(context, [output.input]);
     const pcm = new Pcm16Decoder();
     const cancelRead = new AbortController();
