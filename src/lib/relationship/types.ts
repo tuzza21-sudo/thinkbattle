@@ -79,8 +79,6 @@ export type TurnLog = {
 export type MetricView = { label: string; score?: number };
 export type RelationshipView = {
   characterId: string;
-  /** Developer-only: whether this room sends the few-shot style examples. */
-  styleExamples?: boolean;
   /** What the character remembers about the user, shown to the user. */
   remembered?: Array<{ kind: string; label: string; summary: string; followUp?: string }>;
   macroState: { id: string; label: string };

@@ -2,7 +2,7 @@ import { getLoungeHost, isLoungeHelpKind, loungeSpeechChunks, loungeTranscriptio
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, selectStyleExamples, styleExamplesForPrompt, longMemoryInstructions, memoriesForView, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipRow } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, longMemoryInstructions, memoriesForView, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipRow } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -312,15 +312,6 @@ export default async function handler(req: Request): Promise<Response> {
       return { ok: true as const, row: (await readJson<RelationshipRow[]>(response, 'lounge'))[0] ?? null };
     };
 
-    // The room's own switch for the style examples. On unless the host turned it off; an unreadable or missing setting means on.
-    async function readStyleExamplesFlag() {
-      if (!serviceHeaders) return true;
-      try {
-        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=style_examples`, { headers: serviceHeaders });
-        return response.ok ? (await readJson<Array<{ style_examples?: boolean }>>(response, 'lounge'))[0]?.style_examples !== false : true;
-      } catch { return true; }
-    }
-
     // Active long-term memories of a user (all characters; callers pick one). A missing table or a failed read means none.
     async function readMemoryRows(userId: string) {
       if (!serviceHeaders || process.env.LOUNGE_LONG_MEMORY === 'off') return null;
@@ -349,7 +340,7 @@ export default async function handler(req: Request): Promise<Response> {
         ...memoriesForView(longTerm, config.characterId).map(row => ({ kind: row.kind, label: memoryKindLabels[row.kind], summary: row.summary, ...(row.follow_up ? { followUp: row.follow_up } : {}) })),
         ...record.memories.slice(0, 5).map(memory => ({ kind: 'moment', label: '함께한 순간', summary: memory.summary })),
       ];
-      return json({ enabled: true, relationship: { ...view, remembered, ...(developer ? { styleExamples: process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await readStyleExamplesFlag() } : {}) } });
+      return json({ enabled: true, relationship: { ...view, remembered } });
     }
 
     if (!['opening', 'silence', 'followup', 'requested'].includes(String(body.reason))) return json({ error: '올바르지 않은 진행 요청이에요.' }, 400);
@@ -364,7 +355,6 @@ export default async function handler(req: Request): Promise<Response> {
         .then(async response => response.ok ? await readJson<RelationshipRow[]>(response, 'lounge') : (console.warn('[Lounge relationship] read failed', response.status), null))
         .catch(error => (console.warn('[Lounge relationship] read failed', error instanceof Error ? error.name : 'error'), null))
       : Promise.resolve(null);
-    const styleExamplesFlag = readStyleExamplesFlag();
     // Long-term memory and the previous one-to-one conversation, read in parallel; LOUNGE_LONG_MEMORY=off turns both off.
     const memoryRowsRead = readMemoryRows(user.id);
     const previousRoomsRead = serviceHeaders && process.env.LOUNGE_LONG_MEMORY !== 'off'
@@ -415,16 +405,10 @@ export default async function handler(req: Request): Promise<Response> {
     const fullHumanMessages = new Set(recent.filter(message => message.kind === 'human').slice(-2));
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
-    // A few example dialogues in the character's own voice for this stage and situation. LOUNGE_STYLE_EXAMPLES=off turns them off.
-    const latestHuman = recent.at(-1)?.kind === 'human' ? recent.at(-1)?.text : undefined;
-    const styleExamples = relationship && process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await styleExamplesFlag ? selectStyleExamples({
-      characterId: relationship.config.characterId, stageIds: relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id), stage: relationship.record.stage,
-      recentEvents: relationship.record.recentEvents, hasMemory: relationship.record.memories.length > 0, userText: latestHuman, reason: String(body.reason), requestKind, turnCount: relationship.record.turnCount,
-    }) : [];
     const context = { mode, participant_count: participantCount, topic: room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members, reason: body.reason, request_kind: requestKind,
-      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}), ...(styleExamples.length ? { style_examples: styleExamplesForPrompt(styleExamples) } : {}) } } : {}),
+      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
       recent: recent.map(message => ({ ...message, text: fullHumanMessages.has(message) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
@@ -487,7 +471,7 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
       const memorySaved = saveMemories(answer?.memory_ops);
       try {
         const turn = processTurn({ record: relationship.record, config: relationship.config, mood: relationship.mood, events: answer?.events, hasUserTurn: recent.at(-1)?.kind === 'human', now: relationship.now });
-        console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, examples: styleExamples.length, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
+        console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
         const response = await fetchTimed(`${url}/rest/v1/rpc/save_voice_lounge_relationship`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({
           p_user: user.id, p_character: relationship.config.characterId, p_room: roomId, p_expected_version: relationship.record.version,
           p_state: relationshipState(turn.record), p_mood: turn.mood,

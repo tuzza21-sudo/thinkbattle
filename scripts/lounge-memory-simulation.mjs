@@ -56,7 +56,6 @@ async function runCharacter(id, print) {
     if (url.includes('apply_voice_lounge_memory_ops')) { const body = JSON.parse(init.body); applyOps(db, body.p_character, body.p_ops); return result(body.p_ops.length); }
     if (url.includes('voice_lounge_relationships?')) return result(db.row ? [db.row] : []);
     if (url.includes('save_voice_lounge_relationship')) { const body = JSON.parse(init.body), state = body.p_state; db.row = { user_id: 'sim-user', character_id: id, scores: state.scores, stage: state.stage, pending: state.pending, recent_events: state.recentEvents, memories: state.memories, meaningful_turns: state.meaningfulTurns, turn_count: state.turnCount, last_interaction_at: state.lastInteractionAt, version: (db.row?.version ?? 0) + 1 }; return result(db.row.version); }
-    if (url.includes('select=style_examples')) return result([{}]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result(db.rooms.filter(room => room !== current).slice().reverse().map(room => ({ host_persona: id, memory: room.memory, created_at: room.createdAt })));
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '요즘 고민', host_persona: id, memory: current.memory, capacity: 1, ai_turns: current.aiTurns, ai_mood: null }]);
     if (url.includes('voice_lounge_messages?')) return result([...current.messages].reverse().slice(0, 24));

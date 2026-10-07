@@ -1,4 +1,4 @@
--- Apply after 20261008000000_voice_lounge_style_examples_toggle.sql.
+-- Apply after 20261007000000_voice_lounge_six_hosts.sql.
 -- Long-term memory for one-to-one characters: what the user told this character that is still useful later
 -- (projects, preferences, decisions, events) and open threads to follow up. One character never sees another
 -- character's memories. Written only by the server role after a reply; sensitive topics are filtered before

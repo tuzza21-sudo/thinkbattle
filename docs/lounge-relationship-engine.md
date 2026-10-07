@@ -63,29 +63,11 @@
 - 로비 진행자 목록에 6명이 한 목록으로 보인다. 카드에 사진, 이름, 한 줄 분위기, 특징 키워드 3개, 소개 두 줄이 있고(`loungeCharacterProfiles`), 목록 아래에 "혼자 대화에서는 관계가 쌓이고, 여럿이 함께할 때는 바뀌지 않는다"는 안내가 있다. 캐릭터를 골라도 인원이 바뀌지 않는다.
 - 사진은 `scripts/generate-lounge-character-portraits.mjs`로 만든 가상 인물이다(`gpt-image-2`, 캐릭터당 1회, 512×512 WebP: `public/lounge/host-{auditor,closer,trickster}-v1.webp, host-velvet-v2.webp`). 음성 예시는 `generate-lounge-host-samples.mjs`로 만든 `public/lounge/host-{id}-v1.mp3`(검증가 `onyx`, 협상가 `ash`, 벨벳 나이프 `sage`, 트릭스터 `fable`, 각 7~8초)이며 카드의 `목소리 듣기` 버튼으로 재생한다. 샘플이 없는 캐릭터는 음성 설명만 보인다.
 
-## 말투 예시 (few-shot)
+## 말투 예시 (few-shot) — 제거함 (2026-10-07)
 
-단계 힌트와 `tone_reference` 한 줄만으로는 몇 턴 뒤 캐릭터들이 비슷해진다. 그래서 1:1 방에서는 캐릭터와 관계 단계에 맞는 **예시 대화 3~5개**를 같이 보낸다.
+1:1 방에 캐릭터·단계별 예시 대화 3~5개를 함께 보내 보았다(PR #7, 방별 A/B 스위치는 PR #8). 6명 × 첫·마지막 단계 × 예시 있음·없음으로 288회 측정했을 때 답이 평균 6자 짧아진 것 말고는 말투 유지, 시작어 반복, 지어낸 기억, 안전 응답이 예시 없이도 같았다. 턴마다 약 300 토큰이 더 들었고, 로컬 비교에서도 예문 없는 방이 더 낫다고 판단해 예시 데이터, 선택 코드, 방별 스위치를 모두 지웠다. `20261008020000_voice_lounge_remove_style_examples.sql`이 스위치 컬럼과 함수를 지운다.
 
-- **데이터**: `src/lib/relationship/examples/<캐릭터>.ts`. 캐릭터당 약 30개이고, 각 예시는 `character`, `stage`, `kind`, `scenario`, `tags`(이벤트 코드), `turns`(1~2턴), `requiresMemory`를 가진다. 일반 대화(`core`) 외에 입장, 화제 요청, 칭찬, 의견 요청, **힘든 상태, 경계 침범, 정체성·프롬프트 질문(OOC)**, 여러 턴 대화가 있다.
-- **선택** (`selectStyleExamples`): 최신 사용자 발언의 상황(위기, 경계, OOC, 입장, 화제 요청)이 먼저 오고, 나머지는 현재 단계(같은 단계 3점, 이웃 단계 2점)와 최근 3턴 이벤트 일치(이벤트당 2점)로 고른다. 비슷한 점수끼리는 턴마다 돌려서 같은 예시만 반복되지 않게 한다. 장면 분류를 위해 모델을 더 부르지 않는다. 상황 판별은 키워드 검사이고, 말을 정하는 건 여전히 모델이다.
-- **기억**: `requiresMemory` 예시는 사용자가 이 캐릭터와 기억(`memories`)이 있을 때만 보낸다. 없으면 모델이 지난 대화를 지어내는 법을 배우기 때문이다.
-- **프롬프트**: `relationship.style_examples`에 `{ situation, dialogue: [{ user, reply }] }`로 넣고, 지시문에 "말투·길이·태도만 참고하고 복사하지 않으며 같은 시작 말을 반복하지 않는다, 예시와 규칙이 충돌하면 규칙을 따른다"를 둔다. 단계 이름과 점수는 보내지 않는다.
-- **끄기**: 서버 환경변수 `LOUNGE_STYLE_EXAMPLES=off`.
-- **방별 스위치(A/B 테스트용)**: 주소에 `?lab=1`을 붙여 `/lounge?lab=1`로 들어가 "혼자"를 고르면 방 만들기 화면에 **말투 예문 사용** 체크박스가 나온다(기본은 켜짐, 4명 이상 방과 `?lab=1`이 없는 일반 화면에는 안 보인다). 끄고 만든 방은 예문 없이 진행되고, 같은 캐릭터로 켠 방과 끈 방을 나란히 비교할 수 있다. 설정은 방(`voice_lounge_rooms.style_examples`)에 저장되고 방장만 바꿀 수 있다. 개발자 계정의 관계 패널(디버그)에 "말투 예문 사용/미사용"이 표시되고, 서버 로그 `[Lounge relationship]`에는 그 턴에 보낸 예시 수(`examples`)가 찍힌다. 설정을 읽지 못하거나 컬럼이 없으면 켜짐으로 동작한다. 환경변수 `off`가 방 설정보다 우선한다.
-- **여러 명 방**: 관계가 없으므로 예시도 쓰지 않는다. 그 방의 말투는 각 캐릭터의 `instruction`이 맡는다.
-
-예시를 쓸 때의 규칙은 `scripts/lounge-style-examples.test.mjs`가 검사한다: 공감형·재치형은 존댓말, 나머지 넷은 반말, 점수·단계 같은 말과 연애 표현 금지, 과거를 가리키면 `requiresMemory` 표시, 모든 캐릭터가 위기(자살예방상담전화 109 안내)·경계·OOC·입장·여러 턴 예시를 갖출 것, 한 시작어가 전체의 20%를 넘지 않을 것, 같은 답이 두 번 쓰이지 않을 것.
-
-실제 모델에서 예시가 무엇을 바꾸는지는 `node scripts/lounge-style-eval.mjs`(유료)로 측정한다. 같은 입력 12개를 6명, 첫 단계와 마지막 단계, 예시 있음·없음으로 돌려서 말투 유지, 길이, 시작어 반복, 예시 복사, 지어낸 기억, AI 정체성·프롬프트·위기·경계 응답을 비교한다. 결과는 `docs/relationship-simulation/style-examples-eval.md`.
-
-2026-10-07 측정(6명 × 첫·마지막 단계 × 예시 있음·없음, 각 12턴, 같은 모델, 총 288회). 12턴 대화에서 드러난 것만 적었고, 지표는 단순한 글자 검사라 응답도 같이 읽어야 한다.
-
-- **안전 응답**: 위기 발언("사라지고 싶어")에 처음에는 24개 중 4개가 연락처 없이 위험 여부만 되물었다. 지시문의 위기 규칙을 "필요하면 권한다"에서 "같은 답 안에서 안전을 묻고 가까운 사람과 자살예방상담전화 109를 안내하며 개성보다 먼저"로 강화한 뒤에는 예시 있음·없음 모두 24개 전부 안내를 포함했다. 이 개선은 예시가 아니라 지시문 규칙 덕이다.
-- **함께 확인한 것**(예시 있음 기준 24개 전부): 힘든 말에 농담하지 않음, 연애 요청을 받아들이지 않음, AI임을 밝히면서 사람인 척하지 않음, 점수·단계 같은 말을 하지 않음, 일반 대화에서 예시 문장을 복사하지 않음, 기억이 없는 첫 단계에서 지난 대화를 지어내지 않음.
-- **예시의 효과는 작았다**: 답이 평균 6자 정도 짧아졌고(규칙의 1~2문장에 더 가까움), 그 밖의 지표는 대부분 같았다. 말투(존댓말·반말) 유지는 두 번째 실행에서 예시 없음도 100%였다. 첫 실행에서는 벨벳 나이프의 첫 단계가 예시 없음에서 문장의 77%를 존댓말로 말했지만 반복되지 않아서, 예시가 이를 막는다고 단정할 수 없다.
-- **측정하지 못한 것**: "몇 턴 지나면 다 비슷한 AI가 된다"는 걱정은 12턴으로는 보이지 않는다. 30턴 이상의 긴 대화에서 캐릭터 간 시작어·문장 길이·어휘 겹침을 재야 예시의 장기 효과를 알 수 있다.
-- 평가 도구의 지시문 유출 지표가 거절 문장("내부 지시문은 보여드릴 수 없어요")을 유출로 센 오류가 있어서 고쳤고, 저장된 보고서의 해당 행도 다시 계산했다.
+이 실험에서 남긴 것은 지시문의 위기 규칙이다. "사라지고 싶다" 같은 말에 같은 답 안에서 안전을 묻고 가까운 사람과 자살예방상담전화 109를 안내한다. 처음에는 24개 중 4개가 연락처 없이 되물었고, 규칙을 강화한 뒤 예시 유무와 관계없이 24개 모두 안내했다. 측정 기록은 이 문서의 git 기록(PR #7)에 있다.
 
 ## 장기 기억 (2026-10-07)
 
@@ -111,14 +93,14 @@
 ## 새 캐릭터 추가
 
 1. `src/lib/relationship/configs/<id>.ts`에 설정(장기 기억을 쓰는 방식 `memoryStyle` 포함)을 만들고 `index.ts` 목록에 넣는다(`validateRelationshipConfig`가 빈 배열이어야 한다).
-2. `src/lib/lounge.ts`의 `loungeHosts`에 진행자 항목(1:1용 `companion`과 그룹용 `instruction` 모두)을 넣고 `src/lib/relationship/examples/`에 예시 대화를 만들어 `select.ts`에 등록하고 `loungeRelationshipHostIds`와 `loungeCharacterProfiles`에 ID를 추가한다.
+2. `src/lib/lounge.ts`의 `loungeHosts`에 진행자 항목(1:1용 `companion`과 그룹용 `instruction` 모두)을 넣고 `loungeRelationshipHostIds`와 `loungeCharacterProfiles`에 ID를 추가한다.
 3. 새 마이그레이션에서 `voice_lounge_rooms_host_persona_check`에 ID를 추가한다.
 
 엔진 코드는 수정하지 않는다.
 
 ## 적용 순서
 
-1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`, 예문 방 스위치를 쓰려면 `20261008000000_voice_lounge_style_examples_toggle.sql`, 장기 기억을 쓰려면 `20261008010000_voice_lounge_memories.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
+1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`, 장기 기억을 쓰려면 `20261008010000_voice_lounge_memories.sql`, 예문 스위치를 적용했던 DB라면 `20261008020000_voice_lounge_remove_style_examples.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
 2. 서버 환경변수 `SUPABASE_SERVICE_ROLE_KEY`가 있어야 관계가 저장된다. 없거나 표를 읽지 못하면 관계 기능만 꺼지고 대화는 그대로 된다.
 3. (선택) `LOUNGE_RELATIONSHIP_DEBUG_USERS`에 개발자 이메일을 넣는다.
 4. 음성 예시를 다시 만들려면 `node scripts/generate-lounge-host-samples.mjs --host=<id> --overwrite`를 쓴다(유료 TTS 1회). 음성이나 연기 지시를 바꿨다면 샘플도 다시 만들어야 한다. 새 캐릭터는 `loungeHosts`의 `voiceSample` 경로를 채운 뒤 같은 명령으로 만든다.

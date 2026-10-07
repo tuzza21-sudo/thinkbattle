@@ -19,7 +19,6 @@ export function LoungeRelationship({ view }: { view: RelationshipView }) {
     </section>
     {debug && <div className="lounge-relationship-debug" aria-label="개발자용 관계 상태">
       <p>{view.macroState.id} · {debug.turnCount}턴(의미 {debug.meaningfulTurns}) · v{debug.version}{debug.pending.direction ? ` · ${debug.pending.direction === 'up' ? '승급' : '강등'} 대기 ${debug.pending.turns}` : ''}</p>
-      {view.styleExamples !== undefined && <p>말투 예문 {view.styleExamples ? '사용' : '미사용'}</p>}
       <p>기분 {Object.entries(debug.mood).map(([key, value]) => `${key} ${value}`).join(' · ')}</p>
       {debug.recentEvents.length > 0 && <p>최근 이벤트 {debug.recentEvents.slice(-6).map(event => `${event.turn}:${event.type}`).join(', ')}</p>}
       {debug.memories.length > 0 && <ul>{debug.memories.slice(0, 5).map(memory => <li key={`${memory.turn}-${memory.type}`}>{memory.summary} <small>({memory.importance})</small></li>)}</ul>}

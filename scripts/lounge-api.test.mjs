@@ -798,88 +798,26 @@ test('a relationship character reads stored state, classifies events in the same
   }));
 });
 
-// One relationship turn with the given latest user message; returns what the model was sent.
-async function relationshipModelInput(userText, { reason = 'followup', row = velvetRow, requestKind, env = {}, styleFlag } = {}) {
+// The few-shot style examples were removed on 2026-10-07: small measured effect for about 300 more tokens a turn.
+test('one-to-one turns send no example dialogues, and the crisis rule stays in the instructions', async () => {
   let sent;
-  const saved = process.env.LOUNGE_STYLE_EXAMPLES;
-  if (env.LOUNGE_STYLE_EXAMPLES === undefined) delete process.env.LOUNGE_STYLE_EXAMPLES; else process.env.LOUNGE_STYLE_EXAMPLES = env.LOUNGE_STYLE_EXAMPLES;
-  try {
-    await withServiceKey(() => run(async (url, init) => {
-      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
-      if (url.includes('claim_voice_lounge_host')) return result('ticket');
-      if (url.includes('voice_lounge_relationships?')) return result([row]);
-      if (url.includes('select=style_examples')) return styleFlag === 'error' ? new Response('{}', { status: 400 }) : result([styleFlag === undefined ? {} : { style_examples: styleFlag }]);
-      if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ host_persona: row.character_id })]);
-      if (url.includes('voice_lounge_messages?')) return result(userText ? [{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: userText }] : []);
-      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
-      if (url.endsWith('/responses')) { sent = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] }); }
-      if (url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge_relationship')) return result(true);
-      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
-      throw new Error('Unexpected fetch ' + url);
-    }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason, ...(requestKind ? { requestKind } : {}) }))).status, 200); }));
-  } finally { if (saved === undefined) delete process.env.LOUNGE_STYLE_EXAMPLES; else process.env.LOUNGE_STYLE_EXAMPLES = saved; }
-  return { body: sent, context: JSON.parse(sent.input) };
-}
-
-test("a one-to-one relationship turn is sent a few example dialogues in the character's own voice, with rules for using them", async () => {
-  const { body, context } = await relationshipModelInput('그건 네 해석이고, 난 다르게 봐.');
-  const shown = context.relationship.style_examples;
-  assert.ok(shown.length >= 3 && shown.length <= 5, `${shown.length} examples`);
-  for (const item of shown) { assert.equal(typeof item.situation, 'string'); assert.ok(item.dialogue.length >= 1 && item.dialogue.every(turn => turn.user && turn.reply)); }
-  assert.doesNotMatch(JSON.stringify(shown), /INTRIGUED|DISMISSIVE|stage|score/);
-  assert.match(body.instructions, /style_examples가 있으면/);
-  assert.match(body.instructions, /같은 시작 말을 반복하지 않는다/);
-});
-
-test('the example dialogues follow the situation: hardship, questions about being an AI, the first greeting and topic requests', async () => {
-  const crisis = (await relationshipModelInput('솔직히 사라지고 싶어.')).context.relationship.style_examples;
-  assert.match(crisis[0].dialogue[0].reply, /109|가까운 사람|전문가/, 'a hardship example comes first');
-  const identity = (await relationshipModelInput('너 사람인 척하는 AI지?')).context.relationship.style_examples;
-  assert.match(identity[0].dialogue[0].reply, /AI/);
-  const opening = (await relationshipModelInput(undefined, { reason: 'opening' })).context.relationship.style_examples;
-  assert.match(opening[0].dialogue[0].user, /입장|찾아왔다/);
-  const topic = (await relationshipModelInput(undefined, { reason: 'requested', requestKind: 'topic' })).context.relationship.style_examples;
-  assert.match(topic[0].dialogue[0].user, /화제/);
-});
-
-test('examples about earlier conversations are only sent to someone who has memories with the character', async () => {
-  const noMemories = { ...velvetRow, stage: 'DRAWN_IN', memories: [] };
-  const without = (await relationshipModelInput('오늘은 왜 먼저 말을 걸었어?', { row: noMemories })).context.relationship.style_examples;
-  assert.ok(!JSON.stringify(without).includes('네 다음 답이 궁금하긴'), 'a memory-based reply is not shown without memories');
-  const withMemories = (await relationshipModelInput(undefined, { row: { ...velvetRow, stage: 'DRAWN_IN' }, reason: 'opening' })).context.relationship.style_examples;
-  assert.match(withMemories[0].dialogue[0].user, /다시 찾아왔다/);
-});
-
-test('the room switch turns the examples off for that room only, and an unreadable switch means on', async () => {
-  const text = '그건 네 해석이고, 난 다르게 봐.';
-  const off = await relationshipModelInput(text, { styleFlag: false });
-  assert.equal(off.context.relationship.style_examples, undefined, 'switched off in this room');
-  assert.equal(off.context.relationship.stage.id, 'INTRIGUED'); assert.ok(off.context.relationship.memories.length > 0, 'the relationship itself is unchanged');
-  for (const [name, flag] of [['on', true], ['not set', undefined], ['unreadable', 'error']]) {
-    const sent = (await relationshipModelInput(text, { styleFlag: flag })).context.relationship.style_examples;
-    assert.ok(sent?.length >= 3, `examples are sent when the switch is ${name}`);
-  }
-});
-
-test('only a developer sees whether a room uses the examples', async () => {
-  for (const [developer, flag] of [[true, false], [true, true], [false, false]]) {
-    let body;
-    await withServiceKey(() => run(async url => {
-      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'Dev@Example.com' });
-      if (url.includes('select=style_examples')) return result([{ style_examples: flag }]);
-      if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'velvet', capacity: 1, ai_mood: null }]);
-      if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
-      throw new Error('Unexpected fetch ' + url);
-    }, async () => { body = await (await handler(request({ action: 'relationship', roomId }))).json(); }), developer ? { LOUNGE_RELATIONSHIP_DEBUG_USERS: 'dev@example.com' } : {});
-    assert.equal(body.relationship.styleExamples, developer ? flag : undefined);
-  }
-});
-
-test('LOUNGE_STYLE_EXAMPLES=off removes the examples without touching anything else', async () => {
-  const { body, context } = await relationshipModelInput('그건 네 해석이고, 난 다르게 봐.', { env: { LOUNGE_STYLE_EXAMPLES: 'off' } });
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom()]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '솔직히 사라지고 싶어.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/responses')) { sent = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] }); }
+    if (url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge_relationship')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200); }));
+  const context = JSON.parse(sent.input);
   assert.equal(context.relationship.style_examples, undefined);
-  assert.equal(context.relationship.stage.id, 'INTRIGUED'); assert.ok(context.relationship.memories.length > 0);
-  assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
+  assert.equal(context.relationship.stage.id, 'INTRIGUED');
+  assert.doesNotMatch(sent.instructions, /style_examples/);
+  assert.match(sent.instructions, /자살예방상담전화 109/);
 });
 
 // One relationship turn with long-term memory available; returns what the model was sent and what was saved.
@@ -898,7 +836,6 @@ async function memoryTurn({ userText = '인터뷰 다 했어. 그리고 퇴사�
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_memories?')) return memories === 'error' ? new Response('{}', { status: 404 }) : result(memories);
       if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
-      if (url.includes('select=style_examples')) return result([{}]);
       if (url.includes('voice_lounge_rooms?host_id=')) return result(previousRooms);
       if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ ai_turns: aiTurns })]);
       if (url.includes('voice_lounge_messages?')) return result(userText ? [{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: userText }] : []);
