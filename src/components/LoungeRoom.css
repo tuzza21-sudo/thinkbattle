@@ -20,8 +20,8 @@
 .lounge-scene { position:relative; height:100%; min-height:0; padding:24px; display:grid; grid-template-rows:auto minmax(0,1fr); gap:22px; isolation:isolate; }
 .lounge-scene::before { content:''; position:absolute; z-index:-2; inset:0; background:var(--lounge-scene-image) center center/cover no-repeat; }
 .lounge-scene::after { content:''; position:absolute; z-index:-1; inset:0; pointer-events:none; background:linear-gradient(180deg,#0c171847,transparent 35%,transparent 70%,#10201b28); }
-.has-room .lounge-moderator,.lounge-guidance:not(:empty),.lounge-participant-controls { background:#12211bb3; border:1px solid #ffffff24; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); box-shadow:0 8px 28px #00000012; }
-.lounge-scene-heading { display:flex; flex-direction:column; gap:14px; padding:8px 4px; background:none; border:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; text-shadow:0 1px 6px #0009; }
+.has-room .lounge-moderator,.lounge-guidance:not(:empty),.lounge-participant-controls { background:#12211bb3; border:1px solid #ffffff24; backdrop-filter:blur(16px); box-shadow:0 8px 28px #00000012; }
+.lounge-scene-heading { display:flex; flex-direction:column; gap:14px; padding:8px 4px; background:none; border:0; box-shadow:none; backdrop-filter:none; text-shadow:0 1px 6px #0009; }
 .has-room .lounge-room-topline { align-items:center; gap:18px; margin:0; }
 .has-room .lounge-room-topline>div:first-child { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-width:0; }
 .has-room .lounge-room-topline h1 { color:#fff5e6; font-size:14px; font-weight:500; letter-spacing:-.3px; margin:0; }
@@ -382,9 +382,9 @@
 
 /* Conversation and controls live beside the people, leaving the scenery open. */
 .lounge-conversation-space { grid-template-columns:minmax(260px,420px) minmax(0,1fr) minmax(300px,380px); }
-.has-room .lounge-moderator,.lounge-guidance:not(:empty),.has-room .lounge-participant-controls { background:transparent; border:0; border-radius:0; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+.has-room .lounge-moderator,.lounge-guidance:not(:empty),.has-room .lounge-participant-controls { background:transparent; border:0; border-radius:0; box-shadow:none; backdrop-filter:none; }
 .has-room .lounge-moderator { padding:10px 0; text-shadow:0 1px 5px #000b; }
-.has-room .lounge-host-bubble { padding:12px; border-radius:12px; background:transparent; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); text-shadow:0 1px 4px #000d; }
+.has-room .lounge-host-bubble { padding:12px; border-radius:12px; background:transparent; backdrop-filter:blur(5px); text-shadow:0 1px 4px #000d; }
 .lounge-guidance { text-shadow:0 1px 4px #000c; }
 .lounge-participant-panel { gap:14px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#ffffff40 transparent; padding:0 4px 4px; }
 .lounge-participant-roster { display:flex; flex-direction:column; gap:10px; min-height:0; flex-shrink:0; }
@@ -418,7 +418,7 @@
 .lounge-participant-log article { padding:0 2px 14px; }
 .lounge-participant-log strong { display:block; color:var(--lounge-accent); font-weight:500; font-size:10px; margin-bottom:5px; }
 .lounge-participant-log article.self { text-align:right; }
-.lounge-participant-log p { margin:0; padding:5px 8px; border-radius:8px; background:transparent; backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); font-size:13px; line-height:1.8; overflow-wrap:anywhere; white-space:pre-wrap; }
+.lounge-participant-log p { margin:0; padding:5px 8px; border-radius:8px; background:transparent; backdrop-filter:blur(5px); font-size:13px; line-height:1.8; overflow-wrap:anywhere; white-space:pre-wrap; }
 .lounge-participant-log .lounge-participant-empty { font-size:11px; color:#e1e6da; }
 @media(min-width:761px) {
   .lounge-host-column { grid-column:1; grid-row:1; }
@@ -642,21 +642,22 @@
 
 /* Conversation bubbles: sized to their text and opaque enough to read over any scene. The moderator speaks on the left,
    people on the right. A person's bubble is no wider than the area their portraits occupy (at least 360px). */
-/* Bubble look as it was before the glass experiments: transparent background, a light 5px blur, white text with a soft shadow. */
-.has-room .lounge-room-main { --lounge-bubble-host:transparent; --lounge-bubble-person:transparent; --lounge-bubble-self:transparent; --lounge-bubble-line:transparent; --lounge-bubble-blur:blur(5px); --lounge-bubble-text:#fff5e9; --lounge-bubble-text-shadow:0 1px 4px #000c; }
+/* Bubble look as it was before the glass experiments: transparent background, a light 5px blur, white text with a soft shadow.
+   The blur is written out instead of read from a variable: the production CSS minifier drops `backdrop-filter:var(...)`, so the blur showed locally but not on the site. */
+.has-room .lounge-room-main { --lounge-bubble-host:transparent; --lounge-bubble-person:transparent; --lounge-bubble-self:transparent; --lounge-bubble-line:transparent; --lounge-bubble-text:#fff5e9; --lounge-bubble-text-shadow:0 1px 4px #000c; }
 .has-room .lounge-participant-log { position:relative; display:flex; flex-direction:column; gap:12px; }
 .has-room .lounge-participant-log.spotlight::after { content:''; flex:0 0 38vh; }
 /* No mask on the log: a masked ancestor stops the bubbles' backdrop blur from reaching the scene. */
 .has-room .lounge-participant-log>* { flex-shrink:0; }
 .has-room .lounge-participant-log .lounge-guidance:not(:empty) * { color:inherit; }
 .has-room .lounge-participant-log .lounge-guidance:not(:empty) a { text-decoration:underline; }
-.has-room .lounge-participant-log .lounge-guidance:not(:empty) { align-self:flex-start; width:fit-content; max-width:min(100%,max(var(--lounge-roster-width,360px),360px)); margin:0; padding:10px 14px; background:#12211bb3; border:1px solid #ffffff24; border-radius:16px; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+.has-room .lounge-participant-log .lounge-guidance:not(:empty) { align-self:flex-start; width:fit-content; max-width:min(100%,max(var(--lounge-roster-width,360px),360px)); margin:0; padding:10px 14px; background:#12211bb3; border:1px solid #ffffff24; border-radius:16px; backdrop-filter:blur(16px); }
 .has-room .lounge-participant-log .lounge-host-message,.has-room .lounge-participant-log article { margin:0; padding:0; display:flex; flex-direction:column; min-width:0; }
 .has-room .lounge-participant-log .lounge-host-message { align-self:flex-start; align-items:flex-start; max-width:min(100%,max(var(--lounge-roster-width,360px),360px)); }
 .has-room .lounge-participant-log article { align-self:flex-end; align-items:flex-end; max-width:min(100%,max(var(--lounge-roster-width,360px),360px)); }
 .has-room .lounge-participant-log .lounge-host-message>strong,.has-room .lounge-participant-log article>strong { margin:0 4px 5px; }
-.has-room .lounge-participant-log .lounge-host-bubble,.has-room .lounge-participant-log article p { width:fit-content; max-width:100%; margin:0; padding:5px 8px; border:0; border-radius:8px; backdrop-filter:var(--lounge-bubble-blur); -webkit-backdrop-filter:var(--lounge-bubble-blur); text-shadow:var(--lounge-bubble-text-shadow); box-shadow:none; font-size:14px; line-height:1.85; overflow:visible; white-space:pre-wrap; overflow-wrap:anywhere; text-align:left; color:var(--lounge-bubble-text); }
-.has-room .lounge-participant-log .lounge-participant-empty { align-self:flex-end; width:fit-content; max-width:100%; padding:5px 8px; border-radius:8px; background:transparent; backdrop-filter:var(--lounge-bubble-blur); -webkit-backdrop-filter:var(--lounge-bubble-blur); font-size:11px; color:#e1e6da; }
+.has-room .lounge-participant-log .lounge-host-bubble,.has-room .lounge-participant-log article p { width:fit-content; max-width:100%; margin:0; padding:5px 8px; border:0; border-radius:8px; backdrop-filter:blur(5px); text-shadow:var(--lounge-bubble-text-shadow); box-shadow:none; font-size:14px; line-height:1.85; overflow:visible; white-space:pre-wrap; overflow-wrap:anywhere; text-align:left; color:var(--lounge-bubble-text); }
+.has-room .lounge-participant-log .lounge-participant-empty { align-self:flex-end; width:fit-content; max-width:100%; padding:5px 8px; border-radius:8px; background:transparent; backdrop-filter:blur(5px); font-size:11px; color:#e1e6da; }
 .has-room .lounge-participant-log .lounge-host-bubble { background:var(--lounge-bubble-host); }
 .has-room .lounge-participant-log article p { background:var(--lounge-bubble-person); font-size:13px; line-height:1.8; }
 @media(max-width:760px) {
