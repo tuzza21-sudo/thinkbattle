@@ -697,11 +697,11 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
         assert.equal(response.status, 200);
         if (streaming) {
           const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
-          assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'audio', 'done']);
+          assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
         } else assert.equal((await response.json()).text, spoken);
-        // Streamed speech is requested one sentence at a time, so a stall costs one sentence.
-        assert.deepEqual(inputs, streaming ? ['산행 뒤 먹은 만두가 가장 기억에 남았군요.', '어떤 점이 좋았어요?'] : [spoken]);
-        assert.equal(speechCalls, streaming ? 2 : 1);
+        // One request for the whole reply: splitting it into sentences made speech start and end later.
+        assert.deepEqual(inputs, [spoken]);
+        assert.equal(speechCalls, 1, 'one shared voice request serves the turn');
       });
     }
   }
@@ -1540,7 +1540,7 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
         spokenInputs.push(JSON.parse(init.body).input);
         // Every sentence gets more than the former 25 seconds.
         assert.ok(deadlines.at(-1).milliseconds > 25_001, 'speech was given only 25 seconds');
-        return new Response(new ReadableStream({ start(controller) { for (let index = 0; index < 16; index++) controller.enqueue(new Uint8Array(16_384)); controller.close(); } }));
+        return new Response(new ReadableStream({ start(controller) { for (let index = 0; index < 256; index++) controller.enqueue(new Uint8Array(16_384)); controller.close(); } }));
       }
       throw new Error('Unexpected fetch');
     }, async () => {
@@ -1548,10 +1548,9 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
       const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
       assert.equal(events[0].text, text); assert.equal(events.at(-1).type, 'done');
       assert.equal(events.some(event => event.type === 'error'), false);
-      assert.equal(spokenInputs.join(' '), text.trim(), 'every sentence is spoken once, in order');
-      assert.ok(spokenInputs.length > 1);
+      assert.deepEqual(spokenInputs, [text], 'the whole reply is spoken by one request');
       const bytes = events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0);
-      assert.equal(bytes, spokenInputs.length * 262_144); assert.ok(bytes > 3_000_000, 'more than the former 3MB cap');
+      assert.equal(bytes, 4_194_304, 'more than the former 3MB cap');
     });
   } finally { AbortSignal.timeout = originalTimeout; }
 });
@@ -1631,7 +1630,7 @@ test('TTS recovery is bounded, never repeats transmitted audio, and does not ret
   }
 });
 
-test('a speech request that stalls before or during a sentence is requested again, without repeating sent audio', async () => {
+test('a speech request that stalls before or during the reply is requested again, without repeating sent audio', async () => {
   const saved = { ...lounge.loungeSpeechStall };
   Object.assign(lounge.loungeSpeechStall, { firstAudioMs: 40, gapMs: 40 });
   const silent = signal => new Response(new ReadableStream({ start(controller) { signal.addEventListener('abort', () => controller.error(signal.reason), { once: true }); } }));
@@ -1648,17 +1647,18 @@ test('a speech request that stalls before or during a sentence is requested agai
         if (url.includes('finish_voice_lounge_host')) return result(true);
         if (url.endsWith('/audio/speech')) {
           calls++; inputs.push(JSON.parse(init.body).input);
-          // The first sentence stalls once: with no audio at all, or after its first four bytes.
+          // The first request stalls: with no audio at all, or after its first four bytes.
           if (calls === 1) return stall === 'before' ? silent(init.signal) : partThenSilent(init.signal, new Uint8Array([1, 0, 2, 0]));
-          return new Response(new Uint8Array(calls === 2 ? [1, 0, 2, 0, 3, 0, 4, 0] : [5, 0, 6, 0]));
+          return new Response(new Uint8Array([1, 0, 2, 0, 3, 0, 4, 0]));
         }
         throw new Error('Unexpected fetch');
       }, async () => {
         const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
         assert.equal(events.at(-1).type, 'done', stall);
-        assert.deepEqual(inputs, ['마지막 장면이 오래 남았다니 반가워요.', '마지막 장면이 오래 남았다니 반가워요.', '어떤 점이 좋았어요?'], 'only the stalled sentence is requested again');
+        const reply = '마지막 장면이 오래 남았다니 반가워요. 어떤 점이 좋았어요?';
+        assert.deepEqual(inputs, [reply, reply], 'the stalled reply is requested once more');
         const audio = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
-        assert.deepEqual([...audio], [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0], 'the retry continues where the stalled audio stopped');
+        assert.deepEqual([...audio], [1, 0, 2, 0, 3, 0, 4, 0], 'the retry continues where the stalled audio stopped');
       });
     }
   } finally { Object.assign(lounge.loungeSpeechStall, saved); }
@@ -1714,12 +1714,6 @@ test('a transcription that times out on both requests explains itself in Korean 
     const body = await response.json();
     assert.equal(body.code, 'lounge_upstream_timeout'); assert.equal(body.retryable, true); assert.doesNotMatch(body.error, /aborted/);
   });
-});
-
-test('sentences for speech keep numbers whole and join short pieces', () => {
-  assert.deepEqual(lounge.loungeSpeechChunks('전환율이 3.5배 올랐어요. 좋아요! 그다음엔 무엇을 해 볼까요?'), ['전환율이 3.5배 올랐어요. 좋아요!', '그다음엔 무엇을 해 볼까요?']);
-  assert.deepEqual(lounge.loungeSpeechChunks('그래.'), ['그래.']);
-  assert.deepEqual(lounge.loungeSpeechChunks('왔군. 요즘 고민이라… 머릿속에서 제일 자주 되감기는 게 뭐야?'), ['왔군. 요즘 고민이라… 머릿속에서 제일 자주 되감기는 게 뭐야?'], 'a short opening is not spoken on its own');
 });
 
 test('stream failures preserve billing metadata after host text is saved', async () => {

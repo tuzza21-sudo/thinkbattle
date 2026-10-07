@@ -210,26 +210,10 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
 }
 
 /**
- * A reply split into sentences for speech, so a stalled request costs one sentence instead of the whole reply.
- * Short pieces join their neighbour; a number such as 3.5 is not a sentence end because no space follows the dot.
- */
-export function loungeSpeechChunks(input: string, minLength = 20) {
-  const chunks: string[] = [];
-  for (const part of input.trim().split(/(?<=[.!?…~])\s+/)) {
-    const text = part.trim();
-    if (!text) continue;
-    const last = chunks.at(-1);
-    if (last !== undefined && (last.length < minLength || text.length < minLength / 2)) chunks[chunks.length - 1] = `${last} ${text}`;
-    else chunks.push(text);
-  }
-  return chunks.length ? chunks : [input.trim()];
-}
-
-/**
  * OpenAI speech sometimes stops sending for tens of seconds (3 of 16 requests on 2026-10-07; normally the
  * first audio arrives within 1.3 s and packets are at most 0.8 s apart). A second request is started when the
  * first audio is `hedgeAfterMs` late, a request with no audio after `firstAudioMs` or a `gapMs` pause is given up,
- * and each sentence gets at most `attempts` tries.
+ * and a reply gets at most `attempts` tries.
  */
 export const loungeSpeechStall = { hedgeAfterMs: 2500, firstAudioMs: 8000, gapMs: 4000, attempts: 3 };
 

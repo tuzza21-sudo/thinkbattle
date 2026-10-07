@@ -1,4 +1,4 @@
-import { getLoungeHost, isLoungeHelpKind, loungeSpeechChunks, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeHelpKind, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
@@ -495,11 +495,11 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
     // so a sentence whose first audio or next packet is late is requested again. A retry after part of the
     // sentence was sent skips that many bytes of the new audio: the listener may hear a small seam, never a repeat.
     // One speech request up to its first audio. A request that sends nothing for firstAudioMs is given up.
-    const openSpeech = async (chunk: string, signal: AbortSignal, hedge: AbortSignal) => {
+    const openSpeech = async (text: string, signal: AbortSignal, hedge: AbortSignal) => {
       const stall = new AbortController();
       const timer = setTimeout(() => stall.abort(new DOMException('speech stalled', 'TimeoutError')), loungeSpeechStall.firstAudioMs);
       try {
-        const response = await openai('audio/speech', JSON.stringify(loungeSpeechRequest(host.id, chunk, 'pcm')), AbortSignal.any([req.signal, signal, hedge, stall.signal]), loungeSpeechLimits(chunk).timeoutMs);
+        const response = await openai('audio/speech', JSON.stringify(loungeSpeechRequest(host.id, text, 'pcm')), AbortSignal.any([req.signal, signal, hedge, stall.signal]), loungeSpeechLimits(text).timeoutMs);
         if (!response.body) throw new Error('empty audio');
         const reader = response.body.getReader();
         try {
@@ -511,52 +511,51 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
       } finally { clearTimeout(timer); }
     };
     const streamSpeech = async (text: string, send: (event: unknown) => void, signal: AbortSignal, track: (reader?: ReadableStreamDefaultReader<Uint8Array>) => void) => {
-      const chunks = loungeSpeechChunks(text);
+      // One request for the whole reply: splitting it into sentences made each reply wait on more requests
+      // (first audio +0.2 s, last audio +2.7 s on 2026-10-07) for no gain once retries skip what was sent.
       const limits = loungeSpeechLimits(text);
       const started = performance.now();
       const stats = { firstMs: -1, maxGapMs: 0, retries: 0, hedges: 0, failed: false };
       let bytesSent = 0;
       try {
-        for (const chunk of chunks) {
-          let chunkSent = 0;
-          for (let attempt = 1; ; attempt++) {
-            let reader: ReadableStreamDefaultReader<Uint8Array> | undefined, stall: AbortController | undefined, timer: ReturnType<typeof setTimeout> | undefined;
-            try {
-              // The first audio of each request is raced against a second request if it is slow.
-              const opened = await hedged(hedge => openSpeech(chunk, signal, hedge), loungeSpeechStall.hedgeAfterMs, transientUpstream, () => { stats.hedges++; });
-              reader = opened.reader; stall = opened.stall; track(reader);
-              const stalled = () => stall?.abort(new DOMException('speech stalled', 'TimeoutError'));
-              let received = 0, last = 0, next: { done: boolean; value?: Uint8Array } = { done: false, value: opened.first };
-              while (!signal.aborted && !next.done) {
-                clearTimeout(timer); timer = setTimeout(stalled, loungeSpeechStall.gapMs);
-                const now = performance.now();
-                if (stats.firstMs < 0) stats.firstMs = Math.round(now - started);
-                if (last) stats.maxGapMs = Math.max(stats.maxGapMs, Math.round(now - last));
-                last = now;
-                const value = next.value ?? new Uint8Array();
-                const fresh = value.subarray(Math.max(0, Math.min(value.length, chunkSent - received)));
-                received += value.length;
-                if (bytesSent + fresh.length > limits.maxPcmBytes) throw new LoungeUpstreamError('사회자 음성이 허용 길이를 넘었어요. 남은 내용은 대화 기록에서 확인해 주세요.', 502, 'lounge_audio_too_long', true, 60);
-                for (let offset = 0; offset < fresh.length; offset += 16_384) {
-                  const packet = fresh.subarray(offset, offset + 16_384);
-                  let binary = ''; for (const byte of packet) binary += String.fromCharCode(byte);
-                  send({ type: 'audio', audio: btoa(binary) }); bytesSent += packet.length; chunkSent += packet.length;
-                }
-                next = await reader.read();
+        for (let attempt = 1; ; attempt++) {
+          let reader: ReadableStreamDefaultReader<Uint8Array> | undefined, stall: AbortController | undefined, timer: ReturnType<typeof setTimeout> | undefined;
+          try {
+            // The first audio is raced against a second request if it is slow.
+            const opened = await hedged(hedge => openSpeech(text, signal, hedge), loungeSpeechStall.hedgeAfterMs, transientUpstream, () => { stats.hedges++; });
+            reader = opened.reader; stall = opened.stall; track(reader);
+            const stalled = () => stall?.abort(new DOMException('speech stalled', 'TimeoutError'));
+            let received = 0, last = 0, next: { done: boolean; value?: Uint8Array } = { done: false, value: opened.first };
+            while (!signal.aborted && !next.done) {
+              clearTimeout(timer); timer = setTimeout(stalled, loungeSpeechStall.gapMs);
+              const now = performance.now();
+              if (stats.firstMs < 0) stats.firstMs = Math.round(now - started);
+              if (last) stats.maxGapMs = Math.max(stats.maxGapMs, Math.round(now - last));
+              last = now;
+              // A retry is new audio of the same text: skip as many bytes as were already sent, so nothing repeats.
+              const value = next.value ?? new Uint8Array();
+              const fresh = value.subarray(Math.max(0, Math.min(value.length, bytesSent - received)));
+              received += value.length;
+              if (bytesSent + fresh.length > limits.maxPcmBytes) throw new LoungeUpstreamError('사회자 음성이 허용 길이를 넘었어요. 남은 내용은 대화 기록에서 확인해 주세요.', 502, 'lounge_audio_too_long', true, 60);
+              for (let offset = 0; offset < fresh.length; offset += 16_384) {
+                const packet = fresh.subarray(offset, offset + 16_384);
+                let binary = ''; for (const byte of packet) binary += String.fromCharCode(byte);
+                send({ type: 'audio', audio: btoa(binary) }); bytesSent += packet.length;
               }
-              await reader.cancel().catch(() => {}); reader.releaseLock(); track(undefined);
-              break;
-            } catch (error) {
-              await reader?.cancel().catch(() => {}); reader?.releaseLock(); track(undefined);
-              const cancelled = req.signal.aborted || signal.aborted;
-              const stalledOut = Boolean(stall?.signal.aborted) || (error instanceof Error && error.name === 'TimeoutError');
-              if (attempt < loungeSpeechStall.attempts && (stalledOut || transientUpstream(error)) && !cancelled) { stats.retries++; continue; }
-              throw stall?.signal.aborted && !cancelled ? stall.signal.reason : error;
-            } finally { clearTimeout(timer); }
-          }
+              next = await reader.read();
+            }
+            await reader.cancel().catch(() => {}); reader.releaseLock(); track(undefined);
+            return;
+          } catch (error) {
+            await reader?.cancel().catch(() => {}); reader?.releaseLock(); track(undefined);
+            const cancelled = req.signal.aborted || signal.aborted;
+            const stalledOut = Boolean(stall?.signal.aborted) || (error instanceof Error && error.name === 'TimeoutError');
+            if (attempt < loungeSpeechStall.attempts && (stalledOut || transientUpstream(error)) && !cancelled) { stats.retries++; continue; }
+            throw stall?.signal.aborted && !cancelled ? stall.signal.reason : error;
+          } finally { clearTimeout(timer); }
         }
       } catch (error) { stats.failed = true; throw error; }
-      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, sentences: chunks.length, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed })); }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed })); }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'
