@@ -667,7 +667,7 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
   for (const host of lounge.loungeHosts) {
     for (const streaming of [false, true]) {
       const spoken = '산행 뒤 먹은 만두가 가장 기억에 남았군요. 어떤 점이 좋았어요?';
-      let speechCalls = 0;
+      let speechCalls = 0; const inputs = [];
       await run(async (url, init) => {
         if (url.includes('/auth/')) return result({ id: 'host' });
         if (url.includes('claim_voice_lounge_host')) return result('ticket');
@@ -686,7 +686,7 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
           assert.equal(body.speed, host.speechSpeed);
           assert.ok(body.instructions.includes(host.speechInstruction), 'voice delivery uses speech-specific directions');
           assert.ok(!body.instructions.includes(host.instruction) && !body.instructions.includes(host.companion), 'conversation examples are not speech performance instructions');
-          assert.equal(body.input, spoken);
+          inputs.push(body.input);
           assert.equal(body.response_format, streaming ? 'pcm' : 'mp3');
           return new Response(new Uint8Array([0, 128, 255, 127]));
         }
@@ -697,9 +697,11 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
         assert.equal(response.status, 200);
         if (streaming) {
           const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
-          assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+          assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'audio', 'done']);
         } else assert.equal((await response.json()).text, spoken);
-        assert.equal(speechCalls, 1, 'one shared voice request serves the turn');
+        // Streamed speech is requested one sentence at a time, so a stall costs one sentence.
+        assert.deepEqual(inputs, streaming ? ['산행 뒤 먹은 만두가 가장 기억에 남았군요.', '어떤 점이 좋았어요?'] : [spoken]);
+        assert.equal(speechCalls, streaming ? 2 : 1);
       });
     }
   }
@@ -1204,6 +1206,19 @@ test('transcription is gated and attributed through the authenticated member RPC
     assert.equal(response.status, 200); assert.equal(paid, 1); assert.equal(posted, true);
   });
 });
+// No transcription prompt: on 2026-10-07 a prompt with the room topic and the AI's last sentence came back as the
+// transcript of silence and of noise 6 times out of 6, and did not fix the misheard word in real speech.
+test('transcription sends no prompt that could come back as the speaker\'s words', async () => {
+  let form;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'guest' });
+    if (url.includes('claim_voice_lounge_audio')) return result(true);
+    if (url.endsWith('/audio/transcriptions')) { form = init.body; return result({ text: '인터뷰 세 명 다 했어' }); }
+    if (url.includes('post_voice_lounge_message')) return new Response(null, { status: 204 });
+    throw new Error('Unexpected fetch');
+  }, async () => assert.equal((await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm;codecs=opus' }))).status, 200));
+  assert.equal(form.get('prompt'), null); assert.equal(form.get('model'), 'gpt-4o-mini-transcribe');
+});
 test('a transcript saved inside the two-second message gap is retried once instead of failing the speaker', async () => {
   for (const [rejections, expected] of [[1, 200], [2, 429]]) {
     let paid = 0, posts = 0;
@@ -1547,7 +1562,7 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
   const deadlines = [];
   AbortSignal.timeout = milliseconds => { const controller = new AbortController(); deadlines.push({ milliseconds, controller }); return controller.signal; };
   const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 600);
-  let speechSignal, speechDeadline, upstream;
+  const spokenInputs = [];
   try {
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -1557,25 +1572,21 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
       if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text, memory: '' }) }] }] });
       if (url.includes('finish_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_text, text); return result(true); }
       if (url.endsWith('/audio/speech')) {
-        assert.equal(JSON.parse(init.body).input, text);
-        speechSignal = init.signal; speechDeadline = deadlines.at(-1);
-        return new Response(new ReadableStream({ start(controller) { upstream = controller; speechSignal.addEventListener('abort', () => controller.error(speechSignal.reason), { once: true }); } }));
+        spokenInputs.push(JSON.parse(init.body).input);
+        // Every sentence gets more than the former 25 seconds.
+        assert.ok(deadlines.at(-1).milliseconds > 25_001, 'speech was given only 25 seconds');
+        return new Response(new ReadableStream({ start(controller) { for (let index = 0; index < 16; index++) controller.enqueue(new Uint8Array(16_384)); controller.close(); } }));
       }
       throw new Error('Unexpected fetch');
     }, async () => {
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
-      const eventsPromise = response.text();
-      // One-to-one replies open the stream first and start speech inside it.
-      for (let wait = 0; wait < 200 && !speechDeadline; wait++) await new Promise(resolve => setTimeout(resolve, 5));
-      // Advance only the TTS deadline virtually, not wall time or completed RPCs.
-      if (speechDeadline.milliseconds <= 25_001) speechDeadline.controller.abort(new DOMException('deadline', 'TimeoutError'));
-      assert.equal(speechSignal.aborted, false, 'long speech was cancelled after just 25 seconds');
-      for (let index = 0; index < 256; index++) upstream.enqueue(new Uint8Array(16_384));
-      upstream.close();
-      const events = (await eventsPromise).trim().split('\n').map(line => JSON.parse(line));
+      const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
       assert.equal(events[0].text, text); assert.equal(events.at(-1).type, 'done');
       assert.equal(events.some(event => event.type === 'error'), false);
-      assert.equal(events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0), 4_194_304);
+      assert.equal(spokenInputs.join(' '), text.trim(), 'every sentence is spoken once, in order');
+      assert.ok(spokenInputs.length > 1);
+      const bytes = events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0);
+      assert.equal(bytes, spokenInputs.length * 262_144); assert.ok(bytes > 3_000_000, 'more than the former 3MB cap');
     });
   } finally { AbortSignal.timeout = originalTimeout; }
 });
@@ -1625,7 +1636,7 @@ test('a transient TTS failure before the first audio retries the same saved text
   }
 });
 
-test('TTS recovery is bounded and never repeats already transmitted syllables or immediate rate limits', async () => {
+test('TTS recovery is bounded, never repeats transmitted audio, and does not retry rate limits', async () => {
   for (const failure of ['empty', 'partial', 'rate_limit']) {
     let speech = 0;
     await run(async url => {
@@ -1647,10 +1658,50 @@ test('TTS recovery is bounded and never repeats already transmitted syllables or
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
       assert.equal(events.at(-1).type, 'error'); assert.equal(events.some(event => event.type === 'done'), false);
-      assert.equal(speech, failure === 'empty' ? 2 : 1);
+      assert.equal(speech, failure === 'rate_limit' ? 1 : lounge.loungeSpeechStall.attempts);
+      // A retry after a partial sentence skips the bytes already sent, so the same audio is never sent twice.
       assert.equal(events.filter(event => event.type === 'audio').length, failure === 'partial' ? 1 : 0);
     });
   }
+});
+
+test('a speech request that stalls before or during a sentence is requested again, without repeating sent audio', async () => {
+  const saved = { ...lounge.loungeSpeechStall };
+  Object.assign(lounge.loungeSpeechStall, { firstAudioMs: 40, gapMs: 40 });
+  const silent = signal => new Response(new ReadableStream({ start(controller) { signal.addEventListener('abort', () => controller.error(signal.reason), { once: true }); } }));
+  const partThenSilent = (signal, bytes) => new Response(new ReadableStream({ start(controller) { controller.enqueue(bytes); signal.addEventListener('abort', () => controller.error(signal.reason), { once: true }); } }));
+  try {
+    for (const stall of ['before', 'during']) {
+      const inputs = []; let calls = 0;
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '마지막 장면이 오래 남았다니 반가워요. 어떤 점이 좋았어요?', memory: '' }) }] }] });
+        if (url.includes('finish_voice_lounge_host')) return result(true);
+        if (url.endsWith('/audio/speech')) {
+          calls++; inputs.push(JSON.parse(init.body).input);
+          // The first sentence stalls once: with no audio at all, or after its first four bytes.
+          if (calls === 1) return stall === 'before' ? silent(init.signal) : partThenSilent(init.signal, new Uint8Array([1, 0, 2, 0]));
+          return new Response(new Uint8Array(calls === 2 ? [1, 0, 2, 0, 3, 0, 4, 0] : [5, 0, 6, 0]));
+        }
+        throw new Error('Unexpected fetch');
+      }, async () => {
+        const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+        assert.equal(events.at(-1).type, 'done', stall);
+        assert.deepEqual(inputs, ['마지막 장면이 오래 남았다니 반가워요.', '마지막 장면이 오래 남았다니 반가워요.', '어떤 점이 좋았어요?'], 'only the stalled sentence is requested again');
+        const audio = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.deepEqual([...audio], [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0], 'the retry continues where the stalled audio stopped');
+      });
+    }
+  } finally { Object.assign(lounge.loungeSpeechStall, saved); }
+});
+
+test('sentences for speech keep numbers whole and join short pieces', () => {
+  assert.deepEqual(lounge.loungeSpeechChunks('전환율이 3.5배 올랐어요. 좋아요! 그다음엔 무엇을 해 볼까요?'), ['전환율이 3.5배 올랐어요. 좋아요!', '그다음엔 무엇을 해 볼까요?']);
+  assert.deepEqual(lounge.loungeSpeechChunks('그래.'), ['그래.']);
+  assert.deepEqual(lounge.loungeSpeechChunks('왔군. 요즘 고민이라… 머릿속에서 제일 자주 되감기는 게 뭐야?'), ['왔군. 요즘 고민이라… 머릿속에서 제일 자주 되감기는 게 뭐야?'], 'a short opening is not spoken on its own');
 });
 
 test('stream failures preserve billing metadata after host text is saved', async () => {

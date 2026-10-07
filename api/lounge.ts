@@ -1,4 +1,4 @@
-import { getLoungeHost, isLoungeHelpKind, loungeSpeechLimits, loungeSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeHelpKind, loungeSpeechChunks, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
@@ -463,39 +463,59 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
         if (!response.ok) console.warn('[Lounge memory] not saved', response.status);
       } catch (error) { console.warn('[Lounge memory] not saved', error instanceof Error ? error.name : 'error'); }
     }
-    // Streams PCM for a reply. Retries once, and only before any audio was sent:
-    // repeating an audible prefix would repeat the first syllables.
+    // Streams PCM for a reply one sentence at a time. OpenAI speech sometimes stops sending for tens of seconds,
+    // so a sentence whose first audio or next packet is late is requested again. A retry after part of the
+    // sentence was sent skips that many bytes of the new audio: the listener may hear a small seam, never a repeat.
     const streamSpeech = async (text: string, send: (event: unknown) => void, signal: AbortSignal, track: (reader?: ReadableStreamDefaultReader<Uint8Array>) => void) => {
+      const chunks = loungeSpeechChunks(text);
       const limits = loungeSpeechLimits(text);
+      const started = performance.now();
+      const stats = { firstMs: -1, maxGapMs: 0, retries: 0, failed: false };
       let bytesSent = 0;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-        try {
-          const response = await openai('audio/speech', JSON.stringify(loungeSpeechRequest(host.id, text, 'pcm')), AbortSignal.any([req.signal, signal]), limits.timeoutMs);
-          if (!response.body) throw new Error('empty audio');
-          reader = response.body.getReader(); track(reader);
-          let bytesRead = 0;
-          while (!signal.aborted) {
-            const chunk = await reader.read();
-            if (chunk.done) break;
-            bytesRead += chunk.value.length;
-            if (bytesRead > limits.maxPcmBytes) throw new LoungeUpstreamError('사회자 음성이 허용 길이를 넘었어요. 남은 내용은 대화 기록에서 확인해 주세요.', 502, 'lounge_audio_too_long', true, 60);
-            for (let offset = 0; offset < chunk.value.length; offset += 16_384) {
-              const packet = chunk.value.subarray(offset, offset + 16_384);
-              let binary = ''; for (const byte of packet) binary += String.fromCharCode(byte);
-              send({ type: 'audio', audio: btoa(binary) }); bytesSent += packet.length;
-            }
+      try {
+        for (const chunk of chunks) {
+          let chunkSent = 0;
+          for (let attempt = 1; ; attempt++) {
+            let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+            const stall = new AbortController();
+            const stalled = () => stall.abort(new DOMException('speech stalled', 'TimeoutError'));
+            let timer = setTimeout(stalled, loungeSpeechStall.firstAudioMs);
+            try {
+              const response = await openai('audio/speech', JSON.stringify(loungeSpeechRequest(host.id, chunk, 'pcm')), AbortSignal.any([req.signal, signal, stall.signal]), loungeSpeechLimits(chunk).timeoutMs);
+              if (!response.body) throw new Error('empty audio');
+              reader = response.body.getReader(); track(reader);
+              let received = 0, last = 0;
+              while (!signal.aborted) {
+                const result = await reader.read();
+                if (result.done) break;
+                clearTimeout(timer); timer = setTimeout(stalled, loungeSpeechStall.gapMs);
+                const now = performance.now();
+                if (stats.firstMs < 0) stats.firstMs = Math.round(now - started);
+                if (last) stats.maxGapMs = Math.max(stats.maxGapMs, Math.round(now - last));
+                last = now;
+                const fresh = result.value.subarray(Math.max(0, Math.min(result.value.length, chunkSent - received)));
+                received += result.value.length;
+                if (bytesSent + fresh.length > limits.maxPcmBytes) throw new LoungeUpstreamError('사회자 음성이 허용 길이를 넘었어요. 남은 내용은 대화 기록에서 확인해 주세요.', 502, 'lounge_audio_too_long', true, 60);
+                for (let offset = 0; offset < fresh.length; offset += 16_384) {
+                  const packet = fresh.subarray(offset, offset + 16_384);
+                  let binary = ''; for (const byte of packet) binary += String.fromCharCode(byte);
+                  send({ type: 'audio', audio: btoa(binary) }); bytesSent += packet.length; chunkSent += packet.length;
+                }
+              }
+              if (!received) throw new Error('empty audio');
+              await reader.cancel().catch(() => {}); reader.releaseLock(); track(undefined);
+              break;
+            } catch (error) {
+              await reader?.cancel().catch(() => {}); reader?.releaseLock(); track(undefined);
+              const cancelled = req.signal.aborted || signal.aborted;
+              const transient = stall.signal.aborted || !(error instanceof LoungeUpstreamError) || (error.retryable && error.status >= 500 && error.code !== 'lounge_audio_too_long');
+              if (attempt < loungeSpeechStall.attempts && transient && !cancelled) { stats.retries++; continue; }
+              throw stall.signal.aborted && !cancelled ? stall.signal.reason : error;
+            } finally { clearTimeout(timer); }
           }
-          if (!bytesRead) throw new Error('empty audio');
-          await reader.cancel().catch(() => {}); reader.releaseLock(); track(undefined);
-          return;
-        } catch (error) {
-          await reader?.cancel().catch(() => {}); reader?.releaseLock(); track(undefined);
-          const transient = !(error instanceof LoungeUpstreamError) || (error.retryable && error.status >= 500 && error.code !== 'lounge_audio_too_long');
-          if (attempt === 0 && !bytesSent && transient && !req.signal.aborted && !signal.aborted) continue;
-          throw error;
         }
-      }
+      } catch (error) { stats.failed = true; throw error; }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, sentences: chunks.length, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, failed: stats.failed })); }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'

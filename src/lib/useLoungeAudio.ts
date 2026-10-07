@@ -11,6 +11,10 @@ export type VoiceParticipant = { id: string; name: string; muted: boolean; avata
 // A person's sustained voice stops the AI. The device that plays the AI locally
 // hears its own output, so it needs a louder voice than a remote listener.
 export const loungeBargeIn = { remoteRms: 0.06, localPlaybackRms: 0.09, sustainMs: 400 };
+// Speech is detected on the live microphone but recorded from a copy delayed by this much, so the
+// recording keeps the first syllable spoken before the level crossed the threshold (and the start
+// of a sentence that interrupted the AI). Without it the transcript often lost its first word.
+export const loungeRecordingPreRollSeconds = 0.4;
 const readAvatarUrl = (metadata?: string) => { try { return safeLoungeAvatarUrl(JSON.parse(metadata || '{}').loungeAvatarUrl); } catch { return undefined; } };
 const readAvatar = (metadata?: string) => {
   try {
@@ -215,7 +219,10 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       audioContext.current = context; enableAudio();
       const stream = new MediaStream([track.mediaStreamTrack]);
       const input = context.createMediaStreamSource(stream); const analyser = context.createAnalyser(); analyser.fftSize = 1024; input.connect(analyser);
-      releaseMicAnalysis.current = () => { input.disconnect(); analyser.disconnect(); };
+      const delay = context.createDelay(1); delay.delayTime.value = loungeRecordingPreRollSeconds;
+      const delayed = context.createMediaStreamDestination(); delayed.channelCount = 1;
+      input.connect(delay); delay.connect(delayed);
+      releaseMicAnalysis.current = () => { input.disconnect(); analyser.disconnect(); delay.disconnect(); delayed.stream.getTracks().forEach(item => item.stop()); };
       const values = new Float32Array(analyser.fftSize);
       let started = 0, lastVoice = 0, lastFrame = performance.now(), bargeMs = 0;
       const interruptHost = () => {
@@ -231,7 +238,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const begin = (now: number) => {
         const turnId = floorRef.current?.turnId;
         const chunks: Blob[] = [];
-        const next = new MediaRecorder(stream, { mimeType: format }); recorder.current = next;
+        const next = new MediaRecorder(delayed.stream, { mimeType: format }); recorder.current = next;
         const speech = { voicedFrames: 0 }; utterance = speech; started = now;
         next.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
         next.onstop = () => {

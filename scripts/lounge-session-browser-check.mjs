@@ -386,7 +386,8 @@ try {
       state='running';sampleRate=24000;epoch=performance.now();destination={};resume=async()=>{};close=async()=>{};
       get currentTime(){return (performance.now()-this.epoch)/1000;}
       createMediaStreamSource(){return {connect(){},disconnect(){}};}
-      createMediaStreamDestination(){return {stream:{getAudioTracks:()=>[mediaTrack]}};}
+      createMediaStreamDestination(){return {stream:{getAudioTracks:()=>[mediaTrack],getTracks:()=>[]}};}
+      createDelay(){return {delayTime:{value:0},connect(){},disconnect(){}};}
       createAnalyser(){return {fftSize:1024,disconnect(){},getFloatTimeDomainData(values){values.fill(.1);}};}
       createGain(){return {connect(){},disconnect(){},gain:{setValueAtTime(){},linearRampToValueAtTime(){},cancelScheduledValues(){}}};}
       createDynamicsCompressor(){const parameter=()=>({setValueAtTime(){}});return {connect(){},disconnect(){},threshold:parameter(),knee:parameter(),ratio:parameter(),attack:parameter(),release:parameter()};}
