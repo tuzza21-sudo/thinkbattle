@@ -59,9 +59,10 @@ export class Pcm16Decoder {
 
 // Boost quiet TTS by 6 dB before both local playback and the shared LiveKit
 // track. Compress loud peaks so the gain does not simply clip the waveform.
-export function createLoungeHostOutput(context: AudioContext, destinations: AudioNode[]) {
+// `loudness` multiplies the boost for voices the speech model renders quietly.
+export function createLoungeHostOutput(context: AudioContext, destinations: AudioNode[], loudness = 1) {
   const gain = context.createGain();
-  gain.gain.setValueAtTime(2, context.currentTime);
+  gain.gain.setValueAtTime(2 * loudness, context.currentTime);
   const compressor = context.createDynamicsCompressor();
   compressor.threshold.setValueAtTime(-6, context.currentTime);
   compressor.knee.setValueAtTime(6, context.currentTime);

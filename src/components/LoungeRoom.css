@@ -643,3 +643,18 @@
 .lounge-help-menu small { font-size:10px; color:#fff5e8b3; }
 .lounge-help-menu p { margin:2px 2px 0; font-size:10px; line-height:1.5; color:#fff5e8b3; }
 .lounge-session-card-label { display:block; font-size:10px; letter-spacing:.2px; opacity:.75; margin-bottom:4px; }
+
+/* Relationship with a one-to-one character: a stage and qualitative labels, numbers only for developers. */
+.lounge-relationship { margin-top:6px; font-size:11px; color:#fff5e8; }
+.lounge-relationship summary { display:inline-flex; gap:6px; align-items:center; cursor:pointer; padding:4px 10px; border-radius:999px; border:1px solid #ffffff30; background:#ffffff12; list-style:none; }
+.lounge-relationship summary::-webkit-details-marker { display:none; }
+.lounge-relationship summary span { opacity:.7; }
+.lounge-relationship summary strong { color:var(--lounge-accent); font-weight:700; }
+.lounge-relationship dl { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:4px 12px; margin:8px 0 0; padding:10px 12px; border-radius:12px; background:var(--lounge-surface, #242421); border:1px solid #ffffff24; }
+.lounge-relationship dl div { display:flex; justify-content:space-between; gap:8px; }
+.lounge-relationship dt { opacity:.7; }
+.lounge-relationship dd { margin:0; text-align:right; }
+.lounge-relationship dd b { margin-left:6px; font-variant-numeric:tabular-nums; color:var(--lounge-accent); }
+.lounge-relationship-debug { margin-top:6px; padding:8px 12px; border-radius:12px; border:1px dashed #ffffff40; font-size:10px; line-height:1.6; opacity:.9; overflow-wrap:anywhere; }
+.lounge-relationship-debug p, .lounge-relationship-debug ul { margin:0; }
+.lounge-relationship-debug ul { padding-left:16px; }

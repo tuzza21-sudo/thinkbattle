@@ -3,6 +3,8 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { filmCard, filmMaterial, filmSource, filmStudyFixture } from './lounge-film-fixtures.mjs';
+import { fileURLToPath } from 'node:url';
+import { loadTs } from './lounge-ts-loader.mjs';
 const compile = (path, require = () => {}) => {
   const exports = {};
   new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require);
@@ -12,7 +14,8 @@ const lounge = compile('../src/lib/lounge.ts');
 const study = compile('../src/lib/loungeStudy.ts');
 const filmStudy = compile('../src/lib/loungeFilmStudy.ts');
 const sessionLib = compile('../src/lib/loungeSession.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : lounge).default;
+const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -725,6 +728,171 @@ test('one host response serves six members; context is bounded and speech is gen
     assert.equal(calls.filter(call => call.url.endsWith('/audio/speech')).length, 1);
   });
 });
+const withServiceKey = async (task, extra = {}) => {
+  const saved = { SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY, LOUNGE_RELATIONSHIP_DEBUG_USERS: process.env.LOUNGE_RELATIONSHIP_DEBUG_USERS };
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+  for (const [name, value] of Object.entries(extra)) process.env[name] = value;
+  try { await task(); } finally { for (const [name, value] of Object.entries(saved)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } }
+};
+const velvetRow = { user_id: 'user-1', character_id: 'velvet', stage: 'INTRIGUED', version: 4, pending: { direction: null, turns: 0 },
+  scores: { trust: 30, respect: 40, interest: 60, comfort: 20, openness: 15, intrigue: 58, poise: 55 },
+  recent_events: [], memories: [{ type: 'ADMITS_ERROR', summary: '지난번 가정이 틀렸다고 인정함', at: '2026-10-05T00:00:00Z', importance: 0.8, turn: 3 }],
+  meaningful_turns: 3, turn_count: 6, last_interaction_at: '2026-10-05T00:00:00Z' };
+const relationshipRoom = (extra = {}) => ({ topic: '요즘 고민', host_persona: 'velvet', memory: '', capacity: 1, ai_turns: 7, ai_mood: { curiosity: 60, boredom: 10 }, ...extra });
+
+test('a relationship character reads stored state, classifies events in the same call and saves a deterministic update', async () => {
+  let saves = 0, modelCalls = 0;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) {
+      assert.equal(init.headers.Authorization, 'Bearer service-key', 'relationship state is read with the server role only');
+      assert.match(url, /user_id=eq\.user-1/);
+      return result([velvetRow, { ...velvetRow, character_id: 'auditor', stage: 'UNVERIFIED' }]);
+    }
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /ai_mood/); return result([relationshipRoom()]); }
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '그건 네 해석이고, 난 근거가 달라.' }, { id: 1, nickname: 'AI', kind: 'host', text: '흥미로운 변명이군.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/responses')) {
+      modelCalls++;
+      const body = JSON.parse(init.body), context = JSON.parse(body.input);
+      assert.equal(context.relationship.stage.id, 'INTRIGUED');
+      assert.equal(context.relationship.metrics.intrigue.score, 58);
+      assert.deepEqual(context.relationship.memories, ['지난번 가정이 틀렸다고 인정함']);
+      assert.equal(context.relationship.mood.curiosity, 60);
+      assert.ok(context.relationship.character_core.includes('칭찬은 아끼며 얻어야 한다'));
+      assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
+      assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
+      assert.match(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
+      assert.match(body.instructions, /사람의 가치나 인격은 평가하지 않는다/);
+      assert.ok(body.instructions.includes(lounge.getLoungeHost('velvet').companion));
+      assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
+      assert.equal(body.max_output_tokens, 1400, 'events and a long memory must not truncate the JSON reply');
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반박이 있네. 근거부터 들어 보지.', memory: '', events: [
+        { type: 'CHALLENGES_CHARACTER_RESPECTFULLY', confidence: 0.92, note: '근거를 들어 침착하게 반박함' },
+        { type: 'INVENTED_EVENT', confidence: 0.99, note: '' },
+      ] }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.includes('save_voice_lounge_relationship')) {
+      saves++;
+      assert.equal(init.headers.Authorization, 'Bearer service-key');
+      const body = JSON.parse(init.body);
+      assert.equal(body.p_user, 'user-1'); assert.equal(body.p_character, 'velvet'); assert.equal(body.p_room, roomId);
+      assert.equal(body.p_expected_version, 4, 'optimistic version from the stored row');
+      assert.equal(body.p_state.scores.respect, 45); assert.equal(body.p_state.scores.intrigue, 62);
+      assert.equal(body.p_state.turnCount, 7); assert.equal(body.p_state.recentEvents.at(-1).type, 'CHALLENGES_CHARACTER_RESPECTFULLY');
+      assert.ok(body.p_state.memories.some(memory => memory.summary === '근거를 들어 침착하게 반박함'));
+      assert.ok(body.p_mood.curiosity > 0);
+      return result(5);
+    }
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2, 3]));
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup' }));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).text, '반박이 있네. 근거부터 들어 보지.');
+    assert.equal(saves, 1); assert.equal(modelCalls, 1, 'no extra classifier call');
+  }));
+});
+
+test('relationship scores do not move without a new user turn, and a storage failure never blocks the reply', async () => {
+  let saved;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom()]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 3, nickname: 'AI', kind: 'host', text: '그래서?' }, { id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '내가 틀렸어.' }]);
+    if (url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '다른 이야기를 해 볼까.', memory: '', events: [{ type: 'ADMITS_ERROR', confidence: 0.95, note: '' }] }) }] }] });
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.includes('save_voice_lounge_relationship')) { saved = JSON.parse(init.body); return result(null); }
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    assert.equal((await handler(request({ action: 'host', roomId, reason: 'requested', requestKind: 'topic' }))).status, 200);
+    assert.deepEqual(saved.p_state.scores, velvetRow.scores, 'a topic request after the AI spoke last re-scores nothing');
+    assert.equal(saved.p_state.recentEvents.length, 0);
+  }));
+  for (const failure of ['read', 'save']) await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) return failure === 'read' ? result({ code: '42P01' }, 404) : result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom()]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      assert.equal(Boolean(body.text.format.schema.properties.events), failure === 'save', 'without stored state the reply uses the plain schema');
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '계속해.', memory: '', events: [] }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.includes('save_voice_lounge_relationship')) throw new TypeError('fetch failed');
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.text()).trim().split('\n').map(line => JSON.parse(line).type), ['host', 'audio', 'done']);
+  }));
+});
+
+test('rooms with other people never receive relationship context or events, whichever of the six hosts leads them', async () => {
+  for (const persona of ['velvet', 'ina', 'jaeseok']) await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '책', host_persona: persona, memory: '', capacity: 4, ai_turns: 2 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      assert.equal(JSON.parse(body.input).relationship, undefined);
+      assert.equal(body.text.format.schema.properties.events, undefined);
+      assert.doesNotMatch(body.instructions, /relationship은/);
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반가워요.', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.includes('save_voice_lounge_relationship')) throw new Error('must not save');
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+    throw new Error('Unexpected fetch');
+  }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200)));
+});
+
+test('the relationship endpoint returns labels to players and raw scores only to listed developers, without paid calls', async () => {
+  for (const [developer, owner, persona, capacity] of [[false, true, 'velvet', 1], [true, true, 'velvet', 1], [false, false, 'velvet', 1], [false, true, 'velvet', 4]]) {
+    let body;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'Dev@Example.com' });
+      if (url.includes('voice_lounge_rooms?')) return result([{ host_id: owner ? 'user-1' : 'someone-else', host_persona: persona, capacity, ai_mood: { amusement: 40 } }]);
+      if (url.includes('voice_lounge_relationships?')) { assert.equal(init.headers.Authorization, 'Bearer service-key'); assert.match(url, /character_id=eq\.velvet/); return result([velvetRow]); }
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => { body = await (await handler(request({ action: 'relationship', roomId }))).json(); }), developer ? { LOUNGE_RELATIONSHIP_DEBUG_USERS: 'other@x.com, dev@example.com' } : {});
+    if (!owner || capacity !== 1) { assert.deepEqual(body, { enabled: false }); continue; }
+    assert.equal(body.relationship.macroState.id, 'INTRIGUED');
+    assert.equal(body.relationship.macroState.label, '흥미를 느낌');
+    assert.equal(body.relationship.metrics.trust.label, '조심스러움');
+    assert.equal(body.relationship.metrics.trust.score, developer ? 30 : undefined);
+    assert.equal(Boolean(body.relationship.debug), developer);
+    if (developer) { assert.equal(body.relationship.debug.mood.amusement, 40); assert.equal(body.relationship.debug.version, 4); }
+  }
+});
+
+test('there are exactly six hosts, each with a relationship configuration and instructions for both one-to-one and group rooms', () => {
+  assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), ['auditor', 'closer', 'ina', 'jaeseok', 'trickster', 'velvet']);
+  for (const id of lounge.loungeRelationshipHostIds) {
+    assert.ok(lounge.loungeHosts.some(host => host.id === id));
+    assert.ok(relationshipLib.getRelationshipConfig(id), id);
+    assert.deepEqual(relationshipLib.validateRelationshipConfig(relationshipLib.getRelationshipConfig(id)), []);
+    assert.ok(lounge.loungeCharacterProfiles[id], `${id} has a lobby profile`);
+  }
+  assert.deepEqual(Object.keys(relationshipLib.relationshipConfigs).sort(), [...lounge.loungeRelationshipHostIds].sort());
+  assert.equal(lounge.isLoungeRelationshipHost('sunny'), false);
+  for (const host of lounge.loungeHosts) {
+    assert.match(host.companion, /사람의 가치|사람 자체|사람이 아니다/, `${host.id} companion never judges the person`);
+    assert.ok(host.instruction.length > 200 && host.instruction.includes('여럿일 때'), `${host.id} has a real group instruction`);
+  }
+});
+
 test('a solo host turn uses one-to-one instructions and returns playable speech', async () => {
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
@@ -884,15 +1052,15 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   const now = Date.now();
   const room = { status: 'active', capacity: 1, ai_turns: 2, last_ai_at: new Date(now - 6000).toISOString(), started_at: new Date(now - 10_000).toISOString() };
   const messages = [{ id: 1, kind: 'host', created_at: room.last_ai_at }, { id: 2, kind: 'human', created_at: new Date(now - 500).toISOString() }];
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 1200), 'followup');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1600, now - 6000, now - 1600, now - 350), 'followup', 'replies 1.5 s after the user stops and 0.3 s after the transcript');
   assert.equal(lounge.nextLoungeHostReason({ ...room, capacity: 6 }, messages, now, now - 500, now - 4000), null);
   assert.equal(lounge.nextLoungeHostReason(room, [...messages, { id: 3, kind: 'host', created_at: new Date(now).toISOString() }], now, now - 500, now - 4000), null, 'do not answer the same human twice');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now, now - 4000), null, 'wait until the human finishes');
   assert.equal(lounge.nextLoungeHostReason({ ...room, ai_turns: 120 }, messages, now, now - 500, 0), null);
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1500, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 2000, now - 1200), null, 'wait after the AI finishes speaking');
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 500), null, 'settle after transcription is saved');
-  assert.equal(lounge.loungeSpeechPauseMs(1), 2000);
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1400, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 1000, now - 1200), null, 'wait after the AI finishes speaking');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 200), null, 'settle after transcription is saved');
+  assert.equal(lounge.loungeSpeechPauseMs(1), 1500);
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
 });
 
@@ -965,7 +1133,7 @@ test('group help follows the requested kind and each scheduled announcement stay
   for (const item of cases) await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_reason, item.reason); return result('ticket'); }
-    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /moderator_request_kind/); return result([{ topic: '책 이야기', host_persona: 'sunny', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /moderator_request_kind/); return result([{ topic: '책 이야기', host_persona: 'jaeseok', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
     if (url.includes('voice_lounge_sessions?')) return result([{ turn_kind: 'basic', speaker_id: null, ...item.session }]);
     if (url.includes('voice_lounge_messages?')) { assert.doesNotMatch(url, /kind=eq.human/, 'no whole-round summary read'); return result([{ nickname: '소연', kind: 'human', text: '저는 결말이 좋았어요.' }]); }
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'a', nickname: '민수', last_seen: '' }, { user_id: 'b', nickname: '소연', last_seen: '' }, { user_id: 'c', nickname: '지우', last_seen: '' }]);
@@ -981,7 +1149,7 @@ test('group help follows the requested kind and each scheduled announcement stay
       assert.match(body.instructions, /- direct: 누군가 AI를 직접 불러 물었다/);
       assert.doesNotMatch(body.instructions, /round_summary|free_ending|4~9문장|4~6문장/);
       if (item.rule) assert.match(body.instructions, item.rule);
-      assert.ok(body.max_output_tokens <= 700);
+      assert.equal(body.max_output_tokens, 1000, 'room for the reply and a 600-character memory with headroom');
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '다른 장면도 떠오르세요?', memory: '' }) }] }] });
     }
     if (url.includes('finish_voice_lounge_host')) return result(true);
@@ -1068,6 +1236,96 @@ test('host PCM packets arrive before upstream completion and cancelling stops th
   });
 });
 
+const sse = (events, gate) => new Response(new ReadableStream({ async start(controller) {
+  const encoder = new TextEncoder();
+  for (const event of events) {
+    if (event === 'gate') { await gate; continue; }
+    controller.enqueue(encoder.encode(`event: ${event.type}\r\ndata: ${JSON.stringify(event)}\r\n\r\n`));
+  }
+  controller.close();
+} }), { headers: { 'Content-Type': 'text/event-stream' } });
+const deltas = (json, split) => [json.slice(0, split), json.slice(split)].map(delta => ({ type: 'response.output_text.delta', delta }));
+
+test('one-to-one speech starts once the reply sentence is complete, before the memory and events are written', async () => {
+  const reply = { text: '네 주장이지. "근거"는 아직이야.', memory: '사용자는 마케팅 탓을 했다.', events: [{ type: 'MAKES_UNSUPPORTED_CLAIM', confidence: 0.95, note: '근거 없이 단정' }] };
+  const json = JSON.stringify(reply);
+  let release, speechStartedBeforeRelease = false, released = false, finish, saved;
+  const gate = new Promise(resolve => { release = () => { released = true; resolve(); }; });
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_relationships?')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'auditor', memory: '이전 기억', capacity: 1, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '다 마케팅 탓이야.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/responses')) {
+      assert.equal(JSON.parse(init.body).stream, true);
+      // The text field closes in the first chunk; the rest waits on the gate.
+      return sse([...deltas(json, json.indexOf(',"memory"') + 3).slice(0, 1), 'gate', deltas(json, json.indexOf(',"memory"') + 3)[1], { type: 'response.completed', response: { status: 'completed' } }], gate);
+    }
+    if (url.endsWith('/audio/speech')) {
+      speechStartedBeforeRelease = !released;
+      assert.equal(JSON.parse(init.body).input, reply.text);
+      setTimeout(release, 20);
+      return new Response(new Uint8Array([0, 1, 2, 3]));
+    }
+    if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+    if (url.includes('save_voice_lounge_relationship')) { saved = JSON.parse(init.body); return result(1); }
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    assert.equal(response.status, 200);
+    const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+    assert.equal(events[0].text, reply.text, 'escaped quotes in the reply survive early extraction');
+    assert.ok(speechStartedBeforeRelease, 'speech started while the memory and events were still being generated');
+    assert.equal(finish.p_text, reply.text); assert.equal(finish.p_memory, reply.memory, 'the full memory is saved before the stream closes');
+    assert.equal(saved.p_state.recentEvents.at(-1).type, 'MAKES_UNSUPPORTED_CLAIM', 'events written after the text still update the relationship');
+  }));
+});
+
+test('if the reply is cut off after its sentence, the spoken sentence is saved and the previous memory is kept', async () => {
+  const head = JSON.stringify({ text: '좋아, 그 근거는 볼 만해.', memory: '' }).replace(/"memory":""\}$/, '"memory":"사용자는 전환율');
+  let finish;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'ina', memory: '이전 기억', capacity: 1, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return sse([{ type: 'response.output_text.delta', delta: head }, { type: 'response.incomplete', response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } } }]);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
+    if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => {
+    const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+    assert.equal(finish.p_text, '좋아, 그 근거는 볼 만해.');
+    assert.equal(finish.p_memory, '이전 기억');
+  });
+  // A failure before any sentence becomes a stream error, as before.
+  await run(async url => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'ina', memory: '', capacity: 1, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return result({ error: { code: 'insufficient_quota', type: 'insufficient_quota' } }, 429);
+    if (url.includes('finish_voice_lounge_host') || url.endsWith('/audio/speech')) throw new Error('nothing to save or speak');
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => {
+    const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(events, [{ type: 'error', error: events[0].error, code: 'openai_quota_exceeded', retryable: false, retryAfterSeconds: undefined }].map(event => JSON.parse(JSON.stringify(event))));
+  });
+});
+
+test('the reply sentence is read from a partial JSON stream only once its string is closed', () => {
+  const { replyTextSoFar } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
+  assert.equal(replyTextSoFar('{"text":"아직 말하는 중'), undefined);
+  assert.equal(replyTextSoFar('{"text":"그건 \\"근거\\"가 아니야.\\n다시'), undefined);
+  assert.equal(replyTextSoFar('{"text":"그건 \\"근거\\"가 아니야.\\n다시.","mem'), '그건 "근거"가 아니야.\n다시.');
+  assert.equal(replyTextSoFar('{ "text" : "끝\\\\", "memory": ""}'), '끝\\');
+  assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), undefined, 'another key first waits for the full reply');
+});
+
 test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
   const originalTimeout = AbortSignal.timeout;
   const deadlines = [];
@@ -1091,6 +1349,8 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
     }, async () => {
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       const eventsPromise = response.text();
+      // One-to-one replies open the stream first and start speech inside it.
+      for (let wait = 0; wait < 200 && !speechDeadline; wait++) await new Promise(resolve => setTimeout(resolve, 5));
       // Advance only the TTS deadline virtually, not wall time or completed RPCs.
       if (speechDeadline.milliseconds <= 25_001) speechDeadline.controller.abort(new DOMException('deadline', 'TimeoutError'));
       assert.equal(speechSignal.aborted, false, 'long speech was cancelled after just 25 seconds');
