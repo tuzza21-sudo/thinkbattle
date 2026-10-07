@@ -1658,7 +1658,8 @@ test('TTS recovery is bounded, never repeats transmitted audio, and does not ret
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
       assert.equal(events.at(-1).type, 'error'); assert.equal(events.some(event => event.type === 'done'), false);
-      assert.equal(speech, failure === 'rate_limit' ? 1 : lounge.loungeSpeechStall.attempts);
+      // An empty answer is also raced by a second request, so each try costs two requests.
+      assert.equal(speech, failure === 'rate_limit' ? 1 : failure === 'empty' ? lounge.loungeSpeechStall.attempts * 2 : lounge.loungeSpeechStall.attempts);
       // A retry after a partial sentence skips the bytes already sent, so the same audio is never sent twice.
       assert.equal(events.filter(event => event.type === 'audio').length, failure === 'partial' ? 1 : 0);
     });
@@ -1696,6 +1697,58 @@ test('a speech request that stalls before or during a sentence is requested agai
       });
     }
   } finally { Object.assign(lounge.loungeSpeechStall, saved); }
+});
+
+test('slow speech and slow transcription are raced by a second request, and the slow one is cancelled', async () => {
+  const saved = { ...lounge.loungeSpeechStall };
+  Object.assign(lounge.loungeSpeechStall, { hedgeAfterMs: 30, firstAudioMs: 5000 });
+  const hanging = signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  try {
+    const signals = []; const started = performance.now();
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 장면이 제일 오래 남았어요?', memory: '' }) }] }] });
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) { signals.push(init.signal); return signals.length === 1 ? hanging(init.signal) : new Response(new Uint8Array([1, 0, 2, 0])); }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+      assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+    });
+    assert.equal(signals.length, 2); assert.equal(signals[0].aborted, true, 'the slow speech request is cancelled');
+    assert.ok(performance.now() - started < 3000, 'the reply did not wait for the slow request');
+
+    const transcriptions = []; let posted;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'guest' });
+      if (url.includes('claim_voice_lounge_audio')) return result(true);
+      if (url.endsWith('/audio/transcriptions')) { transcriptions.push(init.signal); return transcriptions.length === 1 ? hanging(init.signal) : result({ text: '두 번째 요청이 먼저 왔어요' }); }
+      if (url.includes('post_voice_lounge_message')) { posted = JSON.parse(init.body).p_text; return new Response(null, { status: 204 }); }
+      throw new Error('Unexpected fetch');
+    }, async () => {
+      // A tiny recording: the second transcription starts after 2.5 s.
+      assert.equal((await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm;codecs=opus' }))).status, 200);
+    });
+    assert.equal(transcriptions.length, 2); assert.equal(transcriptions[0].aborted, true); assert.equal(posted, '두 번째 요청이 먼저 왔어요');
+    assert.equal(lounge.loungeTranscriptionHedgeMs(400), 2510); assert.equal(lounge.loungeTranscriptionHedgeMs(1_000_000), 8000);
+  } finally { Object.assign(lounge.loungeSpeechStall, saved); }
+});
+
+test('a transcription that times out on both requests explains itself in Korean and can be retried', async () => {
+  await run(async url => {
+    if (url.includes('/auth/')) return result({ id: 'guest' });
+    if (url.includes('claim_voice_lounge_audio')) return result(true);
+    if (url.endsWith('/audio/transcriptions')) throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(request({ action: 'transcribe', roomId, audio: Buffer.alloc(400).toString('base64'), mimeType: 'audio/webm;codecs=opus' }));
+    assert.equal(response.status, 504);
+    const body = await response.json();
+    assert.equal(body.code, 'lounge_upstream_timeout'); assert.equal(body.retryable, true); assert.doesNotMatch(body.error, /aborted/);
+  });
 });
 
 test('sentences for speech keep numbers whole and join short pieces', () => {
