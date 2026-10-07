@@ -95,11 +95,22 @@ async function openaiFailure(response: Response): Promise<LoungeUpstreamError> {
 }
 
 type ModelResult = { status?: string; incomplete_details?: { reason?: string }; usage?: { output_tokens?: number }; output?: Array<{ phase?: string; content?: Array<{ type: string; text?: string }> }> };
-// The model sometimes says a plain sentence in a 'commentary' message before the JSON answer; only the answer counts.
-const modelOutputText = (result: ModelResult) => result.output?.filter(item => item.phase !== 'commentary').flatMap(item => item.content ?? []).find(item => item.type === 'output_text')?.text;
+// The model sometimes writes more than one message: usually a plain 'commentary' sentence and then the JSON answer,
+// but the JSON can also arrive in the commentary message itself. The answer is the message that parses as one,
+// preferring the final answer; joining or skipping messages by phase broke replies both ways.
+type OutputMessage = { phase?: string; text: string };
+function pickAnswerText(messages: OutputMessage[]) {
+  const ordered = [...messages.filter(item => item.phase !== 'commentary'), ...messages.filter(item => item.phase === 'commentary')];
+  const parses = (text: string) => { try { const value = JSON.parse(text); return typeof value?.text === 'string' && value.text.trim().length > 0; } catch { return false; } };
+  return ordered.find(item => parses(item.text))?.text ?? ordered.find(item => item.text.trim())?.text;
+}
+const modelOutputText = (result: ModelResult) => pickAnswerText((result.output ?? []).map(item => ({ phase: item.phase, text: (item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('') })));
 
 function parseHostAnswer(output: string | undefined, result?: ModelResult): { text: string; memory: string; events?: unknown } {
-  if (!output) throw new Error('사회자가 답변을 준비하지 못했어요.');
+  if (!output) {
+    console.error('[Lounge API] host reply was empty', JSON.stringify({ status: result?.status, incomplete: result?.incomplete_details?.reason, outputTokens: result?.usage?.output_tokens, messages: result?.output?.map(item => item.phase ?? 'none') }));
+    throw new LoungeUpstreamError('사회자 답변이 비어 있었어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_empty_response', true, 5);
+  }
   try {
     const answer = JSON.parse(output);
     if (typeof answer?.text !== 'string' || !answer.text.trim() || typeof answer.memory !== 'string') throw new Error();
@@ -585,17 +596,21 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
           const reply = (async () => {
             const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
-            let output = '', final: ModelResult | undefined, found = false;
-            const commentary = new Set<number>();
+            let output: string, final: ModelResult | undefined, found = false;
+            // Text per output message; speech starts from whichever message begins as the JSON answer.
+            const messages = new Map<number, OutputMessage>();
             if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
               for await (const event of readModelEvents(response.body)) {
-                if (event.type === 'response.output_item.added' && event.item?.phase === 'commentary') commentary.add(event.output_index ?? -1);
-                else if (event.type === 'response.output_text.delta' && typeof event.delta === 'string' && !commentary.has(event.output_index ?? -2)) {
-                  output += event.delta;
-                  if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
+                if (event.type === 'response.output_item.added') messages.set(event.output_index ?? messages.size, { phase: event.item?.phase, text: '' });
+                else if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+                  const index = event.output_index ?? 0;
+                  const message = messages.get(index) ?? { text: '' };
+                  message.text += event.delta; messages.set(index, message);
+                  if (!found) { const early = replyTextSoFar(message.text); if (early !== undefined) { found = true; resolveText(early); } }
                 } else if (event.type === 'response.completed' || event.type === 'response.incomplete') final = event.response;
                 else if (event.type === 'response.failed' || event.type === 'error') throw new LoungeUpstreamError('AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, 'openai_request_failed', true, 60);
               }
+              output = pickAnswerText([...messages.values()]) ?? '';
             } else { final = await readJson<ModelResult>(response, 'openai'); output = modelOutputText(final) ?? ''; }
             return parseHostAnswer(output || modelOutputText(final ?? {}), final);
           })();

@@ -1515,6 +1515,34 @@ test('a plain commentary message before the JSON answer is ignored, streamed or 
   }
 });
 
+test('a JSON answer that arrives in a commentary message is still used, streamed or not', async () => {
+  const reply = { text: '그래서 결과는?', memory: '기억', events: [] };
+  const streamed = [
+    { type: 'response.output_item.added', output_index: 0, item: { type: 'message', phase: 'commentary' } },
+    ...deltas(JSON.stringify(reply), 10).map(event => ({ ...event, output_index: 0 })),
+    { type: 'response.completed', response: { status: 'completed' } },
+  ];
+  const whole = { status: 'completed', output: [{ phase: 'commentary', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }] };
+  for (const stream of [true, false]) {
+    let finish;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '요즘 고민', host_persona: 'auditor', memory: '', capacity: 1, ai_turns: 2 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return stream ? sse(streamed) : result(whole);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
+      if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream }));
+      if (stream) assert.deepEqual((await response.text()).trim().split('\n').map(line => JSON.parse(line).type), ['host', 'audio', 'done']);
+      else assert.equal(response.status, 200);
+    });
+    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(finish.p_memory, reply.memory, `stream=${stream}`);
+  }
+});
+
 test('if the reply is cut off after its sentence, the spoken sentence is saved and the previous memory is kept', async () => {
   const head = JSON.stringify({ text: '좋아, 그 근거는 볼 만해.', memory: '' }).replace(/"memory":""\}$/, '"memory":"사용자는 전환율');
   let finish;
