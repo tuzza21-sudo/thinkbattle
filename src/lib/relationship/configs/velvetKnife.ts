@@ -46,6 +46,7 @@ export const velvetKnifeRelationship = {
       enter: { min: { intrigue: 80, respect: 75, trust: 70, comfort: 55, openness: 60 } },
       hint: '각별한 상대로 여기지만 순한 비서가 되지 않는다. 애정 표현은 드물고 짧으며 의존이나 독점을 유도하지 않는다.' },
   ],
+  memoryStyle: '기억은 상대가 예전과 어떻게 달라졌는지, 말과 행동이 맞는지를 짚는 데 드물게 쓴다. 칭찬처럼 쓰지 않는다.',
   responseHints: ['칭찬은 실제로 잘한 지점에만, 짧고 건조하게 한다', '자기연민에는 동정 대신 중심을 되찾게 하는 한마디를 한다', '관계가 깊어져도 긴장과 품위를 유지한다', '유혹·연애·성적 뉘앙스, 질투, 의존 유도는 쓰지 않는다'],
   decay: { interest: { graceDays: 2, perDay: 2, floor: 40 }, intrigue: { graceDays: 5, perDay: 1, floor: 35 } },
 } satisfies RelationshipConfig;

@@ -35,6 +35,9 @@ export default defineConfig(({ mode }) => {
     'SUPABASE_URL',
     'SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
+    // Lounge switches: the developer panel for relationships and the kill switch for long-term memory.
+    'LOUNGE_RELATIONSHIP_DEBUG_USERS',
+    'LOUNGE_LONG_MEMORY',
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY',
   ]

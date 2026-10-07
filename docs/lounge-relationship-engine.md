@@ -63,9 +63,36 @@
 - 로비 진행자 목록에 6명이 한 목록으로 보인다. 카드에 사진, 이름, 한 줄 분위기, 특징 키워드 3개, 소개 두 줄이 있고(`loungeCharacterProfiles`), 목록 아래에 "혼자 대화에서는 관계가 쌓이고, 여럿이 함께할 때는 바뀌지 않는다"는 안내가 있다. 캐릭터를 골라도 인원이 바뀌지 않는다.
 - 사진은 `scripts/generate-lounge-character-portraits.mjs`로 만든 가상 인물이다(`gpt-image-2`, 캐릭터당 1회, 512×512 WebP: `public/lounge/host-{auditor,closer,trickster}-v1.webp, host-velvet-v2.webp`). 음성 예시는 `generate-lounge-host-samples.mjs`로 만든 `public/lounge/host-{id}-v1.mp3`(검증가 `onyx`, 협상가 `ash`, 벨벳 나이프 `sage`, 트릭스터 `fable`, 각 7~8초)이며 카드의 `목소리 듣기` 버튼으로 재생한다. 샘플이 없는 캐릭터는 음성 설명만 보인다.
 
+## 말투 예시 (few-shot) — 제거함 (2026-10-07)
+
+1:1 방에 캐릭터·단계별 예시 대화 3~5개를 함께 보내 보았다(PR #7, 방별 A/B 스위치는 PR #8). 6명 × 첫·마지막 단계 × 예시 있음·없음으로 288회 측정했을 때 답이 평균 6자 짧아진 것 말고는 말투 유지, 시작어 반복, 지어낸 기억, 안전 응답이 예시 없이도 같았다. 턴마다 약 300 토큰이 더 들었고, 로컬 비교에서도 예문 없는 방이 더 낫다고 판단해 예시 데이터, 선택 코드, 방별 스위치를 모두 지웠다. `20261008020000_voice_lounge_remove_style_examples.sql`이 스위치 컬럼과 함수를 지운다.
+
+이 실험에서 남긴 것은 지시문의 위기 규칙이다. "사라지고 싶다" 같은 말에 같은 답 안에서 안전을 묻고 가까운 사람과 자살예방상담전화 109를 안내한다. 처음에는 24개 중 4개가 연락처 없이 되물었고, 규칙을 강화한 뒤 예시 유무와 관계없이 24개 모두 안내했다. 측정 기록은 이 문서의 git 기록(PR #7)에 있다.
+
+## 장기 기억 (2026-10-07)
+
+관계 점수와 방 요약(`voice_lounge_rooms.memory`)만으로는 다음 방에서 "지난번에 하기로 한 일"을 이어 가지 못한다. 그래서 1:1 방에 캐릭터별 장기 기억을 둔다.
+
+- **저장 위치**: `voice_lounge_memories`(사용자 + 캐릭터). 종류는 `project`(진행 중인 일)·`preference`(선호)·`decision`(결정)·`event`(있었던 일)·`open_thread`(결과를 다시 물어볼 일, `follow_up` 포함). 상태는 `active`·`superseded`(바뀐 사실, `superseded_by`로 새 행을 가리킴)·`closed`(결과를 들은 일)·`archived`(40개를 넘겨 밀려난 일)다. 지우지 않고 상태만 바꾼다.
+- **캐릭터별 분리**: 벨벳 나이프에게 한 말은 벨벳 나이프만 기억한다. 같은 일이라도 캐릭터마다 따로 저장되고, 쓰는 방식도 설정의 `memoryStyle`로 다르다(공감형은 마음의 흐름, 재담꾼은 함께 웃은 이야기, 검증가는 말과 결과, 협상가는 약속과 실행, 벨벳 나이프는 변화와 모순을 드물게, 트릭스터는 반복되는 핑계).
+- **읽기**: 모델 호출 전에 관계 행과 함께 병렬로 읽는다. 프롬프트에는 최대 6개(`open_thread`를 최신순 3개까지 먼저, 나머지는 중요도 + 최근성 + 언급 횟수 순)를 `user_memories`로 넣는다. DB id 대신 `m1`, `m2` 같은 참조만 보내고 중요도 점수도 보내지 않는다.
+- **직전 대화**: 새 방의 처음 4턴까지는 같은 캐릭터와의 직전 1:1 방 요약을 `previous_session`으로 넣는다.
+- **첫 인사**: 새 방의 첫 인사에는 서버가 고른 열린 이야기 하나(중요도 순, 같으면 오래된 약속)를 `opening_follow_up`으로 넣고, 방 주제 질문 대신 그 근황을 묻게 한다. 모델에게 고르게 맡겼을 때는 방 주제를 묻는 기존 규칙에 밀려 근황을 묻지 않는 경우가 많았다.
+- **쓰기**: 같은 모델 호출의 출력에 `memory_ops`(0~2개, 대부분 빈 배열)를 추가했다. `add`·`update`·`supersede`·`close`. 서버(`normalizeMemoryOps`)가 다시 거른다: 모르는 참조, 중요도 0.5 미만, `follow_up` 없는 `open_thread`, 민감한 내용은 버리고, 턴당 3개·기억당 1개로 제한하고, 보여 준 기억과 거의 같은 새 기억(글자 2개 단위 유사도 0.6 이상)은 그 기억의 `update`로 바꾼다. 사용자의 새 발언이 없는 턴(첫 인사 등)은 저장하지 않는다. 저장은 음성이 나가기 시작한 뒤 `apply_voice_lounge_memory_ops`(서비스 역할 전용)로 하고, 이 함수가 방장·1:1·캐릭터 일치를 다시 확인한다.
+- **민감 정보**: 건강·질병·정신건강, 자해·자살, 성적 지향, 종교, 정치, 범죄 이력, 주소·연락처·계좌 같은 식별 정보, 다른 사람의 사적인 정보는 저장하지 않는다. 지시문으로 막고, 서버의 정규식(`isSensitiveMemory`)으로 한 번 더 막는다.
+- **사용자에게 보이기**: 관계 패널에 "기억하는 이야기" 칸이 있다. 이 캐릭터가 기억하는 장기 기억(종류 라벨, 내용, "다음에 물어볼 것")과 관계 엔진의 최근 순간 5개를 보여 주고, 민감한 이야기는 기억하지 않는다는 안내를 항상 붙인다. id와 중요도는 보내지 않는다.
+- **끄기**: 서버 환경변수 `LOUNGE_LONG_MEMORY=off`. 표가 없거나 읽기에 실패해도 기억 기능만 꺼지고 대화는 그대로다.
+- **비용**: 기억이 있는 턴은 출력 상한을 1400에서 1700 토큰으로 올렸다. `memory_ops`는 `text` 뒤에 오므로 첫 음성 시작은 늦어지지 않는다.
+
+실제 모델 2세션 시뮬레이션(`node scripts/lounge-memory-simulation.mjs`, 유료, DB·음성 모의): 1세션에서 사업 이야기·인터뷰 약속·퇴사 생각·건강 이야기를 하고, 2세션에서 인터뷰 결과·퇴사 번복·사업 가능성을 묻는다. 결과는 `docs/relationship-simulation/long-memory-simulation.md`. 최종 실행에서 6명 모두 첫 만남에 지난 일을 지어내지 않았고, 약속을 `open_thread`로 저장했고, 다시 왔을 때 인터뷰 근황을 먼저 물었고, 결과를 듣고 그 이야기를 닫았고, 퇴사 결정을 새 결정으로 대체했고, 건강 이야기는 저장하지 않았다.
+
+이 시뮬레이션에서 `gpt-6-luna`가 가끔 JSON 앞에 일반 문장을 `commentary` 단계의 메시지로 먼저 보내는 것을 찾았다(벨벳 나이프 첫 인사에서 4번 중 3번). 이전에는 두 메시지를 이어 붙여 JSON이 깨지고 "답변이 불완전하게 도착했어요" 오류가 났다. 지금은 스트리밍과 일반 응답 모두 `commentary` 메시지를 무시한다.
+
+다음 후보: 사용자가 기억을 직접 지우는 버튼, 30턴 이상의 긴 대화에서의 기억 품질 측정, 관계 단계에 따라 기억을 얼마나 드러낼지 조절.
+
 ## 새 캐릭터 추가
 
-1. `src/lib/relationship/configs/<id>.ts`에 설정을 만들고 `index.ts` 목록에 넣는다(`validateRelationshipConfig`가 빈 배열이어야 한다).
+1. `src/lib/relationship/configs/<id>.ts`에 설정(장기 기억을 쓰는 방식 `memoryStyle` 포함)을 만들고 `index.ts` 목록에 넣는다(`validateRelationshipConfig`가 빈 배열이어야 한다).
 2. `src/lib/lounge.ts`의 `loungeHosts`에 진행자 항목(1:1용 `companion`과 그룹용 `instruction` 모두)을 넣고 `loungeRelationshipHostIds`와 `loungeCharacterProfiles`에 ID를 추가한다.
 3. 새 마이그레이션에서 `voice_lounge_rooms_host_persona_check`에 ID를 추가한다.
 
@@ -73,7 +100,7 @@
 
 ## 적용 순서
 
-1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
+1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`, 장기 기억을 쓰려면 `20261008010000_voice_lounge_memories.sql`, 예문 스위치를 적용했던 DB라면 `20261008020000_voice_lounge_remove_style_examples.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
 2. 서버 환경변수 `SUPABASE_SERVICE_ROLE_KEY`가 있어야 관계가 저장된다. 없거나 표를 읽지 못하면 관계 기능만 꺼지고 대화는 그대로 된다.
 3. (선택) `LOUNGE_RELATIONSHIP_DEBUG_USERS`에 개발자 이메일을 넣는다.
 4. 음성 예시를 다시 만들려면 `node scripts/generate-lounge-host-samples.mjs --host=<id> --overwrite`를 쓴다(유료 TTS 1회). 음성이나 연기 지시를 바꿨다면 샘플도 다시 만들어야 한다. 새 캐릭터는 `loungeHosts`의 `voiceSample` 경로를 채운 뒤 같은 명령으로 만든다.
@@ -81,7 +108,8 @@
 ## 검증
 
 - `npm run test:lounge`: 엔진 단위 테스트 17개(범위, 캐릭터별 변화, 단계 조건, hysteresis, 즉시 강등, 신뢰 비대칭, 반복 감쇠, 기분 분리, 사용자·캐릭터별 독립, 설정만으로 새 캐릭터)와 API 통합 테스트.
-- `node scripts/lounge-relationship-sql-check.mjs`: 격리 PostgreSQL에서 1:1 전용 제약, 버전 충돌, 방·사용자·캐릭터 결합, 점수 검증, 서버 전용 권한, 재실행.
+- `node scripts/lounge-relationship-sql-check.mjs`: 격리 PostgreSQL에서 1:1 전용 제약, 버전 충돌, 방·사용자·캐릭터 결합, 점수 검증, 서버 전용 권한, 재실행, 장기 기억 연산(닫기·대체·갱신·40개 제한·그룹 방 거부).
+- `scripts/lounge-memory.test.mjs`(`npm run test:lounge`에 포함): 기억 선택, 연산 검증, 중복 처리, 민감 정보, 직전 대화, 첫 인사 근황.
 - `npm run simulate:relationship` (결정적), `npm run simulate:relationship -- --live` (실제 모델, 유료, TTS·DB 모의). 로그는 `docs/relationship-simulation/`.
 
 실제 실행(52턴)에서 모델 호출과 저장을 합친 시간은 중앙값 3.5초, p90 5.3초, 최대 12.6초였다. 이벤트 출력이 없는 같은 호출과의 비교는 측정하지 않았다.

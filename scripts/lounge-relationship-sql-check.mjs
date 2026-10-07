@@ -43,6 +43,41 @@ try {
   await assert.rejects(save(ids[0], 'velvet', velvetA, 2, state({ ...scores, trust: 120 })), /invalid relationship score/);
   await assert.rejects(save(ids[0], 'velvet', velvetA, 2, JSON.stringify({ scores })), /invalid relationship state/);
 
+  // Long-term memory: only the room's own one-to-one host and character, validated operations, at most 40 active.
+  const ops = (user, character, room, list) => one('select apply_voice_lounge_memory_ops($1,$2,$3,$4::jsonb) as n', [user, character, room, JSON.stringify(list)]).then(row => row.n);
+  const memory = summary => one('select * from voice_lounge_memories where user_id=$1 and summary=$2', [ids[0], summary]);
+  assert.equal(await ops(ids[0], 'velvet', velvetA, [
+    { op: 'add', kind: 'open_thread', summary: '고객 3명을 인터뷰하기로 했다', follow_up: '인터뷰 결과', importance: 0.8 },
+    { op: 'add', kind: 'decision', summary: '회사를 그만둘 생각이다', importance: 0.7 },
+    { op: 'add', kind: 'project', summary: 'AI 음성 앱을 만들고 있다', importance: 0.75 },
+  ]), 3);
+  assert.equal(await ops(ids[1], 'velvet', velvetA, [{ op: 'add', kind: 'event', summary: '남의 방', importance: 0.9 }]), null, 'another user cannot write');
+  assert.equal(await ops(ids[0], 'auditor', velvetA, [{ op: 'add', kind: 'event', summary: '다른 캐릭터', importance: 0.9 }]), null, 'the character must match the room');
+  assert.equal(await ops(ids[0], 'velvet', velvetGroup, [{ op: 'add', kind: 'event', summary: '그룹 방', importance: 0.9 }]), null, 'group rooms never write memories');
+  const thread = await memory('고객 3명을 인터뷰하기로 했다'), decision = await memory('회사를 그만둘 생각이다'), project = await memory('AI 음성 앱을 만들고 있다');
+  assert.equal(thread.follow_up, '인터뷰 결과'); assert.equal(thread.status, 'active');
+  assert.equal(await ops(ids[0], 'velvet', velvetA, [
+    { op: 'close', id: thread.id },
+    { op: 'supersede', id: decision.id, kind: 'decision', summary: '당분간 회사를 계속 다니기로 했다', importance: 0.8 },
+    { op: 'update', id: project.id, summary: 'AI 음성 대화 앱을 만들고 있다', importance: 0.6 },
+  ]), 3);
+  assert.equal((await one('select status from voice_lounge_memories where id=$1', [thread.id])).status, 'closed');
+  const replaced = await one('select status, superseded_by from voice_lounge_memories where id=$1', [decision.id]), current = await memory('당분간 회사를 계속 다니기로 했다');
+  assert.equal(replaced.status, 'superseded'); assert.equal(replaced.superseded_by, current.id); assert.equal(current.status, 'active');
+  const updated = await one('select * from voice_lounge_memories where id=$1', [project.id]);
+  assert.equal(updated.summary, 'AI 음성 대화 앱을 만들고 있다'); assert.equal(updated.mention_count, 2); assert.equal(Number(updated.importance), 0.75, 'importance never drops on update');
+  assert.equal(await ops(ids[0], 'velvet', velvetA, [{ op: 'close', id: thread.id }, { op: 'update', id: '00000000-0000-4000-8000-000000000000', summary: 'x' }]), 0, 'closed or unknown targets are skipped');
+  await assert.rejects(ops(ids[0], 'velvet', velvetA, Array.from({ length: 4 }, (_, i) => ({ op: 'add', kind: 'event', summary: `일 ${i}`, importance: 0.6 }))), /invalid memory ops/);
+  await assert.rejects(ops(ids[0], 'velvet', velvetA, [{ op: 'add', kind: 'secret', summary: '잘못된 종류', importance: 0.6 }]), /check/);
+  for (let i = 0; i < 15; i++) await ops(ids[0], 'velvet', velvetA, [0, 1, 2].map(j => ({ op: 'add', kind: 'event', summary: `있었던 일 ${i}-${j}`, importance: 0.5 + (i % 5) / 10 })));
+  const counts = await one("select count(*) filter (where status='active') as active, count(*) filter (where status='archived') as archived from voice_lounge_memories where user_id=$1 and character_id='velvet'", [ids[0]]);
+  assert.equal(Number(counts.active), 40, 'at most 40 active memories'); assert.ok(Number(counts.archived) > 0, 'the least important are archived, not deleted');
+  for (const role of ['anon', 'authenticated']) {
+    assert.equal((await one("select has_table_privilege($1,'public.voice_lounge_memories','SELECT') ok", [role])).ok, false);
+    assert.equal((await one("select has_function_privilege($1,'public.apply_voice_lounge_memory_ops(uuid,text,text,jsonb)','EXECUTE') ok", [role])).ok, false);
+  }
+  assert.equal((await one("select relrowsecurity from pg_class where relname='voice_lounge_memories'")).relrowsecurity, true);
+
   // Each user and character pair is independent.
   const auditorScores = { trust: 20, respect: 30, interest: 40, comfort: 30, openness: 15, epistemicHonesty: 50, rigor: 40 };
   assert.equal(await save(ids[0], 'auditor', auditorA, 0, state({ ...auditorScores, trust: 23 }, 'UNVERIFIED')), 1);
@@ -68,7 +103,13 @@ try {
 
   await db.exec(latestSql);
   await db.exec(await readFile('supabase/migrations/20261007000000_voice_lounge_six_hosts.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/20261008010000_voice_lounge_memories.sql', 'utf8'));
+  // The removed style-example switch: the cleanup also works on a database that had it, and can run again.
+  await db.exec('alter table voice_lounge_rooms add column if not exists style_examples boolean not null default true; create or replace function set_voice_lounge_style_examples(p_room text, p_enabled boolean) returns void language plpgsql as $$ begin end $$;');
+  for (let run = 0; run < 2; run++) await db.exec(await readFile('supabase/migrations/20261008020000_voice_lounge_remove_style_examples.sql', 'utf8'));
+  assert.equal((await one("select count(*)::int n from information_schema.columns where table_name='voice_lounge_rooms' and column_name='style_examples'")).n, 0);
+  assert.equal((await one("select count(*)::int n from pg_proc where proname='set_voice_lounge_style_examples'")).n, 0);
   row = await one('select * from voice_lounge_relationships where user_id=$1 and character_id=$2', [ids[0], 'velvet']);
   assert.equal(row.version, 2, 'reapplying the migration keeps stored relationships');
-  console.log('PASS: six hosts in rooms of any size, relationships written only for one-to-one rooms, removed hosts migrated, optimistic versions, room/user/character binding, score validation, session mood on the room, independent user-character rows, server-only access and reapplication.');
+  console.log('PASS: long-term memory operations (owner and room binding, close, supersede, update, 40 active cap, server-only access), six hosts in rooms of any size, relationships written only for one-to-one rooms, removed hosts migrated, optimistic versions, room/user/character binding, score validation, session mood on the room, independent user-character rows, server-only access and reapplication.');
 } catch (error) { console.error(error.stack); process.exitCode = 1; } finally { await db.close(); }

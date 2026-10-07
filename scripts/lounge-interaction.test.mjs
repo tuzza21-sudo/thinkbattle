@@ -75,6 +75,14 @@ test('only an explicit unique participant nickname and confident safe question c
     [{...raw,moderation:'warn',reason:'harassment'},members,'소연님, 어때요?'],
   ])assert.equal(lib.readLoungeInteraction(output(value),roster,a,text).target_id,null);
 });
+test('a plain commentary message next to the JSON decision does not break it',()=>{
+  const decision=JSON.stringify({...raw,moderation:'warn',reason:'harassment'});
+  for(const messages of [
+    [{phase:'commentary',content:[{type:'output_text',text:'검토해 볼게요.'}]},{phase:'final_answer',content:[{type:'output_text',text:decision}]}],
+    [{phase:'commentary',content:[{type:'output_text',text:decision}]}],
+  ])assert.equal(lib.readLoungeInteraction({output:messages},members,a,'내용').moderation,'warn');
+  assert.throws(()=>lib.readLoungeInteraction({output:[{phase:'commentary',content:[{type:'output_text',text:'검토해 볼게요.'}]}]},members,a,'내용'),/Incomplete/);
+});
 test('ordinary attacks warn, severe attacks restrict immediately, and uncertainty cannot sanction anyone',()=>{
   assert.equal(lib.readLoungeInteraction(output({...raw,moderation:'restrict',reason:'threat',moderation_confidence:'low'}),members,a,'내용').moderation,'allow');
   assert.equal(lib.readLoungeInteraction(output({...raw,moderation:'restrict',reason:'harassment'}),members,a,'내용').moderation,'warn');

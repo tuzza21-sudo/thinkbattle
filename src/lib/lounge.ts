@@ -209,6 +209,20 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
     speed: host.speechSpeed, instructions: host.speechInstruction + ' 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.' };
 }
 
+/**
+ * OpenAI speech sometimes stops sending for tens of seconds (3 of 16 requests on 2026-10-07; normally the
+ * first audio arrives within 1.3 s and packets are at most 0.8 s apart). A second request is started when the
+ * first audio is `hedgeAfterMs` late, a request with no audio after `firstAudioMs` or a `gapMs` pause is given up,
+ * and a reply gets at most `attempts` tries.
+ */
+export const loungeSpeechStall = { hedgeAfterMs: 2500, firstAudioMs: 8000, gapMs: 4000, attempts: 3 };
+
+/**
+ * When to start a second transcription request. On 2026-10-07 transcription of a 4-second recording took about
+ * 1 s, 4 of 18 requests took 3.3 to 8.1 s, and one in real use ran past 25 s. Longer recordings take longer.
+ */
+export const loungeTranscriptionHedgeMs = (bytes: number) => Math.min(8000, 2500 + Math.round(bytes / 40));
+
 // Long Korean turns can exceed a minute of audio even within the 600-character
 // moderator limit. Keep generation time and decoded audio duration separate.
 export function loungeSpeechLimits(input: string) {

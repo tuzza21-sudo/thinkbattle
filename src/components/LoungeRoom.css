@@ -688,3 +688,13 @@
   .has-room .lounge-participant-controls .lounge-session-actions { justify-content:flex-end; }
   .has-room .lounge-participant-controls .lounge-session-actions .lounge-help { flex:0 0 auto; }
 }
+
+/* What the character remembers about the user, shown inside the relationship panel. */
+.lounge-relationship-memory { margin-top:8px; padding:10px 12px; border-radius:12px; background:var(--lounge-surface, #242421); border:1px solid #ffffff24; }
+.lounge-relationship-memory h3 { margin:0 0 6px; font-size:11px; color:var(--lounge-accent); }
+.lounge-relationship-memory ul { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+.lounge-relationship-memory li { font-size:11px; line-height:1.55; overflow-wrap:anywhere; }
+.lounge-relationship-memory li>span { display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; background:#ffffff14; font-size:9px; opacity:.85; }
+.lounge-relationship-memory li small { display:block; opacity:.7; font-size:10px; }
+.lounge-relationship-memory p { margin:0; font-size:10px; opacity:.75; }
+.lounge-relationship-memory .lounge-relationship-memory-note { margin-top:6px; font-size:9px; opacity:.6; }

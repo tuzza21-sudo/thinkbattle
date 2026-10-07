@@ -20,9 +20,13 @@ severity: 일반적인 상대 공격은 ordinary. 명확한 폭력 위협, 혐�
 작품의 대사 인용, 등장인물 비판, 과거 피해 경험, 일반적인 성인 주제, 혼잣말이나 감탄의 욕설은 실제 참가자 공격과 구별한다. recent는 문맥 확인용이며 판정 대상은 마지막 text 하나다. 전사 오류, 농담의 의도, 대상이 불확실하면 low와 allow를 택한다. 위험한 발언을 그대로 재출력하지 않는다.
 target_id: 이번 발언에서 닉네임을 직접 부르며 실제 질문한 참가자 한 명의 members.id만 선택한다. 호스트/AI, 본인(speaker_id), 작품 속 인물, 단순 이름 언급은 질문 대상이 아니다. 여러 명에게 묻거나 동명이인, '그분/너/친구/다들'처럼 불분명하면 null. 명확한 질문과 유일한 상대가 있을 때만 high. 질문을 듣는 사람이 부담 없이 답하거나 패스할 수 있게 question에 원 질문의 뜻을 100자 이내로 정리한다. 질문이 없으면 question=null. 공격적인 질문은 대상 연결하지 않는다.`;
 const normalized = (value: string) => value.normalize('NFKC').replace(/\s+/g, '').toLocaleLowerCase();
-export function readLoungeInteraction(result: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }, members: LoungeInteractionMember[], speakerId: string, text: string): LoungeInteractionDecision {
-  const output = result.output?.flatMap(item => item.content ?? []).filter(item => item.type === 'output_text').map(item => item.text ?? '').join('') ?? '';
-  const raw = JSON.parse(output);
+export function readLoungeInteraction(result: { output?: Array<{ phase?: string; content?: Array<{ type?: string; text?: string }> }> }, members: LoungeInteractionMember[], speakerId: string, text: string): LoungeInteractionDecision {
+  // The model can write a plain 'commentary' message besides the JSON one; joining them broke the JSON.
+  // Use the message that parses, preferring the final answer.
+  const messages = (result.output ?? []).map(item => ({ phase: item.phase, text: (item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('') }));
+  const ordered = [...messages.filter(item => item.phase !== 'commentary'), ...messages.filter(item => item.phase === 'commentary')];
+  const raw = ordered.map(item => { try { return JSON.parse(item.text); } catch { return undefined; } }).find(value => value && typeof value === 'object');
+  if (!raw) throw new Error('Incomplete interaction decision');
   if (!['allow', 'warn', 'restrict'].includes(raw?.moderation) || !['high', 'low'].includes(raw.moderation_confidence)
     || !['ordinary', 'severe'].includes(raw.severity) || !['none', 'harassment', 'hate', 'threat', 'sexual_harassment'].includes(raw.reason)
     || !['high', 'low'].includes(raw.target_confidence)) throw new Error('Incomplete interaction decision');

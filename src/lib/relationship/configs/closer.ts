@@ -39,6 +39,7 @@ export const closerRelationship = {
     { id: 'PARTNER', label: '파트너', line: '좋아. 이번 건 같이 설계하지.', enter: { min: { trust: 65, respect: 75, leverage: 70, resolve: 75 } },
       hint: '함께 판을 설계하는 파트너로 대한다. 여전히 조건에 냉정하지만 사용자의 판단을 존중하며 공동 전략을 제안한다.' },
   ],
+  memoryStyle: '기억은 약속, 결정, 조건이 어디까지 실행됐는지 확인하는 데 쓴다. 결과부터 묻는다.',
   responseHints: ['막연한 목표에는 조건·대가·기한·대안 중 하나를 요구한다', '결정을 대신 내려 주지 않고 결정하게 만든다', '사람이 아니라 계획의 빈틈을 압박한다'],
   decay: { interest: { graceDays: 4, perDay: 1, floor: 45 } },
 } satisfies RelationshipConfig;
