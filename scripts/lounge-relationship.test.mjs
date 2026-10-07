@@ -180,14 +180,14 @@ test('10. a new character runs through the unchanged engine from configuration a
 
 test('the empath grows by understanding: feelings raise attunement and nobody is punished for needing reassurance', () => {
   const config = configs.ina;
-  assert.deepEqual(config.stages.map(stage => stage.id), ['POLITE', 'COMFORTABLE', 'UNDERSTOOD', 'CONFIDANT', 'SAFE_HARBOR']);
-  assert.deepEqual(run(config, [[event('SHARES_FEELING')]]).logs[0].delta, { openness: 3, comfort: 2, attunement: 4, emotionalSafety: 2 });
+  assert.deepEqual(config.stages.map(stage => stage.id), ['POLITE', 'UNDERSTOOD', 'CONFIDANT', 'SAFE_HARBOR']);
+  assert.deepEqual(run(config, [[event('SHARES_FEELING')]]).logs[0].delta, { openness: 3, comfort: 2, attunement: 4, emotionalSafety: 2, respect: 1 });
   for (const type of ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'REPEATS_SELF']) assert.deepEqual(run(config, [[event(type)]]).logs[0].delta, {}, type);
   // Crossing a boundary costs far more safety than a good turn gives.
   assert.equal(run(config, [[event('VIOLATES_BOUNDARY')]]).logs[0].delta.emotionalSafety, -15);
-  const ready = withScores(config, { attunement: 50, comfort: 60, trust: 52, openness: 45 }, 'COMFORTABLE');
+  const ready = withScores(config, { attunement: 42, comfort: 55, trust: 45, openness: 38 });
   const { record, logs } = run(config, [[event('SHARES_FEELING')], [event('SHOWS_VULNERABILITY')], [event('CORRECTS_UNDERSTANDING')]], ready);
-  assert.deepEqual(logs.map(log => log.stageAfter), ['COMFORTABLE', 'COMFORTABLE', 'UNDERSTOOD']);
+  assert.deepEqual(logs.map(log => log.stageAfter), ['POLITE', 'POLITE', 'UNDERSTOOD']);
   assert.equal(record.stage, 'UNDERSTOOD');
   // A feeling that is shared is remembered so a later turn can connect it.
   assert.ok(run(config, [[event('SHARES_FEELING', 0.9, '괜찮다고 했지만 많이 속상해함')]]).record.memories.some(memory => memory.summary === '괜찮다고 했지만 많이 속상해함'));
@@ -195,7 +195,7 @@ test('the empath grows by understanding: feelings raise attunement and nobody is
 
 test('the wit grows by shared jokes: running jokes raise familiarity and are remembered', () => {
   const config = configs.jaeseok;
-  assert.deepEqual(config.stages.map(stage => stage.id), ['FRIENDLY', 'CLICKED', 'IN_SYNC', 'INSIDE_JOKE', 'OLD_FRIEND']);
+  assert.deepEqual(config.stages.map(stage => stage.id), ['FRIENDLY', 'IN_SYNC', 'INSIDE_JOKE', 'OLD_FRIEND']);
   const created = run(config, [[event('CREATES_RUNNING_JOKE', 0.9, '“시장조사 좀 더”가 미루기의 암호가 됨')]]);
   assert.deepEqual(created.logs[0].delta, { familiarity: 5, chemistry: 3, interest: 2 });
   assert.ok(created.record.memories.some(memory => memory.summary.includes('시장조사')), 'the joke is remembered so it can come back later');

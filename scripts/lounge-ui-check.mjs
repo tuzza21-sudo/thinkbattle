@@ -165,12 +165,7 @@ try {
   assert.match(await evaluate("document.querySelector('.lounge-seat.speaking').textContent"), /지금 이야기 중/);
   await evaluate("document.querySelector('.lounge-on-air button').click()");
   await waitFor("document.querySelectorAll('.lounge-seat.speaking,.lounge-moderator.speaking').length===0");
-  await evaluate("document.querySelector('.lounge-avatar-toggle').click()");
-  await waitFor("document.querySelectorAll('.lounge-avatar-picker button').length===6");
-  await evaluate("document.querySelectorAll('.lounge-avatar-picker button')[4].click()");
-  await waitFor("document.querySelector('.lounge-avatar-picker')===null");
-  assert.equal(await evaluate("document.querySelector('.lounge-seat.self .lounge-portrait-sprite').style.left"), '-100%');
-  assert.equal(await evaluate("document.querySelector('.lounge-seat.self .lounge-portrait-sprite').style.transform"), 'translateY(-50%)');
+  assert.equal(await evaluate("document.querySelector('.lounge-avatar-toggle')===null"), true, 'avatars are chosen in the profile, not in the room');
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await evaluate("document.querySelector('.lounge-on-air button').click()");
   await waitFor("document.querySelector('.lounge-seat.speaking,.lounge-moderator.speaking')!==null");
