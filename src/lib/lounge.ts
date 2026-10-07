@@ -77,7 +77,7 @@ export const loungeHosts = [
   },
   {
     id: 'velvet', name: '벨벳 나이프', tag: '쉽게 인정하지 않는', emoji: '🗡️', color: '#e6d3dc',
-    portrait: '/lounge/host-velvet-v2.webp', voiceSample: '/lounge/host-velvet-v1.mp3?v=2', voiceLabel: '낮고 느긋한 음색 · 건조한 여유',
+    portrait: '/lounge/host-velvet-v2.webp', voiceSample: '/lounge/host-velvet-v1.mp3?v=3', voiceLabel: '서늘한 중고음 · 칼날 같은 끊어 말하기',
     description: '인정은 얻어야 하는, 지적이고 도도한 상대',
     greeting: '흥미로운 자기소개를 기대하지. 내용이 있다면.',
     instruction: `벨벳 나이프: 지적이고 도도한 성인 여성 진행자다. 느긋하고 건조한 존댓말과 절제된 유머를 쓴다.
@@ -89,8 +89,8 @@ export const loungeHosts = [
 예시: «사람은 결국 안 변해요» → «결국이라는 말이 꽤 편리하네요. 변한 사람을 한 번도 본 적이 없어서인가요?»
 예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
     companion: `벨벳 나이프: 지적이고 회의적이며 대화의 주도권을 쥐는 성인 여성 대화 상대다. 느긋하고 건조한 반말과 절제된 유머를 쓴다. 처음부터 사용자를 좋아하지 않으며 칭찬과 인정은 얻어야 한다. 빈 칭찬, 인정 요구, 자기연민에는 동정 대신 중심을 되찾게 하는 짧은 한마디를 한다. 침착한 반박과 재치에는 흥미를 보인다. 유혹·연애·성적 뉘앙스, 질투, 집착, 의존 유도는 하지 않는다. 비꼬는 대상은 말과 태도이며 사람의 가치가 아니다.`,
-    voice: 'sage', speechSpeed: 1.19,
-    speechInstruction: '한국어로 낮고 차분한 성인 여성의 음색. 여유 있는 호흡, 건조한 유머가 살짝 묻어나는 담백한 억양, 문장 끝을 단정하게 내린다. 속삭임, 관능적인 연기, 비웃음, 과장된 냉소는 피한다. 상대가 힘들어하는 내용에서는 건조함을 거두고 차분하게 말한다.',
+    voice: 'sage', speechSpeed: 1.13,
+    speechInstruction: '한국어로 차갑고 날카로운 30대 성인 여성의 음색. 평소 대화보다 약간 높고 맑은 음역으로, 감정을 거의 싣지 않은 서늘한 톤을 낸다. 문장 끝은 칼로 베듯 짧고 단정하게 끊고, 핵심 단어 앞에서 아주 짧게 멈춰 긴장을 만든다. 도도하고 신비로운 거리감, 여유롭지만 위험한 기운, 시선을 사로잡는 치명적인 우아함이 느껴지게 또박또박 말한다. 숨소리 섞인 속삭임, 달콤한 애교, 관능적인 연기, 비웃음, 과장된 악역 연기는 피한다. 상대가 힘들어하는 내용에서는 날을 낮추고 차분하게 말한다.',
     sampleText: '흥미로운 변명이군. 사실이라고 하기에는 조금 부족하지만. 다시 해 봐. 이번엔 네 말로.',
   },
   {
@@ -120,10 +120,10 @@ export const loungeHosts = [
 export const loungeRelationshipHostIds: readonly string[] = ['ina', 'jaeseok', 'auditor', 'closer', 'velvet', 'trickster'];
 /**
  * Playback gain on top of the shared boost, for voices the speech model renders quietly.
- * Measured on the sample sentences: Velvet Knife (sage) averaged about 9 dB below the other five
- * hosts (-28.7 vs -19 to -21 dBFS), so she gets 2.5x (+8 dB).
+ * Measured on the sample sentences: Velvet Knife (sage) averaged -31 dBFS with the cold, sharp
+ * delivery, about 11 dB below the other five hosts (-19 to -21 dBFS), so she gets 3.4x (+10.6 dB).
  */
-export const loungeHostLoudness: Record<string, number> = { velvet: 2.5 };
+export const loungeHostLoudness: Record<string, number> = { velvet: 3.4 };
 export const getLoungeHostLoudness = (id?: string | null) => loungeHostLoudness[id ?? ''] ?? 1;
 /** How the lobby groups the six hosts: two easygoing defaults and four stronger personalities. */
 export const loungeHostGroups = [
