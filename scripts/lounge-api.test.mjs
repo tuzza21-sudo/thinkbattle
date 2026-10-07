@@ -880,6 +880,107 @@ test('LOUNGE_STYLE_EXAMPLES=off removes the examples without touching anything e
   assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
 });
 
+// One relationship turn with long-term memory available; returns what the model was sent and what was saved.
+const memoryRows = [
+  { id: '11111111-1111-4111-8111-111111111111', character_id: 'velvet', kind: 'open_thread', summary: '사용자는 다음 주까지 잠재 고객 3명을 인터뷰하기로 했다.', follow_up: '인터뷰 결과', importance: 0.8, status: 'active', mention_count: 1, updated_at: '2026-10-07T00:00:00Z', last_confirmed_at: '2026-10-07T00:00:00Z' },
+  { id: '22222222-2222-4222-8222-222222222222', character_id: 'velvet', kind: 'decision', summary: '사용자는 회사를 그만둘 생각이다.', follow_up: null, importance: 0.7, status: 'active', mention_count: 1, updated_at: '2026-10-06T00:00:00Z', last_confirmed_at: '2026-10-06T00:00:00Z' },
+  { id: '33333333-3333-4333-8333-333333333333', character_id: 'ina', kind: 'event', summary: '공감형에게만 한 이야기', follow_up: null, importance: 0.9, status: 'active', mention_count: 1, updated_at: '2026-10-07T00:00:00Z', last_confirmed_at: '2026-10-07T00:00:00Z' },
+];
+async function memoryTurn({ userText = '인터뷰 다 했어. 그리고 퇴사는 안 하기로 했어.', reason = 'followup', aiTurns = 2, memories = memoryRows, previousRooms = [{ host_persona: 'velvet', memory: '사용자는 사업 아이디어를 이야기했다.', created_at: '2026-10-07T00:00:00Z' }], memoryOps = [], env = {} } = {}) {
+  let sent; const applied = [];
+  const saved = process.env.LOUNGE_LONG_MEMORY;
+  if (env.LOUNGE_LONG_MEMORY === undefined) delete process.env.LOUNGE_LONG_MEMORY; else process.env.LOUNGE_LONG_MEMORY = env.LOUNGE_LONG_MEMORY;
+  try {
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_memories?')) return memories === 'error' ? new Response('{}', { status: 404 }) : result(memories);
+      if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+      if (url.includes('select=style_examples')) return result([{}]);
+      if (url.includes('voice_lounge_rooms?host_id=')) return result(previousRooms);
+      if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ ai_turns: aiTurns })]);
+      if (url.includes('voice_lounge_messages?')) return result(userText ? [{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: userText }] : []);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+      if (url.endsWith('/responses')) { sent = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그래서 결과는?', memory: '', events: [], memory_ops: memoryOps }) }] }] }); }
+      if (url.includes('apply_voice_lounge_memory_ops')) { applied.push(JSON.parse(init.body)); return result(1); }
+      if (url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge_relationship')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1]));
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason }))).status, 200); }));
+  } finally { if (saved === undefined) delete process.env.LOUNGE_LONG_MEMORY; else process.env.LOUNGE_LONG_MEMORY = saved; }
+  return { body: sent, context: JSON.parse(sent.input), applied };
+}
+
+test('this character\'s long-term memories and the previous conversation reach the prompt, and only validated memory changes are saved', async () => {
+  const { body, context, applied } = await memoryTurn({ memoryOps: [
+    { op: 'close', ref: 'm1', kind: '', summary: '', importance: 0, follow_up: '' },
+    { op: 'supersede', ref: 'm2', kind: 'decision', summary: '사용자는 당분간 회사를 계속 다니기로 했다.', importance: 0.8, follow_up: '' },
+    { op: 'add', ref: '', kind: 'event', summary: '사용자는 우울증 진단을 받았다.', importance: 0.9, follow_up: '' },
+    { op: 'add', ref: '', kind: 'event', summary: '사용자는 고객 3명 인터뷰를 마쳤고 2명이 유료 사용 의사를 밝혔다.', importance: 0.85, follow_up: '' },
+  ] });
+  const memories = context.relationship.user_memories;
+  assert.deepEqual(memories.map(item => item.ref), ['m1', 'm2']);
+  assert.equal(memories[0].follow_up, '인터뷰 결과');
+  assert.ok(!JSON.stringify(memories).includes('공감형에게만'), "another character's memories are not sent");
+  assert.ok(!JSON.stringify(memories).includes('1111'), 'database ids stay on the server');
+  assert.equal(context.relationship.memory_style, relationshipLib.getRelationshipConfig('velvet').memoryStyle);
+  assert.deepEqual(context.relationship.previous_session, { summary: '사용자는 사업 아이디어를 이야기했다.', days_ago: context.relationship.previous_session.days_ago });
+  assert.match(body.instructions, /user_memories와 previous_session에 없는 과거는 지어내지 않으며/);
+  assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events', 'memory_ops']);
+  assert.equal(body.max_output_tokens, 1700);
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].p_character, 'velvet'); assert.equal(applied[0].p_user, 'user-1'); assert.equal(applied[0].p_room, roomId);
+  assert.deepEqual(applied[0].p_ops, [
+    { op: 'close', id: '11111111-1111-4111-8111-111111111111' },
+    { op: 'supersede', id: '22222222-2222-4222-8222-222222222222', kind: 'decision', summary: '사용자는 당분간 회사를 계속 다니기로 했다.', importance: 0.8 },
+    { op: 'add', kind: 'event', summary: '사용자는 고객 3명 인터뷰를 마쳤고 2명이 유료 사용 의사를 밝혔다.', importance: 0.85 },
+  ], 'refs become database ids and the sensitive fact is dropped');
+});
+
+test('without readable memories the conversation works as before: no memory fields, no saving', async () => {
+  const { body, context, applied } = await memoryTurn({ memories: 'error', memoryOps: [{ op: 'add', ref: '', kind: 'event', summary: '저장되면 안 됨', importance: 0.9, follow_up: '' }] });
+  assert.equal(context.relationship.user_memories, undefined); assert.equal(context.relationship.previous_session, undefined);
+  assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
+  assert.doesNotMatch(body.instructions, /memory_ops/);
+  assert.equal(applied.length, 0);
+  assert.equal(context.relationship.stage.id, 'INTRIGUED', 'the relationship itself still works');
+});
+
+test('a greeting without a new user message never saves memories, and later turns no longer carry the previous conversation', async () => {
+  const opening = await memoryTurn({ userText: null, reason: 'opening', aiTurns: 1, memoryOps: [{ op: 'add', ref: '', kind: 'event', summary: '첫 인사에서 지어낸 일', importance: 0.9, follow_up: '' }] });
+  assert.equal(opening.applied.length, 0);
+  assert.ok(opening.context.relationship.previous_session);
+  assert.deepEqual(opening.context.relationship.opening_follow_up, { ref: 'm1', summary: '사용자는 다음 주까지 잠재 고객 3명을 인터뷰하기로 했다.', follow_up: '인터뷰 결과' }, 'the opening asks about the unfinished story');
+  assert.match(opening.body.instructions, /opening_follow_up이 있으면 새 대화의 첫 인사\(reason=opening\)는 방 주제 질문 대신/);
+  const later = await memoryTurn({ aiTurns: 9 });
+  assert.equal(later.context.relationship.previous_session, undefined);
+  assert.equal(later.context.relationship.opening_follow_up, undefined);
+  assert.ok(later.context.relationship.user_memories.length > 0);
+});
+
+test('LOUNGE_LONG_MEMORY=off turns memory reading, prompting and saving off', async () => {
+  const { body, context, applied } = await memoryTurn({ env: { LOUNGE_LONG_MEMORY: 'off' }, memoryOps: [{ op: 'add', ref: '', kind: 'event', summary: '저장되면 안 됨', importance: 0.9, follow_up: '' }] });
+  assert.equal(context.relationship.user_memories, undefined);
+  assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
+  assert.equal(applied.length, 0);
+});
+
+test('the owner of a one-to-one room can see what the character remembers, and only that character', async () => {
+  let body;
+  await withServiceKey(() => run(async url => {
+    if (url.includes('/auth/')) return result({ id: 'user-1', email: 'user@example.com' });
+    if (url.includes('voice_lounge_memories?')) return result(memoryRows);
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'velvet', capacity: 1, ai_mood: null }]);
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => { body = await (await handler(request({ action: 'relationship', roomId }))).json(); }));
+  const remembered = body.relationship.remembered;
+  assert.deepEqual(remembered.map(item => item.label), ['다음에 물어볼 일', '결정', '함께한 순간']);
+  assert.equal(remembered[0].followUp, '인터뷰 결과');
+  assert.ok(!JSON.stringify(remembered).includes('공감형에게만'));
+  assert.ok(remembered.every(item => !('importance' in item) && !('id' in item)), 'no internal scores or ids');
+});
+
 test('relationship scores do not move without a new user turn, and a storage failure never blocks the reply', async () => {
   let saved;
   await withServiceKey(() => run(async (url, init) => {
@@ -1366,6 +1467,37 @@ test('one-to-one speech starts once the reply sentence is complete, before the m
     assert.equal(finish.p_text, reply.text); assert.equal(finish.p_memory, reply.memory, 'the full memory is saved before the stream closes');
     assert.equal(saved.p_state.recentEvents.at(-1).type, 'MAKES_UNSUPPORTED_CLAIM', 'events written after the text still update the relationship');
   }));
+});
+
+test('a plain commentary message before the JSON answer is ignored, streamed or not', async () => {
+  const reply = { text: '인터뷰는 해봤어?', memory: '기억', events: [] };
+  const commentary = '인터뷰는 해봤어?';
+  const streamed = [
+    { type: 'response.output_item.added', output_index: 0, item: { type: 'message', phase: 'commentary' } },
+    { type: 'response.output_text.delta', output_index: 0, delta: commentary },
+    { type: 'response.output_item.added', output_index: 1, item: { type: 'message', phase: 'final_answer' } },
+    ...deltas(JSON.stringify(reply), 12).map(event => ({ ...event, output_index: 1 })),
+    { type: 'response.completed', response: { status: 'completed' } },
+  ];
+  const whole = { status: 'completed', output: [{ phase: 'commentary', content: [{ type: 'output_text', text: commentary }] }, { phase: 'final_answer', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }] };
+  for (const stream of [true, false]) {
+    let finish;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '요즘 고민', host_persona: 'auditor', memory: '', capacity: 1, ai_turns: 1 }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return stream ? sse(streamed) : result(whole);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
+      if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'opening', stream }));
+      if (stream) assert.deepEqual((await response.text()).trim().split('\n').map(line => JSON.parse(line).type), ['host', 'audio', 'done']);
+      else assert.equal(response.status, 200);
+    });
+    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(finish.p_memory, reply.memory, `stream=${stream}`);
+  }
 });
 
 test('if the reply is cut off after its sentence, the spoken sentence is saved and the previous memory is kept', async () => {

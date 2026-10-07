@@ -38,6 +38,7 @@ export default defineConfig(({ mode }) => {
     // Lounge test switches: the developer panel for relationships and the kill switch for the style examples.
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
     'LOUNGE_STYLE_EXAMPLES',
+    'LOUNGE_LONG_MEMORY',
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY',
   ]

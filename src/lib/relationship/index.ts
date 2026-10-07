@@ -12,6 +12,7 @@ export * from './events';
 export * from './engine';
 export * from './persistence';
 export * from './examples';
+export * from './memory';
 
 // Adding a character means adding a configuration here; the engine is unchanged.
 export const relationshipConfigs: Record<string, RelationshipConfig> = Object.fromEntries(

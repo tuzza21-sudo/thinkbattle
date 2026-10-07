@@ -41,6 +41,8 @@ export type RelationshipConfig = {
   /** Ordered from the first stage to the closest. The first stage has no conditions. */
   stages: readonly StageRule[];
   responseHints: readonly string[];
+  /** How this character brings up long-term memories, so the same memory sounds different per character. */
+  memoryStyle?: string;
   decay?: Partial<Record<string, DecayRule>>;
   maxGainPerTurn?: Partial<Record<string, number>>;
 };
@@ -79,6 +81,8 @@ export type RelationshipView = {
   characterId: string;
   /** Developer-only: whether this room sends the few-shot style examples. */
   styleExamples?: boolean;
+  /** What the character remembers about the user, shown to the user. */
+  remembered?: Array<{ kind: string; label: string; summary: string; followUp?: string }>;
   macroState: { id: string; label: string };
   metrics: Record<string, MetricView & { name: string }>;
   debug?: {

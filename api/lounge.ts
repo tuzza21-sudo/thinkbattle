@@ -2,7 +2,7 @@ import { getLoungeHost, isLoungeHelpKind, loungeSpeechLimits, loungeSpeechReques
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, selectStyleExamples, styleExamplesForPrompt, type RelationshipRow } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructions, relationshipState, selectStyleExamples, styleExamplesForPrompt, longMemoryInstructions, memoriesForView, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipRow } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -65,8 +65,9 @@ async function openaiFailure(response: Response): Promise<LoungeUpstreamError> {
   return new LoungeUpstreamError(response.status >= 500 ? 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.' : 'AI 요청 설정을 확인해 주세요.', 502, 'openai_request_failed', response.status >= 500, seconds);
 }
 
-type ModelResult = { status?: string; incomplete_details?: { reason?: string }; usage?: { output_tokens?: number }; output?: Array<{ content?: Array<{ type: string; text?: string }> }> };
-const modelOutputText = (result: ModelResult) => result.output?.flatMap(item => item.content ?? []).find(item => item.type === 'output_text')?.text;
+type ModelResult = { status?: string; incomplete_details?: { reason?: string }; usage?: { output_tokens?: number }; output?: Array<{ phase?: string; content?: Array<{ type: string; text?: string }> }> };
+// The model sometimes says a plain sentence in a 'commentary' message before the JSON answer; only the answer counts.
+const modelOutputText = (result: ModelResult) => result.output?.filter(item => item.phase !== 'commentary').flatMap(item => item.content ?? []).find(item => item.type === 'output_text')?.text;
 
 function parseHostAnswer(output: string | undefined, result?: ModelResult): { text: string; memory: string; events?: unknown } {
   if (!output) throw new Error('사회자가 답변을 준비하지 못했어요.');
@@ -93,7 +94,7 @@ async function* readModelEvents(body: ReadableStream<Uint8Array>) {
       while ((boundary = pending.indexOf('\n\n')) >= 0) {
         const block = pending.slice(0, boundary); pending = pending.slice(boundary + 2);
         const data = block.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
-        if (data && data !== '[DONE]') yield JSON.parse(data) as { type?: string; delta?: unknown; response?: ModelResult };
+        if (data && data !== '[DONE]') yield JSON.parse(data) as { type?: string; delta?: unknown; output_index?: number; item?: { phase?: string }; response?: ModelResult };
       }
       if (done) return;
     }
@@ -276,6 +277,16 @@ export default async function handler(req: Request): Promise<Response> {
       } catch { return true; }
     }
 
+    // Active long-term memories of a user (all characters; callers pick one). A missing table or a failed read means none.
+    async function readMemoryRows(userId: string) {
+      if (!serviceHeaders || process.env.LOUNGE_LONG_MEMORY === 'off') return null;
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&order=importance.desc,updated_at.desc&limit=200&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at`, { headers: serviceHeaders });
+        if (!response.ok) { console.warn('[Lounge memory] read failed', response.status); return null; }
+        return await readJson<MemoryRow[]>(response, 'lounge');
+      } catch { return null; }
+    }
+
     if (body.action === 'relationship') {
       const user = await readJson<{ id: string; email?: string }>(auth, 'lounge');
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,ai_mood`, { headers });
@@ -288,7 +299,13 @@ export default async function handler(req: Request): Promise<Response> {
       const record = applyDecay(relationshipFromRow(config, stored.row), config, new Date());
       const developer = isRelationshipDeveloper(user);
       const view = describeRelationship(record, config, { mood: moodFromRoom(config, room.ai_mood), debug: developer });
-      return json({ enabled: true, relationship: developer ? { ...view, styleExamples: process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await readStyleExamplesFlag() } : view });
+      // What this character remembers about the user: long-term memories first, then moments from the relationship.
+      const longTerm = await readMemoryRows(user.id) ?? [];
+      const remembered = [
+        ...memoriesForView(longTerm, config.characterId).map(row => ({ kind: row.kind, label: memoryKindLabels[row.kind], summary: row.summary, ...(row.follow_up ? { followUp: row.follow_up } : {}) })),
+        ...record.memories.slice(0, 5).map(memory => ({ kind: 'moment', label: '함께한 순간', summary: memory.summary })),
+      ];
+      return json({ enabled: true, relationship: { ...view, remembered, ...(developer ? { styleExamples: process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await readStyleExamplesFlag() } : {}) } });
     }
 
     if (!['opening', 'silence', 'followup', 'requested'].includes(String(body.reason))) return json({ error: '올바르지 않은 진행 요청이에요.' }, 400);
@@ -304,6 +321,12 @@ export default async function handler(req: Request): Promise<Response> {
         .catch(error => (console.warn('[Lounge relationship] read failed', error instanceof Error ? error.name : 'error'), null))
       : Promise.resolve(null);
     const styleExamplesFlag = readStyleExamplesFlag();
+    // Long-term memory and the previous one-to-one conversation, read in parallel; LOUNGE_LONG_MEMORY=off turns both off.
+    const memoryRowsRead = readMemoryRows(user.id);
+    const previousRoomsRead = serviceHeaders && process.env.LOUNGE_LONG_MEMORY !== 'off'
+      ? fetchTimed(`${url}/rest/v1/voice_lounge_rooms?host_id=eq.${encodeURIComponent(user.id)}&capacity=eq.1&id=neq.${encodeURIComponent(roomId)}&order=created_at.desc&limit=12&select=host_persona,memory,created_at`, { headers: serviceHeaders })
+        .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
+      : Promise.resolve(null);
     const responses = await Promise.all([
       fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=topic,host_persona,memory,capacity,ai_turns,study_required,topic_study,guided_session,topic_brief,moderator_request_kind,ai_mood`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers }),
@@ -335,6 +358,11 @@ export default async function handler(req: Request): Promise<Response> {
       const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId)), relationshipConfig, now);
       return { config: relationshipConfig, record, mood: moodFromRoom(relationshipConfig, room.ai_mood), now };
     })() : undefined;
+    const memoryRows = relationship ? await memoryRowsRead : null;
+    const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now) : undefined;
+    const previousSession = relationship && longMemory ? previousSessionSummary((await previousRoomsRead) ?? [], relationship.config.characterId, room.ai_turns ?? 0, relationship.now) : undefined;
+    // A new conversation opens with the most overdue unfinished story instead of the room topic.
+    const openingThread = longMemory && body.reason === 'opening' && (room.ai_turns ?? 0) <= 1 ? openingFollowUp(longMemory.forPrompt, longMemory.chosen) : undefined;
     const participantCount = Math.max(1, members.length);
     const mode = solo ? 'solo' : participantCount <= 2 ? 'pair' : 'group';
     const requestKind = body.reason !== 'requested' ? undefined
@@ -352,7 +380,7 @@ export default async function handler(req: Request): Promise<Response> {
     const context = { mode, participant_count: participantCount, topic: room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members, reason: body.reason, request_kind: requestKind,
-      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(styleExamples.length ? { style_examples: styleExamplesForPrompt(styleExamples) } : {}) } } : {}),
+      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}), ...(styleExamples.length ? { style_examples: styleExamplesForPrompt(styleExamples) } : {}) } } : {}),
       recent: recent.map(message => ({ ...message, text: fullHumanMessages.has(message) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
@@ -384,9 +412,9 @@ ${room.ai_turns === 1 ? '이번 첫 인사에서만 패스해도 된다고 한 �
     const modelRequest = {
       // The reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
-      model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: relationship ? 1400 : 1000, store: false,
+      model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: relationship ? longMemory ? 1700 : 1400 : 1000, store: false,
       instructions: `한국어 소규모 음성 대화방의 AI다. 실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'} 실제 경험이나 감정이 있는 사람인 척하지 않는다.
-${roleInstruction}${relationship ? `\n${relationshipResponseInstructions}` : ''}
+${roleInstruction}${relationship ? `\n${relationshipResponseInstructions}` : ''}${longMemory ? `\n${longMemoryInstructions}` : ''}
 반응할 때는 최근 발언의 핵심과 표현된 감정을 정확히 파악한다. '그렇군요', '좋네요' 같은 빈 맞장구나 자동 칭찬, 같은 질문을 반복하지 않는다. 말하지 않은 속마음이나 의도를 단정하지 않는다. 다른 해석은 '이렇게도 볼 수 있을까요?'처럼 하나의 가능성으로만 말하고 논쟁으로 몰지 않는다. 이미 답한 내용을 다시 묻지 않는다.
 자료 조사는 방 생성 때 시작한 사전 준비다. 자료를 조사 중이다, 준비하고 있다, 찾아보겠다는 진행 멘트를 말하지 않는다. 준비된 자료로 바로 대화한다.
 주제 분야는 미디어·문화, 취미·취향, 연애·사랑, 커리어·진로, 재테크·경제, 자녀·교육이다. 참가자의 감상과 경험을 연결하고 지식 퀴즈나 정답 평가로 흐르지 않는다.
@@ -403,15 +431,18 @@ study.confidence=uncertain이면 clarification을 짧게 한 번 묻고, 이후 
 memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이유, 서로 같거나 다른 해석, 이미 나온 화제를 600자 이내로 요약한다. 누가 한 말인지 구분한다. 민감정보나 추측한 성격·감정은 담지 않는다.`,
       // Relationship characters classify the user's latest behaviour in this same call (no extra request).
       input: JSON.stringify(context), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: relationship
-        ? { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema }, required: ['text', 'memory', 'events'], additionalProperties: false }
+        ? longMemory
+          ? { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema, memory_ops: memoryOpsSchema }, required: ['text', 'memory', 'events', 'memory_ops'], additionalProperties: false }
+          : { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema }, required: ['text', 'memory', 'events'], additionalProperties: false }
         : { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' } }, required: ['text', 'memory'], additionalProperties: false } } },
     };
     // Deterministic score update from the classified events. It runs alongside speech
     // synthesis so the first audio is not delayed, and a failure never breaks the reply.
-    const saveRelationship = async (events: unknown) => {
+    const saveRelationship = async (answer: { events?: unknown; memory_ops?: unknown } | undefined) => {
       if (!relationship) return;
+      const memorySaved = saveMemories(answer?.memory_ops);
       try {
-        const turn = processTurn({ record: relationship.record, config: relationship.config, mood: relationship.mood, events, hasUserTurn: recent.at(-1)?.kind === 'human', now: relationship.now });
+        const turn = processTurn({ record: relationship.record, config: relationship.config, mood: relationship.mood, events: answer?.events, hasUserTurn: recent.at(-1)?.kind === 'human', now: relationship.now });
         console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, examples: styleExamples.length, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
         const response = await fetchTimed(`${url}/rest/v1/rpc/save_voice_lounge_relationship`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({
           p_user: user.id, p_character: relationship.config.characterId, p_room: roomId, p_expected_version: relationship.record.version,
@@ -419,7 +450,19 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
         }) });
         if (!response.ok || await response.json() === null) console.warn('[Lounge relationship] not saved', response.status);
       } catch (error) { console.warn('[Lounge relationship] not saved', error instanceof Error ? error.name : 'error'); }
+      await memorySaved;
     };
+    // Validated memory operations from the reply, applied after the speech has started. Only a real user turn counts.
+    async function saveMemories(raw: unknown) {
+      if (!relationship || !longMemory || recent.at(-1)?.kind !== 'human') return;
+      const ops = normalizeMemoryOps(raw, longMemory.refs, longMemory.chosen);
+      console.info('[Lounge memory]', JSON.stringify({ character: relationship.config.characterId, shown: longMemory.forPrompt.length, previous: Boolean(previousSession), ops: ops.map(item => item.op === 'add' ? `add:${item.kind}` : item.op) }));
+      if (!ops.length) return;
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/rpc/apply_voice_lounge_memory_ops`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_character: relationship.config.characterId, p_room: roomId, p_ops: ops }) });
+        if (!response.ok) console.warn('[Lounge memory] not saved', response.status);
+      } catch (error) { console.warn('[Lounge memory] not saved', error instanceof Error ? error.name : 'error'); }
+    }
     // Streams PCM for a reply. Retries once, and only before any audio was sent:
     // repeating an audible prefix would repeat the first syllables.
     const streamSpeech = async (text: string, send: (event: unknown) => void, signal: AbortSignal, track: (reader?: ReadableStreamDefaultReader<Uint8Array>) => void) => {
@@ -477,9 +520,11 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
           const reply = (async () => {
             const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
             let output = '', final: ModelResult | undefined, found = false;
+            const commentary = new Set<number>();
             if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
               for await (const event of readModelEvents(response.body)) {
-                if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+                if (event.type === 'response.output_item.added' && event.item?.phase === 'commentary') commentary.add(event.output_index ?? -1);
+                else if (event.type === 'response.output_text.delta' && typeof event.delta === 'string' && !commentary.has(event.output_index ?? -2)) {
                   output += event.delta;
                   if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
                 } else if (event.type === 'response.completed' || event.type === 'response.incomplete') final = event.response;
@@ -500,7 +545,7 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
             // Save what was actually spoken. If the rest of the reply was lost, keep the previous memory.
             const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: firstText, p_memory: answer?.memory ?? String(room.memory ?? '') })
               .catch(error => { console.error('[Lounge API] reply not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); return false; });
-            if (saved) await saveRelationship(answer?.events);
+            if (saved) await saveRelationship(answer);
             else console.warn('[Lounge API] spoken reply was not saved');
             await speech;
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
@@ -522,7 +567,7 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
     const saveStarted = performance.now();
     const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: text, p_memory: answer.memory });
     if (!saved) return json({ skipped: true });
-    const relationshipSaved = saveRelationship(answer.events);
+    const relationshipSaved = saveRelationship(answer);
     if (body.stream === true) {
       const encoder = new TextEncoder();
       const cancelled = new AbortController();

@@ -37,6 +37,7 @@ export const auditorRelationship = {
     { id: 'TRUSTED_THINKER', label: '신뢰하는 사고 파트너', line: '이번에는 네 분석부터 들어보지.', enter: { min: { trust: 70, respect: 75, epistemicHonesty: 75, rigor: 70 } },
       hint: '사용자의 분석을 먼저 묻고 함께 검증한다. 여전히 쉽게 동의하지 않지만 동료 검증자로 대한다. 칭찬은 짧고 구체적이다.' },
   ],
+  memoryStyle: '기억은 지난 주장과 실제 결과를 비교하는 근거로 쓴다. 예전의 확신과 지금의 증거가 어떻게 다른지 짚는다.',
   responseHints: ['감정은 한 문장으로 인정하고 사실 확인으로 넘어간다', '숫자나 근거가 나오면 어디까지 확실한지 구분해 준다', '사람을 깎아내리지 않고 주장의 약점을 짚는다'],
   decay: { interest: { graceDays: 3, perDay: 1, floor: 40 } },
 } satisfies RelationshipConfig;
