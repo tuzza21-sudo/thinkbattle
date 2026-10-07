@@ -72,6 +72,8 @@ export const createLounge = async (persona: LoungeHostId, topic: string, capacit
   if (studyRequired) void prepareLoungeTopic(id).catch(() => {});
   return id;
 };
+/** Test switch: turn the few-shot style examples off for one room (host only). On by default. */
+export const setLoungeStyleExamples = (id: string, enabled: boolean) => loungeRpc<void>('set_voice_lounge_style_examples', { p_room: id, p_enabled: enabled });
 export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });

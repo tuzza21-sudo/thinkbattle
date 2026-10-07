@@ -27,6 +27,14 @@ try {
   // Rooms with other people never write a relationship, even for the same host.
   assert.equal(await save(ids[0], 'velvet', velvetGroup, 0, state({ trust: 10, respect: 20, interest: 40, comfort: 15, openness: 10, intrigue: 35, poise: 50 })), null, 'a group room cannot change a relationship');
 
+  // The room switch for the few-shot examples: on by default, only the host can change it.
+  assert.equal((await one('select style_examples from voice_lounge_rooms where id=$1', [velvetA])).style_examples, true, 'on by default');
+  await as(ids[0]); await db.query('select set_voice_lounge_style_examples($1,false)', [velvetA]);
+  assert.equal((await one('select style_examples from voice_lounge_rooms where id=$1', [velvetA])).style_examples, false);
+  await as(ids[1]); await assert.rejects(db.query('select set_voice_lounge_style_examples($1,true)', [velvetA]), /방장만/);
+  assert.equal((await one('select style_examples from voice_lounge_rooms where id=$1', [velvetA])).style_examples, false, 'a guest cannot change it');
+  await as(ids[0]); await db.query('select set_voice_lounge_style_examples($1,true)', [velvetA]);
+
   // Optimistic versions: create once, update only from the stored version.
   const scores = { trust: 10, respect: 20, interest: 40, comfort: 15, openness: 10, intrigue: 35, poise: 50 };
   assert.equal(await save(ids[0], 'velvet', velvetA, 0, state(scores), JSON.stringify({ curiosity: 40 })), 1);
@@ -68,6 +76,7 @@ try {
 
   await db.exec(latestSql);
   await db.exec(await readFile('supabase/migrations/20261007000000_voice_lounge_six_hosts.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/20261008000000_voice_lounge_style_examples_toggle.sql', 'utf8'));
   row = await one('select * from voice_lounge_relationships where user_id=$1 and character_id=$2', [ids[0], 'velvet']);
   assert.equal(row.version, 2, 'reapplying the migration keeps stored relationships');
   console.log('PASS: six hosts in rooms of any size, relationships written only for one-to-one rooms, removed hosts migrated, optimistic versions, room/user/character binding, score validation, session mood on the room, independent user-character rows, server-only access and reapplication.');

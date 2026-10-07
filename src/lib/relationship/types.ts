@@ -77,6 +77,8 @@ export type TurnLog = {
 export type MetricView = { label: string; score?: number };
 export type RelationshipView = {
   characterId: string;
+  /** Developer-only: whether this room sends the few-shot style examples. */
+  styleExamples?: boolean;
   macroState: { id: string; label: string };
   metrics: Record<string, MetricView & { name: string }>;
   debug?: {

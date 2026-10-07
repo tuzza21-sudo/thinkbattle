@@ -267,6 +267,15 @@ export default async function handler(req: Request): Promise<Response> {
       return { ok: true as const, row: (await readJson<RelationshipRow[]>(response, 'lounge'))[0] ?? null };
     };
 
+    // The room's own switch for the style examples. On unless the host turned it off; an unreadable or missing setting means on.
+    async function readStyleExamplesFlag() {
+      if (!serviceHeaders) return true;
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=style_examples`, { headers: serviceHeaders });
+        return response.ok ? (await readJson<Array<{ style_examples?: boolean }>>(response, 'lounge'))[0]?.style_examples !== false : true;
+      } catch { return true; }
+    }
+
     if (body.action === 'relationship') {
       const user = await readJson<{ id: string; email?: string }>(auth, 'lounge');
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,ai_mood`, { headers });
@@ -277,7 +286,9 @@ export default async function handler(req: Request): Promise<Response> {
       const stored = await readRelationship(user.id, config.characterId);
       if (!stored.ok) return json({ enabled: false });
       const record = applyDecay(relationshipFromRow(config, stored.row), config, new Date());
-      return json({ enabled: true, relationship: describeRelationship(record, config, { mood: moodFromRoom(config, room.ai_mood), debug: isRelationshipDeveloper(user) }) });
+      const developer = isRelationshipDeveloper(user);
+      const view = describeRelationship(record, config, { mood: moodFromRoom(config, room.ai_mood), debug: developer });
+      return json({ enabled: true, relationship: developer ? { ...view, styleExamples: process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await readStyleExamplesFlag() } : view });
     }
 
     if (!['opening', 'silence', 'followup', 'requested'].includes(String(body.reason))) return json({ error: '올바르지 않은 진행 요청이에요.' }, 400);
@@ -292,6 +303,7 @@ export default async function handler(req: Request): Promise<Response> {
         .then(async response => response.ok ? await readJson<RelationshipRow[]>(response, 'lounge') : (console.warn('[Lounge relationship] read failed', response.status), null))
         .catch(error => (console.warn('[Lounge relationship] read failed', error instanceof Error ? error.name : 'error'), null))
       : Promise.resolve(null);
+    const styleExamplesFlag = readStyleExamplesFlag();
     const responses = await Promise.all([
       fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=topic,host_persona,memory,capacity,ai_turns,study_required,topic_study,guided_session,topic_brief,moderator_request_kind,ai_mood`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers }),
@@ -333,7 +345,7 @@ export default async function handler(req: Request): Promise<Response> {
     const stages = loungeSessionStagesForTopic(topicBrief);
     // A few example dialogues in the character's own voice for this stage and situation. LOUNGE_STYLE_EXAMPLES=off turns them off.
     const latestHuman = recent.at(-1)?.kind === 'human' ? recent.at(-1)?.text : undefined;
-    const styleExamples = relationship && process.env.LOUNGE_STYLE_EXAMPLES !== 'off' ? selectStyleExamples({
+    const styleExamples = relationship && process.env.LOUNGE_STYLE_EXAMPLES !== 'off' && await styleExamplesFlag ? selectStyleExamples({
       characterId: relationship.config.characterId, stageIds: relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id), stage: relationship.record.stage,
       recentEvents: relationship.record.recentEvents, hasMemory: relationship.record.memories.length > 0, userText: latestHuman, reason: String(body.reason), requestKind, turnCount: relationship.record.turnCount,
     }) : [];
@@ -400,7 +412,7 @@ memory에는 다음 턴에 필요한 참가자별 핵심 관점과 명시한 이
       if (!relationship) return;
       try {
         const turn = processTurn({ record: relationship.record, config: relationship.config, mood: relationship.mood, events, hasUserTurn: recent.at(-1)?.kind === 'human', now: relationship.now });
-        console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
+        console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, examples: styleExamples.length, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
         const response = await fetchTimed(`${url}/rest/v1/rpc/save_voice_lounge_relationship`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({
           p_user: user.id, p_character: relationship.config.characterId, p_room: roomId, p_expected_version: relationship.record.version,
           p_state: relationshipState(turn.record), p_mood: turn.mood,

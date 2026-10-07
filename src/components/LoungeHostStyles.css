@@ -31,3 +31,7 @@
 .lounge-host-section .lounge-host-group { text-align:center; }
 .lounge-host-section .lounge-host-group h3 { justify-content:center; }
 @media(min-width:1025px) { .lounge-host-section .lounge-host-options.centered { grid-template-columns:repeat(2,minmax(0,1fr)); width:calc(50% - 6px); margin-left:auto; margin-right:auto; } }
+
+.lounge-lab-toggle { display:flex; align-items:flex-start; gap:8px; margin:10px 0 0; padding:9px 11px; border:1px dashed #8a6a3c; border-radius:10px; background:#f7f1de; color:#4a4025; font-size:12px; line-height:1.5; cursor:pointer; }
+.lounge-lab-toggle input { margin-top:2px; }
+.lounge-lab-toggle small { display:block; color:#7a6a40; font-size:10px; }

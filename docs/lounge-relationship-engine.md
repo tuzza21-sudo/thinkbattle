@@ -72,6 +72,7 @@
 - **기억**: `requiresMemory` 예시는 사용자가 이 캐릭터와 기억(`memories`)이 있을 때만 보낸다. 없으면 모델이 지난 대화를 지어내는 법을 배우기 때문이다.
 - **프롬프트**: `relationship.style_examples`에 `{ situation, dialogue: [{ user, reply }] }`로 넣고, 지시문에 "말투·길이·태도만 참고하고 복사하지 않으며 같은 시작 말을 반복하지 않는다, 예시와 규칙이 충돌하면 규칙을 따른다"를 둔다. 단계 이름과 점수는 보내지 않는다.
 - **끄기**: 서버 환경변수 `LOUNGE_STYLE_EXAMPLES=off`.
+- **방별 스위치(A/B 테스트용)**: 주소에 `?lab=1`을 붙여 `/lounge?lab=1`로 들어가 "혼자"를 고르면 방 만들기 화면에 **말투 예문 사용** 체크박스가 나온다(기본은 켜짐, 4명 이상 방과 `?lab=1`이 없는 일반 화면에는 안 보인다). 끄고 만든 방은 예문 없이 진행되고, 같은 캐릭터로 켠 방과 끈 방을 나란히 비교할 수 있다. 설정은 방(`voice_lounge_rooms.style_examples`)에 저장되고 방장만 바꿀 수 있다. 개발자 계정의 관계 패널(디버그)에 "말투 예문 사용/미사용"이 표시되고, 서버 로그 `[Lounge relationship]`에는 그 턴에 보낸 예시 수(`examples`)가 찍힌다. 설정을 읽지 못하거나 컬럼이 없으면 켜짐으로 동작한다. 환경변수 `off`가 방 설정보다 우선한다.
 - **여러 명 방**: 관계가 없으므로 예시도 쓰지 않는다. 그 방의 말투는 각 캐릭터의 `instruction`이 맡는다.
 
 예시를 쓸 때의 규칙은 `scripts/lounge-style-examples.test.mjs`가 검사한다: 공감형·재치형은 존댓말, 나머지 넷은 반말, 점수·단계 같은 말과 연애 표현 금지, 과거를 가리키면 `requiresMemory` 표시, 모든 캐릭터가 위기(자살예방상담전화 109 안내)·경계·OOC·입장·여러 턴 예시를 갖출 것, 한 시작어가 전체의 20%를 넘지 않을 것, 같은 답이 두 번 쓰이지 않을 것.
@@ -96,7 +97,7 @@
 
 ## 적용 순서
 
-1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
+1. `20261006000000_voice_lounge_light_moderation.sql` 다음에 `20261006010000_voice_lounge_relationships.sql`, 그다음 `20261007000000_voice_lounge_six_hosts.sql`, 예문 방 스위치를 쓰려면 `20261008000000_voice_lounge_style_examples_toggle.sql`을 실행한다. 마지막 파일은 `sunny` 방을 `jaeseok`으로, `dodi` 방을 `ina`로 옮기고 6명 모두 인원 제한 없이 쓰도록 제약을 바꾼다.
 2. 서버 환경변수 `SUPABASE_SERVICE_ROLE_KEY`가 있어야 관계가 저장된다. 없거나 표를 읽지 못하면 관계 기능만 꺼지고 대화는 그대로 된다.
 3. (선택) `LOUNGE_RELATIONSHIP_DEBUG_USERS`에 개발자 이메일을 넣는다.
 4. 음성 예시를 다시 만들려면 `node scripts/generate-lounge-host-samples.mjs --host=<id> --overwrite`를 쓴다(유료 TTS 1회). 음성이나 연기 지시를 바꿨다면 샘플도 다시 만들어야 한다. 새 캐릭터는 `loungeHosts`의 `voiceSample` 경로를 채운 뒤 같은 명령으로 만든다.
