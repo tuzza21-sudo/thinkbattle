@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Coffee, Copy, Hand, Headphones, LoaderCir
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getCurrentUser } from '../lib/auth';
-import { getLoungeHost, getLoungeHostLoudness, getLoungeTheme, getLoungeTopic, isLoungeRelationshipHost, loungeHelpOptions, loungeThemes, loungeTopics, normalizeLoungeTopicBrief, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
+import { getLoungeHost, getLoungeHostLoudness, getLoungeTheme, getLoungeTopic, isLoungeRelationshipHost, loungeHelpOptions, loungeHosts, loungeThemes, loungeTopics, normalizeLoungeTopicBrief, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
 import { LoungeApiError, controlLounge, controlLoungeSession, createLounge, joinLounge, loadLounge, loadLoungeRelationship, prepareLoungeTopic, requestLoungeHost, requestLoungeModerator, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
@@ -15,6 +15,7 @@ import { LoungeHostOptions } from './LoungeHostOptions';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { ProfileModal } from './ProfileModal';
 import { LoungeIntroduction } from './LoungeIntroduction';
+import { LoungeCharacterPage } from './LoungeCharacterPage';
 import { useLoungeAudio } from '../lib/useLoungeAudio';
 import './LoungePage.css';
 import './LoungeRoom.css';
@@ -37,7 +38,7 @@ function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequ
   </header>;
 }
 export function LoungePage(props: Props) {
-  const { roomId } = useParams();
+  const { roomId, characterId } = useParams();
   const introduction = roomId === 'about';
   const inRoom = Boolean(roomId && !introduction);
   const [showProfile, setShowProfile] = useState(false);
@@ -48,16 +49,18 @@ export function LoungePage(props: Props) {
     setLoggingOut(true); setAccountError('');
     try { await props.onLogout(); setShowProfile(false); } catch (error) { setAccountError(errorText(error)); } finally { setLoggingOut(false); }
   };
-  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{introduction ? <LoungeIntroduction /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeLobby {...props} />}</div>{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="대화 라운지" />}</>;
+  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{characterId ? <LoungeCharacterPage key={characterId} id={characterId} /> : introduction ? <LoungeIntroduction /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeLobby {...props} />}</div>{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="대화 라운지" />}</>;
 }
 
 function LoungeLobby({ user, onGuestRequest, onLoginRequest }: Props) {
   const navigate = useNavigate();
-  const [hostId, setHostId] = useState<LoungeHostId>('jaeseok');
+  const [params] = useSearchParams();
+  // A character page links here with its character and, for one-to-one, a capacity of 1.
+  const [hostId, setHostId] = useState<LoungeHostId>(() => loungeHosts.find(host => host.id === params.get('host'))?.id ?? 'jaeseok');
   const [themeId, setThemeId] = useState<LoungeThemeId>('rooftop');
   const [topicId, setTopicId] = useState<string>('media');
   const [brief, setBrief] = useState<LoungeTopicBrief>({ category: 'media', subcategory: 'film', work_title: '', creator: '', reason: '', discussion: '' });
-  const [capacity, setCapacity] = useState(4);
+  const [capacity, setCapacity] = useState(() => { const value = Number(params.get('capacity')); return Number.isInteger(value) && value >= 1 && value <= 6 ? value : 4; });
   const [customTopic, setCustomTopic] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -68,6 +71,7 @@ function LoungeLobby({ user, onGuestRequest, onLoginRequest }: Props) {
   let briefReady = false;
   try { normalizeLoungeTopicBrief(brief); briefReady = true; } catch { /* Show field guidance until the brief is complete. */ }
   const host = getLoungeHost(hostId);
+  useEffect(() => { if (window.location.hash === '#lounge-create') document.getElementById('lounge-create')?.scrollIntoView(); }, []);
   const openRoom = async () => {
     if (busy) return;
     if (!title) { setError('대화할 주제를 직접 입력해 주세요.'); topicInput.current?.focus(); return; }

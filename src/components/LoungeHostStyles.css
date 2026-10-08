@@ -31,3 +31,5 @@
 .lounge-host-section .lounge-host-group { text-align:center; }
 .lounge-host-section .lounge-host-group h3 { justify-content:center; }
 @media(min-width:1025px) { .lounge-host-section .lounge-host-options.centered { grid-template-columns:repeat(2,minmax(0,1fr)); width:calc(50% - 6px); margin-left:auto; margin-right:auto; } }
+/* Link to the character page. */
+.lounge-character-link { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:#476344; text-decoration:underline; text-underline-offset:3px; }
