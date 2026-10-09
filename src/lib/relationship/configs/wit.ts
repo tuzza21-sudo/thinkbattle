@@ -1,4 +1,4 @@
-import type { RelationshipConfig } from '../types';
+import type { RelationshipConfig } from '../types.js';
 
 // The Wit: affiliative humour that makes the user feel good. Closeness is a shared vocabulary of jokes.
 // The Trickster teases and spars; this character laughs with the user and never pokes at them.

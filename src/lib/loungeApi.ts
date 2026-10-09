@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
 
@@ -72,6 +72,24 @@ export const createLounge = async (persona: LoungeHostId, topic: string, capacit
   if (studyRequired) void prepareLoungeTopic(id).catch(() => {});
   return id;
 };
+// A database still on an earlier draft of the spaces migration answers with fewer columns; fill them so the page renders.
+export const listLoungeSpaces = async () => (await loungeRpc<Array<Partial<LoungeSpace> & Pick<LoungeSpace, 'id' | 'name' | 'host_persona' | 'theme'>>>('list_voice_lounge_spaces', {}))
+  .map((space): LoungeSpace => ({ capacity: 6, present_count: 0, topic: null, ...space, table_count: space.table_count ?? (space.present_count ? 1 : 0),
+    participants: space.participants ?? [], seat_free: space.seat_free ?? true, waiting: space.waiting ?? 0 }));
+/** Opens a table: the space's first, or another one when every table is full. */
+export const openLoungeTable = (spaceId: string, nickname: string) => loungeRpc<string>('open_voice_lounge_table', { p_space: spaceId, p_nickname: nickname });
+/** Keeps the visitor's place in line for a full space; returns a table once a seat is free for them. */
+export const waitLoungeSpace = (spaceId: string) => loungeRpc<LoungeSpaceWait>('wait_voice_lounge_space', { p_space: spaceId });
+export const leaveLoungeWait = (spaceId: string) => loungeRpc<void>('leave_voice_lounge_wait', { p_space: spaceId });
+export const listLoungeSpaceTables = async (spaceId: string) => (await loungeRpc<Array<Partial<LoungeSpaceTable> & Pick<LoungeSpaceTable, 'id'>>>('list_voice_lounge_space_tables', { p_space: spaceId }))
+  .map((table): LoungeSpaceTable => ({ topic: null, present_count: 0, capacity: 6, mine: false, ...table, participants: table.participants ?? [] }));
+/** Sits at a chosen table if a seat is free (people waiting in line get free seats first). */
+export const enterLoungeTable = (roomId: string, nickname: string) => loungeRpc<string>('enter_voice_lounge_table', { p_room: roomId, p_nickname: nickname });
+/** Solo play: a private one-to-one with the space's character; an unfinished one is continued. */
+export const startLoungeSolo = (spaceId: string, nickname: string) => loungeRpc<string>('start_voice_lounge_solo', { p_space: spaceId, p_nickname: nickname });
+/** Keeps or takes the AI voice for this table; returns who sends it now. */
+export const claimLoungeBroadcaster = (roomId: string) => loungeRpc<string | null>('claim_voice_lounge_broadcaster', { p_room: roomId });
+export const setLoungeTopic = (roomId: string, topic: string, source: 'ai' | 'member') => loungeRpc<void>('set_voice_lounge_topic', { p_room: roomId, p_topic: topic, p_source: source });
 export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });
@@ -89,7 +107,7 @@ export async function controlLoungeSession(id: string, action: LoungeSessionActi
 }
 export async function loadLounge(id: string) {
   const results = await Promise.all([
-    supabase.from('voice_lounge_rooms').select('*').eq('id', id).maybeSingle(),
+    supabase.from('voice_lounge_rooms').select('*, space:voice_lounge_spaces(name)').eq('id', id).maybeSingle(),
     supabase.from('voice_lounge_members').select('*').eq('room_id', id).eq('active', true),
     supabase.from('voice_lounge_messages').select('*').eq('room_id', id).order('id', { ascending: false }).limit(60),
   ]);
@@ -123,7 +141,7 @@ async function interactionRequest(body: Record<string, unknown>) {
 }
 async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
   const token = await loungeAccessToken();
-  const source = body.action === 'transcribe' ? '발언 전사 서버' : body.action === 'prepare' ? '자료 준비 서버' : '사회자 서버';
+  const source = body.action === 'transcribe' ? '발언 전사 서버' : body.action === 'prepare' ? '자료 준비 서버' : body.action === 'topics' ? '주제 추천 서버' : '사회자 서버';
   const response = await loungeFetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body), signal }, source);
   if (response.ok && streaming && response.headers.get('content-type')?.includes('application/x-ndjson') && response.body) return { stream: response.body };
   const payload = await response.json().catch(() => null);
@@ -143,6 +161,7 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
 export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'topics', roomId }) as Promise<{ topics?: string[]; skipped?: boolean }>;
 export const loadLoungeRelationship = (roomId: string) => apiRequest({ action: 'relationship', roomId }) as Promise<{ enabled: boolean; relationship?: RelationshipView }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {

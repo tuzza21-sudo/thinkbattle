@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "test:coach": "node --test scripts/thinking-coach.test.mjs scripts/opening-draft.test.mjs",
     "test:session": "node --test scripts/live-session.test.mjs",
-    "test:lounge": "node --test scripts/lounge-api.test.mjs scripts/lounge-interaction.test.mjs scripts/lounge-relationship.test.mjs scripts/lounge-memory.test.mjs",
+    "test:lounge": "node --test scripts/lounge-spaces.test.mjs scripts/lounge-characters.test.mjs scripts/lounge-api.test.mjs scripts/lounge-interaction.test.mjs scripts/lounge-relationship.test.mjs scripts/lounge-memory.test.mjs scripts/lounge-knowledge.test.mjs",
     "simulate:relationship": "node scripts/lounge-relationship-simulation.mjs",
     "test:livekit": "node scripts/livekit-smoke-test.mjs",
     "preview": "vite preview"

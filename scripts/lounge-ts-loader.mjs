@@ -12,7 +12,8 @@ export function loadTs(file) {
   const output = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText;
   const require = specifier => {
     if (!specifier.startsWith('.')) throw new Error(`External import is not available in tests: ${specifier}`);
-    const base = resolve(dirname(path), specifier);
+    // Sources written for the Node ESM runtime import './module.js' for './module.ts'.
+    const base = resolve(dirname(path), specifier.replace(/\.js$/, ''));
     const target = [`${base}.ts`, `${base}/index.ts`].find(existsSync);
     if (!target) throw new Error(`Cannot resolve ${specifier} from ${path}`);
     return loadTs(target);

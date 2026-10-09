@@ -26,6 +26,10 @@ const portraits = {
     file: 'host-velvet-v2.webp',
     prompt: `${common} A strikingly beautiful fictional Korean woman in her early thirties with refined, balanced features, high cheekbones, luminous smooth skin with a soft natural glow, large dark almond-shaped eyes with long lashes, elegantly arched brows, and full lips in a deep burgundy-rose tint. Glossy, sleek dark hair in a polished side-parted waist-to-shoulder-length style with a subtle shine, small pearl-and-gold drop earrings, wearing an elegant dark plum velvet blazer with a slim neckline and a delicate gold necklace. Self-assured, poised, direct gaze with a slight knowing half-smile and one eyebrow barely raised: captivating, dignified and hard to impress. Background: a dimly lit upscale lounge with soft warm bokeh in deep plum and amber tones. Soft, flattering, cinematic but natural lighting with a gentle rim light on the hair. Elegant, magazine-portrait quality, tasteful and not provocative.`,
   },
+  lawyer: {
+    file: 'host-lawyer-v1.webp',
+    prompt: `${common} A fictional Korean man in his early forties with short, neatly side-parted black hair, a strong but refined jawline and calm, intelligent dark eyes, clean-shaven, wearing a dark charcoal suit with a crisp white shirt and a deep forest-green tie. Composed and attentive with a steady, patient gaze and the faintest polite half-smile, like a litigator who is about to ask one precise question. Background: a softly blurred law-firm library with dark wood shelves and warm lamp light. Soft, even, natural lighting.`,
+  },
   trickster: {
     file: 'host-trickster-v1.webp',
     prompt: `${common} A fictional Korean man in his late twenties with tousled dark hair, a quick mischievous grin with one corner of the mouth higher than the other, bright playful eyes with a raised eyebrow, wearing a mustard-yellow overshirt over a plain white tee. Looks like he just thought of the perfect comeback. Background: softly blurred colourful café lights in warm yellow and teal. Bright, lively, natural daylight.`,

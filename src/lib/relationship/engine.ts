@@ -1,5 +1,5 @@
-import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventTypes, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events';
-import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types';
+import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventTypes, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
+import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
 
 export const relationshipSettings = {
   minConfidence: 0.6,
@@ -247,11 +247,20 @@ export function describeRelationship(record: RelationshipRecord, config: Relatio
   };
 }
 
+/** How the character addresses the user in a one-to-one room at this stage. */
+export function speechLevel(config: RelationshipConfig, stageId: string): 'polite' | 'casual' {
+  if (!config.casualFromStage) return 'polite';
+  const stages = enabledStages(config);
+  const from = stages.findIndex(item => item.id === config.casualFromStage);
+  return from >= 0 && stages.findIndex(item => item.id === stageId) >= from ? 'casual' : 'polite';
+}
+
 /** Context for the response model. Numbers are given for nuance; the model must not say them. */
 export function relationshipPromptContext(record: RelationshipRecord, config: RelationshipConfig, mood: Mood) {
   const stage = enabledStages(config).find(item => item.id === record.stage) ?? config.stages[0];
   return {
     character_core: config.core,
+    speech_level: speechLevel(config, stage.id),
     stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line },
     metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, { score: record.scores[metric], label: metricLabel(config, metric, record.scores[metric]) }])),
     mood: Object.fromEntries(moodKeys.map(key => [key, mood[key]] as const).sort((a, b) => b[1] - a[1]).slice(0, 3)),
@@ -278,6 +287,7 @@ export function validateRelationshipConfig(config: RelationshipConfig): string[]
   for (const stage of config.stages) for (const condition of [stage.enter, stage.hold].filter(Boolean) as StageCondition[]) {
     for (const metric of [...Object.keys(condition.min ?? {}), ...Object.keys(condition.max ?? {})]) if (!metrics.includes(metric)) problems.push(`stages.${stage.id}.${metric}`);
   }
+  if (config.casualFromStage !== undefined && !enabledStages(config).slice(1).some(stage => stage.id === config.casualFromStage)) problems.push('casualFromStage');
   for (const metric of Object.keys(config.decay ?? {})) if (!metrics.includes(metric)) problems.push(`decay.${metric}`);
   return problems;
 }

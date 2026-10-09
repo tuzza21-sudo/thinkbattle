@@ -5,6 +5,7 @@ import geminiHandler from './api/gemini/[...path]'
 import loungeHandler from './api/lounge'
 import loungeInteractionHandler from './api/lounge-interaction'
 import loungeAvatarHandler from './api/lounge-avatar'
+import loungeKnowledgeHandler from './api/lounge-knowledge'
 
 const readRequestBody = (request: NodeJS.ReadableStream) => new Promise<Buffer>((resolve, reject) => {
   const chunks: Buffer[] = []
@@ -38,6 +39,10 @@ export default defineConfig(({ mode }) => {
     // Lounge switches: the developer panel for relationships and the kill switch for long-term memory.
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
     'LOUNGE_LONG_MEMORY',
+    'LOUNGE_KNOWLEDGE',
+    'LOUNGE_KNOWLEDGE_CACHE_MS',
+    'LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE',
+    'LOUNGE_KNOWLEDGE_MIN_EXPERIENCE',
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY',
   ]
@@ -66,6 +71,27 @@ export default defineConfig(({ mode }) => {
             } catch {
               response.statusCode = 500; response.setHeader('Content-Type', 'application/json')
               response.end(JSON.stringify({ error: '사진 변환 요청을 처리하지 못했어요.' }))
+            }
+          })
+        },
+      },
+      {
+        name: 'thinkfit-lounge-knowledge-dev',
+        configureServer(server) {
+          server.middlewares.use('/api/lounge-knowledge', async (request, response) => {
+            try {
+              const body = await readRequestBody(request)
+              if (body.length > 20_000) { response.statusCode = 413; response.end(JSON.stringify({ error: '내용이 너무 길어요.' })); return }
+              const headers = toHeaders(request.headers)
+              const result = await loungeKnowledgeHandler(new Request(`${headers.get('x-forwarded-proto') || 'http'}://${headers.get('host') || 'localhost'}/api/lounge-knowledge`, {
+                method: request.method, headers, body: body.length ? new Uint8Array(body) : undefined,
+              }))
+              response.statusCode = result.status
+              result.headers.forEach((value, key) => response.setHeader(key, value))
+              response.end(Buffer.from(await result.arrayBuffer()))
+            } catch {
+              response.statusCode = 500; response.setHeader('Content-Type', 'application/json')
+              response.end(JSON.stringify({ error: '저장 요청을 처리하지 못했어요.' }))
             }
           })
         },

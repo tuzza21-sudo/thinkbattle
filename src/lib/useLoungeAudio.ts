@@ -3,7 +3,7 @@ import { createLocalAudioTrack, LocalAudioTrack, Room, RoomEvent, Track } from '
 import { supabase } from './supabase';
 import { createLoungeHostOutput, Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
 import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from './loungeApi';
-import { loungeSpeechPauseMs } from './lounge';
+import { loungeRecording, loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
 import { createLoungeTranscriptionQueue } from './loungeTranscription';
 
@@ -145,7 +145,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (subscribedAudio.current.has(track)) return;
         const element = track.attach(); elements.current.add(element);
         subscribedAudio.current.set(track, element);
-        const isHostAudio = participant.identity === hostIdRef.current && publication.source !== Track.Source.Microphone;
+        // The AI voice is the 'ai-host' track. In a space whoever currently drives the AI sends it, so the name, not the sender, identifies it.
+        const isHostAudio = publication.trackName === 'ai-host' || (participant.identity === hostIdRef.current && publication.source !== Track.Source.Microphone);
         element.volume = 1;
         element.setAttribute('playsinline', '');
         remoteMicrophones.current.set(element, participant.identity);
@@ -238,18 +239,29 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const begin = (now: number) => {
         const turnId = floorRef.current?.turnId;
         const chunks: Blob[] = [];
-        const next = new MediaRecorder(delayed.stream, { mimeType: format }); recorder.current = next;
+        // A low speech bitrate keeps a clip small; the upload is a base64 JSON body with a hard size limit.
+        const next = new MediaRecorder(delayed.stream, { mimeType: format, audioBitsPerSecond: loungeRecording.bitsPerSecond }); recorder.current = next;
         const speech = { voicedFrames: 0 }; utterance = speech; started = now;
-        next.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+        let bytes = 0;
+        // The screen-refresh loop that normally ends a recording stops while the window is hidden or covered, which
+        // let one recording grow without end. Data events keep coming, so they enforce the length limit as well.
+        next.ondataavailable = event => {
+          if (!event.data.size) return;
+          chunks.push(event.data); bytes += event.data.size;
+          if ((performance.now() - now > loungeRecording.maxMs || bytes > loungeRecording.maxBytes) && next.state === 'recording') {
+            if (recorder.current === next) recorder.current = null;
+            next.stop();
+          }
+        };
         next.onstop = () => {
           const blob = new Blob(chunks, { type: next.mimeType });
-          if (microphone.current !== track || speech.voicedFrames < 12 || blob.size < 300 || queued >= 3) return;
+          if (microphone.current !== track || speech.voicedFrames < 12 || blob.size < 300 || blob.size > loungeRecording.maxBytes * 1.5 || queued >= 3) return;
           queued += 1;
           pendingTranscriptions.current += 1;
           void transcriptionQueue.current.enqueue(() => callback.current(blob, turnId), () => microphone.current === track)
             .catch(err => setError(err instanceof Error ? err.message : '음성 전사가 잠시 지연돼요.')).finally(() => { queued -= 1; pendingTranscriptions.current -= 1; });
         };
-        next.start();
+        next.start(1000);
       };
       const tick = () => {
         if (microphone.current !== track) return;
@@ -271,7 +283,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         }
         lastFrame = now;
         // AI speech no longer cuts a person off mid-sentence; their pause ends the recording.
-        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > 20_000 || floorRef.current?.allowed === false || restrictedRef.current.has(room.localParticipant.identity))) {
+        if (recorder.current && (now - lastVoice > loungeSpeechPauseMs(capacity) || now - started > loungeRecording.maxMs || floorRef.current?.allowed === false || restrictedRef.current.has(room.localParticipant.identity))) {
           recorder.current.stop(); recorder.current = null;
         }
         speechActivity.current.recording = Boolean(recorder.current);

@@ -1,4 +1,4 @@
-import type { RelationshipConfig } from '../types';
+import type { RelationshipConfig } from '../types.js';
 
 // The Empath: closeness means being understood more accurately, not being agreed with more often.
 // Ideal long-run values are trust 90, respect 75, interest 85, comfort 95, openness 90, attunement 95 and

@@ -1,4 +1,4 @@
-import type { RelationshipConfig } from '../types';
+import type { RelationshipConfig } from '../types.js';
 
 export const auditorRelationship = {
   characterId: 'auditor',
@@ -28,7 +28,7 @@ export const auditorRelationship = {
     SHOWS_VULNERABILITY: { deltas: { openness: 3, trust: 1 } },
   },
   stages: [
-    { id: 'UNVERIFIED', label: '검증 전', line: '네 주장이지. 아직 사실은 아니야.', enter: {},
+    { id: 'UNVERIFIED', label: '검증 전', line: '그건 주장이에요. 아직 사실은 아니죠.', enter: {},
       hint: '사용자의 말을 아직 사실로 받아들이지 않는다. 근거가 무엇인지 짧게 묻고 감정과 사실을 나눠 준다. 인정은 거의 하지 않는다.' },
     { id: 'UNDER_REVIEW', label: '검토 중', line: '적어도 근거를 가져오기 시작했군.', enter: { min: { respect: 40, rigor: 50 } },
       hint: '근거를 가져온 점은 짧게 인정하되 빈틈 하나를 정확히 짚는다. 사용자의 판단을 아직 결론으로 받지 않는다.' },
@@ -37,6 +37,7 @@ export const auditorRelationship = {
     { id: 'TRUSTED_THINKER', label: '신뢰하는 사고 파트너', line: '이번에는 네 분석부터 들어보지.', enter: { min: { trust: 70, respect: 75, epistemicHonesty: 75, rigor: 70 } },
       hint: '사용자의 분석을 먼저 묻고 함께 검증한다. 여전히 쉽게 동의하지 않지만 동료 검증자로 대한다. 칭찬은 짧고 구체적이다.' },
   ],
+  casualFromStage: 'UNDER_REVIEW',
   memoryStyle: '기억은 지난 주장과 실제 결과를 비교하는 근거로 쓴다. 예전의 확신과 지금의 증거가 어떻게 다른지 짚는다.',
   responseHints: ['감정은 한 문장으로 인정하고 사실 확인으로 넘어간다', '숫자나 근거가 나오면 어디까지 확실한지 구분해 준다', '사람을 깎아내리지 않고 주장의 약점을 짚는다'],
   decay: { interest: { graceDays: 3, perDay: 1, floor: 40 } },
