@@ -137,15 +137,19 @@ export const memoryOpsSchema = {
 } as const;
 
 /** How to use and propose long-term memories; added to the instructions of one-to-one relationship rooms. */
-export const longMemoryInstructions = `user_memories는 이 사용자가 이 캐릭터와의 지난 대화에서 직접 말한 일이다. ref는 내부 표시라 말하지 않는다. 지금 대화와 관련될 때만 자연스럽게 녹여 쓰고, 날짜를 대거나 기억하고 있다고 과시하지 않는다. user_memories와 previous_session에 없는 과거는 지어내지 않으며, 확실하지 않으면 묻는 말로 확인한다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.
+/** How to use the stored memories in a reply. */
+export const longMemoryUseInstructions = `user_memories는 이 사용자가 이 캐릭터와의 지난 대화에서 직접 말한 일이다. ref는 내부 표시라 말하지 않는다. 지금 대화와 관련될 때만 자연스럽게 녹여 쓰고, 날짜를 대거나 기억하고 있다고 과시하지 않는다. user_memories와 previous_session에 없는 과거는 지어내지 않으며, 확실하지 않으면 묻는 말로 확인한다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.
 follow_up이 있는 기억은 아직 결과를 모르는 이야기다. opening_follow_up이 있으면 새 대화의 첫 인사(reason=opening)는 방 주제 질문 대신 그 일이 어떻게 됐는지 가볍게 묻는다. 이 규칙은 첫 인사에서 방 주제를 묻는 규칙보다 우선한다. 그 밖에는 자연스러울 때만 묻고 매번 묻지 않는다.
-previous_session은 이 캐릭터와 나눈 직전 대화의 요약이다. 이어 갈 거리가 있을 때만 쓴다.
-memory_ops: 사용자의 가장 최근 발언에서 다음 대화에도 쓸모 있는 사실만 0~2개 고른다. 대부분의 턴은 빈 배열이다. 사용자의 새 발언이 없으면 빈 배열이다.
+previous_session은 이 캐릭터와 나눈 직전 대화의 요약이다. 이어 갈 거리가 있을 때만 쓴다.`;
+/** How to record new memories (memory_ops). Only solo play records them. */
+export const longMemoryWriteInstructions = `memory_ops: 사용자의 가장 최근 발언에서 다음 대화에도 쓸모 있는 사실만 0~2개 고른다. 대부분의 턴은 빈 배열이다. 사용자의 새 발언이 없으면 빈 배열이다.
 - add: 새 사실. kind는 project(진행 중인 일), preference(선호·원하는 대화 방식), decision(내린 결정), event(성공·실패 같은 일), open_thread(앞으로 결과를 확인할 약속·예정된 일)다. 사용자가 '~해 볼게', '다음 주까지', '~하기로 했어'처럼 앞으로 할 일과 결과가 나올 일을 말하면 project가 아니라 open_thread로 쓰고, follow_up에 다음에 물어볼 것을 짧게 쓴다.
 - update: user_memories와 같은 내용이 다시 나오거나 조금 달라졌을 때 그 ref를 적는다.
 - supersede: 이전 사실이 바뀌었을 때(예: 퇴사하려다 계속 다니기로 함) 그 ref와 새 summary를 적는다.
 - close: follow_up의 결과를 사용자가 알려 줘서 끝난 이야기일 때 그 ref를 적는다. 결과가 남길 만하면 add event를 같이 쓴다.
 summary는 사용자에 대한 3인칭 한 문장, 80자 이내로 쓴다. importance는 0~1이고 일회성 잡담은 0.5 미만이다. 쓰지 않는 칸은 빈 문자열로 둔다.
 건강·질병·정신건강, 자해·자살 관련 발언, 성적 지향·성생활, 종교, 정치 성향, 범죄 이력, 주소·연락처·계좌·주민번호 같은 식별 정보, 다른 사람의 사적인 정보는 memory_ops에 쓰지 않는다.`;
+export const longMemoryInstructions = `${longMemoryUseInstructions}
+${longMemoryWriteInstructions}`;
 
 export const memoryKindLabels: Record<MemoryKind, string> = { project: '진행 중인 일', preference: '선호', decision: '결정', event: '있었던 일', open_thread: '다음에 물어볼 일' };

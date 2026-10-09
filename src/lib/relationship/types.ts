@@ -1,4 +1,4 @@
-import type { RelationshipEventType } from './events';
+import type { RelationshipEventType } from './events.js';
 
 export const commonMetrics = ['trust', 'respect', 'interest', 'comfort', 'openness'] as const;
 export type CommonMetric = typeof commonMetrics[number];
@@ -43,6 +43,8 @@ export type RelationshipConfig = {
   responseHints: readonly string[];
   /** How this character brings up long-term memories, so the same memory sounds different per character. */
   memoryStyle?: string;
+  /** One-to-one speech level: polite until this stage id, casual (banmal) from it on. Absent means polite throughout. Group rooms are always polite. */
+  casualFromStage?: string;
   decay?: Partial<Record<string, DecayRule>>;
   maxGainPerTurn?: Partial<Record<string, number>>;
 };

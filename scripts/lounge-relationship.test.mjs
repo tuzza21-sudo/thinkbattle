@@ -21,7 +21,7 @@ function run(config, turns, start = createRelationship(config)) {
 const withScores = (config, scores, stage) => ({ ...createRelationship(config), scores: { ...createRelationship(config).scores, ...scores }, ...(stage ? { stage } : {}) });
 
 test('every shipped character configuration is valid and starts from its configured values', () => {
-  assert.deepEqual(Object.keys(configs).sort(), ['auditor', 'closer', 'ina', 'jaeseok', 'trickster', 'velvet']);
+  assert.deepEqual(Object.keys(configs).sort(), ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']);
   for (const config of Object.values(configs)) {
     assert.deepEqual(validateRelationshipConfig(config), [], config.characterId);
     const record = createRelationship(config);
@@ -31,6 +31,20 @@ test('every shipped character configuration is valid and starts from its configu
   }
   assert.equal(createRelationship(configs.velvet).scores.intrigue, 35);
   assert.equal(createRelationship(configs.auditor).scores.rigor, 40);
+});
+
+test('one-to-one speech starts polite for everyone; four characters turn casual from the next stage', () => {
+  const casualStage = { auditor: 'UNDER_REVIEW', closer: 'COUNTERPARTY', velvet: 'INTRIGUED', trickster: 'BANTER_PARTNER' };
+  for (const config of Object.values(configs)) {
+    assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
+    const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
+    stageIds.forEach((id, index) => {
+      const expected = casualStage[config.characterId] && index >= stageIds.indexOf(casualStage[config.characterId]) ? 'casual' : 'polite';
+      assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: id }, config, initialMood(config)).speech_level, expected, `${config.characterId} ${id}`);
+    });
+  }
+  assert.ok(validateRelationshipConfig({ ...configs.closer, casualFromStage: 'PROSPECT' }).includes('casualFromStage'), 'the first stage cannot be the casual one');
+  assert.ok(validateRelationshipConfig({ ...configs.closer, casualFromStage: 'NOPE' }).includes('casualFromStage'));
 });
 
 test('1. scores stay between 0 and 100 under repeated extreme events', () => {
@@ -209,7 +223,24 @@ test('the wit grows by shared jokes: running jokes raise familiarity and are rem
 
 test('the new events change only the characters built around them', () => {
   for (const id of ['auditor', 'closer', 'velvet', 'trickster']) {
-    for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
+    for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
+  }
+  for (const id of ['ina', 'jaeseok']) for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
+  // The diplomat ignores the lawyer's events and the lawyer ignores the diplomat's.
+  for (const type of ['ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.diplomat, [[event(type)]]).logs[0].delta, {}, `diplomat ${type}`);
+  for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
+});
+
+test('the diplomat and the lawyer grow by their own habits and stay polite at every stage', () => {
+  const diplomat = run(configs.diplomat, [[event('ACKNOWLEDGES_OTHER_VIEW')], [event('REFRAMES_CONSTRUCTIVELY')]]);
+  assert.equal(diplomat.logs[0].delta.perspective > 0, true);
+  assert.equal(diplomat.logs[1].delta.tact > 0, true);
+  assert.ok(run(configs.diplomat, [[event('MAKES_EMPTY_THREAT')]]).logs[0].delta.tact < 0, 'an empty ultimatum costs her the most');
+  const lawyer = run(configs.lawyer, [[event('ANSWERS_DIRECTLY')], [event('EVADES_QUESTION')], [event('CONTRADICTS_SELF')], [event('ADMITS_ERROR')]]);
+  assert.ok(lawyer.logs[0].delta.directness > 0 && lawyer.logs[1].delta.directness < 0 && lawyer.logs[2].delta.consistency < 0 && lawyer.logs[3].delta.consistency > 0);
+  for (const config of [configs.diplomat, configs.lawyer]) {
+    assert.equal(config.casualFromStage, undefined, `${config.characterId} never turns casual`);
+    for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'polite', `${config.characterId} ${stage.id}`);
   }
 });
 

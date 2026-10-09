@@ -14,8 +14,10 @@ const lounge = compile('../src/lib/lounge.ts');
 const study = compile('../src/lib/loungeStudy.ts');
 const filmStudy = compile('../src/lib/loungeFilmStudy.ts');
 const sessionLib = compile('../src/lib/loungeSession.ts');
+const knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
+const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge).default;
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -147,6 +149,12 @@ test('solo starts and continues a brief conversation without group introductions
         assert.equal(JSON.parse(payload.input).request_kind, reason === 'requested' ? 'topic' : undefined, 'the solo button asks for a new topic');
         assert.match(payload.instructions, /request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다/);
         assert.doesNotMatch(payload.instructions, /AI 도우미/);
+        // The character is a person with a name, a job and a past, never "an AI host".
+        const character = charactersLib.getLoungeCharacter(host.id);
+        assert.ok(payload.instructions.includes(`너는 ${character.name}이다`) && payload.instructions.includes(character.role), `${host.id} knows who they are`);
+        assert.ok(payload.instructions.includes(character.tagline) && payload.instructions.includes(character.habits[0]) && payload.instructions.includes(character.story[0]), `${host.id} always knows the full profile, including the past`);
+        assert.ok(payload.instructions.includes(charactersLib.loungeCharacterRules));
+        assert.doesNotMatch(payload.instructions, /음성 대화방의 AI다|AI 도우미다|인 척하지 않는다/);
         assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
         assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
         assert.match(payload.instructions, /가벼운 인사와 방 소개의 관심사에 맞는 질문 하나/);
@@ -160,6 +168,104 @@ test('solo starts and continues a brief conversation without group introductions
       throw new Error('Unexpected solo call');
     }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason }))).status, 200); });
   }
+});
+
+test('a question about the field of the character brings the closest knowledge and experience to the end of the prompt', async () => {
+  const unit = Array.from({ length: 256 }, (_, index) => index === 0 ? 1 : 0);
+  const entries = [{ id: 'k1', kind: 'knowledge', title: '증거능력과 증명력', content: '증거능력은 법정에서 쓸 수 있는 자격이다.', score: 0.9 }, { id: 'k2', kind: 'experience', title: '반대신문의 경험', content: '세 번째 질문에서 진짜 답이 나왔다.', lesson: '질문을 바꿔 다시 묻는다.', category: 'success', score: 0.5 }];
+  const calls = { embeddings: 0, match: 0, presence: 0 };
+  const scenario = async ({ text, embeddingStatus = 200, rpcStatus = 200, off = false, expectKnowledge, presence = 'some', embeddingDelay = 0, host = 'lawyer', cacheMs = '0', env = {}, thresholds = [0.28, 0.35], members = [{ user_id: 'host', nickname: '나' }], expectedUsers = ['host'] }) => {
+    calls.embeddings = 0; calls.match = 0; calls.presence = 0;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'; process.env.LOUNGE_KNOWLEDGE_CACHE_MS = cacheMs; Object.assign(process.env, env); if (off) process.env.LOUNGE_KNOWLEDGE = 'off';
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?host_id') || url.includes('voice_lounge_relationships') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: host, memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?')) return result(text ? [{ id: 1, user_id: 'user-1', nickname: '나', kind: 'human', text }] : []);
+        if (url.includes('voice_lounge_members?')) return result(members);
+        if (url.includes('/rest/v1/lounge_character_knowledge?')) { calls.presence++; assert.ok(url.includes(`character_id=eq.${host}`) && url.includes('limit=1')); assert.equal(init.headers.Authorization, 'Bearer service'); return presence === 'error' ? result({ message: 'denied' }, 403) : result(presence === 'none' ? [] : [{ id: 'k1' }]); }
+        if (url.endsWith('/embeddings')) { calls.embeddings++; if (embeddingDelay) await new Promise(resolve => setTimeout(resolve, embeddingDelay)); const body = JSON.parse(init.body); assert.equal(body.dimensions, 256); assert.equal(body.model, 'text-embedding-3-small'); assert.ok(body.input.includes('증거능력')); return embeddingStatus === 200 ? result({ data: [{ embedding: unit.map(value => value * 3) }] }) : result({ error: { message: 'x' } }, embeddingStatus); }
+        if (url.includes('pick_lounge_character_knowledge')) {
+          calls.match++; const body = JSON.parse(init.body);
+          assert.equal(body.p_room, roomId, 'the room, so a story is not told twice in it'); assert.deepEqual(body.p_users, expectedUsers, 'the people present, so nobody hears a story twice'); assert.ok(body.p_snippet.includes('증거능력'), 'the question is kept with the record');
+          assert.deepEqual(Object.keys(body).sort(), ['p_character', 'p_min_experience', 'p_min_knowledge', 'p_query', 'p_room', 'p_snippet', 'p_users'], 'selection is decided in the database, not asked for here');
+          assert.deepEqual([body.p_min_knowledge, body.p_min_experience], thresholds, 'the closeness a match needs');
+          assert.equal(body.p_character, host); assert.equal(body.p_query.length, 256); assert.ok(Math.abs(body.p_query[0] - 1) < 1e-9, 'the query vector is normalised');
+          assert.equal(init.headers.Authorization, 'Bearer service', 'only the server role looks knowledge up');
+          return rpcStatus === 200 ? result(entries) : result({ message: 'boom' }, rpcStatus);
+        }
+        if (url.endsWith('/responses')) {
+          const { instructions } = JSON.parse(init.body);
+          assert.equal(instructions.includes('[전문 지식]'), expectKnowledge, text);
+          if (expectKnowledge) {
+            assert.ok(instructions.includes('- 증거능력과 증명력: 증거능력은 법정에서 쓸 수 있는 자격이다.') && instructions.includes('[겪은 일]') && instructions.includes('세 번째 질문에서 진짜 답이 나왔다.'));
+            assert.ok(instructions.includes('(교훈: 질문을 바꿔 다시 묻는다.)') && instructions.includes('이미 들려준 일화는 다시 꺼내지 않는다'), 'the lesson and the use-sparingly rules reach the prompt');
+            assert.ok(instructions.lastIndexOf('[전문 지식]') > instructions.indexOf('역할:'), 'found knowledge comes after the fixed text');
+          }
+          return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] });
+        }
+        if (url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge_relationship')) return result(true);
+        if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+        throw new Error(`Unexpected call ${url}`);
+      }, async () => { assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200, text); });
+    } finally { delete process.env.SUPABASE_SERVICE_ROLE_KEY; delete process.env.LOUNGE_KNOWLEDGE; delete process.env.LOUNGE_KNOWLEDGE_CACHE_MS; for (const name of Object.keys(env)) delete process.env[name]; }
+  };
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true });
+  assert.deepEqual(calls, { embeddings: 1, match: 1, presence: 1 });
+  await scenario({ text: '', expectKnowledge: false });
+  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'nothing is looked up when no one has said anything');
+  await scenario({ text: '증거능력이 정확히 뭐예요?', off: true, expectKnowledge: false });
+  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'LOUNGE_KNOWLEDGE=off turns the lookup off');
+  // A failing lookup never stops the reply.
+  await scenario({ text: '증거능력이 정확히 뭐예요?', embeddingStatus: 500, expectKnowledge: false });
+  await scenario({ text: '증거능력이 정확히 뭐예요?', rpcStatus: 500, expectKnowledge: false });
+  // In a room with several people, everyone who is present counts (once each, the person asking first), so a story one of them has heard is skipped.
+  const now = new Date().toISOString(), stale = new Date(Date.now() - 600_000).toISOString();
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, members: [{ user_id: 'u2', nickname: 'b', last_seen: now }, { user_id: 'host', nickname: '나', last_seen: now }, { user_id: 'u2', nickname: 'b', last_seen: now }, { user_id: 'gone', nickname: 'c', last_seen: stale }, { nickname: 'guest-without-id', last_seen: now }], expectedUsers: ['host', 'u2'] });
+  const crowd = Array.from({ length: 25 }, (_, index) => ({ user_id: `u${index}`, nickname: `n${index}`, last_seen: now }));
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, members: crowd, expectedUsers: ['host', ...crowd.slice(0, 19).map(member => member.user_id)] });
+  // The closeness a match needs can be set without a deploy; a value that is not a number from 0 to 1 is ignored.
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '0.1', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0.2' }, thresholds: [0.1, 0.2] });
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: 'abc', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '1.5' }, thresholds: [0.28, 0.35] });
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0' }, thresholds: [0.28, 0] });
+  // A character with no entries costs nothing: no embedding, no lookup. The empty answer is remembered, so the next turn does not even ask.
+  await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'none', expectKnowledge: false });
+  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 1 }, 'an empty character is not looked up');
+  await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'none', expectKnowledge: false, host: 'diplomat', cacheMs: '60000' });
+  assert.equal(calls.presence, 1);
+  await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'some', expectKnowledge: false, host: 'diplomat', cacheMs: '60000' });
+  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'the empty answer is remembered for a while');
+  // If the presence check cannot be read, look up anyway.
+  await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'error', expectKnowledge: true });
+  assert.deepEqual(calls, { embeddings: 1, match: 1, presence: 1 });
+  // A slow embedding never holds the reply back for long: it is dropped after under a second.
+  const slowStarted = performance.now();
+  await scenario({ text: '증거능력이 정확히 뭐예요?', embeddingDelay: 2500, expectKnowledge: false });
+  assert.ok(performance.now() - slowStarted < 2000, `the reply waited ${Math.round(performance.now() - slowStarted)} ms`);
+});
+
+test('the prompt starts with the same fixed text on every turn and ends with what changes', async () => {
+  const seen = [];
+  for (const [aiTurns, count] of [[1, 2], [4, 3]]) {
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'closer', memory: '', capacity: 6, ai_turns: aiTurns }]);
+      if (url.includes('voice_lounge_messages?')) return result([]);
+      if (url.includes('voice_lounge_members?')) return result(Array.from({ length: count }, (_, index) => ({ user_id: `human-${index}`, nickname: `손님${index}`, last_seen: new Date().toISOString() })));
+      if (url.endsWith('/responses')) { seen.push(JSON.parse(init.body).instructions); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '' }) }] }] }); }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
+      throw new Error('Unexpected call');
+    }, async () => { await handler(request({ action: 'host', roomId, reason: 'silence' })); });
+  }
+  assert.equal(seen.length, 2);
+  // Different people counts and a first greeting versus a later one only change the end.
+  let shared = 0; while (shared < seen[0].length && seen[0][shared] === seen[1][shared]) shared++;
+  assert.ok(shared > seen[0].length * 0.9, `shared start is ${shared} of ${seen[0].length} characters`);
+  assert.match(seen[0], /현재 사람 2명이 함께 있다/); assert.match(seen[1], /현재 사람 3명이 함께 있다/);
 });
 
 test('ten silent seconds end an actual utterance but never an unstarted turn, ongoing speech or free conversation', () => {
@@ -1001,8 +1107,8 @@ test('the relationship endpoint returns labels to players and raw scores only to
   }
 });
 
-test('there are exactly six hosts, each with a relationship configuration and instructions for both one-to-one and group rooms', () => {
-  assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), ['auditor', 'closer', 'ina', 'jaeseok', 'trickster', 'velvet']);
+test('there are exactly eight hosts, each with a relationship configuration and instructions for both one-to-one and group rooms', () => {
+  assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']);
   for (const id of lounge.loungeRelationshipHostIds) {
     assert.ok(lounge.loungeHosts.some(host => host.id === id));
     assert.ok(relationshipLib.getRelationshipConfig(id), id);
@@ -1059,8 +1165,9 @@ for (const [count, mode] of [[1, 'pair'], [2, 'pair'], [3, 'group']]) {
         assert.equal(context.members.length, count);
         assert.ok(context.members.every(member => member.user_id.startsWith('human-')));
         // A group room never turns into an AI conversation because others are briefly away.
-        assert.ok(payload.instructions.includes('사람끼리 이야기하는 방의 AI 도우미'));
+        assert.ok(payload.instructions.includes('사람끼리 이야기하는 방에 함께 있는'));
         assert.ok(!payload.instructions.includes('대화 상대다. 진행자나 인터뷰어가 아니다'));
+        assert.match(payload.instructions, /너는 .+이다\./); assert.ok(payload.instructions.includes(charactersLib.loungeCharacterRules)); assert.doesNotMatch(payload.instructions, /AI 도우미다/);
         assert.match(payload.instructions, new RegExp(`현재 사람 ${count}명이 함께 있다`));
         return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 생각이 남았나요?', memory: '' }) }] }] });
       }
@@ -1120,7 +1227,7 @@ test('an explicit moderator request retains participant question context without
       assert.equal(context.session.target_name, '나래');
       assert.equal(context.session.reply_from, '가람');
       assert.equal(context.session.question, question);
-      assert.match(payload.instructions, /AI가 대신 답하거나 다시 질문을 전달하지 않는다/);
+      assert.match(payload.instructions, /네가 대신 답하거나 다시 질문을 전달하지 않는다/);
       assert.match(payload.instructions, /매 발언에 답하지 않는다/);
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: question, memory: '' }) }] }] });
     }
@@ -1283,7 +1390,7 @@ test('group help follows the requested kind and each scheduled announcement stay
       assert.match(body.instructions, /질문은 많아야 하나다/);
       assert.match(body.instructions, /조용한 사람에게 답을 요구하지 않는다/);
       assert.match(body.instructions, /- summary: 지금까지 나온 서로 다른 생각 2~3가지를 실제 발언만으로 짧게 묶는다/);
-      assert.match(body.instructions, /- direct: 누군가 AI를 직접 불러 물었다/);
+      assert.match(body.instructions, /- direct: 누군가 너를 직접 불러 물었다/);
       assert.doesNotMatch(body.instructions, /round_summary|free_ending|4~9문장|4~6문장/);
       if (item.rule) assert.match(body.instructions, item.rule);
       assert.equal(body.max_output_tokens, 1000, 'room for the reply and a 600-character memory with headroom');

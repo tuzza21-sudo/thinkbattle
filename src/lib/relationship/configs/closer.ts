@@ -1,4 +1,4 @@
-import type { RelationshipConfig } from '../types';
+import type { RelationshipConfig } from '../types.js';
 
 export const closerRelationship = {
   characterId: 'closer',
@@ -30,7 +30,7 @@ export const closerRelationship = {
     DECEIVES_CHARACTER: { deltas: { trust: -15, respect: -5 }, mood: { irritation: 30 } },
   },
   stages: [
-    { id: 'PROSPECT', label: '예비 상대', line: '지금 넌 원하는 것만 말하고 있어.', enter: {},
+    { id: 'PROSPECT', label: '예비 상대', line: '지금은 원하시는 것만 말씀하고 계세요.', enter: {},
       hint: '사용자가 원하는 것만 말하고 있다고 본다. 조건·대가·기한이 무엇인지 하나씩 요구한다. 아직 상대로 대하지 않는다.' },
     { id: 'COUNTERPARTY', label: '협상 상대', line: '좋아. 이제 조건을 이야기할 수 있겠군.', enter: { min: { respect: 40, leverage: 45 } },
       hint: '조건을 이야기할 수 있는 상대로 대한다. 사용자가 가진 패와 빠진 대안을 짚고 다음 수를 묻는다.' },
@@ -39,6 +39,7 @@ export const closerRelationship = {
     { id: 'PARTNER', label: '파트너', line: '좋아. 이번 건 같이 설계하지.', enter: { min: { trust: 65, respect: 75, leverage: 70, resolve: 75 } },
       hint: '함께 판을 설계하는 파트너로 대한다. 여전히 조건에 냉정하지만 사용자의 판단을 존중하며 공동 전략을 제안한다.' },
   ],
+  casualFromStage: 'COUNTERPARTY',
   memoryStyle: '기억은 약속, 결정, 조건이 어디까지 실행됐는지 확인하는 데 쓴다. 결과부터 묻는다.',
   responseHints: ['막연한 목표에는 조건·대가·기한·대안 중 하나를 요구한다', '결정을 대신 내려 주지 않고 결정하게 만든다', '사람이 아니라 계획의 빈틈을 압박한다'],
   decay: { interest: { graceDays: 4, perDay: 1, floor: 45 } },

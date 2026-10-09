@@ -1,5 +1,5 @@
-import { restoreRelationship } from './engine';
-import { moodKeys, type Mood, type RelationshipConfig, type RelationshipRecord } from './types';
+import { restoreRelationship } from './engine.js';
+import { moodKeys, type Mood, type RelationshipConfig, type RelationshipRecord } from './types.js';
 
 /** A row of `voice_lounge_relationships`. */
 export type RelationshipRow = {

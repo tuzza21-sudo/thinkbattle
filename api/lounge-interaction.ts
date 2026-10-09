@@ -1,5 +1,12 @@
 import { RoomServiceClient } from 'livekit-server-sdk';
-import { loungeInteractionInstructions, loungeInteractionSchema, readLoungeInteraction, type LoungeInteractionMember } from '../src/lib/loungeInteraction.js';
+import { loungeInteractionInstructions, loungeInteractionSchema, readLoungeInteraction, readLoungeInteractionEvents, type LoungeInteractionMember } from '../src/lib/loungeInteraction.js';
+import { applyDecay, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructions, relationshipEventsSchema, relationshipFromRow, relationshipState, type RelationshipRow } from '../src/lib/relationship/index.js';
+
+// With other people at a space table the character still forms an impression of each speaker. The events are
+// classified in this same review call and saved to the speaker's relationship; nothing extra is said aloud.
+const groupRelationshipInstructions = (character: string) => `\n${character}(이 공간의 AI 캐릭터)가 여러 사람이 함께 있는 자리에서 이 발언을 지켜봤다. events에는 이 발언에서 speaker_id의 사람이 실제로 보인 행동만 분류한다.
+캐릭터에게 직접 한 말이 아니어도 근거 제시, 감정이나 약한 면의 공유, 재치, 침착함, 좋은 질문, 결단처럼 대화 속에서 드러난 행동은 분류한다. 캐릭터를 향한 행동(아부, 캐릭터에 대한 반박, 선 넘기, 캐릭터와의 약속)은 캐릭터에게 한 말일 때만 분류한다. 다른 참가자와 의견이 다른 것 자체는 이벤트가 아니다. 해당이 없으면 빈 배열.
+${relationshipEventInstructions}`;
 
 type NodeRequest = { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
 type NodeResponse = { statusCode: number; setHeader: (name: string, value: string) => void; end: (body?: Uint8Array | string) => void };
@@ -58,17 +65,34 @@ async function handle(req: Request) {
       await sync(); return json({ ok: true });
     }
     if (!process.env.OPENAI_API_KEY) return json({ error: 'AI 대화 보호 서버 설정을 확인해 주세요.', code: 'lounge_interaction_not_configured', retryable: false }, 503);
-    const claim = await rpc<{ ticket: string; message_id: number; speaker_id: string; text: string; members: LoungeInteractionMember[]; topic: string; recent: unknown[] } | null>('claim_voice_lounge_interaction', { p_room: roomId, p_actor: user.id, p_message: body.messageId ?? null });
+    const claim = await rpc<{ ticket: string; message_id: number; speaker_id: string; text: string; members: LoungeInteractionMember[]; topic: string; recent: unknown[]; host_persona?: string; group?: boolean } | null>('claim_voice_lounge_interaction', { p_room: roomId, p_actor: user.id, p_message: body.messageId ?? null });
     if (!claim) return json({ skipped: true });
+    const relationshipConfig = claim.group ? getRelationshipConfig(claim.host_persona) : undefined;
     try {
+      const schema = relationshipConfig ? { ...loungeInteractionSchema, properties: { ...loungeInteractionSchema.properties, events: relationshipEventsSchema }, required: [...loungeInteractionSchema.required, 'events'] } : loungeInteractionSchema;
       const response = await timed('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
-        model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 500, store: false,
-        instructions: loungeInteractionInstructions, input: JSON.stringify({ text: claim.text, speaker_id: claim.speaker_id, members: claim.members, topic: claim.topic, recent: claim.recent }),
-        text: { format: { type: 'json_schema', name: 'lounge_interaction', strict: true, schema: loungeInteractionSchema } },
+        model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: relationshipConfig ? 900 : 500, store: false,
+        instructions: loungeInteractionInstructions + (relationshipConfig ? groupRelationshipInstructions(relationshipConfig.displayName) : ''),
+        input: JSON.stringify({ text: claim.text, speaker_id: claim.speaker_id, members: claim.members, topic: claim.topic, recent: claim.recent }),
+        text: { format: { type: 'json_schema', name: 'lounge_interaction', strict: true, schema } },
       }) });
       if (!response.ok) throw new Error('interaction_ai_failed');
-      const decision = readLoungeInteraction(await response.json() as Parameters<typeof readLoungeInteraction>[0], claim.members, claim.speaker_id, claim.text);
+      const result = await response.json() as Parameters<typeof readLoungeInteraction>[0];
+      const decision = readLoungeInteraction(result, claim.members, claim.speaker_id, claim.text);
       const applied = await rpc<Record<string, unknown>>('finish_voice_lounge_interaction', { p_room: roomId, p_message: claim.message_id, p_ticket: claim.ticket, p_decision: decision });
+      // The speaker's relationship with the character; a failure never affects the safety decision.
+      if (relationshipConfig) {
+        try {
+          const read = await timed(`${base}/rest/v1/voice_lounge_relationships?user_id=eq.${encodeURIComponent(claim.speaker_id)}&character_id=eq.${encodeURIComponent(relationshipConfig.characterId)}&select=*`, { headers: { apikey: service, Authorization: `Bearer ${service}` } });
+          if (!read.ok) throw new Error('relationship_read_failed');
+          const now = new Date();
+          const record = applyDecay(relationshipFromRow(relationshipConfig, (await read.json() as RelationshipRow[])[0]), relationshipConfig, now);
+          const turn = processTurn({ record, config: relationshipConfig, mood: moodFromRoom(relationshipConfig, null), events: readLoungeInteractionEvents(result), hasUserTurn: true, now });
+          // The room mood belongs to one-to-one conversations, so a group turn saves the relationship without it.
+          await rpc('save_voice_lounge_relationship', { p_user: claim.speaker_id, p_character: relationshipConfig.characterId, p_room: roomId, p_expected_version: record.version, p_state: relationshipState(turn.record), p_mood: null });
+          console.info('[Lounge relationship]', JSON.stringify({ group: true, character: relationshipConfig.characterId, events: turn.log.accepted.map(event => event.type), stage: turn.log.stageAfter, change: turn.log.stageChange }));
+        } catch (error) { console.warn('[Lounge relationship] group turn not saved', error instanceof Error ? error.message : 'error'); }
+      }
       // A committed decision is never counted again if the voice server is down.
       try { await sync(); } catch { return json({ ...applied, voiceSyncPending: true }); }
       return json(applied);

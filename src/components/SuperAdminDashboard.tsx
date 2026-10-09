@@ -133,6 +133,7 @@ export const SuperAdminDashboard = () => {
           </button>
           <h1><ShieldCheck color="var(--primary)" style={{ verticalAlign: 'middle' }} /> 슈퍼 관리자</h1>
           <p className="admin-lead" style={{ margin: '.4rem 0 0' }}>전체 활동과 기관 게시판을 관리합니다.</p>
+          <button className="btn btn-secondary" style={{ padding: '.45rem .7rem', marginTop: '.7rem' }} onClick={() => navigate('/super-admin/lounge-knowledge')}>캐릭터 지식·경험 관리</button>
         </div>
         <button className="icon-button" onClick={() => void load()} title="새로고침" aria-label="새로고침">
           <RefreshCw size={18} />

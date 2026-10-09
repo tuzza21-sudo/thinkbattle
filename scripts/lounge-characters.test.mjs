@@ -4,7 +4,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
-const { loungeCharacters } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+const { loungeCharacters, loungePersonaPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const { relationshipConfigs, defaultEventEffects, protectiveEvents, relationshipEventTypes } = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const { loungeHosts, loungeThemes } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
 const effect = (config, event) => (config.events[event] ?? defaultEventEffects[event]).deltas;
@@ -60,5 +60,13 @@ test('a page shows a final note only where the closest stage is switched off', (
   for (const character of loungeCharacters) {
     const hidden = relationshipConfigs[character.id].stages.some(stage => stage.enabled === false);
     assert.equal(Boolean(character.beyond), hidden, `${character.id}: beyond note and disabled stage disagree`);
+  }
+});
+
+test('every character has a full profile for the model: name, age, work, past, temperament and habits', () => {
+  for (const character of loungeCharacters) {
+    const persona = loungePersonaPrompt(character);
+    for (const part of [character.name, character.age, character.role, character.story[0], character.habits[0], character.personality[0].text]) assert.ok(persona.includes(part), `${character.id}: ${part.slice(0, 20)}`);
+    assert.ok(persona.startsWith(`너는 ${character.name}이다.`));
   }
 });

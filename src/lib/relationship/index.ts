@@ -1,21 +1,23 @@
-import { auditorRelationship } from './configs/auditor';
-import { closerRelationship } from './configs/closer';
-import { empathRelationship } from './configs/empath';
-import { tricksterRelationship } from './configs/trickster';
-import { velvetKnifeRelationship } from './configs/velvetKnife';
-import { witRelationship } from './configs/wit';
-import { relationshipEventCatalog, relationshipEventTypes } from './events';
-import type { RelationshipConfig } from './types';
+import { auditorRelationship } from './configs/auditor.js';
+import { closerRelationship } from './configs/closer.js';
+import { diplomatRelationship } from './configs/diplomat.js';
+import { lawyerRelationship } from './configs/lawyer.js';
+import { empathRelationship } from './configs/empath.js';
+import { tricksterRelationship } from './configs/trickster.js';
+import { velvetKnifeRelationship } from './configs/velvetKnife.js';
+import { witRelationship } from './configs/wit.js';
+import { relationshipEventCatalog, relationshipEventTypes } from './events.js';
+import type { RelationshipConfig } from './types.js';
 
-export * from './types';
-export * from './events';
-export * from './engine';
-export * from './persistence';
-export * from './memory';
+export * from './types.js';
+export * from './events.js';
+export * from './engine.js';
+export * from './persistence.js';
+export * from './memory.js';
 
 // Adding a character means adding a configuration here; the engine is unchanged.
 export const relationshipConfigs: Record<string, RelationshipConfig> = Object.fromEntries(
-  [empathRelationship, witRelationship, auditorRelationship, closerRelationship, velvetKnifeRelationship, tricksterRelationship].map(config => [config.characterId, config]),
+  [empathRelationship, witRelationship, auditorRelationship, closerRelationship, velvetKnifeRelationship, tricksterRelationship, diplomatRelationship, lawyerRelationship].map(config => [config.characterId, config]),
 );
 export const getRelationshipConfig = (characterId?: string | null): RelationshipConfig | undefined =>
   characterId ? relationshipConfigs[characterId] : undefined;
@@ -26,6 +28,7 @@ ${relationshipEventTypes.map(type => `${type}: ${relationshipEventCatalog[type].
 
 /** Response rules for characters with a relationship, followed by the event classification task. */
 export const relationshipResponseInstructions = `relationship은 이 사용자와 그동안 쌓아 온 장기 관계다. stage.hint와 지표 라벨, memories, mood를 말투·인정의 정도·마음을 여는 정도에 반영한다. tone_reference는 이 단계의 분위기 예시이며 그대로 반복하지 않는다.
+speech_level이 polite이면 모든 문장을 존댓말로, casual이면 모든 문장을 반말로 말한다. 한 답변 안에서 섞지 않으며, 반말이어도 무례하거나 깎아내리는 말은 하지 않는다.
 점수, 단계 이름, 이벤트 코드는 말하지 않는다. 관계의 변화는 숫자가 아니라 표현과 태도로만 드러낸다.
 관계가 깊어져도 character_core는 그대로다. 자동으로 동의하지 않고 약한 가정은 짚는다. 칭찬은 아끼고, 할 때는 실제로 잘한 지점을 짧게 말한다.
 사용자의 지적이 맞으면 캐릭터답게 짧게 인정한다. 사과문이나 반성처럼 말하지 않고, 인정한 뒤에도 자기 기준과 말투를 유지한다. 초기 단계일수록 인정은 더 짧고 건조하다.

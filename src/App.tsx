@@ -33,6 +33,7 @@ const AboutPage = lazy(async () => ({ default: (await import('./components/About
 const SharedReportPage = lazy(async () => ({ default: (await import('./components/SharedReportPage')).SharedReportPage }));
 const ArgumentLibraryPage = lazy(async () => ({ default: (await import('./components/ArgumentLibraryPage')).ArgumentLibraryPage }));
 const AdminDashboard = lazy(async () => ({ default: (await import('./components/AdminDashboard')).AdminDashboard }));
+const LoungeKnowledgePage = lazy(async () => ({ default: (await import('./components/LoungeKnowledgePage')).LoungeKnowledgePage }));
 const SuperAdminDashboard = lazy(async () => ({ default: (await import('./components/SuperAdminDashboard')).SuperAdminDashboard }));
 const InstitutionTopicsPage = lazy(async () => ({ default: (await import('./components/InstitutionTopicsPage')).InstitutionTopicsPage }));
 const B2BMarketingPage = lazy(async () => ({ default: (await import('./components/B2BMarketingPage')).B2BMarketingPage }));
@@ -57,7 +58,7 @@ function App() {
 
   useEffect(() => {
     const pageTitles: Record<string, string> = {
-      '/lounge': '대화 라운지',
+      '/lounge': '상상의 집',
       '/debate': '토론 훈련',
       '/battle/new': 'AI 토론',
       '/history': '훈련 기록',
@@ -74,13 +75,13 @@ function App() {
       '/super-admin': '서비스 관리',
     };
     const pageTitle = pageTitles[normalizedPath]
-      ?? (normalizedPath.startsWith('/lounge/') ? '대화 라운지'
+      ?? (normalizedPath.startsWith('/lounge/') ? '상상의 집'
         : normalizedPath.startsWith('/battle/lobby/') ? '토론 대기실'
         : normalizedPath.startsWith('/battle/live/') ? '실시간 토론'
           : normalizedPath.startsWith('/simulation/') ? '페르소나 대화'
             : normalizedPath.startsWith('/report/') ? '토론 리포트' : null);
     document.title = normalizedPath === '/' || normalizedPath.startsWith('/lounge')
-      ? '대화 라운지 — 취향으로 이어지는 대화'
+      ? '상상의 집 — 당신은 여기서 누구이고 싶습니까?'
       : pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
   }, [normalizedPath]);
 
@@ -182,6 +183,8 @@ function App() {
         />
         <Route path="/history" element={requireAuth(<HistoryPage user={user} onLoginRequest={requestLogin} />)} />
         <Route path="/lounge" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/spaces/:spaceId/:entry" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/characters/:characterId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
@@ -197,6 +200,7 @@ function App() {
         <Route path="/simulation/:missionId" element={requireAuth(user ? <SimulationSessionPage user={user} /> : null)} />
         <Route path="/admin" element={requireAuth(<AdminDashboard />, false)} />
         <Route path="/super-admin" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <SuperAdminDashboard /> : <Navigate to="/" replace />} />
+        <Route path="/super-admin/lounge-knowledge" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <LoungeKnowledgePage /> : <Navigate to="/" replace />} />
       </Routes>
       </Suspense>
 

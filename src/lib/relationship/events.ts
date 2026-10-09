@@ -1,4 +1,4 @@
-import type { EventEffect } from './types';
+import type { EventEffect } from './types.js';
 
 // The language model only classifies what the user did. Score changes are
 // computed by the engine from these codes and each character's configuration.
@@ -10,6 +10,7 @@ export const relationshipEventTypes = [
   'DEFINES_CONCRETE_TERMS', 'IDENTIFIES_BATNA', 'MAKES_EMPTY_THREAT', 'FOLLOWS_THROUGH', 'SHOWS_VULNERABILITY',
   'SHOWS_ENTITLEMENT', 'FLATTERS_CHARACTER', 'DECEIVES_CHARACTER', 'EXPRESSES_DISTRESS',
   'SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE',
+  'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
 export type EventSeverity = 'normal' | 'meaningful' | 'strong' | 'severe';
@@ -48,6 +49,11 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   CORRECTS_UNDERSTANDING: { description: 'AI가 잘못 이해한 점이나 놓친 맥락을 바로잡아 알려 줌', severity: 'normal', importance: 0.4 },
   CREATES_RUNNING_JOKE: { description: '나중에 다시 쓸 만한 별명·말버릇·반복 소재가 되는 농담이나 표현을 새로 만듦', severity: 'normal', importance: 0.75 },
   BUILDS_ON_INSIDE_JOKE: { description: '앞서 대화에서 나온 농담이나 표현을 다시 가져와 이어 감', severity: 'normal', importance: 0.65 },
+  ACKNOWLEDGES_OTHER_VIEW: { description: '자기 의견을 말하기 전에 상대나 제3자의 입장·사정을 먼저 정리하거나 인정함', severity: 'normal', importance: 0.6 },
+  REFRAMES_CONSTRUCTIVELY: { description: '날 선 표현이나 거절·반대를 비난 없는 말로 바꿔 전함', severity: 'normal', importance: 0.55 },
+  ANSWERS_DIRECTLY: { description: 'AI의 질문에 돌려 말하지 않고 핵심부터 직접 답함', severity: 'normal', importance: 0.5 },
+  EVADES_QUESTION: { description: 'AI의 질문에 답하지 않고 화제를 돌리거나 다른 말로 넘어감', severity: 'normal', importance: 0.4 },
+  CONTRADICTS_SELF: { description: '앞서 한 말과 모순되는 말을 하고도 그 차이를 인정하지 않음', severity: 'normal', importance: 0.5 },
 };
 
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
@@ -91,4 +97,9 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   CORRECTS_UNDERSTANDING: { deltas: {} },
   CREATES_RUNNING_JOKE: { deltas: {} },
   BUILDS_ON_INSIDE_JOKE: { deltas: {} },
+  ACKNOWLEDGES_OTHER_VIEW: { deltas: {} },
+  REFRAMES_CONSTRUCTIVELY: { deltas: {} },
+  ANSWERS_DIRECTLY: { deltas: {} },
+  EVADES_QUESTION: { deltas: {} },
+  CONTRADICTS_SELF: { deltas: {} },
 };
