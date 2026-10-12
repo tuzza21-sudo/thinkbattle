@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
-import { ArrowLeft, ArrowRight, Coffee, Copy, Hand, Headphones, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { ArrowLeft, ArrowRight, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, getLoungeHostLoudness, getLoungeTheme, getLoungeTopic, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
-import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, joinLounge, loadLounge, loadLoungeRelationship, prepareLoungeTopic, requestLoungeHost, requestLoungeModerator, setLoungeTopic, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
+import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, joinLounge, loadLounge, loadLoungeRelationship, prepareLoungeTopic, requestLoungeHost, requestLoungeModerator, setLoungeTopic, setLoungePersona, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
@@ -14,6 +14,8 @@ import { LoungeTopicPicker, type LoungeTopicPickerProps } from './LoungeTopicPic
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { ProfileModal } from './ProfileModal';
 import { LoungeIntroduction } from './LoungeIntroduction';
+import { LoungeAfterTalk, LoungeFriendsPage, LoungeProfileCard } from './LoungeSocial';
+import { useLoungeSocialStatus } from '../lib/useLoungeSocialStatus';
 import { LoungeCharacterPage } from './LoungeCharacterPage';
 import { useLoungeAudio } from '../lib/useLoungeAudio';
 import './LoungePage.css';
@@ -21,11 +23,11 @@ import './LoungeRoom.css';
 
 type Props = { user: AppUser | null; onGuestRequest: () => Promise<void>; onLoginRequest: () => void; onSignupRequest?: () => void; onUserUpdate?: (user: AppUser) => void; onLogout?: () => Promise<void> };
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
-function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onProfileRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; onProfileRequest: () => void; loggingOut: boolean }) {
+function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onProfileRequest, onLogout, loggingOut, unread }: Props & { inRoom: boolean; introduction: boolean; onProfileRequest: () => void; loggingOut: boolean; unread: number }) {
   return <header className="lounge-header">
-    {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 상상의 집</Link>}
-    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>상상의 집<span>HOUSE OF IMAGINATION</span></strong></Link>
-    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
+    {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 사석</Link>}
+    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>사석<span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
+    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && user && !user.isAnonymous && <Link to="/lounge/friends" className="lounge-header-friends" aria-label={unread ? `친구 · 안 읽은 쪽지 ${unread}개` : '친구'}><Heart size={15} /><span>친구</span>{unread > 0 && <em>{unread > 9 ? '9+' : unread}</em>}</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
         <button type="button" className="lounge-profile-button" onClick={onProfileRequest} aria-label={`${user.nickname}님 프로필 수정`}><span className="lounge-account-avatar">{user.loungeAvatarUrl ? <img src={user.loungeAvatarUrl} alt="" /> : <UserRound size={18} />}</span><span className="lounge-account-name"><strong>{user.nickname}</strong><small>프로필 수정</small></span></button>
         {onLogout && <button type="button" className="lounge-account-logout" disabled={loggingOut} onClick={() => void onLogout()} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>}
@@ -40,7 +42,12 @@ export function LoungePage(props: Props) {
   const { roomId, characterId, spaceId, entry } = useParams();
   const location = useLocation();
   const introduction = roomId === 'about';
-  const inRoom = Boolean(roomId && !introduction);
+  const friendsPage = roomId === 'friends';
+  const inRoom = Boolean(roomId && !introduction && !friendsPage);
+  const social = useLoungeSocialStatus(props.user);
+  const navigate = useNavigate();
+  // After leaving a conversation with other people, members rate them and pick friends back in the lounge.
+  const afterTalk = (location.state as { afterTalk?: string } | null)?.afterTalk;
   const [showProfile, setShowProfile] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [accountError, setAccountError] = useState('');
@@ -49,10 +56,10 @@ export function LoungePage(props: Props) {
     setLoggingOut(true); setAccountError('');
     try { await props.onLogout(); setShowProfile(false); } catch (error) { setAccountError(errorText(error)); } finally { setLoggingOut(false); }
   };
-  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{characterId ? <LoungeCharacterPage key={characterId} id={characterId} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}</div><LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="상상의 집" />}</>;
+  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{characterId ? <LoungeCharacterPage key={characterId} id={characterId} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
 }
 
-type RoomViewProps = { place?: string; topicPicker?: LoungeTopicPickerProps; relationship?: RelationshipView | null; topicBrief?: LoungeTopicBrief | null; now?: number; onReleaseRestriction?: (userId: string) => Promise<void>; guidedSession?: boolean; session?: LoungeSession | null; sessionNames?: Record<string, string>; onSessionAction?: (action: LoungeSessionAction) => Promise<void>; study?: LoungeTopicStudy | null; theme?: LoungeThemeId; liveHostText?: string; hostId: LoungeHostId; topic: string; capacity: number; messages: LoungeMessage[]; members: Array<{ id: string; name: string; muted: boolean; warnings?: number; restrictedUntil?: string | null; avatarIndex?: number; avatarUrl?: string }>; speakers: string[]; aiSpeaking: boolean; pending: boolean; status: string; remaining: string; preview?: boolean; micOn: boolean; connected: boolean; connecting?: boolean; audioReady?: boolean; starting?: boolean; isHost: boolean; error: string; onConnect: () => void; onMic: () => void; onAsk: (kind: Exclude<LoungeHelpKind, 'direct'>) => void; helpRequested?: boolean; onStart: () => void; onLeave: () => void; inviteUrl?: string; currentUserId?: string; demoPlaying?: boolean; onDemoToggle?: () => void };
+type RoomViewProps = { place?: string; topicPicker?: LoungeTopicPickerProps; relationship?: RelationshipView | null; topicBrief?: LoungeTopicBrief | null; now?: number; onReleaseRestriction?: (userId: string) => Promise<void>; guidedSession?: boolean; session?: LoungeSession | null; sessionNames?: Record<string, string>; onSessionAction?: (action: LoungeSessionAction) => Promise<void>; study?: LoungeTopicStudy | null; theme?: LoungeThemeId; liveHostText?: string; hostId: LoungeHostId; topic: string; capacity: number; messages: LoungeMessage[]; members: Array<{ id: string; name: string; muted: boolean; warnings?: number; restrictedUntil?: string | null; avatarIndex?: number; avatarUrl?: string }>; speakers: string[]; aiSpeaking: boolean; pending: boolean; status: string; remaining: string; preview?: boolean; micOn: boolean; connected: boolean; connecting?: boolean; audioReady?: boolean; starting?: boolean; isHost: boolean; error: string; onConnect: () => void; onMic: () => void; onAsk: (kind: Exclude<LoungeHelpKind, 'direct'>) => void; helpRequested?: boolean; onStart: () => void; onLeave: () => void; inviteUrl?: string; currentUserId?: string; demoPlaying?: boolean; onDemoToggle?: () => void; roomId?: string; socialMember?: boolean };
 
 function LoungeTopicDescription({ brief }: { brief: LoungeTopicBrief }) {
   const category = getLoungeTopic(brief.category);
@@ -101,6 +108,9 @@ const subscribeDesktopLayout = (onChange: () => void) => {
 function RoomView(props: RoomViewProps) {
   const host = getLoungeHost(props.hostId);
   const theme = getLoungeTheme(props.theme);
+  // A member's profile card opens from their portrait; after a conversation people can rate each other and pick friends.
+  const [profileFor, setProfileFor] = useState<{ id: string; name: string; avatarUrl?: string } | null>(null);
+  const [afterTalkOpen, setAfterTalkOpen] = useState(true);
   const [sendError, setSendError] = useState('');
   const [copied, setCopied] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
@@ -218,7 +228,9 @@ function RoomView(props: RoomViewProps) {
           const hasFloor = Boolean(member && !ended && props.session?.state !== 'finished' && !isLoungeFreeStage(props.session) && member.id === props.session?.speaker_id);
           const mine = member?.id === props.currentUserId;
           return <div key={member?.id ?? index} className={`lounge-seat ${member ? 'occupied' : 'empty'} ${speaking ? 'speaking' : ''} ${hasFloor ? 'has-floor' : ''} ${mine ? 'self' : ''}`}>
-            <span className="lounge-seat-avatar">{member ? <LoungePortrait index={member.avatarIndex} url={member.avatarUrl} name={member.name} /> : <Users size={25} />}{member && <i>{member.muted ? <MicOff size={13} /> : <Mic size={13} />}</i>}</span>
+            <span className="lounge-seat-avatar" {...(member && props.roomId && !props.preview ? { role: 'button', tabIndex: 0, title: `${member.name}님 프로필 보기`, 'aria-label': `${member.name}님 프로필 보기`,
+              onClick: () => setProfileFor({ id: member.id, name: member.name, avatarUrl: member.avatarUrl }),
+              onKeyDown: (event: ReactKeyboardEvent) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setProfileFor({ id: member.id, name: member.name, avatarUrl: member.avatarUrl }); } } } : {})}>{member ? <LoungePortrait index={member.avatarIndex} url={member.avatarUrl} name={member.name} /> : <Users size={25} />}{member && <i>{member.muted ? <MicOff size={13} /> : <Mic size={13} />}</i>}</span>
             <strong>{member?.name ?? '빈 자리'}{mine && <b>나</b>}</strong>
             {hasFloor && <span className="lounge-seat-turn">{mine ? '지금 내 차례' : '지금 발언 차례'}</span>}
             <span className="lounge-seat-speaking"><VoiceWave active={speaking} />{Date.parse(member?.restrictedUntil ?? '') > (props.now ?? 0) ? '잠시 발언 제한 중' : speaking ? '지금 이야기 중' : member ? member.muted ? '듣고 있어요' : '함께하는 중' : '초대 링크로 함께해요'}</span>
@@ -250,7 +262,9 @@ function RoomView(props: RoomViewProps) {
           </aside>
         </div>
         {(props.error || sendError) && <p className="lounge-error" role="alert">{props.error || sendError}</p>}
-    {ended && <div className="lounge-ended"><Coffee size={24} /><span>오늘의 대화가 끝났어요. 다음에 또 만나요.</span><Link to="/lounge">새로운 대화방 <ArrowRight size={16} /></Link></div>}
+    {ended && <div className="lounge-ended"><Coffee size={24} /><span>오늘의 대화가 끝났어요. 다음에 또 만나요.</span>{props.socialMember && props.roomId && props.capacity > 1 && <button type="button" onClick={() => setAfterTalkOpen(true)}><Heart size={15} /> 함께한 사람</button>}<Link to="/lounge">새로운 대화방 <ArrowRight size={16} /></Link></div>}
+    {ended && afterTalkOpen && props.socialMember && props.roomId && props.capacity > 1 && !props.preview && <LoungeAfterTalk roomId={props.roomId} onDone={() => setAfterTalkOpen(false)} />}
+    {profileFor && props.roomId && <LoungeProfileCard userId={profileFor.id} roomId={props.roomId} fallbackName={profileFor.name} fallbackAvatarUrl={profileFor.avatarUrl} viewerIsMember={Boolean(props.socialMember)} onClose={() => setProfileFor(null)} />}
       </div>
     </section><aside className="lounge-chat-panel" ref={journalPanel} id={journalId} tabIndex={-1} hidden={!journalOpen} aria-label="대화 기록" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeJournal(); } }}><div className="lounge-chat-heading"><MessageCircle size={19} /><h2>우리의 대화</h2><span>{props.preview ? 'PREVIEW' : 'LIVE'}</span><button type="button" className="lounge-journal-close" onClick={closeJournal} aria-label="대화 기록 접기"><X size={18} /></button></div><p className="lounge-chat-intro">목소리에 담긴 생각, 천천히 알아가는 우리.</p><div className="lounge-chat-log" ref={log} role="log" aria-label="대화 내용">{props.messages.length === 0 && <div className="lounge-chat-empty"><Coffee size={32} /><p>아직은 고요한 대화방.<br />첫 이야기를 기다리고 있어요.</p></div>}{props.messages.map(message => <article key={message.id} className={message.kind === 'host' ? 'host' : ''}><span className="lounge-chat-avatar">{message.kind === 'host' ? <LoungeHostPortrait hostId={props.hostId} /> : <LoungePortrait index={props.members.find(member => member.id === message.user_id)?.avatarIndex} url={props.members.find(member => member.id === message.user_id)?.avatarUrl} name={message.nickname} />}</span><div><strong>{message.kind === 'host' ? host.name : message.nickname}{message.kind === 'host' && <b>{hostRole}</b>}</strong><p>{message.text}</p></div></article>)}</div><p className="lounge-chat-privacy">음성은 AI 진행을 위해 글로 전사됩니다.<br />원본 음성은 저장하지 않아요.</p></aside></div>
   </main>;
@@ -790,7 +804,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     void askModerator('topic');
   };
   const action = async (kind: 'start' | 'leave') => {
-    try { setError(''); await controlLounge(roomId, kind); if (kind === 'leave') { audio.disconnect(); navigate('/lounge'); } else { const state = await loadLounge(roomId); setRoom(state.room); } }
+    try { setError(''); await controlLounge(roomId, kind); if (kind === 'leave') { audio.disconnect(); navigate('/lounge', user && !user.isAnonymous && room && room.capacity > 1 ? { state: { afterTalk: roomId } } : undefined); } else { const state = await loadLounge(roomId); setRoom(state.room); } }
     catch (err) { setError(errorText(err)); }
   };
   if (!user) return <main className="lounge-join-gate"><span>☕</span><h1>친구들과 가볍게 이야기해요.</h1><p>이름을 준비하고 대화방에 들어갈게요.</p><button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 참여하기 <ArrowRight size={17} /></button><button className="lounge-preview-button" type="button" onClick={onLoginRequest}>로그인해서 참여하기</button>{error && <p className="lounge-error" role="alert">{error}</p>}</main>;
@@ -798,14 +812,17 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const remaining = room.expires_at ? Math.max(0, Math.ceil((Date.parse(room.expires_at) - clock) / 1000)) : 3600;
   const present = loungePresentMembers(members, clock).length;
   const ownRestriction = members.find(member => member.user_id === user.id)?.speaking_restricted_until;
+  // In a place the owner (who opened the room) sets the topic and the character; everyone else sees them.
   const topicPicker: LoungeTopicPickerProps | undefined = room.space_id ? {
     topic: room.topic_source ? room.topic : null, source: room.topic_source ?? null, setBy: room.topic_set_by ?? null, suggestions: room.topic_suggestions ?? null,
     hostName: getLoungeHost(room.host_persona).name, disabled: ended || Date.parse(ownRestriction ?? '') > clock,
+    isOwner: room.host_id === user.id, ownerName: members.find(member => member.user_id === room.host_id)?.nickname ?? null, hostId: room.host_persona,
     onSuggest: async () => { await suggestLoungeTopics(roomId); await refreshAfterMessage(); }, onSet: chooseTopic,
+    onHostChange: async persona => { await setLoungePersona(roomId, persona); await refreshAfterMessage(); },
   } : undefined;
   const seats = members.map(member => {
     const voice = audio.participants.find(participant => participant.id === member.user_id);
     return { ...(voice ?? voiceProfiles.current.get(member.user_id)), id: member.user_id, name: member.nickname, muted: voice?.muted ?? true };
   });
-  return <RoomView place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={loungeRoomTheme(room.host_persona, room.id)} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={error || transcriptError || interactionError || audio.error} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && !window.confirm(room.capacity === 1 ? 'AI와의 대화를 마칠까요?' : '나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} />;
+  return <RoomView roomId={roomId} socialMember={!user.isAnonymous} place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={room.space_id && room.theme ? room.theme : loungeRoomTheme(room.host_persona, room.id)} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={error || transcriptError || interactionError || audio.error} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && !window.confirm(room.capacity === 1 ? 'AI와의 대화를 마칠까요?' : '나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} />;
 }

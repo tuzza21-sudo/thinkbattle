@@ -6,7 +6,7 @@
 .has-room .lounge-brand { color:#f0e6d8; }
 .has-room .lounge-brand>svg { color:#d6c8a4; }
 .has-room .lounge-brand strong { font-size:16px; }
-.has-room .lounge-brand strong span { font-size:7px; letter-spacing:1.8px; }
+.has-room .lounge-brand strong span { font-size:7px; letter-spacing:.3px; }
 .has-room .lounge-beta { background:#c6a36c10; border-color:#c6a36c33; color:#d8bd96; }
 .has-room .lounge-room-main { --lounge-accent:#ead0a3; --lounge-surface:#242421; --lounge-scene-image:url('/lounge/rooftop-city-v2.webp'); /* The room sets these from its background (loungeThemes). */ width:100%; max-width:none; margin:0; padding:12px 20px 18px; flex:1; min-height:0; display:flex; flex-direction:column; gap:10px; }
 .has-room .lounge-preview-notice { flex-shrink:0; margin:0; min-height:30px; padding:6px 10px; border:0; background:none; color:#c7cbb8; font-size:10px; line-height:1.5; }
@@ -40,7 +40,10 @@
 .has-room .lounge-moderator-caption { display:block; font-size:10px; color:#d0d6c9; margin:5px 0 0; }
 .has-room .lounge-moderator>.lounge-voice-bars { grid-column:3; grid-row:1; }
 .has-room .lounge-host-bubble { grid-column:1 / -1; text-align:left; width:100%; max-width:none; max-height:clamp(72px,18dvh,170px); overflow:auto; margin:0; padding:2px 0 0; border:0; border-radius:0; background:none; color:#fff5e9; font-size:14px; line-height:1.9; overflow-wrap:anywhere; }
-.has-room .lounge-moderator.speaking .lounge-moderator-avatar { box-shadow:0 0 0 3px color-mix(in srgb,var(--lounge-accent) 20%,transparent); }
+/* While the AI speaks its portrait is ringed in the same bright yellow as a person who has the floor. The dark halo keeps the ring readable on every background, including the dark cocktail bar. */
+.has-room .lounge-moderator.speaking .lounge-moderator-avatar { z-index:1; border-color:#ffdf65; box-shadow:0 0 0 4px #ffdf65,0 0 0 7px #000a,0 0 24px 6px #ffd84f66; animation:lounge-host-speaking 1.3s ease-in-out infinite; }
+@keyframes lounge-host-speaking { 50% { box-shadow:0 0 0 4px #ffdf65,0 0 0 7px #000a,0 0 34px 12px #ffd84f99; } }
+@media(prefers-reduced-motion:reduce) { .has-room .lounge-moderator.speaking .lounge-moderator-avatar { animation:none; } }
 .lounge-guidance { min-height:0; overflow:auto; border-radius:16px; }
 .lounge-guidance:empty { display:none; }
 .lounge-place-view { display:flex; align-items:end; justify-content:center; min-width:0; pointer-events:none; }
@@ -663,7 +666,8 @@
 
 /* Desktop: moderator on the left, participants (up to six) on the right, portraits 20% larger, controls on the right. */
 @media(min-width:761px) and (min-height:501px) {
-  .has-room .lounge-room-main,.has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:77px; --lounge-seat-basis:103px; --lounge-seat-gap:12px; }
+  .has-room .lounge-room-main,.has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:104px; --lounge-seat-basis:132px; --lounge-seat-gap:12px; }
+  .has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:136px; --lounge-seat-basis:164px; }
   .has-room .lounge-room-main:has(.lounge-seat.occupied:nth-child(1)) { --lounge-roster-width:calc(1 * var(--lounge-seat-basis) + 10px); }
   .has-room .lounge-room-main:has(.lounge-seat.occupied:nth-child(2)) { --lounge-roster-width:calc(2 * var(--lounge-seat-basis) + 1 * var(--lounge-seat-gap) + 10px); }
   .has-room .lounge-room-main:has(.lounge-seat.occupied:nth-child(3)) { --lounge-roster-width:calc(3 * var(--lounge-seat-basis) + 2 * var(--lounge-seat-gap) + 10px); }
@@ -682,6 +686,10 @@
   .has-room .lounge-participant-controls .lounge-voice-controls { align-items:flex-end; }
   .has-room .lounge-participant-controls .lounge-session-actions { justify-content:flex-end; }
   .has-room .lounge-participant-controls .lounge-session-actions .lounge-help { flex:0 0 auto; }
+}
+
+@media(min-width:761px) and (max-width:1280px) and (min-height:501px) {
+  .has-room .lounge-room-main,.has-room .lounge-room-main:has(.lounge-seats.seats-1) { --lounge-profile-size:84px; --lounge-seat-basis:110px; }
 }
 
 /* What the character remembers about the user, shown inside the relationship panel. */
@@ -717,3 +725,10 @@
 @media(max-width:760px) { .lounge-topic-form input { font-size:16px; } .has-room .lounge-topic-picker { width:100%; } }
 .has-room .lounge-topic-picker.compact { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:6px 10px; background:#12211b80; }
 .lounge-topic-picker.compact small { font-size:11px; color:#e6ece0; }
+.lounge-topic-picker.compact small { display:inline-flex; align-items:center; gap:5px; }
+.lounge-topic-suggestions button small { margin-left:4px; font-size:10px; color:#cbd3c5; }
+.lounge-topic-suggestions button[aria-pressed=true] { background:var(--lounge-accent); color:#242820; }
+.lounge-topic-suggestions button[aria-pressed=true] small { color:#3c4136; }
+
+/* The speaking ring around the AI portrait reaches 7px past it and the conversation area clips overflow, so the host column leaves room on its top and left. */
+.has-room .lounge-host-column { padding:10px 0 0 10px; box-sizing:border-box; }

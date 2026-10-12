@@ -42,6 +42,20 @@ export function safeLoungeAvatarUrl(value: unknown): string | undefined {
     return url.origin === origin && url.pathname.startsWith('/storage/v1/object/sign/lounge-avatars/') ? value : undefined;
   } catch { return undefined; }
 }
+/** Signs avatar links for other members (the database allows it for members you share a room, friendship or note with). */
+export async function loadLoungeAvatarUrls(paths: Array<string | null | undefined>): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(paths.filter((path): path is string => typeof path === 'string' && path.length > 0)));
+  const urls = new Map<string, string>();
+  if (!unique.length) return urls;
+  try {
+    const { data } = await supabase.storage.from(BUCKET).createSignedUrls(unique, 7200);
+    for (const item of data ?? []) {
+      const url = item.path && !item.error ? safeLoungeAvatarUrl(item.signedUrl) : undefined;
+      if (url) urls.set(item.path!, url);
+    }
+  } catch { /* Portraits fall back to initials. */ }
+  return urls;
+}
 export async function loadLoungeAvatar(path: unknown): Promise<Pick<AppUser, 'loungeAvatarPath' | 'loungeAvatarUrl'>> {
   if (typeof path !== 'string' || !path) return {};
   try {

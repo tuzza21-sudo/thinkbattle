@@ -19,7 +19,18 @@ export type AppUser = {
   createdAt: string;
   loungeAvatarPath?: string;
   loungeAvatarUrl?: string;
+  /** Shown as counts on lounge rooms. Email signup asks for it; others are asked before they first sit down. */
+  gender?: AppUserGender;
+  /** Shown on the member's profile card and used for room age limits. Optional. */
+  ageGroup?: AppUserAgeGroup;
+  region?: string;
+  bio?: string;
+  /** Friends see when the member is online and which room they are in. On unless the member turns it off. */
+  showPresence?: boolean;
 };
+
+export type AppUserGender = 'male' | 'female';
+export type AppUserAgeGroup = '20s' | '30s' | '40s' | '50s' | '60s';
 
 export type PersonaId = 'socrates' | 'jeong_yakyong' | 'kant' | 'nietzsche';
 export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';

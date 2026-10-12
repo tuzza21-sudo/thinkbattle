@@ -174,7 +174,7 @@ test('a question about the field of the character brings the closest knowledge a
   const unit = Array.from({ length: 256 }, (_, index) => index === 0 ? 1 : 0);
   const entries = [{ id: 'k1', kind: 'knowledge', title: '증거능력과 증명력', content: '증거능력은 법정에서 쓸 수 있는 자격이다.', score: 0.9 }, { id: 'k2', kind: 'experience', title: '반대신문의 경험', content: '세 번째 질문에서 진짜 답이 나왔다.', lesson: '질문을 바꿔 다시 묻는다.', category: 'success', score: 0.5 }];
   const calls = { embeddings: 0, match: 0, presence: 0 };
-  const scenario = async ({ text, embeddingStatus = 200, rpcStatus = 200, off = false, expectKnowledge, presence = 'some', embeddingDelay = 0, host = 'lawyer', cacheMs = '0', env = {}, thresholds = [0.28, 0.35], members = [{ user_id: 'host', nickname: '나' }], expectedUsers = ['host'] }) => {
+  const scenario = async ({ text, embeddingStatus = 200, rpcStatus = 200, off = false, expectKnowledge, presence = 'some', embeddingDelay = 0, host = 'lawyer', cacheMs = '0', env = {}, thresholds = [0.33, 0.45], members = [{ user_id: 'host', nickname: '나' }], expectedUsers = ['host'] }) => {
     calls.embeddings = 0; calls.match = 0; calls.presence = 0;
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'; process.env.LOUNGE_KNOWLEDGE_CACHE_MS = cacheMs; Object.assign(process.env, env); if (off) process.env.LOUNGE_KNOWLEDGE = 'off';
     try {
@@ -228,8 +228,8 @@ test('a question about the field of the character brings the closest knowledge a
   await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, members: crowd, expectedUsers: ['host', ...crowd.slice(0, 19).map(member => member.user_id)] });
   // The closeness a match needs can be set without a deploy; a value that is not a number from 0 to 1 is ignored.
   await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '0.1', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0.2' }, thresholds: [0.1, 0.2] });
-  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: 'abc', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '1.5' }, thresholds: [0.28, 0.35] });
-  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0' }, thresholds: [0.28, 0] });
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: 'abc', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '1.5' }, thresholds: [0.33, 0.45] });
+  await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0' }, thresholds: [0.33, 0] });
   // A character with no entries costs nothing: no embedding, no lookup. The empty answer is remembered, so the next turn does not even ask.
   await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'none', expectKnowledge: false });
   assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 1 }, 'an empty character is not looked up');

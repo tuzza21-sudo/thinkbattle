@@ -174,7 +174,7 @@ try {
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-host-option').length===4");
   await evaluate("document.querySelectorAll('.lounge-host-option')[1].click(); document.querySelectorAll('.lounge-capacities button')[5].click(); document.querySelectorAll('.lounge-theme-options button')[1].click()");
-  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /다정한 등대지기/);
+  assert.match(await evaluate("document.querySelector('.lounge-builder-host strong').textContent"), /심층 인터뷰어/);
   await type('.lounge-custom-topic input', '퇴근 후 나만의 작은 즐거움');
   await evaluate("document.querySelector('.lounge-preview-button').click()");
   await waitFor("document.querySelector('.lounge-room-main')!==null");

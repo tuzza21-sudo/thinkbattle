@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowRight, LoaderCircle, LogIn, Mail, UserPlus } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle, EmailConfirmationRequiredError } from '../lib/auth';
-import type { AppUser } from '../types';
+import type { AppUser, AppUserGender } from '../types';
 import { AvatarPhotoInput, LoungeAvatarEditor } from './LoungeAvatarEditor';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
+import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -65,7 +66,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [nickname, setNickname] = useState('');
+  const [gender, setGender] = useState<AppUserGender | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [intro, setIntro] = useState<LoungeProfileFieldsValue>({ ageGroup: '', region: '', bio: '' });
   const [error, setError] = useState(initialError || '');
 
   const [loading, setLoading] = useState(false);
@@ -81,6 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
     setConfirmPassword('');
     setNickname('');
     setAcceptedTerms(false);
+    setIntro({ ageGroup: '', region: '', bio: '' });
     setPhoto(null);
     setConfirmationSent(false);
   };
@@ -116,6 +120,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
         setError(isEnglish ? 'Please enter a display name.' : '닉네임을 입력해 주세요.');
         return;
       }
+      if (!gender) {
+        setError(isEnglish ? 'Please choose your gender.' : '성별을 선택해 주세요.');
+        return;
+      }
       if (password !== confirmPassword) {
         setError(isEnglish ? 'The passwords do not match.' : '비밀번호가 일치하지 않습니다.');
         return;
@@ -134,7 +142,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
 
     try {
       const user = isSignup
-        ? await signUpWithEmail(email, password, nickname)
+        ? await signUpWithEmail(email, password, nickname, gender!, intro)
         : await signInWithEmail(email, password);
       if (isSignup && photo) setCreatedUser(user);
       else { onAuthenticated(user); onClose(); }
@@ -175,6 +183,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
     <div className="lounge-account-divider">{isEnglish ? 'or with email' : '또는 이메일로'}</div>
     <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSubmit(); }} aria-busy={loading}>
       {isSignup && <label className="form-field"><span>{isEnglish ? 'Display name' : '닉네임'}</span><input data-dialog-autofocus value={nickname} onChange={event => setNickname(event.target.value)} autoComplete="nickname" maxLength={20} required disabled={loading} placeholder={isEnglish ? 'What should we call you?' : '대화에서 불리고 싶은 이름'} /><small className="lounge-account-field-note">{isEnglish ? 'A name you feel comfortable with. Up to 20 characters.' : '실명 대신 편한 이름도 좋아요. 최대 20자.'}</small></label>}
+      {isSignup && <fieldset className="form-field lounge-account-gender" disabled={loading}><legend>{isEnglish ? 'Gender' : '성별'}</legend><div>
+        {(['female', 'male'] as const).map(value => <label key={value}><input type="radio" name="signup-gender" value={value} checked={gender === value} onChange={() => setGender(value)} required /><span>{value === 'female' ? isEnglish ? 'Female' : '여성' : isEnglish ? 'Male' : '남성'}</span></label>)}
+      </div><small className="lounge-account-field-note">{isEnglish ? 'Rooms show only how many men and women are there.' : '대화방에는 참가자 성별이 인원수로만 표시돼요.'}</small></fieldset>}
       <label className="form-field"><span>{isEnglish ? 'Email' : '이메일'}</span><input data-dialog-autofocus={!isSignup || undefined} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" type="email" required disabled={loading} /></label>
       <div className={isSignup ? 'lounge-account-passwords' : undefined}>
         <label className="form-field"><span>{isEnglish ? 'Password' : '비밀번호'}</span><input value={password} onChange={event => setPassword(event.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} placeholder={isEnglish ? isSignup ? 'At least 6 characters' : 'Your password' : isSignup ? '6자리 이상' : '비밀번호를 입력해 주세요'} type="password" required disabled={loading} /></label>
@@ -182,6 +193,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
       </div>
       {isSignup && <>
         <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Bring your photo' : '나를 닮은 아바타로 만나기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Add a photo now and create your illustrated avatar after signup. You can also do this later.' : '사진을 첨부하면 가입 후 나를 닮은 아바타를 만들 수 있어요. 나중에 프로필에서 만들어도 괜찮아요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></details>
+        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Introduce yourself' : '나를 소개하기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Age group, region and a short introduction appear on your profile card in rooms. You can change them later in your profile.' : '나이대·지역·자기소개는 대화방에서 내 프로필을 눌렀을 때 보여요. 나중에 프로필에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} /></details>
         <label className="legal-consent-check"><input type="checkbox" checked={acceptedTerms} disabled={loading} onChange={event => setAcceptedTerms(event.target.checked)} /><span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span></label>
       </>}
       {error && <div className="form-error" role="alert">{error}</div>}

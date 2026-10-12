@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
 import { LoungeAvatarEditor } from './LoungeAvatarEditor';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
+import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
+import { saveLoungeProfile } from '../lib/auth';
 
 interface ProfileModalProps {
   user: AppUser;
@@ -17,6 +19,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [fields, setFields] = useState<LoungeProfileFieldsValue>({ ageGroup: user.ageGroup ?? '', region: user.region ?? '', bio: user.bio ?? '' });
+  const [showPresence, setShowPresence] = useState(user.showPresence !== false);
+  const [introState, setIntroState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [introError, setIntroError] = useState('');
+
+  const saveIntroduction = async () => {
+    if (introState === 'saving') return;
+    setIntroState('saving'); setIntroError('');
+    try { onProfileUpdated(await saveLoungeProfile(user, { ...fields, showPresence })); setIntroState('saved'); }
+    catch (err) { setIntroError(err instanceof Error ? err.message : '프로필을 저장하지 못했어요.'); setIntroState('idle'); }
+  };
 
   const handleSave = async () => {
     if (loading) return;
@@ -87,6 +100,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
       {success && <p className="lounge-account-success" role="status"><Check size={16} />이 이름으로 함께 이야기할게요. 저장했어요.</p>}
       <button type="submit" className="btn btn-primary lounge-account-submit" disabled={loading || success}>{loading ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{loading ? '저장 중…' : success ? '저장했어요' : '변경 사항 저장'}</button>
     </form>
-    {!user.isAnonymous && <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />}
+    {!user.isAnonymous && <>
+      <span className="lounge-account-section-label">02 · 다른 분께 보이는 소개</span>
+      <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void saveIntroduction(); }} aria-busy={introState === 'saving'}>
+        <LoungeProfileFields value={fields} onChange={next => { setFields(next); setIntroState('idle'); }} disabled={introState === 'saving'} />
+        <label className="lounge-presence-check"><input type="checkbox" checked={showPresence} onChange={event => { setShowPresence(event.target.checked); setIntroState('idle'); }} /><span>친구에게 내 접속 상태와 대화 중인 방 보여주기<small>끄면 친구 목록에 접속 중인지, 어느 방에 있는지 보이지 않아요.</small></span></label>
+        {introError && <div className="form-error" role="alert">{introError}</div>}
+        {introState === 'saved' && <p className="lounge-account-success" role="status"><Check size={16} />소개를 저장했어요.</p>}
+        <button type="submit" className="btn btn-primary lounge-account-submit" disabled={introState !== 'idle'}>{introState === 'saving' ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{introState === 'saving' ? '저장 중…' : introState === 'saved' ? '저장했어요' : '소개 저장'}</button>
+      </form>
+      <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />
+    </>}
   </LoungeAccountDialog>;
 };

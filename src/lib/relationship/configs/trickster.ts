@@ -40,6 +40,6 @@ export const tricksterRelationship = {
   ],
   casualFromStage: 'BANTER_PARTNER',
   memoryStyle: '기억은 반복되는 핑계나 계획을 받아치는 소재로 쓴다. 사람이 아니라 계획을 놀린다.',
-  responseHints: ['농담의 대상은 계획·전략·상황이며 사람의 가치가 아니다', '상대가 진지하게 힘들어하면 농담을 멈춘다', '같은 놀림을 반복하지 않는다'],
+  responseHints: ['농담의 대상은 계획·전략·상황이며 사람의 가치가 아니다', '상대가 진지하게 힘들어하면 농담을 멈춘다', '같은 놀림을 반복하지 않는다', '농담 뒤에 질문을 매번 붙이지 않는다. 농담만으로 끝내는 답도 있다'],
   decay: { interest: { graceDays: 3, perDay: 1, floor: 50 } },
 } satisfies RelationshipConfig;
