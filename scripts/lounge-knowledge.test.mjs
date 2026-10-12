@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const compile = (path, require = () => ({})) => {
@@ -94,15 +95,17 @@ test('found entries become one block, split into knowledge and experience, and n
   const now = Date.parse('2026-10-09T00:00:00Z');
   const text = loungeKnowledgePrompt([{ id: '1', kind: 'knowledge', title: 'A', content: 'a' }, { id: '2', kind: 'experience', title: 'B', content: 'b', lesson: '교훈 하나' }, { id: '3', kind: 'knowledge', title: 'C', content: 'c' }], now);
   assert.ok(text.includes('[전문 지식]\n- A: a\n- C: c') && text.includes('[겪은 일]\n- B: b (교훈: 교훈 하나)'));
-  assert.ok(text.includes('낭독하거나 늘어놓지 않는다'));
+  assert.ok(text.includes('그대로 읽거나 베끼지 말고'));
   assert.ok(text.includes('실제 회사·브랜드·기관·실존 인물·사건의 이름') && text.includes('일반화한다'), 'names and personal details are generalised, not read out');
   assert.ok(!loungeKnowledgePrompt([{ id: '1', kind: 'knowledge', title: 'A', content: 'a' }], now).includes('[겪은 일]'));
 });
 
-test('a story is used sparingly: a line or two, then back to the person, never twice, and its figures are not evidence', () => {
+test('a story is told as a scene, only where it fits, then back to the person, never twice, and its figures are not evidence', () => {
   const story = loungeKnowledgePrompt([{ id: '2', kind: 'experience', title: 'B', content: 'b' }]);
-  for (const rule of ['한두 문장으로 짧게', '지금 상대의 상황으로 돌아와 질문이나 판단으로 이어간다', '이미 들려준 일화는 다시 꺼내지 않는다', '일반적인 사실이나 현재의 근거로 쓰지 않는다', '정말 도움이 되지 않으면 쓰지 않는다']) assert.ok(story.includes(rule), rule);
+  for (const rule of ['장면으로 생생하게', '4~6문장, 400자 이내', '답변 길이 제한보다 우선한다', '새로 만들지 않고', '받아 주는 말이 먼저다', '지금 상대의 상황으로 돌아와 질문이나 판단 하나로 이어간다', '이미 들려준 일화는 다시 꺼내지 않는다', '일반적인 사실이나 현재의 근거로 쓰지 않는다', '정말 도움이 되지 않으면 쓰지 않는다']) assert.ok(story.includes(rule), rule);
   assert.ok(!loungeKnowledgePrompt([{ id: '1', kind: 'knowledge', title: 'A', content: 'a' }]).includes('이미 들려준 일화'), 'the story rules are only added when a story is');
+  // Whatever is found serves the conversation: it is never read out, and a weak fit is left unused.
+  assert.match(story, /대화의 흐름과 상대가 방금 한 말이 늘 먼저/); assert.match(story, /그대로 읽거나 베끼지 말고/); assert.match(story, /질문 예.*그대로 말하지 않는다/); assert.match(story, /관련이 약하거나.*쓰지 않고/);
 });
 
 test('when some of the people present have already heard a story, the character keeps it short for the others', () => {
@@ -192,4 +195,69 @@ test('embedding and database failures are explained and nothing is saved without
       assert.equal(saved, save ? 1 : 0, label);
     });
   }
+});
+
+test('a file of entries is read as jsonl or csv and every problem is reported with its line, before anything is sent', async () => {
+  const { parseCsv, checkEntries } = await import('./import-lounge-knowledge.mjs');
+  assert.deepEqual(parseCsv('\uFEFFa,"b,1","say ""hi"""\r\nx,"two\nlines",\n\n'), [['a', 'b,1', 'say "hi"'], ['x', 'two\nlines', '']]);
+  const csv = ['character,kind,title,content,tags,lesson,category,source_note,as_of,time_sensitive',
+    'lawyer,experience,"첫 사건","사건 이야기, 쉼표 포함","#증거, 질문",교훈,case,,,',
+    'lawyer,knowledge,증거능력,내용,,,,"출처 메모",2025-01-01,true'].join('\n');
+  const good = checkEntries('x.csv', csv, characters);
+  assert.deepEqual(good.problems, []);
+  assert.deepEqual(good.entries.map(item => [item.title, item.kind, item.tags, item.timeSensitive, item.asOf]), [['첫 사건', 'experience', ['증거', '질문'], false, ''], ['증거능력', 'knowledge', [], true, '2025-01-01']]);
+  const jsonl = [JSON.stringify(entry), '{not json', JSON.stringify({ ...entry, kind: 'rumour' }), JSON.stringify(entry), JSON.stringify({ ...entry, content: '연락처 010-1234-5678' })].join('\n');
+  const bad = checkEntries('x.jsonl', jsonl, characters);
+  assert.equal(bad.entries.length, 1);
+  assert.equal(bad.problems.length, 4);
+  assert.match(bad.problems[0], /^2번째 줄: JSON/); assert.match(bad.problems[1], /^3번째 줄.*지식인지 경험인지/);
+  assert.match(bad.problems[2], /^4번째 줄.*같은 제목/); assert.match(bad.problems[3], /^5번째 줄.*전화번호/);
+});
+
+test('Han Ina\'s knowledge file is valid, has no bookshop past and keeps her stories anonymous and in the first person', async () => {
+  const { checkEntries } = await import('./import-lounge-knowledge.mjs');
+  const path = '../docs/lounge-knowledge/ina.jsonl';
+  const { entries, problems } = checkEntries(path, readFileSync(new URL(path, import.meta.url), 'utf8'), lounge.loungeHosts.map(host => host.id));
+  assert.deepEqual(problems, []);
+  assert.equal(entries.length, 42);
+  assert.ok(entries.every(item => item.character === 'ina'));
+  assert.equal(entries.filter(item => item.kind === 'experience').length, 26);
+  assert.equal(entries.filter(item => item.kind === 'knowledge').length, 16);
+  const text = entries.map(item => [item.title, item.content, item.lesson, item.tags.join(' '), item.sourceNote].join(' ')).join('\n');
+  assert.doesNotMatch(text, /서점|느린 페이지/, 'her past is a podcast host and author, not a bookshop');
+  assert.doesNotMatch(text, /https?:|\bAI\b|인공지능/, 'no web addresses, and she never speaks of herself as an AI');
+  // The breakup interview is told only through the lookup (once per person), never from the profile or the room instruction that go into every reply.
+  const { loadTs } = await import('./lounge-ts-loader.mjs');
+  const profile = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const ina = profile.loungeCharacters.find(character => character.id === 'ina');
+  const host = lounge.loungeHosts.find(item => item.id === 'ina');
+  for (const [where, text] of [['profile', profile.loungePersonaPrompt(ina)], ['room instruction', host.instruction], ['one-to-one instruction', host.companion]]) assert.doesNotMatch(text, /떠난 이유|몇 년 동안|예전에 인터뷰했던/, `${where}: no breakup story`);
+  assert.ok(entries.some(item => item.tags.includes('이별') && item.kind === 'experience'), 'the breakup story is an experience of the lookup');
+  assert.match(loungeKnowledgePrompt([{ id: 'x', kind: 'experience', title: 't', content: 'c' }]), /개인적인 부분이라 말씀드리기 어려워요/, 'asked who a story was about, she does not name anyone');
+  for (const item of entries) {
+    assert.ok(item.tags.some(tag => /^HIN-(INT|HARD|METHOD|CANON)-\d{3}$/.test(tag)), `${item.title}: keeps its record id as a tag`);
+    if (item.kind === 'experience') {
+      assert.doesNotMatch(item.content, /이나(는|가|의|에게)/, `${item.title}: told as her own, not about "이나"`);
+      assert.ok(item.lesson && item.category, `${item.title}: an experience has a lesson and a kind`);
+      assert.ok(item.content.length >= 250, `${item.title}: told as a scene (who, what happened, what was said, how it felt), not a summary`);
+    } else assert.ok(item.sourceNote && !item.lesson && !item.category, `${item.title}: a fact has a source note only`);
+  }
+});
+
+test('an upload on a character\'s page is limited to that character, and a file is refused whole when too big or empty', async () => {
+  const { loadTs } = await import('./lounge-ts-loader.mjs');
+  const { checkKnowledgeFile, loungeKnowledgeFileLimits } = loadTs(fileURLToPath(new URL('../src/lib/loungeKnowledgeImport.ts', import.meta.url)));
+  const all = ['ina', 'lawyer'];
+  const line = extra => JSON.stringify({ kind: 'knowledge', title: `제목 ${Math.random()}`, content: '내용', ...extra });
+  // No character in the file: the page's character is used. A different one is refused with its line.
+  const mixed = [line({}), line({ character: 'ina' }), line({ character: 'lawyer' })].join('\n');
+  const result = checkKnowledgeFile('a.jsonl', mixed, all, 'ina');
+  assert.equal(result.entries.length, 2); assert.ok(result.entries.every(item => item.character === 'ina'));
+  assert.deepEqual(result.problems, ['3번째 줄: 캐릭터(lawyer)가 선택한 캐릭터와 달라요.']);
+  assert.match(checkKnowledgeFile('a.jsonl', line({}), all).problems[0], /캐릭터를 선택/, 'without a page character each entry must name one');
+  assert.match(checkKnowledgeFile('a.jsonl', '\n\n', all, 'ina').problems[0], /항목이 없어요/);
+  assert.match(checkKnowledgeFile('a.jsonl', '[1]', all, 'ina').problems[0], /^1번째 줄: 한 줄에 항목 하나/);
+  const many = Array.from({ length: loungeKnowledgeFileLimits.entries + 1 }, () => line({})).join('\n');
+  assert.match(checkKnowledgeFile('a.jsonl', many, all, 'ina').problems[0], /200개까지/);
+  assert.match(checkKnowledgeFile('a.jsonl', 'x'.repeat(loungeKnowledgeFileLimits.bytes + 1), all, 'ina').problems[0], /너무 커요/);
 });

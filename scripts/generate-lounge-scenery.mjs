@@ -18,13 +18,26 @@ const scenes = {
     file: 'embassy-reception-v1.webp',
     prompt: `${common} A refined diplomatic reception lounge at dusk: floor-to-ceiling windows overlooking a wide city river with softly glowing skyline lights and a deep blue-violet sky, a long polished walnut conference table set with white orchids, water glasses and neatly aligned notepads, elegant upholstered chairs, a few softly blurred plain flagpoles with muted silk flags in no recognisable national design, champagne-gold sconces, a pale marble floor with a navy rug. Calm, formal and quietly warm.`,
   },
+  // The 'lawlibrary' theme id is kept for existing rooms; the place is now the private detective's office.
   lawlibrary: {
-    file: 'law-library-v1.webp',
-    prompt: `${common} A private law-firm library after hours: tall dark-oak shelves of leather-bound books, a long dark-wood reading table with green banker's lamps glowing, neat stacks of case files and a fountain pen, leather armchairs, a tall window with rain-streaked glass and soft city lights beyond, a rolling library ladder, warm amber light with deep green and walnut tones. Quiet, focused and slightly dramatic.`,
+    file: 'detective-office-v1.webp',
+    prompt: `${common} A private detective's office late at night: a scarred dark-wood desk with a green banker's lamp glowing, an open notebook, a magnifying glass and a coffee mug, a corkboard on the wall with blurred photographs, pinned notes and red string with no readable text, venetian blinds with stripes of amber and blue city light across the room, a tall rain-streaked window with a neon-lit street beyond, a coat on a wooden hat stand, a worn leather chair and filing cabinets. Warm amber light with deep teal shadows. Quiet, atmospheric and full of mystery.`,
+  },
+  boardroom: {
+    file: 'boardroom-v1.webp',
+    prompt: `${common} A senior executive boardroom on a high floor at blue hour: a long dark walnut table with a thin brass inlay, leather executive chairs, glass water carafes, blank leather folios and neatly placed pens, floor-to-ceiling windows with a deep blue city skyline and a few glowing towers, a dark wall panel with a switched-off wall display, recessed warm ceiling lights reflecting on the polished table, a charcoal carpet and a slim credenza with a single orchid. Quiet, weighty and calm, the feeling of a room where long negotiations end well.`,
+  },
+  cocktailbar: {
+    file: 'cocktail-bar-v1.webp',
+    prompt: `${common} An upscale cocktail bar seen from a seat at the bar counter. In the foreground on the polished dark stone bar top, softly out of focus, two beautifully garnished cocktails: a coupe glass with a pale pink drink and a citrus twist, and a lowball glass with one large clear ice cube and amber whisky, a long bar spoon and a small dish of olives. Behind the counter an illuminated back bar with glass shelves of bottles whose labels are blank, brass fittings, a mirror reflecting warm lights, deep burgundy leather stools, amber and wine-red glow with deep shadows. Intimate, elegant and a little mysterious.`,
+  },
+  theater: {
+    file: 'improv-theater-v1.webp',
+    prompt: `${common} A small black-box improv theatre just before a show: a low empty wooden stage with a scuffed floor lit by one warm spotlight and a soft blue wash, a few mismatched props on the stage (a bentwood chair, a trench coat on a stand, a battered suitcase, a rolled-up rug), a deep burgundy curtain at the back, a handful of rows of worn red velvet seats in the foreground softly out of focus, string lights along the side wall. Playful, warm and full of possibility.`,
   },
 };
 
-const targets = options.only ? options.only.split(',') : Object.keys(scenes);
+const targets =options.only ? options.only.split(',') : Object.keys(scenes);
 const folder = join(tmpdir(), 'lounge-scenery'); mkdirSync(folder, { recursive: true });
 for (const id of targets) {
   const scene = scenes[id];

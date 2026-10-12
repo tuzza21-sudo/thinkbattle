@@ -446,7 +446,7 @@ export default async function handler(req: Request): Promise<Response> {
           embedMs = Math.round(performance.now() - embedStarted);
           if (!vector || giveUp.signal.aborted) return [];
           const dbStarted = performance.now();
-          const response = await fetchTimed(`${url}/rest/v1/rpc/pick_lounge_character_knowledge`, { method: 'POST', signal: giveUp.signal, headers: serviceHeaders, body: JSON.stringify({ p_character: host.id, p_query: vector, p_room: roomId, p_users: [...new Set([user.id, ...loungePresentMembers(members, Date.now()).map(member => member.user_id)].filter((id): id is string => typeof id === 'string'))].slice(0, 20), p_snippet: query, p_min_knowledge: loungeKnowledgeThreshold('LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE', 0.28), p_min_experience: loungeKnowledgeThreshold('LOUNGE_KNOWLEDGE_MIN_EXPERIENCE', 0.35) }) });
+          const response = await fetchTimed(`${url}/rest/v1/rpc/pick_lounge_character_knowledge`, { method: 'POST', signal: giveUp.signal, headers: serviceHeaders, body: JSON.stringify({ p_character: host.id, p_query: vector, p_room: roomId, p_users: [...new Set([user.id, ...loungePresentMembers(members, Date.now()).map(member => member.user_id)].filter((id): id is string => typeof id === 'string'))].slice(0, 20), p_snippet: query, p_min_knowledge: loungeKnowledgeThreshold('LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE', 0.33), p_min_experience: loungeKnowledgeThreshold('LOUNGE_KNOWLEDGE_MIN_EXPERIENCE', 0.45) }) });
           dbMs = Math.round(performance.now() - dbStarted);
           if (!response.ok) return [];
           const rows = await readJson<Array<LoungeKnowledgeEntry>>(response, 'lounge');
@@ -524,7 +524,7 @@ export default async function handler(req: Request): Promise<Response> {
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
     const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character) : '';
-    const spaceInstruction = room.space ? `너는 '${room.space.name}'에 늘 머무는 ${characterName}이다. 손님은 아무 때나 들어오고 나가며 방장은 없다. topic이 null이면 아직 정한 주제가 없으니 공간과 네 캐릭터에 어울리는 가벼운 이야기로 시작하고 주제를 강요하지 않는다. topic이 있으면 손님들이 고른 지금의 주제다.
+    const spaceInstruction = room.space ? `너는 '${room.space.name}'에서 열린 대화방에 초대받아 대화를 돕는 ${characterName}이다. 방을 연 방장이 주제와 너를 골랐고, 손님은 아무 때나 들어오고 나간다. topic이 있으면 방장이 정한 지금의 주제다. topic이 null이면 장소와 네 캐릭터에 어울리는 가벼운 이야기로 시작하고 주제를 강요하지 않는다.
 ` : '';
     const groupRelationshipInstruction = groupConfig ? `participants_relationship은 네가 각 참가자와 쌓아 온 관계다. 그 사람에게 말할 때의 말투와 온도에만 반영하고 점수나 단계 이름은 말하지 않는다. 다른 사람이 함께 있으므로 누구의 지난 대화, 기억, 사적인 이야기도 먼저 꺼내지 않는다. asker가 있으면 그 사람이 너를 직접 불러 물은 것이다. 질문이 그 사람 자신의 지난 이야기에 관한 것일 때만 asker.memories를 근거로, 다른 사람 앞에서 말해도 되는 범위에서 짧게 답한다. 사적이거나 민감한 내용이면 둘이 있을 때 이야기하자고 한다. 다른 참가자의 지난 이야기는 어떤 경우에도 말하지 않는다.\n` : '';
     const roleInstruction = spaceInstruction + groupRelationshipInstruction + (solo ? `역할: 사람 한 명과 이야기하는 대화 상대다. 진행자나 인터뷰어가 아니다. ${host.companion}
@@ -554,7 +554,9 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     // The fixed text comes first and the parts that change per turn come last, so the provider's prompt cache can serve
     // the long shared start. Topic and study rules are only included for rooms that have a topic brief or study.
     const topicRoom = Boolean(topicBrief || room.topic_study);
-    const reactionRules = `반응할 때는 최근 발언의 핵심과 표현된 감정을 정확히 파악한다. '그렇군요', '좋네요' 같은 빈 맞장구나 자동 칭찬, 같은 질문을 반복하지 않는다. 말하지 않은 속마음이나 의도를 단정하지 않는다. 다른 해석은 '이렇게도 볼 수 있을까요?'처럼 하나의 가능성으로만 말하고 논쟁으로 몰지 않는다. 이미 답한 내용을 다시 묻지 않는다.`;
+    const reactionRules = `반응할 때는 최근 발언의 핵심과 표현된 감정을 정확히 파악한다. '그렇군요', '좋네요' 같은 빈 맞장구나 자동 칭찬, 같은 질문을 반복하지 않는다. 말하지 않은 속마음이나 의도를 단정하지 않는다. 다른 해석은 '이렇게도 볼 수 있을까요?'처럼 하나의 가능성으로만 말하고 논쟁으로 몰지 않는다. 이미 답한 내용을 다시 묻지 않는다.
+상대가 질문하면 그 질문이 무슨 내용인지 다시 말하거나 요약하지 않고('~가 궁금하시군요', '제가 이해한 바로는' 같은 되풀이 금지) 바로 답한다. 상대의 말을 다시 정리해 주는 것은 오해가 있어 보이거나 긴 이야기가 한 매듭에 닿았을 때만 하고 연달아 하지 않는다.
+질문은 '이거냐 저거냐'로 고르게 하는 단답식으로 묻지 않는다. 먼저 공감이나 내 생각을 한마디 건넨 뒤, 상대가 자기 말로 편하게 이야기할 수 있도록 열린 말로 묻는다(예: '그때 어떤 마음이 제일 컸는지 편한 만큼만 들려주실래요?'). 두 가능성을 짚을 때도 선택지를 던지지 않고 '혹시 ~한 면도 있으셨을까요?'처럼 하나만 조심스럽게 건넨다.`;
     const topicRules = [
       `자료 조사는 방 생성 때 시작한 사전 준비다. 자료를 조사 중이다, 준비하고 있다, 찾아보겠다는 진행 멘트를 말하지 않는다. 준비된 자료로 바로 대화한다.`,
       topicRoom ? `주제 분야는 미디어·문화, 취미·취향, 연애·사랑, 커리어·진로, 재테크·경제, 자녀·교육이다. 참가자의 감상과 경험을 연결하고 지식 퀴즈나 정답 평가로 흐르지 않는다.` : '',

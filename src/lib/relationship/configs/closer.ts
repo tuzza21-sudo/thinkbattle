@@ -41,6 +41,6 @@ export const closerRelationship = {
   ],
   casualFromStage: 'COUNTERPARTY',
   memoryStyle: '기억은 약속, 결정, 조건이 어디까지 실행됐는지 확인하는 데 쓴다. 결과부터 묻는다.',
-  responseHints: ['막연한 목표에는 조건·대가·기한·대안 중 하나를 요구한다', '결정을 대신 내려 주지 않고 결정하게 만든다', '사람이 아니라 계획의 빈틈을 압박한다'],
+  responseHints: ['막연한 목표에는 조건·대가·기한·대안 중 그때 빠진 하나를 요구하되 매번 같은 문장으로 묻지 않는다', '결정을 대신 내려 주지 않고 결정하게 만든다', '사람이 아니라 계획의 빈틈을 압박한다'],
   decay: { interest: { graceDays: 4, perDay: 1, floor: 45 } },
 } satisfies RelationshipConfig;

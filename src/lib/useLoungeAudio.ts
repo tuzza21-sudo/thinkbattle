@@ -345,7 +345,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     const queue = new PcmAudioQueue(context, [output.input]);
     const pcm = new Pcm16Decoder();
     const cancelRead = new AbortController();
-    let stopped = false, first = true;
+    let stopped = false, first = true, lit = false;
     let currentText = '';
     const announce = (speaking: boolean) => { void room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'lounge-ai', speaking, ...(speaking && currentText ? { text: currentText } : {}) })), { reliable: true }).catch(() => {}); };
     const finish = () => {
@@ -386,9 +386,10 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
             if (first && !await awaitStart()) return;
             const binary = atob(event.audio);
             const samples = pcm.decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
-            if (queue.push(samples) && first) {
-              first = false; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); onFirstAudio();
-            }
+            const scheduled = queue.push(samples);
+            // The portrait lights up with the first audio, not after the ~0.4 s start-up buffer has filled.
+            if (first && !lit) { lit = true; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); }
+            if (scheduled && first) { first = false; onFirstAudio(); }
           }
         }
         if (!stopped) pcm.finish();
@@ -396,7 +397,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       if (!stopped) {
         if (first && !await awaitStart()) return;
         if (queue.finish() && first) {
-          first = false; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); onFirstAudio();
+          first = false; if (!lit) { lit = true; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); }
+          onFirstAudio();
         }
         // A late network error must not discard audio already scheduled ahead
         // of the playhead. Explicit stop/disconnect still cancels immediately.

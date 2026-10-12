@@ -38,7 +38,7 @@ export function LoungeCharacterPage({ id }: { id: string }) {
 
   return <main className={`lounge-character ${night ? 'night' : ''}`} style={{ '--character-accent': host.color } as CSSProperties}>
     <nav className="lounge-character-nav" aria-label="라운지의 인물들">
-      <Link to="/lounge" className="lounge-character-back"><ArrowLeft size={15} /> 상상의 집</Link>
+      <Link to="/lounge" className="lounge-character-back"><ArrowLeft size={15} /> 사석</Link>
       <div>{loungeHosts.map(item => <Link key={item.id} to={`/lounge/characters/${item.id}`} onClick={stop} aria-current={item.id === character.id ? 'page' : undefined} aria-label={`${nameOf(item.id)} · ${item.name}`} title={`${nameOf(item.id)} · ${item.name}`}><LoungeHostPortrait hostId={item.id} /></Link>)}</div>
     </nav>
 
@@ -48,7 +48,7 @@ export function LoungeCharacterPage({ id }: { id: string }) {
         <figcaption>AI로 만든 가상의 인물 사진</figcaption>
       </figure>
       <div className="lounge-character-intro">
-        <span className="lounge-character-eyebrow">{space ? `${space.name}의 주인` : group ? `${group.title} · ${group.subtitle}` : '상상의 집'}</span>
+        <span className="lounge-character-eyebrow">{space ? `${space.name}의 주인` : group ? `${group.title} · ${group.subtitle}` : '사석'}</span>
         <h1>{character.name}<small>{host.name}</small></h1>
         <p className="lounge-character-tagline">{character.tagline}</p>
         <blockquote>“{character.quote}”</blockquote>

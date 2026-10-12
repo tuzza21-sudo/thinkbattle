@@ -1,9 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, Check, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Check, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { loungeHosts } from '../lib/lounge';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { loungeExperienceCategories, loungeExperienceCategoryLabels, loungeKnowledgeKinds, loungeKnowledgeLimits, type LoungeExperienceCategory, type LoungeKnowledgeKind } from '../lib/loungeKnowledge';
+import { loungeExperienceCategories, loungeExperienceCategoryLabels, loungeKnowledgeKinds, loungeKnowledgeLimits, type LoungeExperienceCategory, type LoungeKnowledgeInput, type LoungeKnowledgeKind } from '../lib/loungeKnowledge';
+import { checkKnowledgeFile, loungeKnowledgeFileLimits } from '../lib/loungeKnowledgeImport';
 import { deleteLoungeKnowledge, listLoungeKnowledge, saveLoungeKnowledge, type LoungeKnowledgeRow } from '../lib/loungeKnowledgeApi';
 import './LoungeKnowledge.css';
 
@@ -27,6 +28,10 @@ export function LoungeKnowledgePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // A file chosen for upload, already checked, and how far saving it has got.
+  const [upload, setUpload] = useState<{ name: string; entries: LoungeKnowledgeInput[]; problems: string[] } | null>(null);
+  const [overwrite, setOverwrite] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const formId = useId();
   const name = (id: string) => getLoungeCharacter(id)?.name ?? id;
 
@@ -52,7 +57,7 @@ export function LoungeKnowledgePage() {
   const draftOf = (row: LoungeKnowledgeRow): Draft => ({ id: row.id, kind: row.kind, title: row.title, content: row.content, active: row.active, tags: row.tags.join(', '), lesson: row.lesson ?? '',
     category: (row.category ?? '') as LoungeExperienceCategory | '', sourceNote: row.source_note ?? '', asOf: row.as_of?.slice(0, 10) ?? '', timeSensitive: row.time_sensitive });
 
-  const choose = (id: string) => { if (id === character) return; setCharacter(id); setDraft(emptyDraft()); setNotice(''); setFilter('all'); };
+  const choose = (id: string) => { if (id === character || progress) return; setCharacter(id); setDraft(emptyDraft()); setNotice(''); setFilter('all'); setUpload(null); };
   const submit = async (event: { preventDefault: () => void }) => {
     event.preventDefault();
     if (!valid || saving) return;
@@ -64,6 +69,26 @@ export function LoungeKnowledgePage() {
       reload();
     } catch (err) { setError(errorText(err)); }
     finally { setSaving(false); }
+  };
+  // Titles already saved for this character: a file entry with the same title is the same entry.
+  const savedIds = useMemo(() => new Map((rows ?? []).map(row => [row.title, row.id])), [rows]);
+  const chooseFile = async (file?: File) => {
+    setError(''); setNotice(''); setOverwrite(false);
+    if (!file) { setUpload(null); return; }
+    try { setUpload({ name: file.name, ...checkKnowledgeFile(file.name, await file.text(), loungeHosts.map(host => host.id), character) }); }
+    catch { setUpload(null); setError('파일을 읽지 못했어요.'); }
+  };
+  const plan = upload && !upload.problems.length ? upload.entries.map(entry => ({ entry, id: savedIds.get(entry.title) })) : [];
+  const toSave = plan.filter(item => overwrite || !item.id);
+  const submitUpload = async () => {
+    if (!toSave.length || progress || !rows) return;
+    setError(''); setNotice(''); setProgress({ done: 0, total: toSave.length });
+    let done = 0;
+    try {
+      for (const { entry, id } of toSave) { await saveLoungeKnowledge({ ...entry, ...(id ? { id } : {}) }); done++; setProgress({ done, total: toSave.length }); }
+      setNotice(`${done}건을 저장했어요. 다음 대화부터 반영돼요(최대 1분).`); setUpload(null);
+    } catch (err) { setError(`${done}건을 저장한 뒤 멈췄어요. ${errorText(err)} 같은 파일을 다시 올리면 저장된 항목은 건너뛰어요.`); }
+    finally { setProgress(null); reload(); }
   };
   const edit = (row: LoungeKnowledgeRow) => { setDraft(draftOf(row)); setNotice(''); setError(''); document.getElementById(formId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const toggle = async (row: LoungeKnowledgeRow) => {
@@ -145,6 +170,32 @@ export function LoungeKnowledgePage() {
       {notice && <p className="notice" role="status">{notice}</p>}
       {(error || loaded?.error) && <p className="error" role="alert">{error || loaded?.error}</p>}
     </form>
+
+    <section className="lounge-knowledge-form lounge-knowledge-import" aria-label="파일로 한꺼번에 추가">
+      <h2>파일로 한꺼번에 추가</h2>
+      <p className="hint">{name(character)}의 지식·경험을 <b>.jsonl</b>(한 줄에 항목 하나) 또는 <b>.csv</b> 파일로 올려요. 필드는 위 입력란과 같아요: kind(knowledge 또는 experience), title, content, tags, lesson, category, sourceNote, asOf, timeSensitive. 한 번에 {loungeKnowledgeFileLimits.entries}개까지 올릴 수 있고, 항목마다 입력란과 같은 검사를 해요. 하나라도 틀리면 어느 줄이 왜 틀렸는지 알려 주고 아무것도 저장하지 않아요.</p>
+      <label className="file">
+        <Upload size={16} aria-hidden="true" /> 파일 선택
+        <input type="file" accept=".jsonl,.csv,.txt" disabled={Boolean(progress)} onChange={event => { void chooseFile(event.target.files?.[0]); event.target.value = ''; }} />
+      </label>
+      {upload && <div className="upload-result" aria-live="polite">
+        <strong>{upload.name}</strong>
+        {upload.problems.length > 0 ? <>
+          <p className="error" role="alert">고쳐야 할 곳이 {upload.problems.length}군데 있어요. 파일을 고쳐서 다시 올려 주세요.</p>
+          <ul className="problems">{upload.problems.slice(0, 20).map(problem => <li key={problem}>{problem}</li>)}{upload.problems.length > 20 && <li>… 외 {upload.problems.length - 20}건</li>}</ul>
+        </> : <>
+          <p>항목 {upload.entries.length}개 · 지식 {upload.entries.filter(entry => entry.kind === 'knowledge').length} · 경험 {upload.entries.filter(entry => entry.kind === 'experience').length}. 새로 추가할 항목 {plan.filter(item => !item.id).length}개, 같은 제목이 이미 있는 항목 {plan.filter(item => item.id).length}개.</p>
+          {plan.some(item => item.id) && <label className="check"><input type="checkbox" checked={overwrite} onChange={event => setOverwrite(event.target.checked)} /> 같은 제목이 이미 있으면 파일 내용으로 덮어쓰기 (끄면 건너뛰어요)</label>}
+          <div className="actions">
+            <button type="button" className="primary" disabled={!toSave.length || Boolean(progress) || !rows} onClick={() => void submitUpload()}>
+              {progress ? <LoaderCircle size={16} className="spin" /> : <Plus size={16} />} {progress ? `저장하는 중 ${progress.done}/${progress.total}` : `${toSave.length}개 저장`}
+            </button>
+            <button type="button" disabled={Boolean(progress)} onClick={() => setUpload(null)}><X size={16} /> 취소</button>
+          </div>
+          {progress && <p className="hint">항목마다 검색용 숫자를 만드느라 시간이 걸려요. 끝날 때까지 이 화면을 닫지 마세요.</p>}
+        </>}
+      </div>}
+    </section>
 
     <section className="lounge-knowledge-list" aria-live="polite">
       <div className="head">

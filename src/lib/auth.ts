@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { AppUser } from '../types';
+import type { AppUser, AppUserAgeGroup, AppUserGender } from '../types';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { loadLoungeAvatar } from './loungeAvatar';
 
@@ -9,6 +9,36 @@ export class EmailConfirmationRequiredError extends Error {
 
 type OAuthProvider = 'google' | 'kakao';
 type AppUserProvider = AppUser['provider'];
+
+const readGender = (value: unknown): AppUserGender | undefined => value === 'male' || value === 'female' ? value : undefined;
+
+const ageGroups: readonly AppUserAgeGroup[] = ['20s', '30s', '40s', '50s', '60s'];
+export const readAgeGroup = (value: unknown): AppUserAgeGroup | undefined => ageGroups.find(group => group === value);
+const readText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
+/** The optional profile fields other members see on the profile card. */
+const readProfileFields = (profile: Record<string, unknown>) => ({
+  ageGroup: readAgeGroup(profile.age_group), region: readText(profile.region), bio: readText(profile.bio), showPresence: profile.show_presence !== false,
+});
+export type LoungeProfileInput = { ageGroup?: AppUserAgeGroup | ''; region?: string; bio?: string; showPresence?: boolean };
+/** Saves the member's age group, region, introduction and presence setting. */
+export const saveLoungeProfile = async (user: AppUser, input: LoungeProfileInput): Promise<AppUser> => {
+  const region = input.region?.trim().slice(0, 30) ?? '', bio = input.bio?.trim().slice(0, 200) ?? '';
+  const { error } = await supabase.rpc('update_lounge_profile', { p_age_group: input.ageGroup ?? '', p_region: region, p_bio: bio, p_show_presence: input.showPresence ?? user.showPresence ?? true });
+  if (error) throw new Error('프로필을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  return { ...user, ageGroup: readAgeGroup(input.ageGroup), region: region || undefined, bio: bio || undefined, showPresence: input.showPresence ?? user.showPresence ?? true };
+};
+/** Fields typed on the signup form travel in the sign-up metadata, so they are saved on the first sign-in even when email confirmation came first. */
+const signupFields = (metadata: Record<string, unknown> | undefined): LoungeProfileInput | null => {
+  const ageGroup = readAgeGroup(metadata?.age_group), region = readText(metadata?.region), bio = readText(metadata?.bio);
+  return ageGroup || region || bio ? { ageGroup, region, bio } : null;
+};
+
+/** Saves the gender shown on lounge rooms to the user's own profile. */
+export const saveUserGender = async (user: AppUser, gender: AppUserGender): Promise<AppUser> => {
+  const { error } = await supabase.from('users').update({ gender }).eq('id', user.id);
+  if (error) throw new Error('성별을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  return { ...user, gender };
+};
 
 const oauthErrorParams = ['error', 'error_code', 'error_description'] as const;
 
@@ -104,15 +134,20 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
       };
     }
 
-    return {
+    const current: AppUser = {
       id: user.id,
       email: profile.email,
       nickname: profile.nickname,
       provider: profile.provider,
       isAnonymous: Boolean(user.is_anonymous),
       createdAt: profile.created_at,
+      gender: readGender(profile.gender),
+      ...readProfileFields(profile),
       ...await loadLoungeAvatar(profile.lounge_avatar_path),
     };
+    const pending = signupFields(user.user_metadata);
+    if (pending && !user.is_anonymous && !current.ageGroup && !current.region && !current.bio) return await saveLoungeProfile(current, pending).catch(() => current);
+    return current;
   } catch (e) {
     console.error('Failed to get current user:', e);
     return null;
@@ -120,7 +155,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
 };
 
 
-export const signUpWithEmail = async (email: string, password: string, nickname: string): Promise<AppUser> => {
+export const signUpWithEmail = async (email: string, password: string, nickname: string, gender: AppUserGender, extras: LoungeProfileInput = {}): Promise<AppUser> => {
   const normalizedEmail = email.trim().toLowerCase();
   const trimmedNickname = nickname.trim();
 
@@ -141,7 +176,7 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     email: normalizedEmail,
     password,
     options: {
-      data: { nickname: trimmedNickname },
+      data: { nickname: trimmedNickname, gender, ...(extras.ageGroup ? { age_group: extras.ageGroup } : {}), ...(extras.region?.trim() ? { region: extras.region.trim().slice(0, 30) } : {}), ...(extras.bio?.trim() ? { bio: extras.bio.trim().slice(0, 200) } : {}) },
     },
   });
 
@@ -173,15 +208,21 @@ export const signUpWithEmail = async (email: string, password: string, nickname:
     throw new Error('프로필 생성을 확인할 수 없습니다. 다시 로그인해 주세요.');
   }
 
-  return {
+  const created: AppUser = {
     id: profile.id,
     email: profile.email,
     nickname: profile.nickname,
     provider: profile.provider,
     isAnonymous: false,
     createdAt: profile.created_at,
+    gender: readGender(profile.gender),
+    ...readProfileFields(profile),
     ...await loadLoungeAvatar(profile.lounge_avatar_path),
   };
+  // A database whose signup trigger predates the gender column leaves it empty; the client writes it instead.
+  const withGender = created.gender ? created : await saveUserGender(created, gender).catch(() => created);
+  const hasExtras = Boolean(extras.ageGroup || extras.region?.trim() || extras.bio?.trim());
+  return hasExtras ? saveLoungeProfile(withGender, extras).catch(() => withGender) : withGender;
 };
 
 export const signInWithEmail = async (email: string, password: string): Promise<AppUser> => {
@@ -206,15 +247,19 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     throw new Error(`사용자 프로필을 찾을 수 없습니다: ${profileError?.message || '알 수 없는 에러'}`);
   }
 
-  return {
+  const signedIn: AppUser = {
     id: profile.id,
     email: profile.email,
     nickname: profile.nickname,
     provider: profile.provider,
     isAnonymous: false,
     createdAt: profile.created_at,
+    gender: readGender(profile.gender),
+    ...readProfileFields(profile),
     ...await loadLoungeAvatar(profile.lounge_avatar_path),
   };
+  const pending = signupFields(authData.user.user_metadata);
+  return pending && !signedIn.ageGroup && !signedIn.region && !signedIn.bio ? saveLoungeProfile(signedIn, pending).catch(() => signedIn) : signedIn;
 };
 
 export const signInAsGuest = async (): Promise<AppUser> => {

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
 
@@ -76,17 +76,25 @@ export const createLounge = async (persona: LoungeHostId, topic: string, capacit
 export const listLoungeSpaces = async () => (await loungeRpc<Array<Partial<LoungeSpace> & Pick<LoungeSpace, 'id' | 'name' | 'host_persona' | 'theme'>>>('list_voice_lounge_spaces', {}))
   .map((space): LoungeSpace => ({ capacity: 6, present_count: 0, topic: null, ...space, table_count: space.table_count ?? (space.present_count ? 1 : 0),
     participants: space.participants ?? [], seat_free: space.seat_free ?? true, waiting: space.waiting ?? 0 }));
-/** Opens a table: the space's first, or another one when every table is full. */
-export const openLoungeTable = (spaceId: string, nickname: string) => loungeRpc<string>('open_voice_lounge_table', { p_space: spaceId, p_nickname: nickname });
+/** Opens a room in a place with the owner's topic and the character who helps the conversation. */
+export const openLoungeTable = (spaceId: string, nickname: string, topic: string, persona: LoungeHostId, ages: LoungeAgeGroup[] = []) =>
+  loungeRpc<string>('open_voice_lounge_table', { p_space: spaceId, p_nickname: nickname, p_topic: topic, p_persona: persona, p_ages: ages });
+/** The owner changes the character helping the room. */
+export const setLoungePersona = (roomId: string, persona: LoungeHostId) => loungeRpc<void>('set_voice_lounge_persona', { p_room: roomId, p_persona: persona });
+const fillTable = <T extends Partial<LoungeSpaceTable> & Pick<LoungeSpaceTable, 'id'>>(table: T) =>
+  ({ topic: null, present_count: 0, capacity: 6, mine: false, host_persona: 'jaeseok' as LoungeHostId, male_count: 0, female_count: 0, owner: null, age_groups: [] as LoungeAgeGroup[], ...table, participants: table.participants ?? [] });
+/** Every open room in the house, fullest first among those with a free seat. */
+export const listLoungeOpenTables = async () => (await loungeRpc<Array<Partial<LoungeOpenTable> & Pick<LoungeOpenTable, 'id' | 'space_id' | 'space_name' | 'theme'>>>('list_voice_lounge_open_tables', {}))
+  .map((table): LoungeOpenTable => fillTable(table));
 /** Keeps the visitor's place in line for a full space; returns a table once a seat is free for them. */
 export const waitLoungeSpace = (spaceId: string) => loungeRpc<LoungeSpaceWait>('wait_voice_lounge_space', { p_space: spaceId });
 export const leaveLoungeWait = (spaceId: string) => loungeRpc<void>('leave_voice_lounge_wait', { p_space: spaceId });
 export const listLoungeSpaceTables = async (spaceId: string) => (await loungeRpc<Array<Partial<LoungeSpaceTable> & Pick<LoungeSpaceTable, 'id'>>>('list_voice_lounge_space_tables', { p_space: spaceId }))
-  .map((table): LoungeSpaceTable => ({ topic: null, present_count: 0, capacity: 6, mine: false, ...table, participants: table.participants ?? [] }));
+  .map((table): LoungeSpaceTable => fillTable(table));
 /** Sits at a chosen table if a seat is free (people waiting in line get free seats first). */
 export const enterLoungeTable = (roomId: string, nickname: string) => loungeRpc<string>('enter_voice_lounge_table', { p_room: roomId, p_nickname: nickname });
 /** Solo play: a private one-to-one with the space's character; an unfinished one is continued. */
-export const startLoungeSolo = (spaceId: string, nickname: string) => loungeRpc<string>('start_voice_lounge_solo', { p_space: spaceId, p_nickname: nickname });
+export const startLoungeSolo = (spaceId: string, nickname: string, persona?: LoungeHostId) => loungeRpc<string>('start_voice_lounge_solo', { p_space: spaceId, p_nickname: nickname, ...(persona ? { p_persona: persona } : {}) });
 /** Keeps or takes the AI voice for this table; returns who sends it now. */
 export const claimLoungeBroadcaster = (roomId: string) => loungeRpc<string | null>('claim_voice_lounge_broadcaster', { p_room: roomId });
 export const setLoungeTopic = (roomId: string, topic: string, source: 'ai' | 'member') => loungeRpc<void>('set_voice_lounge_topic', { p_room: roomId, p_topic: topic, p_source: source });
