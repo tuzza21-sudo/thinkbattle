@@ -31,8 +31,9 @@ export async function generateLoungeAvatar(file: File, signal: AbortSignal): Pro
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new Error('로그인 후 사진을 변환해 주세요.');
   const response = await fetch('/api/lounge-avatar', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ image: await toBase64(photo), mimeType: photo.type, consent: true }), signal });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || '사진 변환에 실패했어요.');
+  // A gateway timeout or crash answers with plain text, not JSON.
+  const result = await response.json().catch(() => ({} as { error?: string }));
+  if (!response.ok) throw new Error(result.error || (response.status === 504 ? '사진 변환 시간이 초과됐어요. 잠시 후 다시 시도해 주세요.' : '사진 변환에 실패했어요. 잠시 후 다시 시도해 주세요.'));
   return result;
 }
 export function safeLoungeAvatarUrl(value: unknown): string | undefined {

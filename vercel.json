@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/lounge-interaction.ts": { "maxDuration": 60 }
+    "api/lounge-interaction.ts": { "maxDuration": 60 },
+    "api/lounge-avatar.ts": { "maxDuration": 60 }
   },
   "rewrites": [
     {
