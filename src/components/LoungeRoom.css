@@ -786,3 +786,9 @@
 .lounge-relationship summary span,.lounge-relationship summary strong { white-space:nowrap; writing-mode:horizontal-tb; }
 .lounge-relationship dl { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
 .lounge-relationship dt,.lounge-relationship dd { white-space:nowrap; }
+
+/* phone: inside a room the header is just the centered brand; the leave button lives in the room itself */
+@media (max-width:760px) {
+  .has-room .lounge-back,.has-room .lounge-header-end { display:none; }
+  .has-room .lounge-header { justify-content:center; }
+}
