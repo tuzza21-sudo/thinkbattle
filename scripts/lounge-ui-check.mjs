@@ -138,7 +138,7 @@ try {
   assert.equal(await evaluate("window.hostSampleAudio[1].paused"), true, 'leaving the choices stops sample playback');
   assert.match(await evaluate("document.querySelector('.lounge-moderator-avatar img').getAttribute('src')"), /host-witty-v2/);
   await evaluate("window.Audio=window.originalHostAudio");
-  for (const [theme, asset] of [['rooftop', 'rooftop-city-v2'], ['river', 'river-v1'], ['forest', 'forest-v1'], ['hotel', 'hotel-lounge-v1'], ['cafe', 'rainy-cafe-v1'], ['seaside', 'seaside-terrace-v1']]) {
+  for (const [theme, asset] of [['rooftop', 'rooftop-city-v2'], ['river', 'river-v1'], ['forest', 'jazz-lp-bar-v1'], ['hotel', 'postproduction-suite-v1'], ['cafe', 'rainy-cafe-v1'], ['seaside', 'seaside-terrace-v1']]) {
     for (const width of [1440, 390]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height:1000, deviceScaleFactor:1, mobile:false });
       await send('Page.navigate', {url:`${base}/lounge/preview?capacity=4&theme=${theme}`});

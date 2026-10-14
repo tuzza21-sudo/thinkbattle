@@ -14,13 +14,20 @@ if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in 
 
 const common = 'Use case: photorealistic-natural. Asset type: square profile photo for a fictional AI lounge conversation character. The person is entirely fictional and must not resemble any real person or celebrity. Natural skin texture, realistic lighting, shoulders-up framing with the face centred and filling roughly 60% of the frame, sharp focus on the eyes, soft out-of-focus background, no text, no logos, no watermark, no hands in frame. Tasteful and professional styling.';
 const portraits = {
+  jaeseok: {
+    // 윤태오 (talk show host) was replaced by 임시우, a film director; the id stays so rooms and links keep working.
+    file: 'host-witty-v3.webp',
+    prompt: `${common} A fictional Korean man in his late thirties with an artistic, cinematic presence: a tall slim frame, tousled dark wavy hair with a few silver strands at the temples, light stubble, a strong straight nose and expressive dark eyes with a warm, slightly wistful half-smile, as if he is quietly framing a scene in his mind. He wears a dark charcoal knit sweater under a relaxed black linen jacket, and a small director's viewfinder hangs on a cord at his neck. Background: a softly blurred warm hotel lounge with amber lamps and dark wood. Warm cinematic lighting with gentle contrast.`,
+  },
   auditor: {
-    file: 'host-auditor-v1.webp',
-    prompt: `${common} A fictional Korean man in his late thirties, clean-shaven, short neat dark hair, thin rimless glasses, wearing a charcoal fine-knit sweater over a crisp white collar. Calm, level, slightly skeptical gaze with the faintest dry half-smile, as if weighing an argument. Background: a softly blurred study with bookshelves in cool grey-blue tones. Cool, even, neutral lighting.`,
+    // The economics commentator was replaced by a semiconductor researcher; the id stays so rooms and links keep working.
+    file: 'host-auditor-v3.webp',
+    prompt: `${common} A fictional Korean man in his mid thirties, strikingly handsome in a refined, wholesome way, the kind of man everyone would call the ideal catch: tall and broad-shouldered with a lean athletic build, a clean defined jawline, high straight nose bridge, smooth well-groomed skin, neatly styled black hair with a soft natural wave, thin gold-rimmed glasses, warm deep eyes and a gentle, confident half-smile. Calm, intelligent, kind and quietly magnetic. He wears a crisp white shirt with the collar open and sleeves rolled up, a plain unmarked ID badge on a lanyard at his neck with no logo and no readable text. Background: a softly blurred forest-view lounge at dusk with warm lamp light and green foliage. Soft warm key light with gentle contrast.`,
   },
   closer: {
-    file: 'host-closer-v1.webp',
-    prompt: `${common} A fictional Korean man in his mid forties with short dark hair graying at the temples, a composed commanding presence, wearing a perfectly tailored dark navy suit, white shirt and no tie, a slim steel watch just visible. Steady direct eye contact and a controlled, confident hint of a smile, like a veteran negotiator who never needs to raise his voice. Background: a softly blurred glass-walled boardroom at dusk in warm amber and beige tones. Warm directional key light.`,
+    // Redrawn again (v4) as a charismatic, attractive man in his early forties; v2 read as a gangster and v3 as too old.
+    file: 'host-closer-v4.webp',
+    prompt: `${common} A fictional Korean man in his early forties with magnetic charisma and a strikingly attractive, masculine face: a sharp defined jawline, a faint neat shadow of stubble, a straight strong nose, intense deep dark eyes under confident straight brows that hold the gaze, thick black hair with no grey, styled back with a slight natural wave, healthy clear skin and no wrinkles beyond faint smile lines. Tall with broad shoulders and a lean athletic build. He wears a perfectly tailored dark charcoal suit jacket over a crisp white shirt open at the collar with no tie, a slim steel watch just visible. A calm, assured gaze with a slow, knowing half-smile, a man whose quiet presence fills the room: charismatic, magnetic and attractive, polished and a little dangerous in charm only, never threatening and nothing like a gangster. Background: a softly blurred glass-walled boardroom at dusk in warm amber and deep shadow. Warm directional key light with a subtle rim light, flattering and cinematic.`,
   },
   velvet: {
     file: 'host-velvet-v2.webp',
@@ -31,9 +38,20 @@ const portraits = {
     file: 'host-lawyer-v2.webp',
     prompt: `${common} A fictional Korean man in his mid forties with short dark hair, slightly untidy and graying at the temples, light stubble, lean angular features and sharp, tired but alert dark eyes, wearing a dark grey wool overcoat over a white shirt with an open collar and no tie. Observant and calm with the faintest dry half-smile, as if he has just noticed the detail everyone else missed. Background: a softly blurred private detective's office at night, warm desk lamp glow and thin stripes of light through window blinds, a corkboard in the dark behind him with no readable text. Moody low-key lighting with a warm key light on the face.`,
   },
+  diplomat: {
+    // 윤지안, the social-affairs reporter, took the diplomat's slot; the id stays so rooms and links keep working.
+    file: 'host-reporter-v1.webp',
+    prompt: `${common} A strikingly beautiful fictional Korean woman aged thirty-two with an intelligent, bright and lively presence: refined balanced features, luminous clear skin with a soft natural glow, large dark almond-shaped eyes with a lively spark, softly arched brows, and a hint of a playful smile at one corner of her lips. Her chin is lifted a little, a poised and slightly aloof first impression that looks about to break into a laugh. Glossy dark chestnut hair, long with soft layers and a natural side part falling past the shoulders, small delicate stud earrings, wearing a crisp ivory blouse under a tailored soft-grey blazer. Confident, witty and warm underneath: captivating but approachable. Background: a riverside evening lounge with floor-to-ceiling windows and a softly glowing city skyline in warm amber and blue dusk bokeh. Soft, flattering natural lighting with a gentle rim light on the hair. Elegant magazine-portrait quality, tasteful and not provocative.`,
+  },
+  'diplomat-cute': {
+    // A second, cuter and livelier take on 윤지안 to choose from (the same slot as diplomat: pick one file name for host-reporter-v1.webp).
+    file: 'host-reporter-v2.webp',
+    prompt: `${common} A fictional Korean woman in her early thirties, clearly an adult, with a cute, baby-faced and cheerful look: a soft round face with full apple cheeks, big bright sparkling eyes with gentle double eyelids, a small button nose, and a wide happy smile showing a hint of teeth with faint dimples. Dewy glowing skin with neat peach-pink makeup, soft airy see-through bangs and chestnut-brown medium-length hair with a bouncy natural wave just past the shoulders, small gold hoop earrings. She wears a crisp white shirt under a light pastel-cream blazer. Her whole vibe is lively, playful, charming and approachable, with a mischievous sparkle in her eyes as if she just thought of a joke; polished and glamorous in a healthy, natural, tasteful way. Background: a bright golden-hour riverside lounge with warm bokeh and a hint of the city skyline. Soft flattering light, magazine-portrait quality, wholesome, tasteful and not provocative.`,
+  },
   trickster: {
-    file: 'host-trickster-v1.webp',
-    prompt: `${common} A fictional Korean man in his late twenties with tousled dark hair, a quick mischievous grin with one corner of the mouth higher than the other, bright playful eyes with a raised eyebrow, wearing a mustard-yellow overshirt over a plain white tee. Looks like he just thought of the perfect comeback. Background: softly blurred colourful café lights in warm yellow and teal. Bright, lively, natural daylight.`,
+    // Redrawn (v2) as a charming, stylish young actor; the v1 version read as a comedian.
+    file: 'host-trickster-v2.webp',
+    prompt: `${common} A fictional Korean man in his late twenties who is strikingly charming and handsome, the kind of leading man in a romantic drama: refined balanced features, clear smooth skin, a slim straight nose, long-lashed dark eyes with a warm teasing look, softly tousled dark hair with a natural side-swept fringe styled with care, a faint dimple when he smiles. A relaxed lopsided half-smile with a hint of mischief and self-assurance, a gaze that holds the camera a moment too long. He wears a tailored deep forest-green knit polo-collar sweater under an unbuttoned black wool coat, a thin silver chain just visible at the collar. Background: a softly blurred small theatre foyer with warm golden bulbs and deep red velvet. Soft cinematic key light with a gentle rim light on the hair, polished and magazine-quality but natural.`,
   },
 };
 

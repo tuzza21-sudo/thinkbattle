@@ -66,6 +66,7 @@ try {
   assert.equal(await claim('requested'),null,'requested needs a pending request');
   await as(ids[1]);await assert.rejects(db.query("select request_voice_lounge_moderator($1,'lecture')",[room]),/도움 요청/);
   await db.query("select request_voice_lounge_moderator($1,'question')",[room]);
+  await db.query("select request_voice_lounge_moderator($1,'opinion')",[room]); // the kind added by 20261023000000, replaced by the next choice
   await as(ids[2]);await db.query("select request_voice_lounge_moderator($1,'topic')",[room]);
   let r=await roomRow();assert.equal(r.moderator_request_kind,'topic');assert.equal(r.moderator_requested_by,ids[1]);
   await as(ids[1]);assert.equal(await claim('requested'),null,'only the room owner broadcasts');

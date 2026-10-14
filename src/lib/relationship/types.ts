@@ -45,6 +45,10 @@ export type RelationshipConfig = {
   memoryStyle?: string;
   /** One-to-one speech level: polite until this stage id, casual (banmal) from it on. Absent means polite throughout. Group rooms are always polite. */
   casualFromStage?: string;
+  /** One-to-one rooms only: the character may flirt with the adult user, with suggestive tension and mild sexual undertones but nothing explicit. Without it the shared rule forbids romantic and sexual play. */
+  adultFlirtation?: boolean;
+  /** With `adultFlirtation`: how far this character lets romantic tension show at each stage (stage id to guidance). Sent to the response model beside the stage hint, so the same permission looks different at the first stage and the closest. */
+  stageRomance?: Record<string, string>;
   decay?: Partial<Record<string, DecayRule>>;
   maxGainPerTurn?: Partial<Record<string, number>>;
 };

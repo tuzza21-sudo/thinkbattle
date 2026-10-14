@@ -33,6 +33,8 @@
 .lounge-character-facts>div:last-child:nth-child(odd) { grid-column:1 / -1; }
 .lounge-character-facts dt { font-size:11px; color:var(--c-muted); }
 .lounge-character-facts dd { margin:3px 0 0; font-size:13px; line-height:1.6; }
+.lounge-character-intro .lounge-character-section { margin-top:26px; }
+.lounge-character-intro .lounge-character-story { padding:24px 26px; }
 .lounge-character-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; }
 .lounge-character .lounge-character-cta { display:inline-flex; align-items:center; gap:8px; padding:14px 18px; border-radius:12px; background:var(--c-accent); color:#fff; font-size:14px; font-weight:700; }
 .lounge-character.night .lounge-character-cta { color:#1c121c; }

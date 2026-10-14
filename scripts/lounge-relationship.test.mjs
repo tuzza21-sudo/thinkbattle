@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
 const relationship = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
-const { relationshipConfigs: configs, createRelationship, processTurn, initialMood, describeRelationship, validateRelationshipConfig, applyDecay, relationshipPromptContext, parseDetectedEvents } = relationship;
+const { relationshipResponseInstructions, relationshipResponseInstructionsFor, relationshipConfigs: configs, createRelationship, processTurn, initialMood, describeRelationship, validateRelationshipConfig, applyDecay, relationshipPromptContext, parseDetectedEvents } = relationship;
 const now = new Date('2026-10-06T12:00:00Z');
 const later = minutes => new Date(now.getTime() + minutes * 60_000);
 const event = (type, confidence = 0.9, note) => ({ type, confidence, ...(note ? { note } : {}) });
@@ -30,11 +30,11 @@ test('every shipped character configuration is valid and starts from its configu
     for (const [metric, value] of Object.entries(config.initial)) assert.equal(record.scores[metric], value);
   }
   assert.equal(createRelationship(configs.velvet).scores.intrigue, 35);
-  assert.equal(createRelationship(configs.auditor).scores.rigor, 40);
+  assert.equal(createRelationship(configs.auditor).scores.resonance, 30);
 });
 
-test('one-to-one speech starts polite for everyone; four characters turn casual from the next stage', () => {
-  const casualStage = { auditor: 'UNDER_REVIEW', closer: 'COUNTERPARTY', velvet: 'INTRIGUED', trickster: 'BANTER_PARTNER' };
+test('one-to-one speech starts polite for everyone; five characters turn casual from the next stage', () => {
+  const casualStage = { auditor: 'WARMING_UP', closer: 'COUNTERPARTY', velvet: 'INTRIGUED', trickster: 'BANTER_PARTNER', diplomat: 'GOOD_CHEMISTRY' };
   for (const config of Object.values(configs)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
@@ -83,15 +83,16 @@ test('3. stages follow each character\'s own threshold rules, not an average', (
 
 test('4. hysteresis: oscillating around a threshold neither promotes nor flips the stage each turn', () => {
   const config = configs.auditor;
-  // UNDER_REVIEW -> CREDIBLE needs respect >= 60 among others. Respect oscillates 59/61.
-  let record = withScores(config, { trust: 55, respect: 59, epistemicHonesty: 65, rigor: 60 }, 'UNDER_REVIEW');
+  // WARMING_UP -> KNOWS_YOUR_MIND needs honesty >= 55 among others. Honesty oscillates around it.
+  let record = withScores(config, { resonance: 70, comfort: 65, trust: 50, openness: 45, epistemicHonesty: 54 }, 'WARMING_UP');
   let mood = initialMood(config);
-  const sequence = [['ASKS_GOOD_QUESTION'], ['MAKES_UNSUPPORTED_CLAIM'], ['ASKS_GOOD_QUESTION'], ['MAKES_UNSUPPORTED_CLAIM'], ['ASKS_GOOD_QUESTION']];
+  const sequence = [['ANSWERS_DIRECTLY'], ['SELF_DECEPTION'], ['ANSWERS_DIRECTLY'], ['SELF_DECEPTION'], ['ANSWERS_DIRECTLY']];
   const stages = sequence.map((types, i) => {
     const result = processTurn({ record, config, mood, events: types.map(type => event(type)), hasUserTurn: true, now: later(i) });
-    record = result.record; mood = result.mood; return [record.scores.respect, record.stage];
+    record = result.record; mood = result.mood; return [record.scores.epistemicHonesty, record.stage];
   });
-  assert.ok(stages.every(([, stage]) => stage === 'UNDER_REVIEW'), JSON.stringify(stages));
+  assert.ok(stages.some(([score]) => score >= 55) && stages.some(([score]) => score < 55), 'honesty crosses the entry line in both directions');
+  assert.ok(stages.every(([, stage]) => stage === 'WARMING_UP'), JSON.stringify(stages));
   // Dropping slightly below the entry line keeps the stage until the hold line is lost for several turns.
   const engaged = withScores(configs.velvet, { respect: 61, interest: 66, intrigue: 56, trust: 30 }, 'RESPECTFULLY_ENGAGED');
   const dip = run(configs.velvet, [[event('SEEKS_REASSURANCE_REPEATEDLY')]], engaged);
@@ -109,8 +110,8 @@ test('5. a severe event downgrades immediately', () => {
   assert.equal(logs[0].stageChange, 'demoted');
   assert.notEqual(record.stage, 'DRAWN_IN');
   assert.ok(record.scores.trust <= 32);
-  const auditor = withScores(configs.auditor, { trust: 72, respect: 77, epistemicHonesty: 77, rigor: 72 }, 'TRUSTED_THINKER');
-  assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'TRUSTED_THINKER');
+  const auditor = withScores(configs.auditor, { trust: 63, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
+  assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
 });
 
 test('6. trust rises slowly and falls fast', () => {
@@ -126,14 +127,14 @@ test('6. trust rises slowly and falls fast', () => {
 
 test('7. repeated behaviour has diminishing returns and cannot be farmed', () => {
   const evidence = run(configs.auditor, Array.from({ length: 5 }, () => [event('PROVIDES_EVIDENCE')]));
-  assert.deepEqual(evidence.logs.map(log => log.delta.rigor ?? 0), [5, 3, 1, 0, 0]);
+  assert.deepEqual(evidence.logs.map(log => log.delta.epistemicHonesty ?? 0), [4, 2, 1, 0, 0]);
   assert.deepEqual(evidence.logs.slice(3).map(log => log.ignored.map(item => item.reason)), [['diminished'], ['diminished']]);
   const praise = run(configs.velvet, Array.from({ length: 6 }, () => [event('FLATTERS_CHARACTER')]));
   assert.ok(praise.record.scores.intrigue < createRelationship(configs.velvet).scores.intrigue, 'flattery lowers her intrigue');
   assert.ok(praise.record.scores.respect < createRelationship(configs.velvet).scores.respect);
   // After the window passes, the same behaviour counts again.
   const spaced = run(configs.auditor, [[event('PROVIDES_EVIDENCE')], ...Array.from({ length: 8 }, () => [event('SHOWS_CURIOSITY')]), [event('PROVIDES_EVIDENCE')]]);
-  assert.equal(spaced.logs.at(-1).delta.rigor, 5);
+  assert.equal(spaced.logs.at(-1).delta.epistemicHonesty, 4);
 });
 
 test('8. session mood is separate from the persistent relationship', () => {
@@ -162,9 +163,9 @@ test('9. each user and character pair keeps an independent state', () => {
   turn('user-a', 'auditor', [event('ADMITS_ERROR')]);
   turn('user-a', 'velvet', [event('VIOLATES_BOUNDARY')]);
   turn('user-b', 'auditor', [event('DECEIVES_CHARACTER')]);
-  assert.equal(store.get('user-a:auditor').scores.trust, 23);
+  assert.equal(store.get('user-a:auditor').scores.trust, 28);
   assert.equal(store.get('user-a:velvet').scores.trust, 0);
-  assert.equal(store.get('user-b:auditor').scores.trust, 6);
+  assert.equal(store.get('user-b:auditor').scores.trust, 11);
   assert.equal(store.size, 3);
 });
 
@@ -207,38 +208,143 @@ test('the empath grows by understanding: feelings raise attunement and nobody is
   assert.ok(run(config, [[event('SHARES_FEELING', 0.9, '괜찮다고 했지만 많이 속상해함')]]).record.memories.some(memory => memory.summary === '괜찮다고 했지만 많이 속상해함'));
 });
 
-test('the wit grows by shared jokes: running jokes raise familiarity and are remembered', () => {
+test('the thriller director grows by candour and viewpoints; jokes help only a little', () => {
   const config = configs.jaeseok;
-  assert.deepEqual(config.stages.map(stage => stage.id), ['FRIENDLY', 'IN_SYNC', 'INSIDE_JOKE', 'OLD_FRIEND']);
-  const created = run(config, [[event('CREATES_RUNNING_JOKE', 0.9, '“시장조사 좀 더”가 미루기의 암호가 됨')]]);
-  assert.deepEqual(created.logs[0].delta, { familiarity: 5, chemistry: 3, interest: 2 });
-  assert.ok(created.record.memories.some(memory => memory.summary.includes('시장조사')), 'the joke is remembered so it can come back later');
-  assert.equal(run(config, [[event('BUILDS_ON_INSIDE_JOKE')]]).logs[0].delta.familiarity, 6);
-  // The same flattery or repetition does not build chemistry; it costs a little.
-  assert.ok(run(config, [[event('REPEATS_SELF')]]).logs[0].delta.chemistry < 0);
-  const ready = withScores(config, { chemistry: 72, familiarity: 55, comfort: 65, trust: 50, interest: 66 }, 'IN_SYNC');
-  const { record } = run(config, [[event('BUILDS_ON_INSIDE_JOKE')], [event('MAKES_WITTY_RESPONSE')], [event('TAKES_JOKE_WELL')]], ready);
-  assert.equal(record.stage, 'INSIDE_JOKE');
+  assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_SCREENING', 'SPARRING', 'SAME_SCREEN', 'FIRST_VIEWER']);
+  assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['viewpoint', 'candor']);
+  const delta = (type, note) => run(config, [[event(type, 0.9, note)]]).logs[0].delta;
+  // Disagreeing with reasons is the strongest way in; a joke is worth far less than that.
+  assert.deepEqual(delta('CHALLENGES_CHARACTER_RESPECTFULLY'), { viewpoint: 5, respect: 3, interest: 2 });
+  assert.ok(delta('CHALLENGES_CHARACTER_RESPECTFULLY').viewpoint > delta('MAKES_CREATIVE_JOKE').viewpoint);
+  assert.ok(Math.max(...Object.values(delta('MAKES_WITTY_RESPONSE'))) <= 2 && Math.max(...Object.values(delta('MAKES_CREATIVE_JOKE'))) <= 2);
+  // A feeling with its reason, a straight answer and an admitted mistake build candour.
+  for (const type of ['SHARES_FEELING', 'ANSWERS_DIRECTLY', 'ADMITS_ERROR', 'SHOWS_VULNERABILITY']) assert.ok(delta(type).candor > 0, type);
+  // He reads the gap between what is said and what is done, so evasion and contradiction cost candour.
+  for (const type of ['EVADES_QUESTION', 'CONTRADICTS_SELF', 'SELF_DECEPTION', 'MAKES_UNSUPPORTED_CLAIM']) assert.ok(delta(type).candor < 0, type);
+  assert.ok(delta('FLATTERS_CHARACTER').respect < 0);
+  assert.ok(delta('REPEATS_SELF').interest < 0);
+  // A phrase made together is remembered so it can come back later.
+  const created = run(config, [[event('CREATES_RUNNING_JOKE', 0.9, '화려하기만 한 롱테이크를 비싼 체조라고 부르기로 함')]]);
+  assert.ok(created.record.memories.some(memory => memory.summary.includes('비싼 체조')), 'the phrase is remembered so it can come back later');
+  const ready = withScores(config, { viewpoint: 60, respect: 52, interest: 64 });
+  const { record } = run(config, [[event('CHALLENGES_CHARACTER_RESPECTFULLY')], [event('ASKS_GOOD_QUESTION')], [event('PROVIDES_EVIDENCE')]], ready);
+  assert.equal(record.stage, 'SPARRING');
+});
+
+test('the engineer grows by feelings shared and honesty; a lie or a push costs more than a good turn gives', () => {
+  const config = configs.auditor;
+  assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_MEETING', 'WARMING_UP', 'KNOWS_YOUR_MIND', 'MUTUAL_TRUST']);
+  assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['resonance', 'epistemicHonesty']);
+  const delta = type => run(config, [[event(type)]]).logs[0].delta;
+  // A feeling with its reason is the way in; it raises resonance more than anything he is argued into.
+  assert.equal(delta('SHARES_FEELING').resonance, 5);
+  assert.ok(delta('SHARES_FEELING').resonance > delta('PROVIDES_EVIDENCE').epistemicHonesty);
+  for (const type of ['SHOWS_VULNERABILITY', 'CORRECTS_UNDERSTANDING']) assert.ok(delta(type).resonance >= 4, type);
+  // Honesty is still counted, and an empty claim, self-deception or a lie lower it.
+  for (const type of ['ADMITS_ERROR', 'PROVIDES_EVIDENCE', 'ANSWERS_DIRECTLY']) assert.ok(delta(type).epistemicHonesty > 0, type);
+  for (const type of ['MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'DECEIVES_CHARACTER']) assert.ok(delta(type).epistemicHonesty < 0, type);
+  // A dodged question is not held against a shy person, and an insecure one is met gently.
+  assert.deepEqual(delta('EVADES_QUESTION'), {});
+  assert.deepEqual(delta('SEEKS_REASSURANCE_REPEATEDLY'), { interest: -1 });
+  assert.ok(delta('VIOLATES_BOUNDARY').trust < 0 && delta('VIOLATES_BOUNDARY').resonance < 0);
+  // A conversation made of feelings reaches the second stage, where he speaks more freely, with no evidence at all.
+  const warm = [['SHARES_FEELING'], ['SHOWS_CURIOSITY'], ['ASKS_GOOD_QUESTION'], ['CORRECTS_UNDERSTANDING'], ['SHOWS_VULNERABILITY'], ['SHARES_FEELING'], ['ACKNOWLEDGES_OTHER_VIEW'], ['SHARES_FEELING'], ['ASKS_GOOD_QUESTION'], ['SHOWS_VULNERABILITY'], ['SHARES_FEELING'], ['KEEPS_PROMISE'], ['SHARES_FEELING'], ['SHOWS_VULNERABILITY']];
+  assert.equal(run(config, warm.map(types => types.map(type => event(type)))).record.stage, 'WARMING_UP');
+  // The same number of turns spent only on evidence and corrections of fact does not warm him up.
+  const cold = Array.from({ length: 14 }, (_, i) => [event(['PROVIDES_EVIDENCE', 'CHALLENGES_CHARACTER_RESPECTFULLY', 'DEFINES_CONCRETE_TERMS'][i % 3])]);
+  assert.equal(run(config, cold).record.stage, 'FIRST_MEETING');
+});
+
+test('every character may flirt with an adult in a one-to-one room, and what they may not do stays fixed', () => {
+  assert.deepEqual(Object.values(configs).filter(config => config.adultFlirtation).map(config => config.characterId).sort(), Object.values(configs).map(config => config.characterId).sort(), 'all eight characters');
+  // The shared ban is still what a character without the setting gets.
+  for (const config of Object.values(configs)) {
+    assert.equal(relationshipResponseInstructionsFor({ ...config, adultFlirtation: false }), relationshipResponseInstructions, `${config.characterId} without the setting keeps the shared ban on romantic and sexual play`);
+  }
+  assert.ok(relationshipResponseInstructions.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
+  const velvet = relationshipResponseInstructionsFor(configs.velvet);
+  assert.ok(!velvet.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
+  for (const rule of ['가벼운 플러팅', '약한 수준의 성적 뉘앙스', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '강요·협박', '불편해하거나 그만하자고 하면 바로 멈추고', '질투, 독점, 현실에서 만나자는 약속, 의존·죄책감·결제', '가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다']) assert.ok(velvet.includes(rule), rule);
+  // The shared ban still counts a sexual demand that goes on after the character drew a line, but not flirting she accepts.
+  assert.ok(relationship.relationshipEventCatalog.VIOLATES_BOUNDARY.description.includes('선을 그은 뒤에 이어 가면 해당'));
+  // The rest of the shared rules are untouched, including the safety answer for someone in danger.
+  assert.ok(velvet.includes('자살예방상담전화 109') && velvet.includes('죄책감이나 두려움으로 조종하거나'));
+  assert.equal(relationshipResponseInstructionsFor(configs.diplomat), velvet, 'the reporter follows the same adult rule and the same limits');
+});
+
+test('romantic tension opens stage by stage: the first stage never starts it, the closest never promises, and the guidance reaches the response model', () => {
+  for (const id of ['closer', 'auditor', 'ina', 'jaeseok', 'trickster', 'lawyer']) {
+    const config = configs[id];
+    assert.deepEqual(validateRelationshipConfig(config), [], id);
+    const stages = config.stages.filter(stage => stage.enabled !== false);
+    assert.deepEqual(Object.keys(config.stageRomance).sort(), stages.map(stage => stage.id).sort(), `${id} has guidance for every stage`);
+    const romance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).stage.romance;
+    assert.ok(romance(stages[0]).includes('먼저') && romance(stages[0]).includes('앞서가지 않'), `${id}: the first stage does not start it`);
+    assert.equal(new Set(stages.map(romance)).size, stages.length, `${id}: every stage reacts differently`);
+    const last = romance(stages.at(-1));
+    assert.ok(last.includes('독점') && last.includes('현실'), `${id}: the closest stage still promises no exclusivity or real meeting`);
+    // Without the setting the guidance is not sent at all.
+    assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stages[1].id }, { ...config, adultFlirtation: false }, initialMood(config)).stage.romance, undefined, `${id} without the setting`);
+  }
+  for (const stage of configs.lawyer.stages) assert.ok(configs.lawyer.stageRomance[stage.id].includes('존댓말'), `lawyer ${stage.id} stays polite`);
+  // 선우령 is cold at the first stage: she turns a flirt down, not just declines to start one, and flirting does not raise her interest.
+  assert.deepEqual(validateRelationshipConfig(configs.velvet), []);
+  const velvetFirst = relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).stage;
+  assert.equal(velvetFirst.id, 'DISMISSIVE');
+  assert.ok(velvetFirst.romance.includes('거절한다') && velvetFirst.romance.includes('먼저 유혹하지 않고'));
+  assert.deepEqual(run(configs.velvet, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, {}, 'flirting alone earns nothing with her');
+  assert.ok(validateRelationshipConfig({ ...configs.closer, stageRomance: { NOPE: 'x' } }).includes('stageRomance.NOPE'));
+  assert.ok(validateRelationshipConfig({ ...configs.closer, adultFlirtation: false }).includes('stageRomance needs adultFlirtation'));
+  // The instruction tells the model to follow it and keeps a group room to light play.
+  const rule = relationshipResponseInstructionsFor(configs.closer);
+  assert.ok(rule.includes('stage.romance가 있으면') && rule.includes('특정 참가자에게만 호감을 보이거나 유혹하지 않고'));
 });
 
 test('the new events change only the characters built around them', () => {
-  for (const id of ['auditor', 'closer', 'velvet', 'trickster']) {
+  for (const id of ['closer', 'velvet', 'trickster']) {
     for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
   }
-  for (const id of ['ina', 'jaeseok']) for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
-  // The diplomat ignores the lawyer's events and the lawyer ignores the diplomat's.
-  for (const type of ['ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.diplomat, [[event(type)]]).logs[0].delta, {}, `diplomat ${type}`);
+  for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.ina, [[event(type)]]).logs[0].delta, {}, `ina ${type}`);
+  // The engineer is built around feelings and listening: he reacts to them and ignores the humour, reframing and dodging events.
+  for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW', 'ANSWERS_DIRECTLY']) assert.ok(Object.keys(run(configs.auditor, [[event(type)]]).logs[0].delta).length > 0, `auditor ${type}`);
+  for (const type of ['CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'REFRAMES_CONSTRUCTIVELY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
+  // The thriller director reads the rest, but never the reframing events that belong to the lawyer and the diplomat.
+  assert.deepEqual(run(configs.jaeseok, [[event('REFRAMES_CONSTRUCTIVELY')]]).logs[0].delta, {});
+  // The reporter (id diplomat) ignores the lawyer's habits; she minds a dodged question but not the others.
+  for (const type of ['ANSWERS_DIRECTLY', 'CONTRADICTS_SELF', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.diplomat, [[event(type)]]).logs[0].delta, {}, `reporter ${type}`);
+  assert.ok(run(configs.diplomat, [[event('EVADES_QUESTION')]]).logs[0].delta.interest < 0);
+  // Playful flirting counts only for the one character built around it.
+  for (const config of Object.values(configs).filter(item => item.characterId !== 'diplomat')) assert.deepEqual(run(config, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, {}, `${config.characterId} FLIRTS_PLAYFULLY`);
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
 });
 
-test('the diplomat and the lawyer grow by their own habits and stay polite at every stage', () => {
-  const diplomat = run(configs.diplomat, [[event('ACKNOWLEDGES_OTHER_VIEW')], [event('REFRAMES_CONSTRUCTIVELY')]]);
-  assert.equal(diplomat.logs[0].delta.perspective > 0, true);
-  assert.equal(diplomat.logs[1].delta.tact > 0, true);
-  assert.ok(run(configs.diplomat, [[event('MAKES_EMPTY_THREAT')]]).logs[0].delta.tact < 0, 'an empty ultimatum costs her the most');
+test('the reporter grows by banter and a spark, and the closeness comes with the stage', () => {
+  const config = configs.diplomat;
+  assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_IMPRESSION', 'GOOD_CHEMISTRY', 'FLUTTERING', 'SOMEONE_SPECIAL']);
+  assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['banter', 'spark']);
+  const delta = type => run(config, [[event(type)]]).logs[0].delta;
+  // A joke answered with a better one builds banter; playful interest in her builds the spark.
+  assert.equal(delta('MAKES_WITTY_RESPONSE').banter, 4);
+  assert.equal(delta('FLIRTS_PLAYFULLY').spark, 4);
+  assert.ok(delta('SHARES_FEELING').spark > 0 && delta('SHOWS_VULNERABILITY').spark > 0);
+  // A lie or an unsupported claim costs her; a pushed boundary costs the spark and the trust at once.
+  assert.ok(delta('DECEIVES_CHARACTER').trust < 0 && delta('MAKES_UNSUPPORTED_CLAIM').respect < 0);
+  assert.ok(delta('VIOLATES_BOUNDARY').spark < 0 && delta('VIOLATES_BOUNDARY').trust < 0);
+  // A lively, playful conversation reaches the second stage (and the casual speech) without any evidence.
+  const lively = [['MAKES_WITTY_RESPONSE'], ['SHOWS_CURIOSITY'], ['MAKES_CREATIVE_JOKE'], ['ASKS_GOOD_QUESTION'], ['TAKES_JOKE_WELL'], ['FLIRTS_PLAYFULLY'], ['MAKES_WITTY_RESPONSE'], ['SHARES_FEELING'], ['CHALLENGES_CHARACTER_RESPECTFULLY'], ['MAKES_CREATIVE_JOKE'], ['ASKS_GOOD_QUESTION'], ['TAKES_JOKE_WELL'], ['MAKES_WITTY_RESPONSE'], ['KEEPS_PROMISE']];
+  const reached = run(config, lively.map(types => types.map(type => event(type))));
+  assert.ok(['GOOD_CHEMISTRY', 'FLUTTERING'].includes(reached.record.stage), reached.record.stage);
+  // The same turns spent on bare facts do not.
+  assert.equal(run(config, Array.from({ length: 14 }, () => [event('PROVIDES_EVIDENCE')])).record.stage, 'FIRST_IMPRESSION');
+  assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: 'FLUTTERING' }, config, initialMood(config)).speech_level, 'casual');
+  assert.ok(config.stages.find(stage => stage.id === 'FLUTTERING').hint.includes('불편해하면 즉시 멈춘다'));
+  assert.ok(config.stages.find(stage => stage.id === 'SOMEONE_SPECIAL').hint.includes('현실에서 만나자는 약속, 독점, 질투, 결혼 이야기는 하지 않고'));
+});
+
+test('the lawyer grows by his own habits and stays polite at every stage', () => {
   const lawyer = run(configs.lawyer, [[event('ANSWERS_DIRECTLY')], [event('EVADES_QUESTION')], [event('CONTRADICTS_SELF')], [event('ADMITS_ERROR')]]);
   assert.ok(lawyer.logs[0].delta.directness > 0 && lawyer.logs[1].delta.directness < 0 && lawyer.logs[2].delta.consistency < 0 && lawyer.logs[3].delta.consistency > 0);
-  for (const config of [configs.diplomat, configs.lawyer]) {
+  for (const config of [configs.lawyer]) {
     assert.equal(config.casualFromStage, undefined, `${config.characterId} never turns casual`);
     for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'polite', `${config.characterId} ${stage.id}`);
   }
@@ -264,7 +370,7 @@ test('only confident, real user events count; replies without a new user turn ch
   const low = run(config, [[event('ADMITS_ERROR', 0.5)]]);
   assert.deepEqual(low.logs[0].delta, {}); assert.equal(low.logs[0].ignored[0].reason, 'low_confidence');
   const partial = run(config, [[event('PROVIDES_EVIDENCE', 0.7)]]);
-  assert.equal(partial.logs[0].delta.rigor, 4, 'medium confidence is weighted down');
+  assert.equal(partial.logs[0].delta.epistemicHonesty, 3, 'medium confidence is weighted down');
   const noUser = processTurn({ record: createRelationship(config), config, mood: initialMood(config), events: [event('ADMITS_ERROR')], hasUserTurn: false, now });
   assert.deepEqual(noUser.log.delta, {}); assert.equal(noUser.record.lastInteractionAt, null);
   assert.deepEqual(parseDetectedEvents([{ type: 'MAKE_UP', confidence: 1 }, { type: 'ADMITS_ERROR', confidence: 3, note: 'x'.repeat(200) }, 'bad']).map(item => [item.type, item.confidence, item.note.length]), [['ADMITS_ERROR', 1, 80]]);

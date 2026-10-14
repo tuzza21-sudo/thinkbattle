@@ -14,9 +14,21 @@ if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in 
 
 const common = 'Use case: photorealistic-natural. Asset type: wide 3:2 background photograph for a voice conversation app, an empty, inviting interior with no people. Premium editorial interior photography, warm cinematic lighting, realistic materials, shallow depth of field with the foreground softly out of focus, the centre of the frame calm and uncluttered. No people, no text, no logos, no watermark, no readable signs.';
 const scenes = {
+  // The 'embassy' theme id is kept for existing rooms; the place is now the reporter's rooftop rest garden on top of a newspaper building
+  // (the old diplomatic reception scene is embassy-reception-v1.webp, kept with the shelved diplomat).
   embassy: {
-    file: 'embassy-reception-v1.webp',
-    prompt: `${common} A refined diplomatic reception lounge at dusk: floor-to-ceiling windows overlooking a wide city river with softly glowing skyline lights and a deep blue-violet sky, a long polished walnut conference table set with white orchids, water glasses and neatly aligned notepads, elegant upholstered chairs, a few softly blurred plain flagpoles with muted silk flags in no recognisable national design, champagne-gold sconces, a pale marble floor with a navy rug. Calm, formal and quietly warm.`,
+    file: 'newsroom-rooftop-v1.webp',
+    prompt: `${common} A quiet rooftop rest garden on top of a newspaper office building just after the evening deadline, at blue hour: a warm wooden deck with low planters of ornamental grasses and small potted trees, a few wooden benches and a small round table in the foreground softly out of focus with two paper coffee cups and a folded newspaper with no readable text, strings of warm bulb lights overhead, a low glass railing and a wide view over a glowing city skyline and a river, a softly lit office window below with a few desks and monitors glowing, a dusk sky fading from amber to deep blue, a vending machine glowing in the corner, a calm relaxed after-work mood, the centre of the frame open and uncluttered.`,
+  },
+  // The 'hotel' theme id is kept for existing rooms; the place is now the film director's post-production suite before dawn.
+  hotel: {
+    file: 'postproduction-suite-v1.webp',
+    prompt: `${common} A film post-production editing suite in the hour before dawn: a dim room lit mostly by the cool blue-white glow of two large monitors showing an abstract paused multi-track timeline with no readable text and no recognisable film frame, an editing console with a jog wheel and a keyboard, studio headphones resting on the desk, a half-finished cup of coffee going cold on the desk edge in the foreground softly out of focus, a worn leather sofa behind, shelves with hard drives and film canisters, a small desk lamp casting a warm amber pool of light, a window with blinds showing the first faint blue light of dawn over a city skyline, neatly coiled cables, a soft haze, a moody thriller-director atmosphere, the centre of the frame calm and open.`,
+  },
+  // The 'forest' theme id is kept for existing rooms; the place is now an old LP jazz bar after midnight.
+  forest: {
+    file: 'jazz-lp-bar-v1.webp',
+    prompt: `${common} An old LP jazz bar after midnight: a warm wood-panelled room with floor-to-ceiling shelves of vinyl records, a vintage turntable with a spinning record on the bar counter in the foreground softly out of focus beside a lowball glass of amber whisky and a small candle, a pair of large vintage speakers, brass pendant lamps with a warm glow, a small low stage with an upright bass and a saxophone on a stand, leather stools along a long wooden bar, framed black-and-white photographs with no readable text, a rain-streaked window with blurred neon lights outside, a calm intimate late-night mood, the centre of the frame open and uncluttered.`,
   },
   // The 'lawlibrary' theme id is kept for existing rooms; the place is now the private detective's office.
   lawlibrary: {

@@ -96,7 +96,8 @@ test('found entries become one block, split into knowledge and experience, and n
   const text = loungeKnowledgePrompt([{ id: '1', kind: 'knowledge', title: 'A', content: 'a' }, { id: '2', kind: 'experience', title: 'B', content: 'b', lesson: '교훈 하나' }, { id: '3', kind: 'knowledge', title: 'C', content: 'c' }], now);
   assert.ok(text.includes('[전문 지식]\n- A: a\n- C: c') && text.includes('[겪은 일]\n- B: b (교훈: 교훈 하나)'));
   assert.ok(text.includes('그대로 읽거나 베끼지 말고'));
-  assert.ok(text.includes('실제 회사·브랜드·기관·실존 인물·사건의 이름') && text.includes('일반화한다'), 'names and personal details are generalised, not read out');
+  assert.ok(text.includes('연락처 같은 개인정보는 말하지 않는다') && text.includes('역할로 말한다'), 'personal details are not read out and people in a story are told by role');
+  assert.ok(text.includes('널리 알려진 역사적 사건과 공적 인물·기관의 이름은 적힌 그대로 말해도 된다') && text.includes('없는 대사나 사생활, 소문을 덧붙이지 않으며'), 'a famous historical case may be named, but only with what the card says');
   assert.ok(!loungeKnowledgePrompt([{ id: '1', kind: 'knowledge', title: 'A', content: 'a' }], now).includes('[겪은 일]'));
 });
 
