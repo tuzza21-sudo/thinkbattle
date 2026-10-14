@@ -5,6 +5,7 @@ import './components/HomeStudio.css';
 import './components/ServiceStudio.css';
 import { AuthModal } from './components/AuthModal';
 import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
+import { initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
 import {
@@ -86,6 +87,13 @@ function App() {
       ? '사석 — 진짜 대화는 사석에서'
       : pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
   }, [normalizedPath]);
+
+  // Ad measurement: the pixel starts once, every screen counts as a page view, and a new member counts once.
+  useEffect(() => { initMetaPixel(); }, []);
+  useEffect(() => { trackMetaPageView(); }, [pathname]);
+  useEffect(() => {
+    if (user && !user.isAnonymous && Date.now() - Date.parse(user.createdAt) < 7 * 86_400_000) trackMetaOnce('CompleteRegistration', user.id);
+  }, [user]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'dark');

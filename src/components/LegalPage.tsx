@@ -17,6 +17,7 @@ const privacySections = [
   ['외부 처리', '서비스 제공을 위해 인증과 데이터 보관(Supabase), AI 답변 생성·음성 전사·음성 합성(OpenAI), 소셜 로그인(카카오·구글), 서비스 호스팅 업무의 일부를 국내외 전문 서비스 제공자에게 위탁할 수 있습니다. 이 경우 필요한 범위의 정보만 처리하고 계약과 접근 통제를 통해 보호하며, 법령상 별도 공개 또는 동의가 필요한 사항은 해당 화면이나 정책을 통해 안내합니다.'],
   ['이용자의 권리', '이용자는 자신의 개인정보 열람·정정·삭제·처리정지 및 동의 철회를 요청할 수 있습니다. 프로필 사진은 언제든 바꾸거나 지울 수 있습니다.'],
   ['안전성 확보', '개인정보에 대한 접근 권한 제한, 비공개 저장, 전송 구간 보호와 사용량 제한 등 필요한 안전조치를 적용합니다.'],
+  ['광고 성과 측정', '사석은 광고 성과를 측정하기 위해 메타(Meta Platforms)의 픽셀과 전환 API를 사용합니다. 방문한 화면, 가입 완료·첫 대화·일정 시간 이상 이어진 대화 같은 이용 행동, 광고 클릭 정보와 브라우저 식별값(쿠키), 가입한 회원의 경우 암호화(해시)한 이메일과 계정 식별값이 메타로 전송됩니다. 대화 내용, 음성, 프로필 소개는 전송하지 않습니다. 브라우저의 "추적 안 함" 설정으로 거부할 수 있고, 메타의 광고 설정에서 맞춤 광고를 끌 수 있습니다.'],
   ['개인정보 문의', '개인정보 보호 담당자: 최석빈 · 문의: ask.saseok@gmail.com · 주소: 서울시 서초구 사임당로8길 13, 4층 402-331A호'],
 ];
 
@@ -43,6 +44,7 @@ const englishPrivacy = [
   ['External processing', 'We may use domestic or overseas specialist providers for authentication and data hosting (Supabase), AI replies, speech transcription and synthesis (OpenAI), social sign-in (Kakao, Google) and service hosting. We limit processing to what is necessary and provide any additional notice or consent required by applicable law.'],
   ['Your choices and rights', 'You may request access, correction, deletion or restriction of your information and withdraw consent. You can change or remove your profile photo in your profile at any time.'],
   ['Security', 'We apply access controls, private storage, transmission safeguards and usage limits appropriate to the service.'],
+  ['Ad measurement', 'To measure advertising, Saseok uses the Meta (Meta Platforms) pixel and conversions API. The screens you visit, actions such as completing registration, a first conversation and a conversation that lasts, ad click information and a browser identifier (cookie) and, for members, a hashed email address and account identifier are sent to Meta. Conversation content, voice and your profile introduction are not sent. You can opt out with your browser’s "Do Not Track" setting and turn off personalised ads in your Meta ad settings.'],
   ['Contact', 'Privacy contact: Seokbin Choi · ask.saseok@gmail.com · 4F, 402-331A, 13 Saimdang-ro 8-gil, Seocho-gu, Seoul, Republic of Korea'],
 ];
 

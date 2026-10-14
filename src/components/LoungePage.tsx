@@ -16,6 +16,7 @@ import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { ProfileModal } from './ProfileModal';
 import { LoungeIntroduction } from './LoungeIntroduction';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
+import { trackMetaOnce } from '../lib/metaPixel';
 import { LoungeReplyButton, LoungeReplyPanel, useLoungeReplies } from './LoungeReplySuggestions';
 import { LoungeAfterTalk, LoungeFriendsPage, LoungeProfileCard } from './LoungeSocial';
 import { useLoungeSocialStatus } from '../lib/useLoungeSocialStatus';
@@ -445,6 +446,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (!mounted.current || activeRoomId.current !== roomId) return;
       setTranscriptError('');
       if (result.posted) {
+        if (user) trackMetaOnce('FirstConversation', user.id);
         // Display committed speech immediately. Neither the display refresh nor
         // protection inference holds the ordered audio queue or the ending button.
         inputReadyAt.current = Date.now();
@@ -464,7 +466,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (mounted.current) setTranscriptError(errorText(err));
     }
     finally { transcribing.current -= 1; }
-  }, [roomId, reviewAfterInput]);
+  }, [roomId, reviewAfterInput, user]);
   // "Suggest my reply": picking one posts it like a spoken turn, so the character answers it the same way.
   const replySuggest = useMemo(() => ({
     suggest: async () => {
@@ -474,12 +476,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     },
     send: async (text: string) => {
       await postLoungeText(roomId, text);
+      if (user) trackMetaOnce('FirstConversation', user.id);
       if (!mounted.current || activeRoomId.current !== roomId) return;
       inputReadyAt.current = Date.now();
       void refreshAfterInput.current().catch(err => { if (mounted.current && activeRoomId.current === roomId) setTranscriptError(errorText(err)); });
       void reviewAfterInput();
     },
-  }), [roomId, reviewAfterInput]);
+  }), [roomId, reviewAfterInput, user]);
   const restrictedIds = restrictedLoungeMembers(members, clock);
   const audio = useLoungeAudio(roomId, (room?.space_id ? broadcaster : room?.host_id) ?? '', transcript, viewRoom?.capacity, room?.guided_session && !isLoungeFreeStage(session) ? { allowed: session?.speaker_id === user?.id && session?.state === 'speaking', speakerId: session?.state === 'speaking' ? session.speaker_id : null, turnId: session?.turn_id } : undefined, restrictedIds, getLoungeHostLoudness(room?.host_persona));
   const voiceProfiles = useRef(new Map<string, (typeof audio.participants)[number]>());
