@@ -15,7 +15,7 @@ import { LoungeTopicPicker, type LoungeTopicPickerProps } from './LoungeTopicPic
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { ProfileModal } from './ProfileModal';
 import { LoungeIntroduction } from './LoungeIntroduction';
-import { LoungeReplySuggestions } from './LoungeReplySuggestions';
+import { LoungeReplyButton, LoungeReplyPanel, useLoungeReplies } from './LoungeReplySuggestions';
 import { LoungeAfterTalk, LoungeFriendsPage, LoungeProfileCard } from './LoungeSocial';
 import { useLoungeSocialStatus } from '../lib/useLoungeSocialStatus';
 import { LoungeCharacterPage } from './LoungeCharacterPage';
@@ -131,6 +131,7 @@ function RoomView(props: RoomViewProps) {
   const participantLog = useRef<HTMLDivElement>(null);
   const participantSeats = useRef<HTMLDivElement>(null);
   const followParticipantLog = useRef(true);
+  const reply = useLoungeReplies(props.replySuggest, false);
   // On desktop the newest bubble is held near the top of the log, in every room and with every host. Phones keep it pinned to the bottom.
   const spotlightLatest = useSyncExternalStore(subscribeDesktopLayout, desktopLayout, () => false);
   const spotlightAnchor = useRef(0);
@@ -226,7 +227,7 @@ function RoomView(props: RoomViewProps) {
           <div className="lounge-host-column">
             <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><LoungeHostPortrait hostId={props.hostId} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{hostTitle}</h2><span className="lounge-moderator-caption">{hostSpeaking ? solo ? '대화 상대 · 이야기하는 중' : 'AI 도우미 · 이야기하는 중' : props.pending ? solo ? '대화 상대 · 생각하는 중…' : 'AI 도우미 · 생각하는 중…' : solo ? '대화 상대 · 편하게 이야기해요' : 'AI 도우미 · 필요할 때 불러 주세요'}</span>{props.relationship && <LoungeRelationship view={props.relationship} />}</div><VoiceWave active={hostSpeaking} /></div>
 
-            {solo && !ended && !props.preview && props.replySuggest && <LoungeReplySuggestions suggest={props.replySuggest.suggest} send={props.replySuggest.send} disabled={restricted} />}
+            
           </div>
           <div className="lounge-place-view" aria-hidden="true"><div className="lounge-scene-intro"><span>{theme.tag}</span><p>{theme.caption}</p><div className="lounge-stage-label"><Headphones size={15} /> 함께 머무는 대화석 <span>{solo ? 'AI와 1:1' : `${props.members.length} / ${props.capacity}명`}</span></div></div></div>
           <aside className="lounge-participant-panel" aria-label="함께하는 참가자">
@@ -252,7 +253,6 @@ function RoomView(props: RoomViewProps) {
             </div>
             <section className="lounge-participant-speech" aria-label="참가자들의 발언">
               <h2><MessageCircle size={14} />나누는 이야기</h2>
-              {props.topicPicker && <LoungeTopicPicker {...props.topicPicker} />}
               <div className={`lounge-participant-log ${spotlightLatest ? 'spotlight' : ''}`} ref={participantLog} role="log" aria-label="라운지 대화" onScroll={event => { const element = event.currentTarget; followParticipantLog.current = spotlightLatest ? element.scrollTop >= spotlightAnchor.current - 24 : element.scrollHeight - element.scrollTop - element.clientHeight < 48; }}>
                 {(props.status === 'lobby' || !conversationMessages.length) && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : host.greeting}</div></div>}
                 <div className="lounge-guidance">{props.topicBrief && <LoungeTopicDescription brief={props.topicBrief} />}{props.study && <LoungeStudyNotes study={props.study} />}
@@ -264,9 +264,12 @@ function RoomView(props: RoomViewProps) {
               </div>
             </section>
         <div className="lounge-participant-controls">
+          {solo && !ended && !props.preview && props.replySuggest && <LoungeReplyPanel state={reply} logRef={participantLog} followRef={followParticipantLog} />}
           <div className="lounge-voice-controls"><div className="lounge-room-controls">
+            {!sessionProps && !ended && props.topicPicker && <LoungeTopicPicker {...props.topicPicker} disabled={props.topicPicker.disabled || restricted} />}
             {!sessionProps && (solo || ended || space) && microphoneControl}
         {!sessionProps && assistanceControl}
+            {!sessionProps && solo && !ended && !props.preview && props.replySuggest && <LoungeReplyButton state={reply} />}
         </div>{sessionProps ? <LoungeSessionPanel {...sessionProps} mode="controls" microphoneControl={microphoneControl} assistanceControl={assistanceControl} /> : !solo && !ended && !space && <section className="lounge-session-waiting" aria-label="대화 순서와 손들기"><p className="lounge-session-current" role="status">{props.status === 'lobby' ? '대화 시작을 기다리고 있어요' : props.guidedSession ? '발언 순서를 불러오는 중이에요' : '현재는 자유 대화 중이에요'}</p><div className="lounge-session-actions">{microphoneControl}<button type="button" disabled title="순서 대화가 시작되면 사용할 수 있어요"><Hand size={16} />손들기</button></div><p className="lounge-waiting-summary">{props.status === 'lobby' ? '시작하면 내 차례와 발언 대기 명단이 여기에 보여요.' : props.guidedSession ? '순서가 준비되면 손들기와 발언 대기를 사용할 수 있어요.' : '순서 진행이 적용된 새 대화방에서 손들기와 발언 대기를 사용할 수 있어요.'}</p></section>}<div className="lounge-stage-note">{solo ? '편하게 이야기해 주세요.' : '같은 취향도, 다른 생각도 좋아요. AI는 끼어들지 않으니 서로 편하게 말을 건네세요.'}</div></div>
         </div>
           </aside>
