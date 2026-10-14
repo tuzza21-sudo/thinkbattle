@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createLocalAudioTrack, LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client';
+import { createLocalAudioTrack, DisconnectReason, LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client';
 import { supabase } from './supabase';
 import { createLoungeHostOutput, isMobileDevice, Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
 import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from './loungeApi';
@@ -28,6 +28,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const microphone = useRef<LocalAudioTrack | null>(null);
   const microphoneWanted = useRef(false);
   const pausedForPlayback = useRef(false);
+  const duplicateKick = useRef(false);
+  const [duplicateKicked, setDuplicateKicked] = useState(false);
   const audioContext = useRef<AudioContext | null>(null);
   const releaseMicAnalysis = useRef<(() => void) | null>(null);
   const outputContext = useRef<AudioContext | null>(null);
@@ -128,6 +130,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
 
   const connect = useCallback(async () => {
     if (pending.current || roomRef.current) return;
+    duplicateKick.current = false; setDuplicateKicked(false);
     pending.current = true; const generation = version.current;
     setConnecting(true); setError('');
     try {
@@ -181,8 +184,15 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       });
       room.on(RoomEvent.Reconnecting, () => { stopHost(); releaseMicrophone(); setConnected(false); });
       room.on(RoomEvent.Reconnected, () => { setConnected(true); sync(); });
-      room.on(RoomEvent.Disconnected, () => {
+      room.on(RoomEvent.Disconnected, reason => {
         if (roomRef.current !== room) return;
+        // The same account joined from another window or device, which makes the voice server drop this connection.
+        // Joining straight back would drop that one in turn and the two would keep knocking each other out.
+        if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+          disconnect(); microphoneWanted.current = false; duplicateKick.current = true; setDuplicateKicked(true);
+          setError('같은 계정이 다른 창이나 기기에서 접속해서 이 창의 음성 연결을 끊었어요. 한 계정은 한 곳에서만 쓸 수 있어요. 두 사람이 대화하려면 서로 다른 계정으로 접속해 주세요.');
+          return;
+        }
         const resumeMicrophone = microphoneWanted.current;
         disconnect(); microphoneWanted.current = resumeMicrophone;
       });
@@ -456,5 +466,5 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   // AI audio is published by the human room owner's participant. It must not
   // light up that person's seat as if they were speaking into their microphone.
   const humanSpeakers = aiSpeaking ? speakers.filter(id => id !== hostId) : speakers;
-  return { connected, connecting, micOn, audioReady, aiSpeaking, hostText, participants, speakers: humanSpeakers.filter(id => !restrictedIds.includes(id)), error, connect, enableAudio, disconnect, startMicrophone, stopMicrophone, flushUtterance, playHost, playHostStream, stopHost, getSpeechActivity, chooseAvatar };
+  return { connected, connecting, micOn, audioReady, aiSpeaking, hostText, participants, speakers: humanSpeakers.filter(id => !restrictedIds.includes(id)), error, duplicateKicked, connect, enableAudio, disconnect, startMicrophone, stopMicrophone, flushUtterance, playHost, playHostStream, stopHost, getSpeechActivity, chooseAvatar };
 }

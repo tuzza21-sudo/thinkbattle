@@ -4,12 +4,14 @@ import './App.css';
 import './components/HomeStudio.css';
 import './components/ServiceStudio.css';
 import { AuthModal } from './components/AuthModal';
+import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
 import {
   clearOAuthCallbackError,
   getCurrentUser,
   getOAuthCallbackError,
+  isLoungeProfileComplete,
   signInAsGuest,
   signOut,
   subscribeToAuthChanges,
@@ -203,6 +205,10 @@ function App() {
         <Route path="/super-admin/lounge-knowledge" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <LoungeKnowledgePage /> : <Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+
+      {user && !user.isAnonymous && !showAuthModal && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user) && (
+        <ProfileCompletionDialog user={user} onSaved={setUser} onLogout={handleLogout} />
+      )}
 
       {showAuthModal && (
         <AuthModal

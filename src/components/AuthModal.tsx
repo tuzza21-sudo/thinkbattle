@@ -124,6 +124,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
         setError(isEnglish ? 'Please choose your gender.' : '성별을 선택해 주세요.');
         return;
       }
+      if (!intro.ageGroup) {
+        setError(isEnglish ? 'Please choose your age group.' : '나이대를 선택해 주세요.');
+        return;
+      }
+      if (!intro.region.trim()) {
+        setError(isEnglish ? 'Please enter your region.' : '지역을 입력해 주세요.');
+        return;
+      }
+      if (!intro.bio.trim()) {
+        setError(isEnglish ? 'Please write a short introduction.' : '자기소개를 적어 주세요.');
+        return;
+      }
       if (password !== confirmPassword) {
         setError(isEnglish ? 'The passwords do not match.' : '비밀번호가 일치하지 않습니다.');
         return;
@@ -155,13 +167,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   };
 
   const finish = (user: AppUser) => { onAuthenticated(user); onClose(); };
-  if (createdUser) return <LoungeAccountDialog title={isEnglish ? 'Make this seat yours' : '이제 나만의 얼굴을 더해요'} description={isEnglish ? 'Your account is ready. Review your portrait before joining the conversation.' : '가입이 완료됐어요. 사진으로 아바타를 만들거나, 지금은 가볍게 시작해도 좋아요.'} eyebrow="YOUR FIRST HELLO" onClose={() => finish(createdUser)} language={language} displayName={createdUser.nickname} avatarUrl={createdUser.loungeAvatarUrl}>
+  if (createdUser) return <LoungeAccountDialog title={isEnglish ? 'Add a profile photo' : '프로필 사진을 올려요'} description={isEnglish ? 'Your account is ready. Add a photo for your seat, or start without one.' : '가입이 완료됐어요. 내 자리에 보일 사진을 올리거나, 지금은 가볍게 시작해도 좋아요.'} eyebrow="YOUR FIRST HELLO" onClose={() => finish(createdUser)} language={language} displayName={createdUser.nickname} avatarUrl={createdUser.loungeAvatarUrl}>
     <LoungeAvatarEditor user={createdUser} initialFile={photo} language={language} onSaved={finish} />
-    <button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Set up later in my profile' : '나중에 프로필에서 만들기'}</button>
+    <button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Add it later in my profile' : '나중에 프로필에서 올리기'}</button>
   </LoungeAccountDialog>;
 
   if (confirmationSent) return <LoungeAccountDialog title={isEnglish ? 'Check your email' : '가입 확인 메일을 보냈어요'} description={isEnglish ? 'One small step before your first conversation.' : '이메일을 확인하면, 첫 이야기를 시작할 수 있어요.'} eyebrow="ALMOST THERE" onClose={onClose} language={language}>
-    <div className="lounge-account-status"><span className="lounge-account-mail-icon"><Mail size={26} /></span><p><strong>{email}</strong><br />{isEnglish ? 'Follow the link in your email, then log in. You can create your avatar in your profile. Your photo has not been uploaded.' : '메일의 인증 링크를 누른 뒤 로그인해 주세요. 아바타는 프로필에서 만들 수 있어요. 첨부한 사진은 아직 전송하지 않았어요.'}</p>
+    <div className="lounge-account-status"><span className="lounge-account-mail-icon"><Mail size={26} /></span><p><strong>{email}</strong><br />{isEnglish ? 'Follow the link in your email, then log in. You can add a profile photo in your profile. Your photo has not been uploaded.' : '메일의 인증 링크를 누른 뒤 로그인해 주세요. 프로필 사진은 프로필에서 올릴 수 있어요. 첨부한 사진은 아직 전송하지 않았어요.'}</p>
       <button type="button" className="btn btn-primary lounge-account-submit" onClick={() => handleModeChange('login')}>{isEnglish ? 'Back to login' : '로그인으로 돌아가기'}<ArrowRight size={17} /></button>
       <button type="button" className="avatar-text-button" onClick={onClose}>{isEnglish ? 'Close' : '지금은 닫기'}</button>
     </div>
@@ -185,15 +197,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
       {isSignup && <label className="form-field"><span>{isEnglish ? 'Display name' : '닉네임'}</span><input data-dialog-autofocus value={nickname} onChange={event => setNickname(event.target.value)} autoComplete="nickname" maxLength={20} required disabled={loading} placeholder={isEnglish ? 'What should we call you?' : '대화에서 불리고 싶은 이름'} /><small className="lounge-account-field-note">{isEnglish ? 'A name you feel comfortable with. Up to 20 characters.' : '실명 대신 편한 이름도 좋아요. 최대 20자.'}</small></label>}
       {isSignup && <fieldset className="form-field lounge-account-gender" disabled={loading}><legend>{isEnglish ? 'Gender' : '성별'}</legend><div>
         {(['female', 'male'] as const).map(value => <label key={value}><input type="radio" name="signup-gender" value={value} checked={gender === value} onChange={() => setGender(value)} required /><span>{value === 'female' ? isEnglish ? 'Female' : '여성' : isEnglish ? 'Male' : '남성'}</span></label>)}
-      </div><small className="lounge-account-field-note">{isEnglish ? 'Rooms show only how many men and women are there.' : '대화방에는 참가자 성별이 인원수로만 표시돼요.'}</small></fieldset>}
+      </div><small className="lounge-account-field-note">{isEnglish ? 'Required. Rooms show only how many men and women are there.' : '대화방에는 참가자 성별이 인원수로만 표시돼요.'}</small></fieldset>}
       <label className="form-field"><span>{isEnglish ? 'Email' : '이메일'}</span><input data-dialog-autofocus={!isSignup || undefined} value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" type="email" required disabled={loading} /></label>
       <div className={isSignup ? 'lounge-account-passwords' : undefined}>
         <label className="form-field"><span>{isEnglish ? 'Password' : '비밀번호'}</span><input value={password} onChange={event => setPassword(event.target.value)} autoComplete={isSignup ? 'new-password' : 'current-password'} placeholder={isEnglish ? isSignup ? 'At least 6 characters' : 'Your password' : isSignup ? '6자리 이상' : '비밀번호를 입력해 주세요'} type="password" required disabled={loading} /></label>
         {isSignup && <label className="form-field"><span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span><input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} autoComplete="new-password" placeholder={isEnglish ? 'Once more' : '한 번 더 입력'} type="password" required disabled={loading} /></label>}
       </div>
       {isSignup && <>
-        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Bring your photo' : '내 분위기의 아바타로 만나기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Add a photo now and create your illustrated avatar after signup. You can also do this later.' : '사진을 첨부하면 가입 후 내 분위기의 그림 아바타를 만들 수 있어요. 나중에 프로필에서 만들어도 괜찮아요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></details>
-        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Introduce yourself' : '나를 소개하기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Age group, region and a short introduction appear on your profile card in rooms. You can change them later in your profile.' : '나이대·지역·자기소개는 대화방에서 내 프로필을 눌렀을 때 보여요. 나중에 프로필에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} /></details>
+        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Add a profile photo' : '프로필 사진 올리기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Pick a photo now and confirm it right after signup. It does not have to be your face. You can also do this later.' : '사진을 골라 두면 가입 직후 바로 적용할 수 있어요. 본인 얼굴이 아니어도 괜찮아요. 나중에 프로필에서 올려도 돼요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></details>
+        <div className="lounge-account-intro"><p className="avatar-signup-intro">{isEnglish ? 'Age group, region and a short introduction are required. They appear on your profile card in rooms, and you can change them later in your profile.' : '나이대·지역·자기소개는 꼭 입력해 주세요. 대화방에서 내 프로필을 눌렀을 때 보이고, 나중에 프로필에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} required /></div>
         <label className="legal-consent-check"><input type="checkbox" checked={acceptedTerms} disabled={loading} onChange={event => setAcceptedTerms(event.target.checked)} /><span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span></label>
       </>}
       {error && <div className="form-error" role="alert">{error}</div>}

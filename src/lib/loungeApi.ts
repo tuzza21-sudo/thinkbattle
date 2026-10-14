@@ -25,23 +25,35 @@ async function loungeFetch(url: string, init: RequestInit, source = '서버') {
   catch (error) { if (init.signal?.aborted) throw error; throw loungeConnectionError(error, source); }
 }
 
-async function loungeAccessToken() {
+const sessionExpired = () => new LoungeApiError('로그인 세션이 끝났어요. 다시 로그인해 주세요.', 'lounge_session_expired', false);
+async function loungeAccessToken(forceRefresh = false) {
   try {
-    const { data, error } = await supabase.auth.getSession();
+    let { data, error } = forceRefresh ? await supabase.auth.refreshSession() : await supabase.auth.getSession();
     if (error) throw error;
-    return data.session?.access_token ?? '';
-  } catch (error) { throw loungeConnectionError(error, '로그인 서버'); }
+    // A missing session is retried once through a refresh before the member is told to log in again.
+    if (!data.session && !forceRefresh) ({ data, error } = await supabase.auth.refreshSession());
+    if (!data.session?.access_token) throw sessionExpired();
+    return data.session.access_token;
+  } catch (error) { if (error instanceof LoungeApiError) throw error; throw loungeConnectionError(error, '로그인 서버'); }
+}
+/** Sends an authenticated request; if the server rejects the token, refreshes the session once and sends it again. */
+async function loungeAuthorizedFetch(url: string, init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }, source: string) {
+  const send = async (forceRefresh: boolean) => loungeFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${await loungeAccessToken(forceRefresh)}` } }, source);
+  const response = await send(false);
+  if (response.status !== 401) return response;
+  const retried = await send(true);
+  if (retried.status === 401) throw sessionExpired();
+  return retried;
 }
 
 export async function requestLoungeVoiceToken(roomId: string) {
-  const token = await loungeAccessToken();
-  const init = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ roomName: roomId }) };
+  const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomName: roomId }) };
   let response: Response;
-  try { response = await loungeFetch('/api/livekit-token', init, '음성 서버'); }
+  try { response = await loungeAuthorizedFetch('/api/livekit-token', init, '음성 서버'); }
   catch (error) {
     if (!(error instanceof LoungeApiError) || error.code !== 'lounge_network_error') throw error;
     await new Promise(resolve => setTimeout(resolve, 500));
-    response = await loungeFetch('/api/livekit-token', init, '음성 서버');
+    response = await loungeAuthorizedFetch('/api/livekit-token', init, '음성 서버');
   }
   const credentials = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof credentials?.error === 'string' ? credentials.error : '음성 서버에 연결하지 못했어요. 연결 재시도를 눌러 주세요.', `lounge_voice_http_${response.status}`, response.status >= 500 || response.status === 429, 10);
@@ -76,9 +88,9 @@ export const createLounge = async (persona: LoungeHostId, topic: string, capacit
 export const listLoungeSpaces = async () => (await loungeRpc<Array<Partial<LoungeSpace> & Pick<LoungeSpace, 'id' | 'name' | 'host_persona' | 'theme'>>>('list_voice_lounge_spaces', {}))
   .map((space): LoungeSpace => ({ capacity: 6, present_count: 0, topic: null, ...space, table_count: space.table_count ?? (space.present_count ? 1 : 0),
     participants: space.participants ?? [], seat_free: space.seat_free ?? true, waiting: space.waiting ?? 0 }));
-/** Opens a room in a place with the owner's topic and the character who helps the conversation. */
-export const openLoungeTable = (spaceId: string, nickname: string, topic: string, persona: LoungeHostId, ages: LoungeAgeGroup[] = []) =>
-  loungeRpc<string>('open_voice_lounge_table', { p_space: spaceId, p_nickname: nickname, p_topic: topic, p_persona: persona, p_ages: ages });
+/** Opens a room in a place with the owner's topic, the character who helps the conversation and, if chosen, how many people sit at it (2 to 6). */
+export const openLoungeTable = (spaceId: string, nickname: string, topic: string, persona: LoungeHostId, ages: LoungeAgeGroup[] = [], capacity?: number) =>
+  loungeRpc<string>('open_voice_lounge_table', { p_space: spaceId, p_nickname: nickname, p_topic: topic, p_persona: persona, p_ages: ages, ...(capacity ? { p_capacity: capacity } : {}) });
 /** The owner changes the character helping the room. */
 export const setLoungePersona = (roomId: string, persona: LoungeHostId) => loungeRpc<void>('set_voice_lounge_persona', { p_room: roomId, p_persona: persona });
 const fillTable = <T extends Partial<LoungeSpaceTable> & Pick<LoungeSpaceTable, 'id'>>(table: T) =>
@@ -136,8 +148,7 @@ export async function reviewLoungeInteraction(roomId: string, messageId?: number
 export const syncLoungeSafety = (roomId: string) => interactionRequest({ roomId, action: 'sync' });
 export const releaseLoungeRestriction = (roomId: string, targetId: string) => interactionRequest({ roomId, action: 'release', targetId });
 async function interactionRequest(body: Record<string, unknown>) {
-  const token = await loungeAccessToken();
-  const response = await loungeFetch('/api/lounge-interaction', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }, '대화 보호 서버');
+  const response = await loungeAuthorizedFetch('/api/lounge-interaction', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '대화 보호 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload) throw new LoungeApiError(
     typeof payload?.error === 'string' ? payload.error : 'AI 대화 보호 연결을 다시 확인해 주세요.',
@@ -148,9 +159,8 @@ async function interactionRequest(body: Record<string, unknown>) {
   return payload as { skipped?: boolean; voiceSyncPending?: boolean; question_queued?: boolean };
 }
 async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
-  const token = await loungeAccessToken();
   const source = body.action === 'transcribe' ? '발언 전사 서버' : body.action === 'prepare' ? '자료 준비 서버' : body.action === 'topics' ? '주제 추천 서버' : '사회자 서버';
-  const response = await loungeFetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body), signal }, source);
+  const response = await loungeAuthorizedFetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal }, source);
   if (response.ok && streaming && response.headers.get('content-type')?.includes('application/x-ndjson') && response.body) return { stream: response.body };
   const payload = await response.json().catch(() => null);
   const headerDelay = Number(response.headers.get('retry-after'));

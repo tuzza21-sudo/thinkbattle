@@ -397,7 +397,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const interactionBlockedRoom = useRef<string | null>(null);
   const reportInteractionError = useCallback((err: unknown) => {
     if (!mounted.current || activeRoomId.current !== roomId) return;
-    if (err instanceof LoungeApiError && err.code === 'lounge_interaction_not_configured' && !err.retryable) interactionBlockedRoom.current = roomId;
+    if (err instanceof LoungeApiError && ['lounge_interaction_not_configured', 'lounge_session_expired'].includes(err.code ?? '') && !err.retryable) interactionBlockedRoom.current = roomId;
     setInteractionError(errorText(err));
   }, [roomId]);
   const hostRequest = useRef<AbortController | null>(null);
@@ -591,7 +591,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       try { await refreshAfterMessage(); }
       catch { return; }
       const latest = current.current;
-      if (!cancelled && latest.room?.status !== 'ended' && !latest.audio.connected && !latest.audio.connecting) await latest.audio.connect();
+      if (!cancelled && latest.room?.status !== 'ended' && !latest.audio.connected && !latest.audio.connecting && !latest.audio.duplicateKicked) await latest.audio.connect();
       else if (!cancelled && latest.audio.connected) latest.audio.enableAudio();
     };
     const onResume = () => { void resume(); };

@@ -33,6 +33,9 @@ const signupFields = (metadata: Record<string, unknown> | undefined): LoungeProf
   return ageGroup || region || bio ? { ageGroup, region, bio } : null;
 };
 
+/** Gender, age group, region and introduction are required of every member (guests are exempt). */
+export const isLoungeProfileComplete = (user: AppUser) => Boolean(user.gender && user.ageGroup && user.region?.trim() && user.bio?.trim());
+
 /** Saves the gender shown on lounge rooms to the user's own profile. */
 export const saveUserGender = async (user: AppUser, gender: AppUserGender): Promise<AppUser> => {
   const { error } = await supabase.from('users').update({ gender }).eq('id', user.id);

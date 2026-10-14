@@ -256,3 +256,5 @@
   .lounge-create-topic { font-size:16px; }
   .lounge-space-tables-head { flex-direction:column; align-items:flex-start; }
 }
+.lounge-create-seats label { min-width:56px; text-align:center; }
+.lounge-create-host-fixed small + b + small { color:var(--l-muted); }

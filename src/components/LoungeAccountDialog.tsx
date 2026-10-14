@@ -5,14 +5,17 @@ import './LoungeAccountDialog.css';
 type Props = {
   title: string; description: string; eyebrow: string; children: ReactNode;
   onClose: () => void; language?: 'ko' | 'en'; displayName?: string; avatarUrl?: string;
+  /** False for a step that must be completed: no close button, no Escape, no click outside. */
+  dismissible?: boolean;
 };
 
-export function LoungeAccountDialog({ title, description, eyebrow, children, onClose, language = 'ko', displayName, avatarUrl }: Props) {
+export function LoungeAccountDialog({ title, description, eyebrow, children, onClose, language = 'ko', displayName, avatarUrl, dismissible = true }: Props) {
   const en = language === 'en';
   const titleId = useId(), descriptionId = useId();
   const dialog = useRef<HTMLElement>(null);
   const close = useRef(onClose);
-  useEffect(() => { close.current = onClose; }, [onClose]);
+  const dismissibleRef = useRef(dismissible);
+  useEffect(() => { close.current = onClose; dismissibleRef.current = dismissible; }, [onClose, dismissible]);
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
@@ -22,7 +25,7 @@ export function LoungeAccountDialog({ title, description, eyebrow, children, onC
       target?.focus({ preventScroll: true });
     });
     const keyboard = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); close.current(); }
+      if (event.key === 'Escape') { event.preventDefault(); if (dismissibleRef.current) close.current(); }
       if (event.key !== 'Tab' || !dialog.current) return;
       const targets = Array.from(dialog.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), summary, [tabindex="0"]')).filter(target => target.getClientRects().length > 0);
       const first = targets[0], last = targets[targets.length - 1];
@@ -38,7 +41,7 @@ export function LoungeAccountDialog({ title, description, eyebrow, children, onC
     };
   }, []);
 
-  return <div className="modal-overlay auth-modal-overlay lounge-account-overlay" onMouseDown={event => { if (event.target === event.currentTarget) close.current(); }}>
+  return <div className="modal-overlay auth-modal-overlay lounge-account-overlay" onMouseDown={event => { if (dismissible && event.target === event.currentTarget) close.current(); }}>
     <section ref={dialog} className="modal-content auth-modal lounge-account-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1}>
       <aside className="lounge-account-scene" aria-label={en ? 'A seat in the lounge' : '라운지의 나만의 자리'}>
         <div className="lounge-account-view"><span><Coffee size={18} /> {en ? 'Conversation lounge' : '대화 라운지'}</span><small>A LITTLE ROOM FOR YOU</small></div>
@@ -48,7 +51,7 @@ export function LoungeAccountDialog({ title, description, eyebrow, children, onC
         </div>
       </aside>
       <div className="lounge-account-content">
-        <div className="auth-modal-header"><div className="auth-modal-heading"><span className="lounge-account-eyebrow">{eyebrow}</span><h2 id={titleId}>{title}</h2><p id={descriptionId}>{description}</p></div><button type="button" className="icon-button lounge-account-close" onClick={onClose} aria-label={en ? 'Close' : '닫기'}><X size={20} /></button></div>
+        <div className="auth-modal-header"><div className="auth-modal-heading"><span className="lounge-account-eyebrow">{eyebrow}</span><h2 id={titleId}>{title}</h2><p id={descriptionId}>{description}</p></div>{dismissible && <button type="button" className="icon-button lounge-account-close" onClick={onClose} aria-label={en ? 'Close' : '닫기'}><X size={20} /></button>}</div>
         {children}
       </div>
     </section>

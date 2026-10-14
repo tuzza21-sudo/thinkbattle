@@ -78,11 +78,10 @@
 .lounge-account-dialog .lounge-avatar-editor { background:#19291f66; border-color:#ffffff18; padding:18px; border-radius:15px; margin:22px 0 0; }
 .lounge-account-dialog .avatar-editor-heading>span { color:#d5c59e; font-size:9px; letter-spacing:1.3px; }
 .lounge-account-dialog .avatar-editor-heading h3 { color:#eee5d0; font-size:16px; font-weight:500; margin:10px 0 8px; }
-.lounge-account-dialog .avatar-editor-heading p,.lounge-account-dialog .avatar-result p { color:#b2bda7; font-size:11px; line-height:1.8; }
-.lounge-account-dialog .avatar-generate { background:#334733; color:#e2e8d1; border:1px solid #bdcda33b; border-radius:10px; padding:12px; font-size:12px; }
-.lounge-account-dialog .avatar-result .btn { color:#243027; background:#e0c593; border:1px solid #e0c593; padding:12px; border-radius:10px; font-size:12px; }
-.lounge-account-dialog .avatar-usage-note { color:#99a78f; font-size:10px; line-height:1.8; }
-.lounge-account-dialog .avatar-current,.lounge-account-dialog .avatar-result>img { border-radius:46% 46% 28% 28%; border:1px solid #e5d4a740; }
+.lounge-account-dialog .avatar-editor-heading p { color:#b2bda7; font-size:11px; line-height:1.8; }
+.lounge-account-dialog .avatar-generate { color:#243027; background:#e0c593; border:1px solid #e0c593; border-radius:10px; padding:12px; font-size:12px; }
+.lounge-account-dialog .avatar-generate:disabled { opacity:.55; }
+.lounge-account-dialog .avatar-current { border-radius:46% 46% 28% 28%; border:1px solid #e5d4a740; }
 .lounge-account-identity { display:flex; align-items:center; gap:10px; padding:12px 14px; background:#ffffff04; border:1px solid #ffffff14; border-radius:11px; margin-bottom:22px; color:#c3cbb6; }
 .lounge-account-identity>div { display:grid; gap:5px; min-width:0; }
 .lounge-account-identity small { color:#96a58c; font-size:10px; }
@@ -133,3 +132,4 @@
 .lounge-presence-check input { margin-top:3px; accent-color:#dbc28e; }
 .lounge-presence-check small { display:block; color:#9fae98; font-size:10px; }
 @media(max-width:760px) { .lounge-account-dialog .form-field textarea { font-size:16px; } }
+.lounge-account-dialog .lounge-required { font-style:normal; font-size:10px; color:#e0c593; margin-left:4px; }

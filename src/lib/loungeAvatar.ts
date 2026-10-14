@@ -1,40 +1,25 @@
 import { supabase } from './supabase';
 import type { AppUser } from '../types';
 
-export type AvatarImage = { image: string; mimeType: string };
 const BUCKET = 'lounge-avatars';
 export function validateAvatarFile(file: File): void {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('JPG, PNG, WebP 사진을 선택해 주세요.');
   if (file.size > 10 * 1024 * 1024) throw new Error('10MB 이하의 사진을 선택해 주세요.');
 }
-async function normalizeImage(blob: Blob, maxSize: number, mimeType: string): Promise<Blob> {
-  const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+/** The chosen photo as a centered square, so a portrait or a wide picture still fills the round avatar. Runs in the browser; nothing is sent anywhere. */
+async function squareAvatar(photo: Blob, size = 512): Promise<Blob> {
+  const bitmap = await createImageBitmap(photo, { imageOrientation: 'from-image' });
   try {
     if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > 80_000_000) throw new Error('사진 크기가 너무 커요. 작은 사진을 선택해 주세요.');
-    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const side = Math.min(bitmap.width, bitmap.height), target = Math.min(size, side);
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+    canvas.width = canvas.height = target;
     const context = canvas.getContext('2d');
     if (!context) throw new Error('사진을 읽을 수 없어요. 다른 브라우저에서 시도해 주세요.');
-    context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('사진을 처리하지 못했어요.')), mimeType, 0.88));
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, target, target);
+    context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, target, target);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('사진을 처리하지 못했어요.')), 'image/webp', 0.88));
   } finally { bitmap.close(); }
-}
-const toBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = () => reject(new Error('사진을 읽지 못했어요.')); reader.readAsDataURL(blob);
-});
-export async function generateLoungeAvatar(file: File, signal: AbortSignal): Promise<AvatarImage> {
-  validateAvatarFile(file);
-  const photo = await normalizeImage(file, 1024, 'image/jpeg');
-  if (photo.size > 1_200_000) throw new Error('사진 용량이 커요. 더 작은 사진을 선택해 주세요.');
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error('로그인 후 사진을 변환해 주세요.');
-  const response = await fetch('/api/lounge-avatar', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ image: await toBase64(photo), mimeType: photo.type, consent: true }), signal });
-  // A gateway timeout or crash answers with plain text, not JSON.
-  const result = await response.json().catch(() => ({} as { error?: string }));
-  if (!response.ok) throw new Error(result.error || (response.status === 504 ? '사진 변환 시간이 초과됐어요. 잠시 후 다시 시도해 주세요.' : '사진 변환에 실패했어요. 잠시 후 다시 시도해 주세요.'));
-  return result;
 }
 export function safeLoungeAvatarUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -64,15 +49,15 @@ export async function loadLoungeAvatar(path: unknown): Promise<Pick<AppUser, 'lo
     return { loungeAvatarPath: path, loungeAvatarUrl: error ? undefined : safeLoungeAvatarUrl(data?.signedUrl) };
   } catch { return { loungeAvatarPath: path }; }
 }
-export async function saveLoungeAvatar(user: AppUser, image: AvatarImage): Promise<AppUser> {
-  const bytes = Uint8Array.from(atob(image.image), value => value.charCodeAt(0));
-  const avatar = await normalizeImage(new Blob([bytes], { type: image.mimeType }), 512, 'image/webp');
-  if (avatar.type !== 'image/webp' || avatar.size > 1048576) throw new Error('아바타를 저장하지 못했어요. WebP를 지원하는 브라우저를 사용해 주세요.');
+export async function saveLoungeAvatar(user: AppUser, photo: File): Promise<AppUser> {
+  validateAvatarFile(photo);
+  const avatar = await squareAvatar(photo);
+  if (avatar.type !== 'image/webp' || avatar.size > 1048576) throw new Error('사진을 저장하지 못했어요. WebP를 지원하는 브라우저를 사용해 주세요.');
   const path = `${user.id}/${crypto.randomUUID()}.webp`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, avatar, { contentType: 'image/webp', upsert: false });
-  if (uploadError) throw new Error('아바타 저장소에 연결하지 못했어요. DB 설정을 확인하거나 다시 시도해 주세요.');
+  if (uploadError) throw new Error('사진 저장소에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
   const { error, data } = await supabase.from('users').update({ lounge_avatar_path: path }).eq('id', user.id).select('id').single();
-  if (error || !data) { await supabase.storage.from(BUCKET).remove([path]); throw new Error('프로필에 아바타를 저장하지 못했어요. 다시 시도해 주세요.'); }
+  if (error || !data) { await supabase.storage.from(BUCKET).remove([path]); throw new Error('프로필에 사진을 저장하지 못했어요. 다시 시도해 주세요.'); }
   const updated = { ...user, ...await loadLoungeAvatar(path) };
   // Remove superseded stored files after the new profile has been committed.
   if (user.loungeAvatarPath && user.loungeAvatarPath !== path) void supabase.storage.from(BUCKET).remove([user.loungeAvatarPath]).catch(() => {});

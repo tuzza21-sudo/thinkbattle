@@ -745,20 +745,32 @@ test('starting a captured turn retries once after a lost reply without repeating
 });
 
 test('voice token connection recovers once and preserves authorization failures',async()=>{
-  const client=compile('../src/lib/loungeApi.ts',()=>({supabase:{auth:{getSession:async()=>({data:{session:{access_token:'test'}}})}}}));
+  const client=compile('../src/lib/loungeApi.ts',()=>({supabase:{auth:{getSession:async()=>({data:{session:{access_token:'test'}}}),refreshSession:async()=>({data:{session:{access_token:'fresh'}},error:null})}}}));
   let calls=0;
   await run(async(url,init)=>{
     assert.equal(url,'/api/livekit-token');assert.equal(JSON.parse(init.body).roomName,roomId);
     calls++;if(calls===1)throw new TypeError('Failed to fetch');
     return result({url:'wss://voice.test',token:'voice-token'});
   },async()=>{assert.deepEqual(await client.requestLoungeVoiceToken(roomId),{url:'wss://voice.test',token:'voice-token'});assert.equal(calls,2);});
-  for(const status of [401,403,502]) {
+  for(const status of [403,502]) {
     calls=0;
     await run(async()=>{calls++;return result({error:'Voice access refused'},status);},async()=>{
       await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code===`lounge_voice_http_${status}`&&error.retryable===(status===502));
       assert.equal(calls,1);
     });
   }
+  // A rejected token is refreshed once and sent again; a second refusal means the member must log in again.
+  const tokens=[];
+  calls=0;
+  await run(async(url,init)=>{calls++;tokens.push(init.headers.Authorization);return calls===1?result({error:'expired'},401):result({url:'wss://voice.test',token:'voice-token'});},async()=>{
+    assert.deepEqual(await client.requestLoungeVoiceToken(roomId),{url:'wss://voice.test',token:'voice-token'});
+    assert.deepEqual(tokens,['Bearer test','Bearer fresh']);
+  });
+  calls=0;
+  await run(async()=>{calls++;return result({error:'expired'},401);},async()=>{
+    await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code==='lounge_session_expired'&&error.retryable===false);
+    assert.equal(calls,2);
+  });
   calls=0;
   await run(async()=>{calls++;throw new TypeError('Failed to fetch');},async()=>{
     await assert.rejects(client.requestLoungeVoiceToken(roomId),error=>error.code==='lounge_network_error'&&error.message.startsWith('음성 서버'));
@@ -1954,8 +1966,8 @@ test('delayed onset packets preserve each first syllable once and join without s
 });
 
 test('empty or non-JSON HTTP failures preserve status and retry delay in the client', async () => {
-  const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }) } } }));
-  for (const [status, body, code, retryable] of [[429, '', 'lounge_http_429', true], [502, '<html>Bad Gateway</html>', 'lounge_http_502', true], [401, '', 'lounge_http_401', false], [200, '', 'lounge_invalid_response', true]]) {
+  const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }), refreshSession: async () => ({ data: { session: { access_token: 'fresh-session' } }, error: null }) } } }));
+  for (const [status, body, code, retryable] of [[429, '', 'lounge_http_429', true], [502, '<html>Bad Gateway</html>', 'lounge_http_502', true], [401, '', 'lounge_session_expired', false], [200, '', 'lounge_invalid_response', true]]) {
     await run(async () => new Response(body, { status, headers: { 'Retry-After': '90' } }), async () => {
       await assert.rejects(client.requestLoungeHost(roomId, 'opening'), error => error instanceof client.LoungeApiError && error.code === code && error.retryable === retryable && !error.message.includes('JSON'));
     });

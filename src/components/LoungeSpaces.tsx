@@ -223,11 +223,17 @@ function LoungeCreateRoom({ spaces, initialSpace, initialHost, user, onGuestRequ
   const [spaceId, setSpaceId] = useState(initialSpace ?? '');
   const [topic, setTopic] = useState('');
   const [ages, setAges] = useState<LoungeAgeGroup[]>([]);
+  const [capacity, setCapacity] = useState(6);
   const [hostId, setHostId] = useState<LoungeHostId | ''>(initialHost ?? spaces.find(space => space.id === initialSpace)?.host_persona ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const fixedSpace = spaces.find(space => space.id === initialSpace);
-  const step = (index: number) => fixedSpace ? index - 1 : index;
+  // A character picked before opening the form stays picked: the form does not offer the others again.
+  const fixedHost = initialHost ? getLoungeCharacter(initialHost) : undefined;
+  const maxSeats = Math.min(6, spaces.find(space => space.id === spaceId)?.capacity ?? 6);
+  const seatChoices = Array.from({ length: maxSeats - 1 }, (_, index) => index + 2);
+  const seats = Math.min(capacity, maxSeats);
+  const topicStep = fixedSpace ? 1 : 2, hostStep = topicStep + 1, seatStep = hostStep + (fixedHost ? 0 : 1), ageStep = seatStep + 1;
   const submit = async () => {
     if (!spaceId) { setError('대화할 장소를 골라 주세요.'); return; }
     if (!topic.trim()) { setError('대화 주제를 적어 주세요.'); return; }
@@ -235,7 +241,7 @@ function LoungeCreateRoom({ spaces, initialSpace, initialHost, user, onGuestRequ
     setBusy(true); setError('');
     try {
       if (!user) await onGuestRequest();
-      navigate(`/lounge/spaces/${spaceId}/open?${new URLSearchParams({ topic: topic.trim(), host: hostId, ...(ages.length ? { ages: ages.join(',') } : {}) })}`);
+      navigate(`/lounge/spaces/${spaceId}/open?${new URLSearchParams({ topic: topic.trim(), host: hostId, ...(ages.length ? { ages: ages.join(',') } : {}), ...(seats < maxSeats ? { capacity: String(seats) } : {}) })}`);
     } catch (err) { setError(errorText(err)); setBusy(false); }
   };
   return <div className="lounge-sheet-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
@@ -258,14 +264,17 @@ function LoungeCreateRoom({ spaces, initialSpace, initialHost, user, onGuestRequ
       </fieldset>}
 
       <fieldset className="lounge-create-field">
-        <legend><b>{step(2)}</b> 어떤 이야기를 나눌까요?</legend>
+        <legend><b>{topicStep}</b> 어떤 이야기를 나눌까요?</legend>
         <input className="lounge-create-topic" value={topic} maxLength={loungeTopicLimit} onChange={event => setTopic(event.target.value)} placeholder="예: 요즘 빠져 있는 취미 이야기" aria-label="대화 주제" />
         <div className="lounge-create-ideas" role="group" aria-label="주제 예시">{loungeTopics.map(item => <button type="button" key={item.id} onClick={() => setTopic(item.question)}>{item.emoji} {item.title}</button>)}</div>
         <small>다른 사람들이 방 목록에서 이 주제를 보고 들어와요. 방장은 대화 중에도 주제를 바꿀 수 있어요.</small>
       </fieldset>
 
-      <fieldset className="lounge-create-field">
-        <legend><b>{step(3)}</b> 누가 대화를 도와줄까요?</legend>
+      {fixedHost ? <div className="lounge-create-place lounge-create-host-fixed">
+        <img src={getLoungeHost(fixedHost.id).portrait} alt="" style={{ background: getLoungeHost(fixedHost.id).color }} />
+        <span><small>대화를 도와줄 캐릭터</small><b>{fixedHost.name}</b><small>{fixedHost.job}</small></span>
+      </div> : <fieldset className="lounge-create-field">
+        <legend><b>{hostStep}</b> 누가 대화를 도와줄까요?</legend>
         <div className="lounge-create-hosts">{loungeCharacters.map(character => {
           const host = getLoungeHost(character.id);
           return <label key={character.id} className={hostId === character.id ? 'selected' : ''}>
@@ -273,10 +282,18 @@ function LoungeCreateRoom({ spaces, initialSpace, initialHost, user, onGuestRequ
             <img src={host.portrait} alt="" loading="lazy" style={{ background: host.color }} /><span><b>{character.name}</b><small>{character.job}</small></span>
           </label>;
         })}</div>
+      </fieldset>}
+
+      <fieldset className="lounge-create-field">
+        <legend><b>{seatStep}</b> 방 인원</legend>
+        <div className="lounge-create-ages lounge-create-seats" role="radiogroup" aria-label="방 인원">{seatChoices.map(count => <label key={count} className={seats === count ? 'selected' : ''}>
+          <input type="radio" name="lounge-seats" value={count} checked={seats === count} onChange={() => setCapacity(count)} />{count}명
+        </label>)}</div>
+        <small>나를 포함해 최대 {seats}명이 앉아요. 캐릭터는 자리를 차지하지 않아요. 자리가 다 차면 더 들어올 수 없어요.</small>
       </fieldset>
 
       <fieldset className="lounge-create-field">
-        <legend><b>{step(4)}</b> 연령대 제한 <em>선택</em></legend>
+        <legend><b>{ageStep}</b> 연령대 제한 <em>선택</em></legend>
         <div className="lounge-create-ages" role="group" aria-label="입장할 수 있는 연령대">{loungeAgeGroups.map(group => <label key={group.id} className={ages.includes(group.id) ? 'selected' : ''}>
           <input type="checkbox" checked={ages.includes(group.id)} onChange={() => setAges(previous => previous.includes(group.id) ? previous.filter(item => item !== group.id) : [...previous, group.id])} />{group.label}
         </label>)}</div>
@@ -389,20 +406,22 @@ export function LoungeSpaceEntry({ spaceId, entry, user, onGuestRequest, onLogin
   const host = loungeCharacters.find(character => character.id === hostParam)?.id;
   const solo = entry === 'solo';
   const agesKey = (params.get('ages') ?? '').split(',').filter(isLoungeAgeGroup).join(',');
+  const seatParam = Math.trunc(Number(params.get('capacity')));
+  const seatCount = seatParam >= 2 && seatParam <= 6 ? seatParam : undefined;
   const valid = solo || (entry === 'open' && Boolean(topic && host)) || (entry === 'join' && Boolean(table));
   const [error, setError] = useState('');
   const nickname = user?.nickname;
   useEffect(() => {
     if (!nickname || !valid) return;
     let cancelled = false;
-    const seat = solo ? startLoungeSolo(spaceId, nickname, host) : table && entry === 'join' ? enterLoungeTable(table, nickname) : openLoungeTable(spaceId, nickname, topic, host!, agesKey.split(',').filter(isLoungeAgeGroup));
+    const seat = solo ? startLoungeSolo(spaceId, nickname, host) : table && entry === 'join' ? enterLoungeTable(table, nickname) : openLoungeTable(spaceId, nickname, topic, host!, agesKey.split(',').filter(isLoungeAgeGroup), seatCount);
     seat.then(roomId => {
       if (cancelled) return;
       if (!solo) stopLoungeWait();
       navigate(`/lounge/${roomId}`, { replace: true });
     }, err => { if (!cancelled) setError(errorText(err)); });
     return () => { cancelled = true; };
-  }, [spaceId, entry, solo, valid, table, topic, host, agesKey, nickname, navigate]);
+  }, [spaceId, entry, solo, valid, table, topic, host, agesKey, seatCount, nickname, navigate]);
   if (!valid) return <main className="lounge-join-gate"><Coffee size={40} /><h1>{entry === 'open' ? '대화 주제와 캐릭터를 먼저 정해 주세요' : '어느 대화방에 앉을지 골라 주세요'}</h1><Link className="lounge-primary" to={`/lounge/spaces/${spaceId}`}>장소 둘러보기 <ArrowRight size={17} /></Link></main>;
   if (!user) return <main className="lounge-join-gate"><DoorOpen size={40} /><h1>{solo ? '둘이서 이야기하기 전에' : '들어가기 전에'} 불릴 이름이 필요해요.</h1><p>게스트로 바로 들어가거나, 로그인하면 캐릭터와의 관계가 계정에 이어져요.</p>
     <button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 들어가기 <ArrowRight size={17} /></button>
