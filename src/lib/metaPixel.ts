@@ -35,28 +35,52 @@ export function trackMetaPageView() {
 const cookie = (name: string) => document.cookie.split('; ').find(item => item.startsWith(`${name}=`))?.slice(name.length + 1);
 
 /**
+ * The ad's click id arrives in the address as ?fbclid=. Meta's own script turns it into the _fbc cookie, but a visitor
+ * whose browser blocks that script would lose it. Our own code keeps it in Meta's documented format instead, so the
+ * server events of that visitor can still be traced back to the ad.
+ */
+export function captureMetaClickId() {
+  if (!metaTrackingAllowed()) return;
+  try {
+    const fbclid = new URLSearchParams(window.location.search).get('fbclid');
+    if (!fbclid || !/^[\w-]{10,300}$/.test(fbclid) || cookie('_fbc')) return;
+    document.cookie = `_fbc=fb.1.${Date.now()}.${fbclid}; max-age=7776000; path=/; SameSite=Lax; Secure`;
+  } catch { /* Measuring must never get in the way of the app. */ }
+}
+
+/**
  * Reports one action to the browser pixel and, for a signed-in member, to the server, which relays it to Meta's
  * conversions API. Both carry the same event id so Meta counts the action once. Nothing the member said is sent.
  */
 export async function trackMetaEvent(name: MetaEventName, eventId: string) {
-  if (!metaTrackingAllowed()) return;
+  if (!metaTrackingAllowed()) return false;
   initMetaPixel();
   window.fbq?.(name === 'CompleteRegistration' ? 'track' : 'trackCustom', name, {}, { eventID: eventId });
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return;
-    await fetch('/api/meta-events', {
+    if (!token) return false;
+    const response = await fetch('/api/meta-events', {
       method: 'POST', keepalive: true,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ eventName: name, eventId, eventSourceUrl: window.location.href, fbp: cookie('_fbp'), fbc: cookie('_fbc') }),
     });
-  } catch { /* Measuring must never get in the way of the app. */ }
+    // Our own server answered (it relayed the action, or had nothing to relay to), so it need not be tried again.
+    return response.status === 200 || response.status === 202;
+  } catch { return false; /* Measuring must never get in the way of the app. */ }
 }
 
-/** An action that counts once per member: remembered in this browser and given an id that Meta also uses to drop repeats. */
-export function trackMetaOnce(name: MetaEventName, userId: string) {
+const inFlight = new Set<string>();
+/**
+ * An action that counts once per member. It is marked as done only after our server took it, so a blocked or failed
+ * attempt is tried again at the next visit; the id is the same every time, so Meta drops a repeat.
+ */
+export async function trackMetaOnce(name: MetaEventName, userId: string) {
   const key = `meta:${name}:${userId}`;
-  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch { /* Without storage the id below still lets Meta drop a repeat. */ }
-  void trackMetaEvent(name, `${name}-${userId}`);
+  try { if (localStorage.getItem(key)) return; } catch { /* Without storage the shared id still lets Meta drop a repeat. */ }
+  if (inFlight.has(key)) return;
+  inFlight.add(key);
+  try {
+    if (await trackMetaEvent(name, `${name}-${userId}`)) { try { localStorage.setItem(key, '1'); } catch { /* Same as above. */ } }
+  } finally { inFlight.delete(key); }
 }

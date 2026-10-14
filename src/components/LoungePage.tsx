@@ -646,6 +646,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const disconnectAudio = audio.disconnect;
   useEffect(() => { if (ended) disconnectAudio(); }, [ended, disconnectAudio]);
   useEffect(() => { if (ended || !audio.connected) hostRequest.current?.abort(); }, [ended, audio.connected]);
+  // A conversation that lasts: five minutes connected to an active room, reported once per member.
+  const meId = user?.id;
+  useEffect(() => {
+    if (!meId || !audio.connected || room?.status !== 'active') return;
+    const timer = setTimeout(() => void trackMetaOnce('ConversationEngaged', meId), 5 * 60_000);
+    return () => clearTimeout(timer);
+  }, [meId, audio.connected, room?.status]);
   const connectAudio = audio.connect;
   const prepareMicrophone = audio.startMicrophone;
   const readSpeechActivity = audio.getSpeechActivity;

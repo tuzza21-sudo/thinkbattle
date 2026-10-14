@@ -5,7 +5,7 @@ import './components/HomeStudio.css';
 import './components/ServiceStudio.css';
 import { AuthModal } from './components/AuthModal';
 import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
-import { initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
+import { captureMetaClickId, initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
 import {
@@ -89,7 +89,7 @@ function App() {
   }, [normalizedPath]);
 
   // Ad measurement: the pixel starts once, every screen counts as a page view, and a new member counts once.
-  useEffect(() => { initMetaPixel(); }, []);
+  useEffect(() => { captureMetaClickId(); initMetaPixel(); }, []);
   useEffect(() => { trackMetaPageView(); }, [pathname]);
   useEffect(() => {
     if (user && !user.isAnonymous && Date.now() - Date.parse(user.createdAt) < 7 * 86_400_000) trackMetaOnce('CompleteRegistration', user.id);

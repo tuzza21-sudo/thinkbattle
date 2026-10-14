@@ -48,7 +48,7 @@ export default async function handler(req: Request): Promise<Response> {
     const sourceUrl = typeof body.eventSourceUrl === 'string' ? body.eventSourceUrl : '';
     let eventSourceUrl = origin ?? new URL(req.url).origin;
     try { const parsed = new URL(sourceUrl); if (/^https?:$/.test(parsed.protocol) && parsed.origin === new URL(req.url).origin) eventSourceUrl = `${parsed.origin}${parsed.pathname}`; } catch { /* Keep the site address. */ }
-    const text = (value: unknown) => typeof value === 'string' && /^[\w.\-:%]{1,200}$/.test(value) ? value : undefined;
+    const text = (value: unknown) => typeof value === 'string' && /^[\w.\-:%]{1,400}$/.test(value) ? value : undefined;
     const forwarded = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim();
     const userData: Record<string, unknown> = {
       external_id: [await sha256(user.id)],
