@@ -4,6 +4,7 @@ import { getLoungeHost, isLoungeHelpKind, loungeIsSolo, loungePresentMembers, lo
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
+import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
 import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, memoriesForView, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipRow } from '../src/lib/relationship';
 
@@ -27,6 +28,18 @@ const fetchTimed = (url: string, init: RequestInit, timeout = 25_000) => fetch(u
  * in parallel; whichever answers first wins and the other is cancelled. OpenAI audio usually answers in about a second
  * but sometimes stalls for tens of seconds, so waiting out the slow request is what made turns feel stuck.
  */
+// Reply suggestions cost one model call each. A short gap per member and room, and an hourly cap, keep that bounded
+// (kept per server instance, which is enough to stop a button held down).
+const replyCalls = new Map<string, number[]>();
+function replyCooldown(key: string) {
+  const now = Date.now(), recent = (replyCalls.get(key) ?? []).filter(time => now - time < 3_600_000);
+  if (recent.length && now - recent[recent.length - 1] < 4_000) return 4;
+  if (recent.length >= 60) return 600;
+  recent.push(now); replyCalls.set(key, recent);
+  if (replyCalls.size > 2000) replyCalls.delete(replyCalls.keys().next().value as string);
+  return 0;
+}
+
 function hedged<T>(attempt: (signal: AbortSignal) => Promise<T>, hedgeAfterMs: number, retryable: (error: unknown) => boolean, onHedge?: () => void) {
   return new Promise<T>((resolve, reject) => {
     const controllers: AbortController[] = [];
@@ -222,7 +235,7 @@ export default async function handler(req: Request): Promise<Response> {
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -388,6 +401,36 @@ export default async function handler(req: Request): Promise<Response> {
       catch { throw new LoungeUpstreamError('주제 추천을 받지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_topics_invalid', true, 20); }
       if (!await rpc<boolean>('finish_voice_lounge_topic_suggestions', { p_room: roomId, p_ticket: claim.ticket, p_topics: topics })) return json({ skipped: true });
       return json({ topics });
+    }
+
+    if (body.action === 'replies') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      const wait = replyCooldown(`${user.id}|${roomId}`);
+      if (wait) throw new LoungeUpstreamError('조금 뒤에 다시 추천받을 수 있어요.', 429, 'lounge_replies_cooldown', true, wait);
+      const encoded = encodeURIComponent(roomId);
+      const responses = await Promise.all([
+        fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encoded}&select=host_persona,status,expires_at`, { headers }),
+        fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encoded}&order=id.desc&limit=10&select=user_id,nickname,kind,text`, { headers }),
+        fetchTimed(`${url}/rest/v1/voice_lounge_members?room_id=eq.${encoded}&user_id=eq.${encodeURIComponent(user.id)}&active=eq.true&select=user_id`, { headers }),
+      ]);
+      if (responses.some(response => !response.ok)) throw new LoungeUpstreamError('대화 내용을 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_replies_context', true, 5);
+      const [room] = await readJson<Array<{ host_persona: string; status: string; expires_at: string | null }>>(responses[0], 'lounge');
+      const [member] = await readJson<Array<{ user_id: string }>>(responses[2], 'lounge');
+      if (!room || !member) throw new LoungeUpstreamError('방 참가 상태를 확인해 주세요. 라운지에 다시 입장해 주세요.', 403, 'lounge_access_denied', false);
+      if (room.status === 'ended' || (room.expires_at && Date.parse(room.expires_at) <= Date.now())) throw new LoungeUpstreamError('끝난 대화에서는 추천받을 수 없어요.', 410, 'lounge_replies_room_ended', false);
+      const host = getLoungeHost(room.host_persona);
+      const recent = (await readJson<Array<{ user_id: string | null; nickname: string; kind: string; text: string }>>(responses[1], 'lounge')).reverse()
+        .map(message => ({ speaker: message.kind === 'host' ? host.name : message.user_id === user.id ? '나' : message.nickname, text: message.text.slice(0, 240) }));
+      const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+        model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 500, store: false,
+        instructions: loungeReplyInstructions(host.name),
+        input: JSON.stringify({ recent }),
+        text: { format: { type: 'json_schema', name: 'lounge_reply_suggestions', strict: true, schema: loungeReplySchema } },
+      }), req.signal, 20_000), 'openai');
+      let replies: string[];
+      try { replies = readLoungeReplies(JSON.parse(modelOutputText(result) ?? '')); }
+      catch { throw new LoungeUpstreamError('답변 추천을 받지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_replies_invalid', true, 10); }
+      return json({ replies });
     }
 
     if (!['opening', 'silence', 'followup', 'requested'].includes(String(body.reason))) return json({ error: '올바르지 않은 진행 요청이에요.' }, 400);

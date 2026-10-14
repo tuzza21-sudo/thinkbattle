@@ -732,3 +732,34 @@
 
 /* The speaking ring around the AI portrait reaches 7px past it and the conversation area clips overflow, so the host column leaves room on its top and left. */
 .has-room .lounge-host-column { padding:10px 0 0 10px; box-sizing:border-box; }
+
+/* topic typed in a sheet above the phone keyboard */
+.lounge-topic-sheet-backdrop { position:fixed; inset:0; z-index:3000; background:#0b130f8c; }
+.lounge-topic-sheet { position:fixed; left:0; right:0; display:grid; gap:12px; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; background:#fffdf6; color:#26301f; box-shadow:0 -12px 40px #0006; }
+.lounge-topic-sheet-head { display:flex; align-items:center; justify-content:space-between; }
+.lounge-topic-sheet-head b { font-size:16px; }
+.lounge-topic-sheet-head button { display:grid; place-items:center; width:36px; height:36px; border:0; border-radius:50%; background:#ece8d8; color:#26301f; }
+.lounge-topic-sheet input { width:100%; box-sizing:border-box; min-height:50px; padding:0 14px; border:2px solid #cfd5c0; border-radius:12px; background:#fff; color:#26301f; font-size:16px; }
+.lounge-topic-sheet input:focus { outline:none; border-color:#6d8a4f; }
+.lounge-topic-sheet-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.lounge-topic-sheet-foot small { color:#6a735f; font-size:12px; }
+.lounge-topic-sheet-foot button { display:inline-flex; align-items:center; gap:7px; min-height:46px; padding:0 20px; border:0; border-radius:12px; background:#35503a; color:#fffaf0; font-size:14px; font-weight:750; }
+.lounge-topic-sheet-foot button:disabled { opacity:.5; }
+
+/* "suggest my reply" in a one-to-one conversation */
+.lounge-reply-suggest { display:grid; gap:8px; margin-top:12px; }
+.lounge-reply-open { display:inline-flex; align-items:center; justify-content:center; gap:8px; justify-self:start; min-height:42px; padding:0 18px; border:1px solid #dfc99666; border-radius:999px; background:#111b15cc; color:#ecd9aa; font-size:13px; font-weight:750; backdrop-filter:blur(6px); cursor:pointer; }
+.lounge-reply-open:disabled { opacity:.6; }
+.lounge-reply-suggest.open { padding:14px; border:1px solid #dfc99644; border-radius:18px; background:#111b15e6; color:#fffaf0; backdrop-filter:blur(8px); }
+.lounge-reply-head { display:flex; align-items:center; justify-content:space-between; }
+.lounge-reply-head b { font-size:14px; color:#ecd9aa; }
+.lounge-reply-close { display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:50%; background:#ffffff1c; color:#fffaf0; cursor:pointer; }
+.lounge-reply-suggest ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.lounge-reply-suggest li button { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:12px 14px; border:1px solid #ffffff22; border-radius:14px; background:#ffffff12; color:#fffaf0; font-size:14px; line-height:1.55; text-align:left; word-break:keep-all; cursor:pointer; transition:background .2s,border-color .2s; }
+.lounge-reply-suggest li button:hover:not(:disabled) { background:#dfc99626; border-color:#dfc996; }
+.lounge-reply-suggest li button:disabled { opacity:.6; }
+.lounge-reply-suggest li svg { flex-shrink:0; color:#ecd9aa; }
+.lounge-reply-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.lounge-reply-foot small { color:#c8d1bd; font-size:11px; line-height:1.5; }
+.lounge-reply-foot button { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:7px 12px; border:1px solid #ffffff33; border-radius:99px; background:transparent; color:#ecd9aa; font-size:12px; cursor:pointer; }
+.lounge-reply-error { margin:0; color:#ffb4a8; font-size:12px; }

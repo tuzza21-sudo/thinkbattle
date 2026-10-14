@@ -17,7 +17,8 @@ const sessionLib = compile('../src/lib/loungeSession.ts');
 const knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const repliesLib = compile('../src/lib/loungeReplies.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -2124,4 +2125,29 @@ test('a one-shot reply from 윤지안 comes back as a WAV the browser can decode
       });
     } finally { delete process.env.GEMINI_API_KEY; }
   }
+});
+
+test('reply suggestions need a seat in the room, are spaced out and return spoken replies', async () => {
+  const model = { output: [{ content: [{ type: 'output_text', text: JSON.stringify({ replies: ['네, 좀 그랬어요.', '사실 저도 궁금해요.', '그럼 어떻게 하세요?'] }) }] }] };
+  let paid = 0, seated = true;
+  const mock = async url => {
+    if (url.includes('/auth/')) return result({ id: 'replies-member' });
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_persona: 'trickster', status: 'active', expires_at: null }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ user_id: null, nickname: '진행자', kind: 'host', text: '어서 와요.' }]);
+    if (url.includes('voice_lounge_members?')) return result(seated ? [{ user_id: 'replies-member' }] : []);
+    if (url.endsWith('/responses')) { paid++; return result(model); }
+    throw new Error(`unexpected request ${url}`);
+  };
+  const ask = () => handler(request({ action: 'replies', roomId: 'lounge-00000000-0000-4000-8000-0000000000aa' }));
+  await run(mock, async () => {
+    const first = await ask();
+    assert.equal(first.status, 200); assert.deepEqual((await first.json()).replies, ['네, 좀 그랬어요.', '사실 저도 궁금해요.', '그럼 어떻게 하세요?']);
+    const again = await ask();
+    assert.equal(again.status, 429); assert.equal((await again.json()).code, 'lounge_replies_cooldown'); assert.equal(paid, 1, 'a held-down button must not buy more suggestions');
+  });
+  seated = false; paid = 0;
+  await run(mock, async () => {
+    const response = await handler(request({ action: 'replies', roomId: 'lounge-00000000-0000-4000-8000-0000000000bb' }));
+    assert.equal(response.status, 403); assert.equal(paid, 0, 'a non-member never reaches the model');
+  });
 });
