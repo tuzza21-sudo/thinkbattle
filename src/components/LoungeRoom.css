@@ -792,3 +792,7 @@
   .has-room .lounge-back,.has-room .lounge-header-end { display:none; }
   .has-room .lounge-header { justify-content:center; }
 }
+
+/* shown when the AI's reply is late */
+.lounge-slow-note { display:flex; align-items:center; gap:8px; margin:10px 0 0; padding:10px 14px; border:1px solid #ffffff30; border-radius:14px; background:#ffffff12; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff5e9; font-size:12.5px; line-height:1.6; text-shadow:0 1px 4px #000d; }
+.lounge-slow-note svg { flex-shrink:0; }

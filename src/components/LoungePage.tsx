@@ -191,6 +191,18 @@ function RoomView(props: RoomViewProps) {
   const needsConnection = !props.preview && !ended && (!props.connected || !props.audioReady || (solo && props.status === 'lobby'));
   const liveSpeakers = ended || props.status === 'lobby' ? [] : props.members.filter(member => props.speakers.includes(member.id));
   const hostSpeaking = props.aiSpeaking && !ended;
+  // A reply that takes long says so. The AI can be slow to answer, or still waiting for a pause in the speech, and
+  // from the outside both look like a frozen room.
+  const [slowReply, setSlowReply] = useState(false);
+  useEffect(() => {
+    if (!props.pending) { setSlowReply(false); return; }
+    const timer = setTimeout(() => setSlowReply(true), 8000);
+    return () => clearTimeout(timer);
+  }, [props.pending]);
+  const lastMessage = props.messages.at(-1);
+  const waitingForReply = solo && !ended && props.status === 'active' && !props.pending && !hostSpeaking && lastMessage?.kind === 'human'
+    && props.now !== undefined && props.now - Date.parse(lastMessage.created_at) > 15_000;
+  const replyDelayed = !ended && !hostSpeaking && (slowReply || waitingForReply);
   const closeJournal = () => { setJournalOpen(false); journalToggle.current?.focus(); };
   const toggleJournal = (button: HTMLButtonElement) => {
     journalToggle.current = button;
@@ -227,9 +239,9 @@ function RoomView(props: RoomViewProps) {
         </div>
         <div className="lounge-conversation-space">
           <div className="lounge-host-column">
-            <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><LoungeHostPortrait hostId={props.hostId} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{hostTitle}</h2><span className="lounge-moderator-caption">{hostSpeaking ? solo ? '대화 상대 · 이야기하는 중' : 'AI 도우미 · 이야기하는 중' : props.pending ? solo ? '대화 상대 · 생각하는 중…' : 'AI 도우미 · 생각하는 중…' : solo ? '대화 상대 · 편하게 이야기해요' : 'AI 도우미 · 필요할 때 불러 주세요'}</span>{props.relationship && <LoungeRelationship view={props.relationship} />}</div><VoiceWave active={hostSpeaking} /></div>
+            <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><LoungeHostPortrait hostId={props.hostId} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{hostTitle}</h2><span className="lounge-moderator-caption">{hostSpeaking ? solo ? '대화 상대 · 이야기하는 중' : 'AI 도우미 · 이야기하는 중' : replyDelayed ? solo ? '대화 상대 · 답변이 늦어지고 있어요' : 'AI 도우미 · 답변이 늦어지고 있어요' : props.pending ? solo ? '대화 상대 · 생각하는 중…' : 'AI 도우미 · 생각하는 중…' : solo ? '대화 상대 · 편하게 이야기해요' : 'AI 도우미 · 필요할 때 불러 주세요'}</span>{props.relationship && <LoungeRelationship view={props.relationship} />}</div><VoiceWave active={hostSpeaking} /></div>
 
-            
+            {replyDelayed && <p className="lounge-slow-note" role="status"><LoaderCircle size={14} className="lounge-spin" />응답이 평소보다 늦어지고 있어요. 곧 이어갈게요. 계속 멈춰 있으면 한 번 더 말씀해 주세요.</p>}
           </div>
           <div className="lounge-place-view" aria-hidden="true"><div className="lounge-scene-intro"><span>{theme.tag}</span><p>{theme.caption}</p><div className="lounge-stage-label"><Headphones size={15} /> 함께 머무는 대화석 <span>{solo ? 'AI와 1:1' : `${props.members.length} / ${props.capacity}명`}</span></div></div></div>
           <aside className="lounge-participant-panel" aria-label="함께하는 참가자">
@@ -789,7 +801,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (controller.signal.aborted) return;
       if (err instanceof LoungeApiError) {
         hostBlocked.current = !err.retryable;
-        nextHostAttempt.current = Date.now() + Math.max(30, err.retryAfterSeconds) * 1000;
+        nextHostAttempt.current = Date.now() + Math.max(3, err.retryAfterSeconds) * 1000;
       }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.
       const yielded = err instanceof LoungeApiError && err.code === 'lounge_audio_deferred' && reason !== 'requested';
