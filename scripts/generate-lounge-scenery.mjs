@@ -43,9 +43,10 @@ const scenes = {
     file: 'cocktail-bar-v1.webp',
     prompt: `${common} An upscale cocktail bar seen from a seat at the bar counter. In the foreground on the polished dark stone bar top, softly out of focus, two beautifully garnished cocktails: a coupe glass with a pale pink drink and a citrus twist, and a lowball glass with one large clear ice cube and amber whisky, a long bar spoon and a small dish of olives. Behind the counter an illuminated back bar with glass shelves of bottles whose labels are blank, brass fittings, a mirror reflecting warm lights, deep burgundy leather stools, amber and wine-red glow with deep shadows. Intimate, elegant and a little mysterious.`,
   },
+  // 백도하 became a late-night talk show host; the 'theater' theme id is kept for existing rooms (the earlier scene is improv-theater-v1.webp).
   theater: {
-    file: 'improv-theater-v1.webp',
-    prompt: `${common} A small black-box improv theatre just before a show: a low empty wooden stage with a scuffed floor lit by one warm spotlight and a soft blue wash, a few mismatched props on the stage (a bentwood chair, a trench coat on a stand, a battered suitcase, a rolled-up rug), a deep burgundy curtain at the back, a handful of rows of worn red velvet seats in the foreground softly out of focus, string lights along the side wall. Playful, warm and full of possibility.`,
+    file: 'talkshow-stage-v1.webp',
+    prompt: `${common} A late-night talk show set seen from the empty audience side just before the show: a polished dark wooden host desk with a warm brass lamp, a ceramic mug and a small stack of blank cue cards, a guest armchair in deep burgundy leather beside it, a deep blue backdrop with a softly glowing abstract city skyline and golden bokeh lights, a warm spotlight on the desk area and a soft blue wash on the backdrop, studio cameras on pedestals softly out of focus at the sides, tiered rows of empty audience seats in the foreground softly out of focus. Warm, witty, inviting and full of anticipation.`,
   },
 };
 

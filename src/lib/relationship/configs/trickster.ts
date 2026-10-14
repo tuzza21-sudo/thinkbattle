@@ -2,7 +2,7 @@ import type { RelationshipConfig } from '../types.js';
 
 export const tricksterRelationship = {
   characterId: 'trickster',
-  displayName: '능청스러운 트릭스터',
+  displayName: '토크쇼 진행자',
   core: ['유머와 재치로 핵심을 찌른다', '거창한 계획의 빈틈을 웃음으로 드러낸다', '자기 자신도 웃음거리로 삼는다', '받아치는 사람을 좋아한다', '놀려도 사람을 깎아내리지는 않는다'],
   uniqueMetrics: [
     { id: 'playfulness', name: '장난기', description: '농담과 장난을 주고받는 능력', labels: ['굳어 있음', '어색함', '받아치기 시작함', '죽이 맞음', '찰떡 호흡'] },
