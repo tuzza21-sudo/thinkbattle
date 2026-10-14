@@ -290,7 +290,16 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         frame.current = requestAnimationFrame(tick);
       };
       setMicOn(true); setError(''); tick();
-    } catch (err) { stopMicrophone(); setError(err instanceof Error && err.name === 'NotAllowedError' ? '마이크 권한이 꺼져 있어요. 브라우저에서 허용하거나 글로 이야기해 주세요.' : err instanceof Error ? err.message : '마이크 권한을 확인해 주세요.'); }
+    } catch (err) {
+      stopMicrophone();
+      // The browser's own messages are English ("Requested device not found"); say what to do instead.
+      const reasons: Record<string, string> = {
+        NotAllowedError: '마이크 권한이 꺼져 있어요. 브라우저에서 허용하거나 글로 이야기해 주세요.',
+        NotFoundError: '마이크를 찾지 못했어요. 마이크나 헤드셋이 연결돼 있고 컴퓨터의 소리 입력 장치로 잡혀 있는지 확인하거나 글로 이야기해 주세요.',
+        NotReadableError: '마이크를 쓸 수 없어요. 다른 앱이 마이크를 쓰고 있는지 확인하거나 글로 이야기해 주세요.',
+      };
+      setError(err instanceof Error ? reasons[err.name] ?? err.message : '마이크 권한을 확인해 주세요.');
+    }
     finally { pending.current = false; }
   }, [connected, stopMicrophone, enableAudio, capacity]);
   useEffect(() => {

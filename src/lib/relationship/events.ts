@@ -11,6 +11,7 @@ export const relationshipEventTypes = [
   'SHOWS_ENTITLEMENT', 'FLATTERS_CHARACTER', 'DECEIVES_CHARACTER', 'EXPRESSES_DISTRESS',
   'SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE',
   'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF',
+  'FLIRTS_PLAYFULLY',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
 export type EventSeverity = 'normal' | 'meaningful' | 'strong' | 'severe';
@@ -26,7 +27,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   SEEKS_REASSURANCE_REPEATEDLY: { description: '같은 인정이나 안심을 거듭 요구함', severity: 'normal', importance: 0.4 },
   SELF_DEPRECATES_EXCESSIVELY: { description: '자신을 지나치게 깎아내림', severity: 'normal', importance: 0.4 },
   RESPECTS_BOUNDARY: { description: 'AI가 거절하거나 선을 그은 것을 존중함', severity: 'meaningful', importance: 0.7 },
-  VIOLATES_BOUNDARY: { description: '거절한 요구를 고집하거나 모욕·성적 요구를 함', severity: 'severe', importance: 0.95 },
+  VIOLATES_BOUNDARY: { description: '캐릭터가 거절하거나 선을 그은 요구를 고집하거나 모욕·강요·협박을 함. 성적인 요구도 캐릭터가 선을 그은 뒤에 이어 가면 해당하고, 캐릭터가 받아 주는 성인 사이의 가벼운 플러팅이나 성적 농담 자체는 해당하지 않음', severity: 'severe', importance: 0.95 },
   KEEPS_PROMISE: { description: '이 대화에서 앞서 하겠다고 한 일을 실제로 해 왔다고 밝힘', severity: 'strong', importance: 0.85 },
   BREAKS_PROMISE: { description: '분명히 약속한 일을 이유 없이 지키지 않음', severity: 'strong', importance: 0.85 },
   SHOWS_CURIOSITY: { description: '진심으로 더 알고 싶어 함', severity: 'normal', importance: 0.3 },
@@ -54,6 +55,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   ANSWERS_DIRECTLY: { description: 'AI의 질문에 돌려 말하지 않고 핵심부터 직접 답함', severity: 'normal', importance: 0.5 },
   EVADES_QUESTION: { description: 'AI의 질문에 답하지 않고 화제를 돌리거나 다른 말로 넘어감', severity: 'normal', importance: 0.4 },
   CONTRADICTS_SELF: { description: '앞서 한 말과 모순되는 말을 하고도 그 차이를 인정하지 않음', severity: 'normal', importance: 0.5 },
+  FLIRTS_PLAYFULLY: { description: '상대(AI 캐릭터)에게 장난스럽고 다정하게 호감을 표현하거나 가볍게 유혹함. 상대가 불편해하지 않는 선 안의 말이며, 노골적이거나 강요하는 말은 해당하지 않음', severity: 'normal', importance: 0.5 },
 };
 
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
@@ -102,4 +104,5 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   ANSWERS_DIRECTLY: { deltas: {} },
   EVADES_QUESTION: { deltas: {} },
   CONTRADICTS_SELF: { deltas: {} },
+  FLIRTS_PLAYFULLY: { deltas: {} },
 };

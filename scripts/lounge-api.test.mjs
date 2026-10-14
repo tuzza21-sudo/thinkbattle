@@ -120,7 +120,8 @@ test('only the first group host turn permits a pass reminder and research announ
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body);
       assert.equal(JSON.parse(body.input).first_host_turn, aiTurns === 1);
-      assert.match(body.instructions, aiTurns === 1 ? /이번 첫 인사에서만/ : /첫 인사는 이미 끝났다\. 패스 가능.*반복하지 않는다/);
+      // Both rules are fixed text; first_host_turn in the input says which one applies, so the instructions stay the same.
+      assert.match(body.instructions, /first_host_turn=true이면 이번 첫 인사에서만/); assert.match(body.instructions, /first_host_turn=false이면 첫 인사는 이미 끝났다\. 패스 가능.*반복하지 않는다/);
       assert.match(body.instructions, /2~3문장, 180자 이내/);
       assert.doesNotMatch(body.instructions, /4~6문장|round_summary|free_ending/);
       assert.match(body.instructions, /진행 멘트를 말하지 않는다/);
@@ -186,7 +187,7 @@ test('a question about the field of the character brings the closest knowledge a
         if (url.includes('voice_lounge_messages?')) return result(text ? [{ id: 1, user_id: 'user-1', nickname: '나', kind: 'human', text }] : []);
         if (url.includes('voice_lounge_members?')) return result(members);
         if (url.includes('/rest/v1/lounge_character_knowledge?')) { calls.presence++; assert.ok(url.includes(`character_id=eq.${host}`) && url.includes('limit=1')); assert.equal(init.headers.Authorization, 'Bearer service'); return presence === 'error' ? result({ message: 'denied' }, 403) : result(presence === 'none' ? [] : [{ id: 'k1' }]); }
-        if (url.endsWith('/embeddings')) { calls.embeddings++; if (embeddingDelay) await new Promise(resolve => setTimeout(resolve, embeddingDelay)); const body = JSON.parse(init.body); assert.equal(body.dimensions, 256); assert.equal(body.model, 'text-embedding-3-small'); assert.ok(body.input.includes('증거능력')); return embeddingStatus === 200 ? result({ data: [{ embedding: unit.map(value => value * 3) }] }) : result({ error: { message: 'x' } }, embeddingStatus); }
+        if (url.endsWith('/embeddings')) { calls.embeddings++; const delay = Array.isArray(embeddingDelay) ? embeddingDelay[calls.embeddings - 1] ?? 0 : embeddingDelay; if (delay) await new Promise(resolve => setTimeout(resolve, delay)); const body = JSON.parse(init.body); assert.equal(body.dimensions, 256); assert.equal(body.model, 'text-embedding-3-small'); assert.ok(body.input.includes('증거능력')); return embeddingStatus === 200 ? result({ data: [{ embedding: unit.map(value => value * 3) }] }) : result({ error: { message: 'x' } }, embeddingStatus); }
         if (url.includes('pick_lounge_character_knowledge')) {
           calls.match++; const body = JSON.parse(init.body);
           assert.equal(body.p_room, roomId, 'the room, so a story is not told twice in it'); assert.deepEqual(body.p_users, expectedUsers, 'the people present, so nobody hears a story twice'); assert.ok(body.p_snippet.includes('증거능력'), 'the question is kept with the record');
@@ -197,12 +198,14 @@ test('a question about the field of the character brings the closest knowledge a
           return rpcStatus === 200 ? result(entries) : result({ message: 'boom' }, rpcStatus);
         }
         if (url.endsWith('/responses')) {
-          const { instructions } = JSON.parse(init.body);
-          assert.equal(instructions.includes('[전문 지식]'), expectKnowledge, text);
+          const { instructions, input } = JSON.parse(init.body), found = JSON.parse(input).character_knowledge ?? '';
+          // Found knowledge travels in the input; the instructions never change with it, so they stay cached.
+          assert.ok(!instructions.includes('[전문 지식]') && !instructions.includes('[겪은 일]'));
+          assert.equal(found.includes('[전문 지식]'), expectKnowledge, text);
+          assert.match(instructions, /character_knowledge는 서버가 이번 질문에 맞춰 넣은 네 전문 지식/);
           if (expectKnowledge) {
-            assert.ok(instructions.includes('- 증거능력과 증명력: 증거능력은 법정에서 쓸 수 있는 자격이다.') && instructions.includes('[겪은 일]') && instructions.includes('세 번째 질문에서 진짜 답이 나왔다.'));
-            assert.ok(instructions.includes('(교훈: 질문을 바꿔 다시 묻는다.)') && instructions.includes('이미 들려준 일화는 다시 꺼내지 않는다'), 'the lesson and the use-sparingly rules reach the prompt');
-            assert.ok(instructions.lastIndexOf('[전문 지식]') > instructions.indexOf('역할:'), 'found knowledge comes after the fixed text');
+            assert.ok(found.includes('- 증거능력과 증명력: 증거능력은 법정에서 쓸 수 있는 자격이다.') && found.includes('[겪은 일]') && found.includes('세 번째 질문에서 진짜 답이 나왔다.'));
+            assert.ok(found.includes('(교훈: 질문을 바꿔 다시 묻는다.)') && found.includes('이미 들려준 일화는 다시 꺼내지 않는다'), 'the lesson and the use-sparingly rules reach the prompt');
           }
           return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] });
         }
@@ -244,10 +247,13 @@ test('a question about the field of the character brings the closest knowledge a
   const slowStarted = performance.now();
   await scenario({ text: '증거능력이 정확히 뭐예요?', embeddingDelay: 2500, expectKnowledge: false });
   assert.ok(performance.now() - slowStarted < 2000, `the reply waited ${Math.round(performance.now() - slowStarted)} ms`);
+  // A stalled embedding is asked once more and the faster answer is used, so the lookup still finds the knowledge.
+  await scenario({ text: '증거능력이 정확히 뭐예요?', embeddingDelay: [2500, 0], expectKnowledge: true });
+  assert.equal(calls.embeddings, 2, 'a second embedding request after the first stalled');
 });
 
-test('the prompt starts with the same fixed text on every turn and ends with what changes', async () => {
-  const seen = [];
+test('the instructions are the same on every turn so they stay cached; what changes goes in the input', async () => {
+  const seen = [], inputs = [];
   for (const [aiTurns, count] of [[1, 2], [4, 3]]) {
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -255,17 +261,17 @@ test('the prompt starts with the same fixed text on every turn and ends with wha
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'closer', memory: '', capacity: 6, ai_turns: aiTurns }]);
       if (url.includes('voice_lounge_messages?')) return result([]);
       if (url.includes('voice_lounge_members?')) return result(Array.from({ length: count }, (_, index) => ({ user_id: `human-${index}`, nickname: `손님${index}`, last_seen: new Date().toISOString() })));
-      if (url.endsWith('/responses')) { seen.push(JSON.parse(init.body).instructions); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '' }) }] }] }); }
+      if (url.endsWith('/responses')) { const body = JSON.parse(init.body); seen.push(body.instructions); inputs.push(JSON.parse(body.input)); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '' }) }] }] }); }
       if (url.includes('finish_voice_lounge_host')) return result(true);
       if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 32]));
       throw new Error('Unexpected call');
     }, async () => { await handler(request({ action: 'host', roomId, reason: 'silence' })); });
   }
   assert.equal(seen.length, 2);
-  // Different people counts and a first greeting versus a later one only change the end.
-  let shared = 0; while (shared < seen[0].length && seen[0][shared] === seen[1][shared]) shared++;
-  assert.ok(shared > seen[0].length * 0.9, `shared start is ${shared} of ${seen[0].length} characters`);
-  assert.match(seen[0], /현재 사람 2명이 함께 있다/); assert.match(seen[1], /현재 사람 3명이 함께 있다/);
+  // Different people counts and a first greeting versus a later one change only the input. The provider caches the
+  // instructions as a whole, so a single changed character would leave all of them uncached.
+  assert.equal(seen[0], seen[1]);
+  assert.deepEqual(inputs.map(input => [input.participant_count, input.first_host_turn]), [[2, true], [3, false]]);
 });
 
 test('ten silent seconds end an actual utterance but never an unstarted turn, ongoing speech or free conversation', () => {
@@ -856,7 +862,7 @@ test('a relationship character reads stored state, classifies events in the same
     if (url.includes('voice_lounge_relationships?')) {
       assert.equal(init.headers.Authorization, 'Bearer service-key', 'relationship state is read with the server role only');
       assert.match(url, /user_id=eq\.user-1/);
-      return result([velvetRow, { ...velvetRow, character_id: 'auditor', stage: 'UNVERIFIED' }]);
+      return result([velvetRow, { ...velvetRow, character_id: 'auditor', stage: 'FIRST_MEETING' }]);
     }
     if (url.includes('voice_lounge_rooms?')) { assert.match(url, /ai_mood/); return result([relationshipRoom()]); }
     if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '그건 네 해석이고, 난 근거가 달라.' }, { id: 1, nickname: 'AI', kind: 'host', text: '흥미로운 변명이군.' }]);
@@ -1118,7 +1124,7 @@ test('there are exactly eight hosts, each with a relationship configuration and 
   assert.deepEqual(Object.keys(relationshipLib.relationshipConfigs).sort(), [...lounge.loungeRelationshipHostIds].sort());
   assert.equal(lounge.isLoungeRelationshipHost('sunny'), false);
   for (const host of lounge.loungeHosts) {
-    assert.match(host.companion, /사람의 가치|사람 자체|사람이 아니다/, `${host.id} companion never judges the person`);
+    assert.match(host.companion, /사람의 가치|사람 자체|사람이 아니다|인간으로서의 가치/, `${host.id} companion never judges the person`);
     assert.ok(host.instruction.length > 200 && host.instruction.includes('여럿일 때'), `${host.id} has a real group instruction`);
   }
 });
@@ -1168,7 +1174,7 @@ for (const [count, mode] of [[1, 'pair'], [2, 'pair'], [3, 'group']]) {
         assert.ok(payload.instructions.includes('사람끼리 이야기하는 방에 함께 있는'));
         assert.ok(!payload.instructions.includes('대화 상대다. 진행자나 인터뷰어가 아니다'));
         assert.match(payload.instructions, /너는 .+이다\./); assert.ok(payload.instructions.includes(charactersLib.loungeCharacterRules)); assert.doesNotMatch(payload.instructions, /AI 도우미다/);
-        assert.match(payload.instructions, new RegExp(`현재 사람 ${count}명이 함께 있다`));
+        assert.doesNotMatch(payload.instructions, /현재 사람 \d+명/, 'the count is in the input, so the instructions stay cached');
         return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어떤 생각이 남았나요?', memory: '' }) }] }] });
       }
       if (url.includes('finish_voice_lounge_host')) return result(true);
@@ -1296,15 +1302,15 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   const now = Date.now();
   const room = { status: 'active', capacity: 1, ai_turns: 2, last_ai_at: new Date(now - 6000).toISOString(), started_at: new Date(now - 10_000).toISOString() };
   const messages = [{ id: 1, kind: 'host', created_at: room.last_ai_at }, { id: 2, kind: 'human', created_at: new Date(now - 500).toISOString() }];
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1600, now - 6000, now - 1600, now - 350), 'followup', 'replies 1.5 s after the user stops and 0.3 s after the transcript');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1600, now - 6000, now - 1600, now - 350), 'followup', 'replies 1 s after the user stops and 0.3 s after the transcript');
   assert.equal(lounge.nextLoungeHostReason({ ...room, capacity: 6 }, messages, now, now - 500, now - 4000), null);
   assert.equal(lounge.nextLoungeHostReason(room, [...messages, { id: 3, kind: 'host', created_at: new Date(now).toISOString() }], now, now - 500, now - 4000), null, 'do not answer the same human twice');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now, now - 4000), null, 'wait until the human finishes');
   assert.equal(lounge.nextLoungeHostReason({ ...room, ai_turns: 120 }, messages, now, now - 500, 0), null);
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1400, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 800, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 1000, now - 1200), null, 'wait after the AI finishes speaking');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 200), null, 'settle after transcription is saved');
-  assert.equal(lounge.loungeSpeechPauseMs(1), 1500);
+  assert.equal(lounge.loungeSpeechPauseMs(1), 1000);
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
 });
 
@@ -1369,6 +1375,8 @@ test('group help follows the requested kind and each scheduled announcement stay
   const cases = [
     { reason: 'requested', kind: undefined, stored: 'summary', expect: 'summary', session: { stage: 2, state: 'free' } },
     { reason: 'requested', kind: 'question', stored: 'spark', expect: 'question', session: { stage: 3, state: 'free' } },
+    { reason: 'requested', kind: 'opinion', stored: 'spark', expect: 'opinion', session: { stage: 3, state: 'free' } },
+    { reason: 'requested', kind: undefined, stored: 'opinion', expect: 'opinion', session: { stage: 2, state: 'free' } },
     { reason: 'requested', kind: undefined, stored: 'direct', expect: 'direct', session: { stage: 2, state: 'free' } },
     { reason: 'opening', session: { stage: 1, state: 'ready', speaker_id: 'b' }, rule: /stage_index=1이면 자기소개에서 이어지는 첫 이야기다. 1~2문장, 150자 이내/ },
     { reason: 'opening', session: { stage: 5, state: 'ready', speaker_id: 'a' }, rule: /stage_index=5이면 마무리다. 1~2문장, 120자 이내/ },
@@ -1391,6 +1399,9 @@ test('group help follows the requested kind and each scheduled announcement stay
       assert.match(body.instructions, /조용한 사람에게 답을 요구하지 않는다/);
       assert.match(body.instructions, /- summary: 지금까지 나온 서로 다른 생각 2~3가지를 실제 발언만으로 짧게 묶는다/);
       assert.match(body.instructions, /- direct: 누군가 너를 직접 불러 물었다/);
+      // "AI 의견 듣기" deepens the talk that is going on: no new topic, one view with its reason, no verdict on the people.
+      assert.match(body.instructions, /- opinion: 지금 사람들이 나누고 있는 이야기에 대한 네 의견을 듣고 싶다는 요청이다. 새 화제로 넘어가지 않고/);
+      assert.match(body.instructions, /참가자의 의견을 판정하거나 대신 정하지 않고/);
       assert.doesNotMatch(body.instructions, /round_summary|free_ending|4~9문장|4~6문장/);
       if (item.rule) assert.match(body.instructions, item.rule);
       assert.equal(body.max_output_tokens, 1000, 'room for the reply and a 600-character memory with headroom');
@@ -1412,7 +1423,9 @@ test('guided scheduling announces only the greeting, the first topic and the clo
   assert.equal(sessionLib.loungeSessionHostReason({ ...session, stage: 5, state: 'speaking' }), null);
   assert.equal(sessionLib.loungeSessionHostReason({ ...session, state: 'summarizing' }), null);
   assert.deepEqual([...sessionLib.loungeAnnouncedStages], [0, 1, 5]);
-  assert.deepEqual(lounge.loungeHelpOptions.map(option => option.kind), ['spark', 'question', 'topic', 'summary']);
+  assert.deepEqual(lounge.loungeHelpOptions.map(option => option.kind), ['spark', 'question', 'opinion', 'topic', 'summary']);
+  assert.equal(lounge.loungeHelpOptions.find(option => option.kind === 'opinion').label, 'AI 의견 듣기');
+  assert.ok(lounge.isLoungeHelpKind('opinion') && !lounge.isLoungeHelpKind('lecture'));
 });
 
 test('moderator context follows the stored category instead of a shared film discussion outline', async () => {
@@ -2022,5 +2035,81 @@ test('LiveKit creates a room with one seat for solo and six seats for a group', 
     for (const name of ['LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET']) {
       if (originalEnv[name] === undefined) delete process.env[name]; else process.env[name] = originalEnv[name];
     }
+  }
+});
+
+test('윤지안 (id diplomat) speaks with Gemini through the same PCM stream, and OpenAI speaks for her when Gemini fails', async () => {
+  const pcm = Uint8Array.from({ length: 3000 }, (_, index) => (index * 7) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
+  const sse = chunks => chunks.map(chunk => `data: ${JSON.stringify(chunk)}
+
+`).join('');
+  const piece = bytes => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(bytes).toString('base64') } }] } }] });
+  const scenarios = {
+    gemini: { key: 'gem-key', upstream: () => new Response(sse([piece(pcm.subarray(0, 1200)), piece(pcm.subarray(1200))]), { headers: { 'Content-Type': 'text/event-stream' } }), expect: pcm, gemini: 1, openai: 0 },
+    blocked: { key: 'gem-key', upstream: () => new Response(sse([{ candidates: [{ finishReason: 'SAFETY', content: { parts: [] } }] }])), expect: fallback, gemini: 1, openai: 1 },
+    down: { key: 'gem-key', upstream: () => new Response('nope', { status: 500 }), expect: fallback, gemini: 1, openai: 1 },
+    nokey: { key: undefined, upstream: () => { throw new Error('must not be called'); }, expect: fallback, gemini: 0, openai: 1 },
+  };
+  for (const [name, scenario] of Object.entries(scenarios)) {
+    const calls = { gemini: 0, openai: 0 };
+    if (scenario.key) process.env.GEMINI_API_KEY = scenario.key; else delete process.env.GEMINI_API_KEY;
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'diplomat', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어서 와요, 오늘은 어떤 이야기예요?', memory: '' }) }] }] });
+        if (url.includes('generativelanguage.googleapis.com')) {
+          calls.gemini++;
+          assert.ok(url.includes('gemini-3.1-flash-tts-preview:streamGenerateContent?alt=sse'), 'the speech model and the streaming route');
+          assert.equal(init.headers['x-goog-api-key'], scenario.key, 'the key goes in a header, not the address');
+          const body = JSON.parse(init.body);
+          assert.equal(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Despina');
+          assert.deepEqual(body.generationConfig.responseModalities, ['AUDIO']);
+          assert.ok(body.contents[0].parts[0].text.includes('어서 와요, 오늘은 어떤 이야기예요?') && body.contents[0].parts[0].text.includes('도도'), 'the sentence and her way of speaking');
+          return scenario.upstream();
+        }
+        if (url.endsWith('/audio/speech')) { calls.openai++; assert.equal(JSON.parse(init.body).voice, 'nova', 'OpenAI keeps her nova voice as the fallback'); return new Response(fallback); }
+        if (url.includes('finish_voice_lounge_host')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+        assert.equal(response.status, 200, name);
+        const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.deepEqual([...heard], [...scenario.expect], `${name}: what the listener hears`);
+        assert.equal(events.at(-1).type, 'done', name);
+        assert.deepEqual(calls, { gemini: scenario.gemini, openai: scenario.openai }, name);
+      });
+    } finally { delete process.env.GEMINI_API_KEY; }
+  }
+});
+
+test('a one-shot reply from 윤지안 comes back as a WAV the browser can decode, and falls back to the OpenAI mp3', async () => {
+  const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 5) % 256), mp3 = new Uint8Array([1, 2, 3]);
+  for (const [name, geminiAnswer] of [['gemini', () => result({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(pcm).toString('base64') } }] } }] })], ['down', () => result({ error: { message: 'x' } }, 503)]]) {
+    process.env.GEMINI_API_KEY = 'gem-key';
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'diplomat', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어서 와요.', memory: '' }) }] }] });
+        if (url.includes('generativelanguage.googleapis.com')) { assert.ok(url.endsWith(':generateContent'), 'one request for the whole reply'); return geminiAnswer(); }
+        if (url.endsWith('/audio/speech')) { assert.equal(JSON.parse(init.body).response_format, 'mp3'); return new Response(mp3); }
+        if (url.includes('finish_voice_lounge_host')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const answer = await (await handler(request({ action: 'host', roomId, reason: 'followup' }))).json();
+        const audio = Buffer.from(answer.audio, 'base64');
+        if (name === 'gemini') {
+          assert.equal(audio.subarray(0, 4).toString(), 'RIFF'); assert.equal(audio.subarray(8, 12).toString(), 'WAVE');
+          assert.equal(audio.readUInt32LE(24), 24000, 'sample rate'); assert.equal(audio.readUInt16LE(22), 1, 'mono'); assert.equal(audio.readUInt16LE(34), 16, '16 bit');
+          assert.deepEqual([...audio.subarray(44)], [...pcm]);
+        } else assert.deepEqual([...audio], [...mp3], 'the OpenAI mp3 when Gemini fails');
+      });
+    } finally { delete process.env.GEMINI_API_KEY; }
   }
 });

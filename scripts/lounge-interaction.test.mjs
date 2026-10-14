@@ -95,6 +95,15 @@ test('ordinary attacks warn, severe attacks restrict immediately, and uncertaint
   assert.throws(()=>lib.readLoungeInteraction(output({...raw,moderation:'ban'}),members,a,'내용'));
   assert.match(lib.loungeInteractionInstructions,/작품의 대사 인용/);assert.match(lib.loungeInteractionInstructions,/신뢰할 수 없는/);
 });
+test('flirting and mild sexual teasing between adults are allowed; only insults, harassment and the narrow cases are restricted',()=>{
+  const text=lib.loungeInteractionInstructions;
+  assert.match(text,/플러팅, 유혹, 성적인 농담, 약한 수준의 성적 암시나 자극, 애정 표현은 제한하지 않고 allow/);
+  assert.match(text,/성적인 단어가 들어 있다는 이유만으로 warn이나 restrict를 선택하지 않는다/);
+  // Sexual harassment stays, but only for what is unwelcome, degrading, graphic, about minors or coerced.
+  for(const narrow of ['싫다고 하거나 불쾌감을 드러낸 뒤에도 이어지는 성적인 접근','노골적인 성행위의 상세한 묘사','미성년자와 관련된 성적 내용','강요나 협박이 섞인 성적 요구']) assert.ok(text.includes(narrow),narrow);
+  // Insults and profanity at a person are still warned.
+  assert.match(text,/인신공격·욕설·괴롭힘이면 warn/);
+});
 test('reply prompts and queues preserve the current target’s basic opportunity',()=>{
   const session={stage:2,speaker_id:b,turn_kind:'reply',reply_question:'어떤 문장이 남았나요?',round_order:[a,b],completed:[a],hand_queue:[],reply_queue:[]};
   assert.equal(sessionLib.loungeSessionPrompt(session),session.reply_question);

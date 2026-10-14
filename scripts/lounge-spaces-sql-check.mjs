@@ -139,7 +139,7 @@ try {
   await db.query("update voice_lounge_rooms set topic_set_at=now()-interval '6 seconds' where id=$1",[tt]);
   await assert.rejects(db.query("select set_voice_lounge_topic($1,'추천받은 척','ai')",[tt]),/추천된 주제/);
   const suggest = (await one('select claim_voice_lounge_topic_suggestions($1) as c',[tt])).c;
-  assert.ok(suggest.ticket); assert.equal(suggest.space_name,'숲속 서재'); assert.equal(suggest.topic,'요즘 읽는 책');
+  assert.ok(suggest.ticket); assert.equal(suggest.space_name,'오래된 LP 재즈 바'); assert.equal(suggest.topic,'요즘 읽는 책');
   await as(u2); assert.equal((await one('select claim_voice_lounge_topic_suggestions($1) as c',[tt])).c,null);
   await as(u1); assert.equal((await one("select finish_voice_lounge_topic_suggestions($1,$2,'[\" 근거 없는 확신 \",\"요즘 믿게 된 뉴스\"]'::jsonb) as ok",[tt,suggest.ticket])).ok,true);
   await as(u2); await db.query("select set_voice_lounge_topic($1,'요즘 믿게 된 뉴스','ai')",[tt]);

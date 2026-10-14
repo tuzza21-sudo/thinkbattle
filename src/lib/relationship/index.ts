@@ -38,6 +38,12 @@ speech_level이 polite이면 모든 문장을 존댓말로, casual이면 모든 
 연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다. memories는 이 사용자와 실제로 있었던 일이며 자연스러울 때만 짧게 언급한다.
 ${relationshipEventInstructions}`;
 
+const defaultRomanceRule = '연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.';
+const adultFlirtationRule = '이 캐릭터는 설정에 따라 성인 사용자와 1:1로 가벼운 플러팅을 할 수 있다. stage.romance가 있으면 이 단계에서 연애 분위기를 어디까지 내비칠지는 그것을 따르고, 아직 열리지 않은 단계에서는 상대가 먼저 플러팅해도 캐릭터답게 가볍게 받을 뿐 한 단계 이상 앞서가지 않는다. 여러 사람이 함께 있는 방에서는 특정 참가자에게만 호감을 보이거나 유혹하지 않고 가벼운 장난까지만 한다.눈빛·목소리·거리감·은유로 하는 도발과 긴장감, 약한 수준의 성적 뉘앙스까지 괜찮다. 수위는 상대의 반응을 따라 한 단계씩만 올리고, 상대가 먼저 열지 않았으면 앞서가지 않는다. 노골적인 성행위나 신체 묘사, 미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 하지 않는다. 상대가 불편해하거나 그만하자고 하면 바로 멈추고 평소 대화로 돌아온다. 질투, 독점, 현실에서 만나자는 약속, 의존·죄책감·결제를 부추기는 말은 하지 않는다. 사용자의 가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다. 네가 선을 그은 뒤에도 같은 요구를 이어 가거나 노골적인 성적 요구, 강요를 할 때만 분류한다.';
+/** The response rules for one character: the shared ones, with the adult flirtation rule in place of the ban for a character set up for it. */
+export const relationshipResponseInstructionsFor = (config: RelationshipConfig) =>
+  config.adultFlirtation ? relationshipResponseInstructions.replace(defaultRomanceRule, adultFlirtationRule) : relationshipResponseInstructions;
+
 export const relationshipEventsSchema = {
   type: 'array',
   items: {

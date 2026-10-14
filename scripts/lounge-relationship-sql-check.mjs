@@ -79,9 +79,9 @@ try {
   assert.equal((await one("select relrowsecurity from pg_class where relname='voice_lounge_memories'")).relrowsecurity, true);
 
   // Each user and character pair is independent.
-  const auditorScores = { trust: 20, respect: 30, interest: 40, comfort: 30, openness: 15, epistemicHonesty: 50, rigor: 40 };
-  assert.equal(await save(ids[0], 'auditor', auditorA, 0, state({ ...auditorScores, trust: 23 }, 'UNVERIFIED')), 1);
-  assert.equal(await save(ids[1], 'auditor', auditorB, 0, state({ ...auditorScores, trust: 6 }, 'UNVERIFIED')), 1);
+  const auditorScores = { trust: 25, respect: 30, interest: 45, comfort: 35, openness: 25, epistemicHonesty: 45, resonance: 30 };
+  assert.equal(await save(ids[0], 'auditor', auditorA, 0, state({ ...auditorScores, trust: 23 }, 'FIRST_MEETING')), 1);
+  assert.equal(await save(ids[1], 'auditor', auditorB, 0, state({ ...auditorScores, trust: 6 }, 'FIRST_MEETING')), 1);
   const rows = (await db.query('select user_id, character_id, scores->>\'trust\' as trust from voice_lounge_relationships order by user_id, character_id')).rows;
   assert.deepEqual(rows.map(item => `${item.user_id.slice(-1)}:${item.character_id}:${item.trust}`), ['1:auditor:23', '1:velvet:14', '2:auditor:6']);
 
