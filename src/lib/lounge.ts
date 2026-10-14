@@ -202,12 +202,12 @@ export const loungeRelationshipHostIds: readonly string[] = ['ina', 'jaeseok', '
 /**
  * Playback gain on top of the shared boost, for voices the speech model renders quietly.
  * Measured on the sample sentences: Velvet Knife's earlier OpenAI voice (sage) averaged about 9 dB below the other five
- * hosts (-28.7 vs -19 to -21 dBFS), so she had 2.5x (+8 dB). She now speaks with Gemini Gacrux (-19.7 dBFS on the
- * sample, in line with the others), which needs no boost; the quiet sage voice is only her fallback when Gemini fails.
+ * hosts (-28.7 vs -19 to -21 dBFS), so she has 2.5x (+8 dB). She briefly spoke with Gemini Gacrux, which needed no boost,
+ * but the Gemini quota ran out, so she is back on sage.
  */
 // The private detective (onyx: median pitch about 95 Hz against 113 Hz for the earlier echo voice) measured 1.8 dB below echo
 // (-20.1 vs -18.3 dBFS), so 1.2x.
-export const loungeHostLoudness: Record<string, number> = { lawyer: 1.2 };
+export const loungeHostLoudness: Record<string, number> = { lawyer: 1.2, velvet: 2.5 };
 export const getLoungeHostLoudness = (id?: string | null) => loungeHostLoudness[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
@@ -346,7 +346,7 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = { diplomat: { voiceName: 'Despina' }, closer: { voiceName: 'Algenib' }, velvet: { voiceName: 'Gacrux' } };
+export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = { diplomat: { voiceName: 'Despina' } };
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string) {
   const host = getLoungeHost(hostId);
