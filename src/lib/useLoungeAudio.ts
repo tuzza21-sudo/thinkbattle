@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createLocalAudioTrack, LocalAudioTrack, Room, RoomEvent, Track } from 'livekit-client';
 import { supabase } from './supabase';
-import { createLoungeHostOutput, Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
+import { createLoungeHostOutput, isMobileDevice, Pcm16Decoder, PcmAudioQueue, readLoungeStream } from './loungeStream';
 import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from './loungeApi';
 import { loungeRecording, loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
@@ -135,7 +135,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const room = new Room({ adaptiveStream: true }); roomRef.current = room;
       // Match TTS PCM to avoid independently resampling every network packet.
       let context: AudioContext;
-      try { context = new AudioContext({ sampleRate: 24_000 }); } catch { context = new AudioContext(); }
+      // Phones keep their own output rate: a fixed rate on a context that also reads the microphone can leave iOS Safari with silence.
+      try { context = isMobileDevice() ? new AudioContext() : new AudioContext({ sampleRate: 24_000 }); } catch { context = new AudioContext(); }
       outputContext.current = context;
       context.onstatechange = () => { if (outputContext.current === context) setAudioReady(context.state === 'running' && !remotePlaybackBlocked.current); };
       const sync = () => setParticipants([room.localParticipant, ...room.remoteParticipants.values()].map(participant => ({ id: participant.identity, name: participant.name || '친구', muted: !participant.isMicrophoneEnabled, avatarIndex: readAvatar(participant.metadata), avatarUrl: readAvatarUrl(participant.metadata) })));
@@ -218,6 +219,10 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       const context = outputContext.current;
       if (!context) throw new Error('음성 연결을 다시 확인해 주세요.');
       audioContext.current = context; enableAudio();
+      // Level detection reads zeros while the context is suspended, which looks like a dead microphone on a phone.
+      await context.resume().catch(() => {});
+      if (roomRef.current !== room || microphone.current !== track) return;
+      if (context.state !== 'running') throw new Error('소리 켜기를 눌러 마이크를 사용해 주세요.');
       const stream = new MediaStream([track.mediaStreamTrack]);
       const input = context.createMediaStreamSource(stream); const analyser = context.createAnalyser(); analyser.fftSize = 1024; input.connect(analyser);
       const delay = context.createDelay(1); delay.delayTime.value = loungeRecordingPreRollSeconds;
@@ -225,6 +230,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       input.connect(delay); delay.connect(delayed);
       releaseMicAnalysis.current = () => { input.disconnect(); analyser.disconnect(); delay.disconnect(); delayed.stream.getTracks().forEach(item => item.stop()); };
       const values = new Float32Array(analyser.fftSize);
+      // Phone microphones with noise suppression deliver a quieter signal than a desktop one.
+      const voiceRms = isMobileDevice() ? 0.01 : 0.018;
       let started = 0, lastVoice = 0, lastFrame = performance.now(), bargeMs = 0;
       const interruptHost = () => {
         // Record this person right away; the AI audio stops locally or on the broadcasting device.
@@ -274,7 +281,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
           bargeMs = rms > threshold ? bargeMs + elapsed : Math.max(0, bargeMs - elapsed);
           if (bargeMs >= loungeBargeIn.sustainMs) { bargeMs = 0; interruptHost(); }
         } else bargeMs = 0;
-        if (rms > 0.018 && mayTalk && !aiSpeakingRef.current) {
+        if (rms > voiceRms && mayTalk && !aiSpeakingRef.current) {
           speechActivity.current.voicedMs += elapsed;
           lastVoice = now;
           speechActivity.current.lastVoiceAt = Date.now();

@@ -57,14 +57,19 @@ export class Pcm16Decoder {
   }
 }
 
-// Boost quiet TTS by 6 dB before both local playback and the shared LiveKit
+// Phones play Web Audio quietly (and quieter still while the microphone is open), and a page cannot raise the
+// system volume, so the voice is boosted further there.
+export const isMobileDevice = () => typeof navigator !== 'undefined' && (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+// Boost quiet TTS by 6 dB (about 14 dB on a phone) before both local playback and the shared LiveKit
 // track. Compress loud peaks so the gain does not simply clip the waveform.
 // `loudness` multiplies the boost for voices the speech model renders quietly.
 export function createLoungeHostOutput(context: AudioContext, destinations: AudioNode[], loudness = 1) {
+  const mobile = isMobileDevice();
   const gain = context.createGain();
-  gain.gain.setValueAtTime(2 * loudness, context.currentTime);
+  gain.gain.setValueAtTime((mobile ? 5 : 2) * loudness, context.currentTime);
   const compressor = context.createDynamicsCompressor();
-  compressor.threshold.setValueAtTime(-6, context.currentTime);
+  compressor.threshold.setValueAtTime(mobile ? -12 : -6, context.currentTime);
   compressor.knee.setValueAtTime(6, context.currentTime);
   compressor.ratio.setValueAtTime(12, context.currentTime);
   compressor.attack.setValueAtTime(0.003, context.currentTime);
