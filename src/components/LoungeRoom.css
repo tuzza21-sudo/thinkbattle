@@ -764,20 +764,20 @@
 .lounge-topic-sheet-form button:disabled,.lounge-topic-sheet-suggest:disabled { opacity:.5; }
 .lounge-topic-sheet-count { color:#6a735f; font-size:11.5px; line-height:1.5; }
 
-/* "suggest my reply": a wide panel right above the bottom bar */
-.lounge-reply-panel { display:grid; gap:10px; width:100%; box-sizing:border-box; margin-bottom:10px; padding:14px; border:1px solid #dfc99655; border-radius:18px; background:#0f1912f2; color:#fffaf0; text-shadow:none; }
+/* "suggest my reply": a wide panel right above the bottom bar, translucent with white text like the conversation itself */
+.lounge-reply-panel { display:grid; gap:10px; width:100%; box-sizing:border-box; margin-bottom:10px; padding:14px; border:1px solid #ffffff30; border-radius:18px; background:#ffffff12; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff5e9; text-shadow:0 1px 4px #000d; }
 .lounge-reply-head { display:flex; align-items:center; justify-content:space-between; }
-.lounge-reply-head b { font-size:15px; color:#ecd9aa; }
-.lounge-reply-close { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:50%; background:#ffffff1c; color:#fffaf0; cursor:pointer; }
+.lounge-reply-head b { font-size:15px; color:#fff5e9; }
+.lounge-reply-close { display:grid; place-items:center; width:32px; height:32px; border:1px solid #ffffff30; border-radius:50%; background:#ffffff12; color:#fff5e9; cursor:pointer; }
 .lounge-reply-panel ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
-.lounge-reply-panel li button { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; box-sizing:border-box; padding:14px 16px; border:1px solid #ffffff2a; border-radius:14px; background:#ffffff14; color:#fffaf0; font-size:15px; line-height:1.6; text-align:left; word-break:keep-all; cursor:pointer; transition:background .2s,border-color .2s; }
-.lounge-reply-panel li button:hover:not(:disabled) { background:#dfc99626; border-color:#dfc996; }
+.lounge-reply-panel li button { display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; box-sizing:border-box; padding:14px 16px; border:1px solid #ffffff30; border-radius:14px; background:#ffffff0f; color:#fff5e9; font-size:15px; line-height:1.6; text-align:left; text-shadow:inherit; word-break:keep-all; cursor:pointer; transition:background .2s,border-color .2s; }
+.lounge-reply-panel li button:hover:not(:disabled) { background:#ffffff26; border-color:#ffffff66; }
 .lounge-reply-panel li button:disabled { opacity:.6; }
-.lounge-reply-panel li svg { flex-shrink:0; color:#ecd9aa; }
+.lounge-reply-panel li svg { flex-shrink:0; color:#fff5e9; }
 .lounge-reply-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.lounge-reply-foot small { color:#c8d1bd; font-size:12px; line-height:1.5; }
-.lounge-reply-foot button { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:8px 13px; border:1px solid #ffffff38; border-radius:99px; background:transparent; color:#ecd9aa; font-size:12px; cursor:pointer; }
-.lounge-reply-error { margin:0 0 8px; color:#ffb4a8; font-size:12.5px; }
+.lounge-reply-foot small { color:#fff5e9cc; font-size:12px; line-height:1.5; }
+.lounge-reply-foot button { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:8px 13px; border:1px solid #ffffff38; border-radius:99px; background:#ffffff0f; color:#fff5e9; font-size:12px; text-shadow:inherit; cursor:pointer; }
+.lounge-reply-error { margin:0 0 8px; color:#ffc9bf; font-size:12.5px; text-shadow:0 1px 4px #000d; }
 
 /* the relationship badge under the character profile reads left to right */
 .lounge-moderator-info { min-width:0; }
