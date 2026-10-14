@@ -27,6 +27,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const roomRef = useRef<Room | null>(null);
   const microphone = useRef<LocalAudioTrack | null>(null);
   const microphoneWanted = useRef(false);
+  const pausedForPlayback = useRef(false);
   const audioContext = useRef<AudioContext | null>(null);
   const releaseMicAnalysis = useRef<(() => void) | null>(null);
   const outputContext = useRef<AudioContext | null>(null);
@@ -83,7 +84,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   }, []);
 
   const stopHost = useCallback(() => { playback.current?.finish(); }, []);
-  const releaseMicrophone = useCallback(() => {
+  const releaseMicrophone = useCallback((keepIndicator = false) => {
     cancelAnimationFrame(frame.current);
     if (recorder.current?.state === 'recording') recorder.current.stop();
     recorder.current = null;
@@ -92,7 +93,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     const track = microphone.current; microphone.current = null;
     if (track) { void roomRef.current?.localParticipant.unpublishTrack(track); track.stop(); }
     if (audioContext.current !== outputContext.current) void audioContext.current?.close(); audioContext.current = null;
-    setMicOn(false);
+    if (!keepIndicator) setMicOn(false);
   }, []);
   const stopMicrophone = useCallback(() => { microphoneWanted.current = false; releaseMicrophone(); }, [releaseMicrophone]);
 
@@ -309,6 +310,19 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     }
     finally { pending.current = false; }
   }, [connected, stopMicrophone, enableAudio, capacity]);
+  // A phone that has the microphone open plays everything in 'call' mode: far quieter than media, and no
+  // volume setting or gain raises it. So the microphone is let go while the AI speaks and reopened afterwards.
+  // The recording is paused during the AI's speech anyway; only interrupting the AI by voice is lost on a phone.
+  const pauseMicrophoneForPlayback = useCallback(() => {
+    if (!isMobileDevice() || !microphone.current) return;
+    pausedForPlayback.current = true; releaseMicrophone(true);
+  }, [releaseMicrophone]);
+  const resumeMicrophoneAfterPlayback = useCallback(async () => {
+    if (!pausedForPlayback.current) return;
+    pausedForPlayback.current = false;
+    for (let wait = 0; wait < 10 && pending.current; wait++) await new Promise(resolve => setTimeout(resolve, 100));
+    if (microphoneWanted.current && roomRef.current && !microphone.current) await startMicrophone();
+  }, [startMicrophone]);
   useEffect(() => {
     if (!connected || !microphoneWanted.current) return;
     const timer = setTimeout(() => { void startMicrophone(); }, 0);
@@ -320,6 +334,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     stopHost();
     const context = outputContext.current;
     if (!context || context.state !== 'running') throw new Error('소리 켜기를 눌러 사회자 음성을 들어 주세요.');
+    pauseMicrophoneForPlayback();
     try {
       await context.resume();
       const binary = atob(base64); const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
@@ -347,7 +362,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         source.onended = finish; aiSpeakingRef.current = true; setAiSpeaking(true); announce(true); source.start();
       });
     } catch (err) { setError(err instanceof Error ? err.message : '사회자 음성을 재생하지 못했어요.'); }
-  }, [stopHost]);
+    finally { void resumeMicrophoneAfterPlayback(); }
+  }, [stopHost, pauseMicrophoneForPlayback, resumeMicrophoneAfterPlayback]);
 
   const playHostStream = useCallback(async (stream: ReadableStream<Uint8Array>, onFirstAudio: () => void, onTimings: (timings: Record<string, number>) => void, canStart: () => boolean, canWait?: () => boolean) => {
     const room = roomRef.current;
@@ -388,6 +404,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       }
       return false;
     };
+    pauseMicrophoneForPlayback();
     try {
       await context.resume();
       if (context.state !== 'running') throw new LoungeApiError('소리 켜기를 눌러 사회자 음성을 들어 주세요.', 'lounge_audio_not_ready');
@@ -423,8 +440,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (!stopped && first) throw new LoungeApiError('사회자 음성이 비어 있어요. 글로 대화를 이어갈게요.', 'lounge_invalid_audio');
       }
     } catch (err) { if (!stopped) throw err; }
-    finally { finish(); }
-  }, [stopHost]);
+    finally { finish(); void resumeMicrophoneAfterPlayback(); }
+  }, [stopHost, pauseMicrophoneForPlayback, resumeMicrophoneAfterPlayback]);
 
   useEffect(() => () => { disconnect(); }, [disconnect, roomId]);
   const getSpeechActivity = useCallback(() => ({ ...speechActivity.current, transcribing: pendingTranscriptions.current > 0 }), []);
