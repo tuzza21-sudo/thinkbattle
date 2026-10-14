@@ -4,7 +4,6 @@ import livekitTokenHandler from './api/livekit-token'
 import geminiHandler from './api/gemini/[...path]'
 import loungeHandler from './api/lounge'
 import loungeInteractionHandler from './api/lounge-interaction'
-import loungeAvatarHandler from './api/lounge-avatar'
 import loungeKnowledgeHandler from './api/lounge-knowledge'
 
 const readRequestBody = (request: NodeJS.ReadableStream) => new Promise<Buffer>((resolve, reject) => {
@@ -54,27 +53,6 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      {
-        name: 'thinkfit-lounge-avatar-dev',
-        configureServer(server) {
-          server.middlewares.use('/api/lounge-avatar', async (request, response) => {
-            try {
-              const body = await readRequestBody(request)
-              if (body.length > 2_000_000) { response.statusCode = 413; response.end(JSON.stringify({ error: '사진 용량이 너무 커요.' })); return }
-              const headers = toHeaders(request.headers)
-              const result = await loungeAvatarHandler(new Request(`${headers.get('x-forwarded-proto') || 'http'}://${headers.get('host') || 'localhost'}/api/lounge-avatar`, {
-                method: request.method, headers, body: body.length ? new Uint8Array(body) : undefined,
-              }))
-              response.statusCode = result.status
-              result.headers.forEach((value, key) => response.setHeader(key, value))
-              response.end(Buffer.from(await result.arrayBuffer()))
-            } catch {
-              response.statusCode = 500; response.setHeader('Content-Type', 'application/json')
-              response.end(JSON.stringify({ error: '사진 변환 요청을 처리하지 못했어요.' }))
-            }
-          })
-        },
-      },
       {
         name: 'thinkfit-lounge-knowledge-dev',
         configureServer(server) {
