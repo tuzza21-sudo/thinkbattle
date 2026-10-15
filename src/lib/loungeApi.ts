@@ -113,6 +113,9 @@ export const setLoungeTopic = (roomId: string, topic: string, source: 'ai' | 'me
 export const listOpenLounges = () => loungeRpc<LoungeRoomSummary[]>('list_open_voice_lounges', {});
 export const joinLounge = (id: string, nickname: string) => loungeRpc<void>('join_voice_lounge', { p_room: id, p_nickname: nickname });
 export const controlLounge = (id: string, action: 'start' | 'end' | 'leave' | 'heartbeat') => loungeRpc<void>('control_voice_lounge', { p_room: id, p_action: action });
+// Beta limits: the member's daily allowance (seconds) for 1:1 talks and shared rooms; the Left values are null when not limited.
+export type LoungeBetaUsage = { limited: boolean; soloLimit: number; groupLimit: number; soloLeft: number | null; groupLeft: number | null };
+export const getMyLoungeBetaUsage = () => loungeRpc<LoungeBetaUsage>('get_my_lounge_beta_usage', {});
 export const postLoungeMessage = (id: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: id, p_text: text });
 export const requestLoungeModerator = (id: string, kind: Exclude<LoungeHelpKind, 'direct'> = 'spark') => loungeRpc<void>('request_voice_lounge_moderator', { p_room: id, p_kind: kind });
 export async function controlLoungeSession(id: string, action: LoungeSessionAction, turnId?: string, seconds = 0) {

@@ -31,7 +31,41 @@ export const getLoungeAdminConversation = async (roomId: string, userId: string)
   return data as LoungeAdminConversation;
 };
 
-const organizationErrorMessage =(message: string) => {
+export type LoungeBetaOverview = {
+  settings: { enabled: boolean; soloMinutes: number; groupMinutes: number; appliesFrom: string; updatedAt: string };
+  testers: { userId: string; nickname: string | null; email: string | null; note: string; addedAt: string }[];
+  today: { userId: string; nickname: string | null; email: string | null; soloSeconds: number; groupSeconds: number }[];
+};
+
+const betaErrorMessage = (message: string) => {
+  if (message.includes('not authorized')) return '슈퍼 관리자 권한을 확인하지 못했습니다.';
+  if (message.includes('user not found')) return '해당 이메일로 가입한 계정을 찾지 못했습니다.';
+  if (message.includes('minutes out of range')) return '시간은 1~1440분 사이로 입력해 주세요.';
+  return '요청을 처리하지 못했습니다. 베타 제한 마이그레이션이 적용되었는지 확인해 주세요.';
+};
+
+export const getLoungeBetaOverview = async (): Promise<LoungeBetaOverview> => {
+  const { data, error } = await supabase.rpc('admin_get_lounge_beta');
+  if (error || !data) throw new Error(betaErrorMessage(error?.message ?? ''));
+  return data as LoungeBetaOverview;
+};
+
+export const setLoungeBetaLimits = async (enabled: boolean, soloMinutes: number, groupMinutes: number) => {
+  const { error } = await supabase.rpc('admin_set_lounge_beta_limits', { p_enabled: enabled, p_solo_minutes: soloMinutes, p_group_minutes: groupMinutes });
+  if (error) throw new Error(betaErrorMessage(error.message));
+};
+
+export const addLoungeBetaTester = async (email: string, note: string) => {
+  const { error } = await supabase.rpc('admin_add_lounge_beta_tester', { p_email: email.trim().toLowerCase(), p_note: note.trim() });
+  if (error) throw new Error(betaErrorMessage(error.message));
+};
+
+export const removeLoungeBetaTester = async (userId: string) => {
+  const { error } = await supabase.rpc('admin_remove_lounge_beta_tester', { p_user: userId });
+  if (error) throw new Error(betaErrorMessage(error.message));
+};
+
+const organizationErrorMessage = (message: string) => {
   if (message.includes('owner account not found')) {
     return '해당 이메일로 가입한 계정을 찾지 못했습니다. 먼저 회원가입을 완료해 주세요.';
   }
