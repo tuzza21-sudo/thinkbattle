@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import type { AppUser } from '../types';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
 import { getLoungeHost, getLoungeHostLoudness, getLoungeTheme, getLoungeTopic, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
-import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, joinLounge, loadLounge, loadLoungeRelationship, postLoungeText, prepareLoungeTopic, requestLoungeHost, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
+import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, postLoungeText, prepareLoungeTopic, requestLoungeHost, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
@@ -385,6 +385,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const [transcriptError, setTranscriptError] = useState('');
   const [pending, setPending] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
+  const [beta, setBeta] = useState<{ left: number; at: number; minutes: number; solo: boolean } | null>(null);
   const [retry, setRetry] = useState(0);
   const [micPrepared, setMicPrepared] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -618,6 +619,14 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       try { await controlLounge(roomId, 'heartbeat'); }
       catch (err) { if (!cancelled) reportRoomError(err); }
       finally { running = false; }
+      // The beta allowance is read after each heartbeat (which is what the server counts). If it cannot be read,
+      // for example before the limits are installed, the room simply runs without a countdown.
+      try {
+        const usage = await getMyLoungeBetaUsage();
+        const solo = current.current.room?.capacity === 1;
+        const left = solo ? usage.soloLeft : usage.groupLeft;
+        if (!cancelled) setBeta(usage.limited && left !== null ? { left, at: Date.now(), minutes: Math.round((solo ? usage.soloLimit : usage.groupLimit) / 60), solo } : null);
+      } catch { /* no countdown */ }
     };
     const resume = async () => {
       if (document.visibilityState === 'hidden' || cancelled) return;
@@ -654,7 +663,12 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const interval = setInterval(() => void claim(), 4000);
     return () => { cancelled = true; clearTimeout(kickoff); clearInterval(interval); };
   }, [spaceTable, userId, roomId]);
-  const ended = room?.status === 'ended' || Boolean(room?.expires_at && Date.parse(room.expires_at) <= clock);
+  const betaSeconds = beta ? Math.max(0, Math.ceil(beta.left - (clock - beta.at) / 1000)) : null;
+  const betaOut = betaSeconds === 0;
+  const betaNotice = !beta ? '' : betaOut
+    ? `베타 기간에는 ${beta.solo ? '캐릭터와의 1:1 대화를' : '함께하는 대화방을'} 하루 ${beta.minutes}분까지 이용할 수 있어요. 오늘 시간을 다 썼어요. 내일 다시 만나요.`
+    : betaSeconds !== null && betaSeconds <= 60 ? '오늘 베타 이용 시간이 1분 남았어요.' : '';
+  const ended = room?.status === 'ended' || betaOut || Boolean(room?.expires_at && Date.parse(room.expires_at) <= clock);
   const disconnectAudio = audio.disconnect;
   useEffect(() => { if (ended) disconnectAudio(); }, [ended, disconnectAudio]);
   useEffect(() => { if (ended || !audio.connected) hostRequest.current?.abort(); }, [ended, audio.connected]);
@@ -875,5 +889,5 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const voice = audio.participants.find(participant => participant.id === member.user_id);
     return { ...(voice ?? voiceProfiles.current.get(member.user_id)), id: member.user_id, name: member.nickname, muted: voice?.muted ?? true };
   });
-  return <RoomView roomId={roomId} replySuggest={replySuggest} socialMember={!user.isAnonymous} place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={room.space_id && room.theme ? room.theme : loungeRoomTheme(room.host_persona, room.id)} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={error || transcriptError || interactionError || audio.error} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && !window.confirm(room.capacity === 1 ? 'AI와의 대화를 마칠까요?' : '나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} />;
+  return <RoomView roomId={roomId} replySuggest={replySuggest} socialMember={!user.isAnonymous} place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={room.space_id && room.theme ? room.theme : loungeRoomTheme(room.host_persona, room.id)} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={betaSeconds !== null && !betaOut ? `오늘 ${Math.floor(betaSeconds / 60)}:${String(betaSeconds % 60).padStart(2, '0')} 남음` : room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={betaOut ? betaNotice : error || transcriptError || interactionError || audio.error || betaNotice} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && !window.confirm(room.capacity === 1 ? 'AI와의 대화를 마칠까요?' : '나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} />;
 }
