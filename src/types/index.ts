@@ -327,6 +327,50 @@ export type SuperAdminOrganization = {
   owners: SuperAdminOrganizationOwner[];
 };
 
+export type LoungeAdminUser = {
+  userId: string;
+  nickname: string;
+  email: string;
+  gender: 'male' | 'female' | null;
+  ageGroup: string | null;
+  region: string | null;
+  joinedAt: string;
+  lastSignInAt: string | null;
+  lastActiveAt: string | null;
+  roomCount: number;
+  messageCount: number;
+  warnings: number;
+};
+
+export type LoungeAdminRoomSummary = {
+  roomId: string;
+  topic: string;
+  persona: string;
+  space: string | null;
+  capacity: number;
+  status: 'lobby' | 'active' | 'ended';
+  createdAt: string;
+  startedAt: string | null;
+  isHost: boolean;
+  joinedAt: string;
+  warnings: number;
+  restrictedUntil: string | null;
+  restrictionReason: string | null;
+  messageCount: number;
+  others: { userId: string; nickname: string }[];
+};
+
+export type LoungeAdminActivity = {
+  profile: Omit<LoungeAdminUser, 'lastActiveAt' | 'roomCount' | 'messageCount' | 'warnings'> & { provider: string };
+  rooms: LoungeAdminRoomSummary[];
+};
+
+export type LoungeAdminConversation = {
+  room: Pick<LoungeAdminRoomSummary, 'roomId' | 'topic' | 'persona' | 'space' | 'capacity' | 'status' | 'createdAt' | 'startedAt'>;
+  members: { userId: string; nickname: string; joinedAt: string; warnings: number }[];
+  messages: { id: number; userId: string | null; nickname: string; kind: 'human' | 'host'; text: string; createdAt: string }[];
+};
+
 export type SuperAdminDashboard = {
   totalUsers: number;
   totalRecords: number;
