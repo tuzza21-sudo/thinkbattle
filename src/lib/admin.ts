@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isSuperAdminUser } from './superAdmin';
 import type { AdminDashboard, OrganizationStudentRecord, OrganizationSummary, OrganizationTopic, OrganizationUser } from '../types';
 
 const activeOrganizationStorageKey = 'thinkfit-active-organization-id';
@@ -31,7 +32,7 @@ export const getMyOrganizations = async (): Promise<OrganizationSummary[]> => {
   // The developer account gets a private test organization on first B2B visit.
   // The database function independently checks the authenticated email.
   const { data: { user } } = await supabase.auth.getUser();
-  if (user?.email?.toLowerCase() === 'piorne@naver.com') {
+  if (isSuperAdminUser(user)) {
     const { error: accessError } = await supabase.rpc('ensure_developer_b2b_access');
     if (accessError) console.error('Failed to ensure B2B administrator access:', accessError);
   }
