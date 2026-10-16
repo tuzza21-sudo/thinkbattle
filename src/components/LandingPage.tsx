@@ -37,7 +37,7 @@ import { calculateUserStats } from '../lib/userStats';
 import type { UserStats } from '../lib/userStats';
 import { getOpinionStats, autoSeedTopicOpinions } from '../lib/communityStore';
 import type { AppUser, BattleConfig, DebateLevel, DebatePosition, FeaturedBattle, LiveDebateRoomSummary, OrganizationSummary, PublicDebateTopic, TopicOpinionStats, WeeklyIssue } from '../types';
-import { SUPER_ADMIN_EMAIL } from '../lib/superAdmin';
+import { isSuperAdminUser } from '../lib/superAdmin';
 import { getMyMemberOrganizations } from '../lib/admin';
 import { getPublicDebateTopics } from '../lib/publicTopics';
 import { buildDebateLobbyPath, createLiveRoomId } from '../lib/liveDebate';
@@ -322,8 +322,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ user, onLoginRequest, 
           <button type="button" onClick={() => navigate('/about')}><BookOpen size={16} /> 서비스 소개</button>
           {user && <button type="button" onClick={() => navigate('/history')}><FileText size={16} /> 훈련 기록</button>}
           {memberOrganizations.length > 0 && <button type="button" onClick={() => navigate('/institution')}><Users size={16} /> {memberOrganizations[0].name}</button>}
-          {(hasOrganizationStaffAccess || user?.email.toLowerCase() === SUPER_ADMIN_EMAIL) && <button type="button" onClick={() => navigate('/admin')}><Shield size={16} /> 기관 관리</button>}
-          {user?.email.toLowerCase() === SUPER_ADMIN_EMAIL && <button type="button" onClick={() => navigate('/super-admin')}><Shield size={16} /> 슈퍼 관리</button>}
+          {(hasOrganizationStaffAccess || isSuperAdminUser(user)) && <button type="button" onClick={() => navigate('/admin')}><Shield size={16} /> 기관 관리</button>}
+          {isSuperAdminUser(user) && <button type="button" onClick={() => navigate('/super-admin')}><Shield size={16} /> 관리자 페이지</button>}
           {user?.isAnonymous ? (
             <button type="button" className="debate-home-login" onClick={onLoginRequest}><LogIn size={17} /> 회원가입 · 로그인</button>
           ) : user ? (

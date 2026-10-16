@@ -2,6 +2,12 @@ import { supabase } from './supabase';
 import type { LoungeAdminActivity, LoungeAdminConversation, LoungeAdminUser, SuperAdminDashboard, SuperAdminOrganization } from '../types';
 
 export const SUPER_ADMIN_EMAIL = 'piorne@naver.com';
+// The Kakao login of the same developer has an empty sign-in email, so it is recognised by account id (mirrors is_super_admin()).
+const SUPER_ADMIN_USER_IDS = ['d8771e72-7ae4-4402-b8cc-dc52e13bebff'];
+
+export const isSuperAdminUser = (user: { id: string; email?: string | null } | null | undefined) => Boolean(
+  user && (user.email?.toLowerCase() === SUPER_ADMIN_EMAIL || SUPER_ADMIN_USER_IDS.includes(user.id)),
+);
 
 export const getSuperAdminDashboard = async (): Promise<SuperAdminDashboard | null> => {
   const { data, error } = await supabase.rpc('get_super_admin_dashboard');
