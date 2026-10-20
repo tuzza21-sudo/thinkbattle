@@ -184,6 +184,8 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
 export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
+/** Turns the character's voice on or off in the member's own one-to-one room; off, the talk is a chat. */
+export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean>('set_voice_lounge_voice', { p_room: roomId, p_on: on });
 /** Puts text into the conversation as the member's own turn, like a spoken one. */
 export const postLoungeText = (roomId: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: roomId, p_text: text.trim().slice(0, 1200) });
 export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'topics', roomId }) as Promise<{ topics?: string[]; skipped?: boolean }>;

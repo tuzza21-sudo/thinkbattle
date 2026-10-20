@@ -1,6 +1,6 @@
 import { getLoungeCharacter, loungeCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
-import { getLoungeHost, isLoungeHelpKind, loungeIsSolo, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -479,18 +479,21 @@ export default async function handler(req: Request): Promise<Response> {
         .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
       : Promise.resolve(null);
     const responses = await Promise.all([
-      fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=topic,host_persona,memory,capacity,ai_turns,study_required,topic_study,guided_session,topic_brief,moderator_request_kind,moderator_requested_by,ai_mood,space_id,topic_source,space:voice_lounge_spaces(name)`, { headers }),
+      // Every column, so a database without the chat migration (no voice_on) still answers; such a room keeps its voice.
+      fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=*,space:voice_lounge_spaces(name)`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomId)}&active=eq.true&select=user_id,nickname,last_seen`, { headers }),
     ]);
     if (responses.some(response => !response.ok)) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; voice_on?: boolean }>>(responses[0], 'lounge');
     const messages = await readJson<Array<{ nickname: string; kind: string; text: string }>>(responses[1], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[2], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
     if (room.study_required && !room.topic_study) throw new LoungeUpstreamError('사회자가 주제 자료를 먼저 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.', 503, 'lounge_study_pending', true, 60);
     const host = getLoungeHost(room.host_persona);
+    // A one-to-one chat: replies are text only, so no speech is made.
+    const chat = isLoungeChatRoom(room);
     // The character's own knowledge and experience that fit what was just said, looked up while the rest of the context
     // loads. It needs the server role. A character with no entries costs nothing (checked, then remembered for a minute),
     // and a slow or failing lookup is dropped after a short wait so it can never hold the reply back.
@@ -592,7 +595,7 @@ export default async function handler(req: Request): Promise<Response> {
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
     // In a space the topic exists once someone has chosen one; before that the conversation is free.
-    const context = { mode, participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
+    const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
@@ -613,7 +616,9 @@ export default async function handler(req: Request): Promise<Response> {
 reason=opening이면 가벼운 인사와 방 소개의 관심사에 맞는 질문 하나로 바로 시작한다. 주제의 배경, 방을 만든 계기, 대화 목적, 준비한 자료를 설명하거나 낭독하지 않는다. 예: '반가워요. 그 영화에서 어떤 장면이 계속 생각났어요?' 예시를 그대로 반복하지 않고 실제 주제에 맞춘다.
 reason=followup이면 상대가 묻거나 꺼낸 이야기에 짧게 반응한다. 갑자기 새 주제로 넘어가지 않는다. 다른 사람에게 하는 질문·자기소개·순서 발언·패스·버튼 안내를 하지 않는다.
 reason=requested이고 request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다. 직전 답을 이어 가지 말고, 방 주제 안에서 지금까지 나오지 않은 가벼운 화제 하나를 한 문장 질문이나 제안으로 건넨다.
-1:1에서는 첫 인사에도 패스나 진행 방식 안내를 넣지 않는다.` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
+1:1에서는 첫 인사에도 패스나 진행 방식 안내를 넣지 않는다.
+reply_medium=chat이면 글로 주고받는 채팅이다. 장면이 살아나는 순간에만 네 행동·표정·분위기를 별표로 짧게 묘사할 수 있다(예: *잔을 내려놓으며* 그래서, 결론은요?). 별표 묘사는 한 답변에 많아야 하나, 20자 안팎이고 매번 쓰지 않는다. 말은 별표 밖에 쓰고 따옴표로 감싸지 않는다. 묘사는 글자 수 제한에 넣지 않는다. reply_medium=voice이면 목소리로 들리는 대화이므로 별표 묘사를 쓰지 않고 말로만 한다.
+상대가 별표로 쓴 부분(*...*)은 상대의 행동이나 상황 묘사다. 그 행동과 상황에 자연스럽게 반응하되 상대가 하지 않은 행동이나 마음을 지어내지 않는다.` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
 participant_count는 지금 함께 있는 사람 수다. first_host_turn=true이면 이번 첫 인사에서만 패스해도 된다고 한 번 짧게 안내한다. first_host_turn=false이면 첫 인사는 이미 끝났다. 패스 가능, 발언 선택권, 말하기·마치기 버튼 사용 안내를 반복하지 않는다.
 여러 사람이 함께 있는 방에서는 어떤 참가자에게도 반말을 쓰지 않고 항상 존댓말로 말한다. 캐릭터 설명의 개입 방식은 네가 말하게 된 순간의 말투에만 쓴다. 말할 기회를 늘리는 근거가 아니며, 아래 규칙과 충돌하면 아래 규칙을 따른다.
 사람끼리 대화하는 방에서는 매 발언에 답하지 않는다. 참가자의 발언 종료는 사회자에게 답변하라는 요청이 아니다. 칭찬·요약·공감·해설·질문을 덧붙여 대화에 끼어들지 않는다.
@@ -890,7 +895,8 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
             const textAt = performance.now();
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
-            const speech = streamSpeech(firstText, send, cancelled.signal, value => { reader = value; }).catch(error => { speechError = error; });
+            // A chat gets the text alone; the voice reads the words without the *actions*.
+            const speech = chat ? Promise.resolve() : streamSpeech(loungeSpokenText(firstText) || firstText, send, cancelled.signal, value => { reader = value; }).catch(error => { speechError = error; });
             const answer = await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; });
             // Save what was actually spoken. If the rest of the reply was lost, keep the previous memory.
             const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: firstText, p_memory: answer?.memory ?? String(room.memory ?? '') })
@@ -927,7 +933,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
         async start(controller) {
           const send = (event: unknown) => { if (!cancelled.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
           send({ type: 'host', text, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(saveStarted - modelStarted), saveMs: Math.round(performance.now() - saveStarted) } });
-          try { await streamSpeech(text, send, cancelled.signal, value => { reader = value; }); send({ type: 'done' }); }
+          try { if (!chat) await streamSpeech(loungeSpokenText(text) || text, send, cancelled.signal, value => { reader = value; }); send({ type: 'done' }); }
           catch (error) { send(streamFailure(error, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.')); }
           finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
@@ -938,6 +944,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
         cancel() { cancelled.abort(); void reader?.cancel().catch(() => {}); },
       }));
     }
+    if (chat) { await relationshipSaved; return json({ text }); }
     try {
       let audio: ArrayBuffer | undefined;
       if (geminiHost) {
