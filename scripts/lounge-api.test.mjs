@@ -1656,9 +1656,10 @@ test('the reply sentence is read from a partial JSON stream only once its string
 });
 
 test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
-  const originalTimeout = AbortSignal.timeout;
+  // A request's deadline is the last timer set before its fetch.
+  const originalSetTimeout = globalThis.setTimeout;
   const deadlines = [];
-  AbortSignal.timeout = milliseconds => { const controller = new AbortController(); deadlines.push({ milliseconds, controller }); return controller.signal; };
+  globalThis.setTimeout = (callback, milliseconds, ...args) => { deadlines.push({ milliseconds }); return originalSetTimeout(callback, milliseconds, ...args); };
   const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 600);
   const spokenInputs = [];
   try {
@@ -1685,7 +1686,30 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
       const bytes = events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0);
       assert.equal(bytes, 4_194_304, 'more than the former 3MB cap');
     });
-  } finally { AbortSignal.timeout = originalTimeout; }
+  } finally { globalThis.setTimeout = originalSetTimeout; }
+});
+
+test('a signal that fires after a request has finished never reaches that request', async () => {
+  const signals = [];
+  const client = new AbortController();
+  await run(async (url, init) => {
+    signals.push(init.signal);
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '좋아요.', memory: '' }) }] }] });
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(new Request(request({ action: 'host', roomId, reason: 'followup', stream: true }), { signal: client.signal }));
+    await response.text();
+    // A finished lookup's late timeout or give-up once aborted the reply that was streaming at that moment.
+    client.abort();
+    assert.ok(signals.length > 3);
+    assert.deepEqual(signals.filter(signal => signal.aborted), [], 'a finished request was aborted');
+  });
 });
 
 test('speech still cancels an oversized PCM response with an explicit error code', async () => {
