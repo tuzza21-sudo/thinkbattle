@@ -151,6 +151,24 @@ test('forged browser decisions are ignored: only persisted text and authenticate
     assert.deepEqual(committed,{moderation:'allow',reason:'none',target_id:b,question:raw.question});
   });
 });
+test('speaking restrictions are paused unless LOUNGE_MODERATION=on',async()=>{
+  const previous=process.env.LOUNGE_MODERATION;
+  try{
+    for(const setting of [undefined,'on']){
+      if(setting===undefined)delete process.env.LOUNGE_MODERATION;else process.env.LOUNGE_MODERATION=setting;
+      let committed;
+      await run(async(url,init)=>{
+        const permitted=access(url);if(permitted)return permitted;
+        if(url.includes('claim_voice_lounge_interaction'))return result({ticket:'ticket',message_id:1,speaker_id:a,text:'공격',members,topic:'책',recent:[]});
+        if(url.endsWith('/responses'))return result(output({...raw,moderation:'restrict',reason:'threat',target_id:null,question:null}));
+        if(url.includes('finish_voice_lounge_interaction')){committed=JSON.parse(init.body).p_decision;return result({warnings:0});}
+        if(url.includes('pending_voice_lounge_voice_sync'))return result([]);
+        throw new Error('Unexpected');
+      },async handler=>{assert.equal((await handler(request({action:'review',roomId}))).status,200);});
+      assert.deepEqual([committed.moderation,committed.reason],setting==='on'?['restrict','threat']:['allow','none']);
+    }
+  }finally{if(previous===undefined)delete process.env.LOUNGE_MODERATION;else process.env.LOUNGE_MODERATION=previous;}
+});
 test('unauthorized reviewers and duplicate claims never spend inference',async()=>{
   for(const unauthorized of [true,false])await run(async url=>{
     if(url.includes('/auth/'))return result({id:a});

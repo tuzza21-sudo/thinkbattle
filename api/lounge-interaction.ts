@@ -78,7 +78,11 @@ async function handle(req: Request) {
       }) });
       if (!response.ok) throw new Error('interaction_ai_failed');
       const result = await response.json() as Parameters<typeof readLoungeInteraction>[0];
-      const decision = readLoungeInteraction(result, claim.members, claim.speaker_id, claim.text);
+      const reviewed = readLoungeInteraction(result, claim.members, claim.speaker_id, claim.text);
+      // Speaking restrictions are paused (2026-10-21): nobody is warned, restricted or has words hidden unless
+      // LOUNGE_MODERATION=on. What the review would have done is still logged.
+      const decision = process.env.LOUNGE_MODERATION === 'on' || reviewed.moderation === 'allow' ? reviewed : { ...reviewed, moderation: 'allow' as const, reason: 'none' as const };
+      if (decision !== reviewed) console.info('[Lounge moderation] paused', JSON.stringify({ moderation: reviewed.moderation, reason: reviewed.reason }));
       const applied = await rpc<Record<string, unknown>>('finish_voice_lounge_interaction', { p_room: roomId, p_message: claim.message_id, p_ticket: claim.ticket, p_decision: decision });
       // The speaker's relationship with the character; a failure never affects the safety decision.
       if (relationshipConfig) {
