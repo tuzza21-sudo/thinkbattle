@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { getLoungeHost, loungeHosts } from '../lib/lounge';
 import { getLoungeCharacter, loungeCharacters } from '../lib/loungeCharacters';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
+import { LoungeCharacterGallery } from './LoungeCharacterGallery';
 import './LoungeCharacter.css';
 
 /** A character's page: what they do, a story from their life and their temperament. The rest of the profile only feeds the conversation. */
@@ -41,5 +42,7 @@ export function LoungeCharacterPage({ id }: { id: string }) {
       <h2>성격</h2>
       <div className="lounge-character-traits">{character.personality.map(item => <article key={item.label}><h3>{item.label}</h3><p>{item.text}</p></article>)}</div>
     </section>
+
+    <LoungeCharacterGallery characterId={character.id} name={character.name} />
   </main>;
 }

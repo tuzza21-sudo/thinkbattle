@@ -121,3 +121,18 @@
   .lounge-character-actions>* { flex:1 1 100%; justify-content:center; }
   .lounge-character-section { margin-top:34px; }
 }
+
+/* gallery: the character's own day (public) and the photos sent to this member */
+.lounge-gallery-tabs { display:flex; gap:8px; margin-bottom:14px; }
+.lounge-gallery-tabs button { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border:1px solid var(--c-line); border-radius:99px; background:var(--c-card); color:var(--c-muted); font-size:13px; cursor:pointer; }
+.lounge-gallery-tabs button[aria-selected="true"] { border-color:var(--c-accent); color:var(--c-ink); font-weight:650; }
+.lounge-gallery-tabs span { font-size:11px; color:var(--c-muted); }
+.lounge-gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+.lounge-gallery-grid figure { margin:0; border-radius:16px; overflow:hidden; background:var(--c-card); border:1px solid var(--c-line); min-width:0; }
+.lounge-gallery-grid a { display:block; aspect-ratio:2/3; background:var(--c-soft); }
+.lounge-gallery-grid img { display:block; width:100%; height:100%; object-fit:cover; }
+.lounge-gallery-grid figcaption { display:grid; gap:4px; padding:10px 12px 12px; font-size:12.5px; line-height:1.6; color:var(--c-ink); word-break:keep-all; }
+.lounge-gallery-grid time { font-size:11px; color:var(--c-muted); }
+.lounge-gallery-empty { display:flex; align-items:center; gap:8px; padding:18px; border-radius:16px; border:1px dashed var(--c-line); color:var(--c-muted); font-size:13px; line-height:1.7; }
+.lounge-gallery-note { display:block; margin-top:10px; color:var(--c-muted); font-size:11.5px; }
+@media(max-width:640px) { .lounge-gallery-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } }

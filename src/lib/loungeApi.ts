@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
+import type { LoungeCharacterPost } from './loungePhotos';
 
 export class LoungeApiError extends Error {
   code: string | undefined;
@@ -184,6 +185,18 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
 export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
+/**
+ * A photo from the character in the member's one-to-one room: `request` when the member asked, `character` when the
+ * character sends one on their own. Takes 20 to 60 seconds. `skipped` means the character's own photos for today are used up.
+ */
+export async function requestLoungePhoto(roomId: string, source: 'request' | 'character', request?: string) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, ...(request ? { request: request.slice(0, 200) } : {}) }) }, '사진 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 10);
+  return payload as { post?: LoungeCharacterPost; left?: number; skipped?: boolean };
+}
+export type LoungePhotoUsage = { enabled: boolean; daily: number; used: number };
+export const getMyLoungePhotoUsage = () => loungeRpc<LoungePhotoUsage | null>('get_my_lounge_photo_usage', {});
 /** Turns the character's voice on or off in the member's own one-to-one room; off, the talk is a chat. */
 export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean>('set_voice_lounge_voice', { p_room: roomId, p_on: on });
 /** Puts text into the conversation as the member's own turn, like a spoken one. */

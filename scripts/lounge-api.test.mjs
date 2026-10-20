@@ -1706,15 +1706,15 @@ test('a one-to-one room is a chat until its voice is turned on; *actions* are sh
   assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
 });
 
-const chatTurn = async ({ voiceOn, replyText }) => {
+const chatTurn = async ({ voiceOn, replyText, photo, anonymous = false }) => {
   const spoken = [];
-  let input, instructions, events;
+  let input, instructions, schema, events;
   await run(async (url, init) => {
-    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('/auth/')) return result({ id: 'host', is_anonymous: anonymous });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn }]);
     if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
-    if (url.endsWith('/responses')) { ({ instructions } = JSON.parse(init.body)); input = JSON.parse(JSON.parse(init.body).input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '' }) }] }] }); }
+    if (url.endsWith('/responses')) { const body = JSON.parse(init.body); ({ instructions } = body); schema = body.text.format.schema; input = JSON.parse(body.input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '', ...(photo ?? {}) }) }] }] }); }
     if (url.includes('finish_voice_lounge_host')) return result(true);
     if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
     throw new Error('Unexpected fetch');
@@ -1722,8 +1722,24 @@ const chatTurn = async ({ voiceOn, replyText }) => {
     const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
     events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
   });
-  return { spoken, input, instructions, events };
+  return { spoken, input, instructions, schema, events };
 };
+
+test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
+  const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
+  assert.deepEqual(asked.schema.required.slice(-2), ['photo', 'photo_asked']);
+  assert.equal(asked.schema.required[0], 'text', 'text stays first for the early reply');
+  assert.match(asked.instructions, /photo와 photo_asked는 채팅에서만 쓴다/);
+  assert.deepEqual(asked.events.map(event => event.type), ['host', 'photo', 'done']);
+  assert.deepEqual(asked.events[1], { type: 'photo', scene: '작업실 창가에서 야경을 등지고 찍은 셀카', asked: true });
+  const none = await chatTurn({ voiceOn: false, replyText: '그래서요?', photo: { photo: '', photo_asked: false } });
+  assert.deepEqual(none.events.map(event => event.type), ['host', 'done']);
+  // A guest's character does not offer photos, and a voice reply has no photo either.
+  for (const turn of [await chatTurn({ voiceOn: false, replyText: '그래서요?', anonymous: true }), await chatTurn({ voiceOn: true, replyText: '그래서요?' })]) {
+    assert.equal(turn.schema.properties.photo, undefined);
+    assert.equal(turn.events.some(event => event.type === 'photo'), false);
+  }
+});
 
 test('a chat reply is text only and the model is told it is a chat', async () => {
   const { spoken, input, instructions, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });

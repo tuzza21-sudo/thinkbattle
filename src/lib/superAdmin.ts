@@ -61,6 +61,18 @@ export const setLoungeBetaLimits = async (enabled: boolean, soloMinutes: number,
   if (error) throw new Error(betaErrorMessage(error.message));
 };
 
+/** Character photos: on or off, how many a member may receive a day, and how many were made today. */
+export type LoungeImageSettings = { enabled: boolean; daily: number; today: number };
+export const getLoungeImageSettings = async (): Promise<LoungeImageSettings> => {
+  const { data, error } = await supabase.rpc('admin_get_lounge_image_settings');
+  if (error || !data) throw new Error(error?.message.includes('not authorized') ? '슈퍼 관리자 권한을 확인하지 못했습니다.' : '사진 설정을 불러오지 못했습니다. 캐릭터 사진 마이그레이션이 적용되었는지 확인해 주세요.');
+  return data as LoungeImageSettings;
+};
+export const setLoungeImageSettings = async (enabled: boolean, daily: number) => {
+  const { error } = await supabase.rpc('admin_set_lounge_image_settings', { p_enabled: enabled, p_daily: daily });
+  if (error) throw new Error(error.message.includes('daily out of range') ? '하루 장수는 0~100 사이로 입력해 주세요.' : '사진 설정을 저장하지 못했습니다.');
+};
+
 export const addLoungeBetaTester = async (email: string, note: string) => {
   const { error } = await supabase.rpc('admin_add_lounge_beta_tester', { p_email: email.trim().toLowerCase(), p_note: note.trim() });
   if (error) throw new Error(betaErrorMessage(error.message));
