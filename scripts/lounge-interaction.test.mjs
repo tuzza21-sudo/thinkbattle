@@ -60,7 +60,7 @@ const run=async(mock,task,voiceFailure=false)=>{
   const previous={...process.env},fetch=globalThis.fetch,updates=[];
   for(const [name,value] of Object.entries({OPENAI_API_KEY:'test-key',SUPABASE_URL:'https://db.test',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'private-service',LIVEKIT_URL:'wss://voice.test',LIVEKIT_API_KEY:'voice-key',LIVEKIT_API_SECRET:'voice-secret'}))process.env[name]=value;
   const handler=compile('../api/lounge-interaction.ts',path=>path.includes('loungeInteraction')?lib:{RoomServiceClient:class{
-    async listParticipants(){if(voiceFailure)throw new Error('private voice failure');return [{identity:b}];}
+    async listParticipants(){if(voiceFailure)throw voiceFailure instanceof Error?voiceFailure:new Error('private voice failure');return [{identity:b}];}
     async updateParticipant(...args){updates.push(args);}
   }}).default;
   globalThis.fetch=mock;
@@ -168,6 +168,30 @@ test('speaking restrictions are paused unless LOUNGE_MODERATION=on',async()=>{
       assert.deepEqual([committed.moderation,committed.reason],setting==='on'?['restrict','threat']:['allow','none']);
     }
   }finally{if(previous===undefined)delete process.env.LOUNGE_MODERATION;else process.env.LOUNGE_MODERATION=previous;}
+});
+test('alone with the character and restrictions paused, a message is accepted without an inference call',async()=>{
+  const previous=process.env.LOUNGE_MODERATION;delete process.env.LOUNGE_MODERATION;
+  let committed;
+  try{
+    await run(async(url,init)=>{
+      const permitted=access(url);if(permitted)return permitted;
+      if(url.includes('claim_voice_lounge_interaction'))return result({ticket:'ticket',message_id:1,speaker_id:a,text:'*손을 잡는다* 오늘 밤은 안 보내 줄 거예요.',members:[members[0]],topic:'자유',recent:[],group:false});
+      if(url.includes('finish_voice_lounge_interaction')){committed=JSON.parse(init.body).p_decision;return result({warnings:0});}
+      throw new Error('Must not spend inference');
+    },async handler=>{assert.equal((await handler(request({action:'review',roomId}))).status,200);});
+    assert.deepEqual(committed,{moderation:'allow',reason:'none',target_id:null,question:null});
+  }finally{if(previous!==undefined)process.env.LOUNGE_MODERATION=previous;}
+});
+test('a chat room without a voice room still finishes its safety sync',async()=>{
+  const missing=Object.assign(new Error('requested room does not exist'),{status:404,code:'not_found'});
+  let acked=false;
+  await run(async url=>{
+    const permitted=access(url);if(permitted)return permitted;
+    if(url.includes('pending_voice_lounge_voice_sync'))return result([{user_id:a,speaking_restricted_until:null,safety_updated_at:'2026-10-21'}]);
+    if(url.includes('ack_voice_lounge_voice_sync')){acked=true;return new Response(null,{status:204});}
+    throw new Error('Unexpected');
+  },async handler=>{assert.equal((await handler(request({action:'sync',roomId}))).status,200);},missing);
+  assert.equal(acked,true);
 });
 test('unauthorized reviewers and duplicate claims never spend inference',async()=>{
   for(const unauthorized of [true,false])await run(async url=>{
