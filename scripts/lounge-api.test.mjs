@@ -1700,6 +1700,10 @@ test('a one-to-one room is a chat until its voice is turned on; *actions* are sh
   assert.deepEqual(lounge.splitLoungeActions('별표 *하나만 있으면 그대로'), [{ action: false, text: '별표 *하나만 있으면 그대로' }]);
   assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
   assert.equal(lounge.loungeSpokenText('*조용히 웃는다*'), '');
+  assert.equal(lounge.loungeSpokenText("*'…생각보다 재밌잖아.'* 좋아요."), '좋아요.', 'a thought is not read aloud either');
+  // Every voice plays out the feeling in the words, in its own character.
+  assert.ok(lounge.loungeSpeechRequest('velvet', '와, 진짜요?', 'pcm').instructions.includes(lounge.loungeSpeechExpression));
+  assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
 });
 
 const chatTurn = async ({ voiceOn, replyText }) => {
@@ -1725,7 +1729,11 @@ test('a chat reply is text only and the model is told it is a chat', async () =>
   const { spoken, input, instructions, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
   // A chat reply comes with the character's actions, and the member's actions and thoughts are read from context.
-  assert.match(instructions, /거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~2개/);
+  assert.match(instructions, /거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~3개/);
+  // Reactions are big but stay in character; voice replies react in words instead of stage directions.
+  assert.match(instructions, /반응을 미지근하게 하지 않는다/);
+  assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
+  assert.match(instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
   assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
   assert.deepEqual(spoken, [], 'no speech is made for a chat');

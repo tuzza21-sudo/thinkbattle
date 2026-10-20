@@ -335,10 +335,12 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
   return choices[hash % choices.length];
 }
 export const getLoungeHost = (id: string) => loungeHosts.find(host => host.id === id) ?? loungeHosts[0];
+/** Added to every character's voice: the feeling in the words is played out in full, in that character's own voice. */
+export const loungeSpeechExpression = '문장에 담긴 감정과 리액션(감탄사, 웃음, 놀람, 한숨, 망설임, 장난기)을 이 캐릭터의 음색과 성격 안에서 최대한 실감 나고 크게 살린다. 억양의 높낮이, 강약, 쉼에 분명한 변화를 주고 밋밋하게 읽지 않는다.';
 export function loungeSpeechRequest(hostId: LoungeHostId, input: string, responseFormat: 'pcm' | 'mp3') {
   const host = getLoungeHost(hostId);
   return { model: 'gpt-4o-mini-tts', voice: host.voice, input, response_format: responseFormat,
-    speed: host.speechSpeed, instructions: host.speechInstruction + ' 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.' };
+    speed: host.speechSpeed, instructions: `${host.speechInstruction} ${loungeSpeechExpression} 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.` };
 }
 
 /**
@@ -351,7 +353,7 @@ export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string) {
   const host = getLoungeHost(hostId);
   return {
-    contents: [{ parts: [{ text: `${host.speechInstruction}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
+    contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore' } } } },
   };
 }
