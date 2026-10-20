@@ -1741,6 +1741,16 @@ test('a chat reply is text only and the model is told it is a chat', async () =>
   assert.equal(events[0].text, '*잔을 내려놓으며* 그래서, 결론은요?');
 });
 
+test('a chat reply may run to 1200 characters; a voice reply keeps the 600-character limit', async () => {
+  const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
+  const chat = await chatTurn({ voiceOn: false, replyText: long });
+  assert.equal(chat.events[0].text.length, 1200);
+  assert.match(chat.instructions, /채팅의 대사는 보통 3~5문장, 많으면 6문장까지 쓰고 지문을 빼고 400자 이내다/);
+  assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
+  const voice = await chatTurn({ voiceOn: true, replyText: long });
+  assert.equal(voice.events[0].text.length, 600);
+});
+
 test('with the voice on, the reply is spoken without its *actions*', async () => {
   const { spoken, input, events } = await chatTurn({ voiceOn: true, replyText: '*웃으며* 좋아요, 그렇게 해요.' });
   assert.equal(input.reply_medium, 'voice');

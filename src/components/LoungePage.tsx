@@ -835,7 +835,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         // A chat reply is text only: show it as soon as it arrives, then reload the room once it is saved.
         for await (const event of readLoungeStream(response.stream, controller.signal)) {
           if (event.type !== 'host' || !mounted.current) continue;
-          spoke = true; setChatHostText(event.text.slice(0, 600)); setPending(false);
+          spoke = true; setChatHostText(event.text.slice(0, 1200)); setPending(false);
           console.info('[Lounge latency]', { ...event.timings, firstTextMs: Math.round(performance.now() - started) });
         }
         if (mounted.current) await refreshAfterMessage();
