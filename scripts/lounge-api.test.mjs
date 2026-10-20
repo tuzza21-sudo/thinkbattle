@@ -1704,13 +1704,13 @@ test('a one-to-one room is a chat until its voice is turned on; *actions* are sh
 
 const chatTurn = async ({ voiceOn, replyText }) => {
   const spoken = [];
-  let input, events;
+  let input, instructions, events;
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn }]);
     if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
-    if (url.endsWith('/responses')) { input = JSON.parse(JSON.parse(init.body).input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '' }) }] }] }); }
+    if (url.endsWith('/responses')) { ({ instructions } = JSON.parse(init.body)); input = JSON.parse(JSON.parse(init.body).input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '' }) }] }] }); }
     if (url.includes('finish_voice_lounge_host')) return result(true);
     if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
     throw new Error('Unexpected fetch');
@@ -1718,12 +1718,16 @@ const chatTurn = async ({ voiceOn, replyText }) => {
     const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
     events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
   });
-  return { spoken, input, events };
+  return { spoken, input, instructions, events };
 };
 
 test('a chat reply is text only and the model is told it is a chat', async () => {
-  const { spoken, input, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
+  const { spoken, input, instructions, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
+  // A chat reply comes with the character's actions, and the member's actions and thoughts are read from context.
+  assert.match(instructions, /거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~2개/);
+  assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
+  assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
   assert.deepEqual(spoken, [], 'no speech is made for a chat');
   assert.deepEqual(events.map(event => event.type), ['host', 'done']);
   assert.equal(events[0].text, '*잔을 내려놓으며* 그래서, 결론은요?');
