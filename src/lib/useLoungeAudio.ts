@@ -52,6 +52,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
   const pending = useRef(false);
   const version = useRef(0);
   const playback = useRef<{ finish: () => void } | null>(null);
+  // Why the AI's voice stopped, set by whoever stops it and logged when it ends; 'end' means it was read to the end.
+  const stopCause = useRef<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -85,7 +87,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     } finally { draining.current = false; }
   }, []);
 
-  const stopHost = useCallback(() => { playback.current?.finish(); }, []);
+  const stopHost = useCallback((cause = 'replaced') => { if (playback.current) stopCause.current = cause; playback.current?.finish(); }, []);
   const releaseMicrophone = useCallback((keepIndicator = false) => {
     cancelAnimationFrame(frame.current);
     if (recorder.current?.state === 'recording') recorder.current.stop();
@@ -101,7 +103,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
 
   const disconnect = useCallback(() => {
     version.current += 1;
-    stopHost(); stopMicrophone();
+    stopHost('disconnect'); stopMicrophone();
     const current = roomRef.current; roomRef.current = null;
     void current?.disconnect();
     void outputContext.current?.close(); outputContext.current = null;
@@ -178,14 +180,15 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         let data;
         try { data = JSON.parse(new TextDecoder().decode(payload)); } catch { return; /* Ignore other room packets. */ }
         // A participant started talking over the AI: the broadcasting device stops it.
-        if (data?.type === 'lounge-barge-in') { if (participant && !restrictedRef.current.has(participant.identity)) playback.current?.finish(); return; }
+        if (data?.type === 'lounge-barge-in') { if (participant && !restrictedRef.current.has(participant.identity)) { if (playback.current) stopCause.current = 'remote-barge-in'; playback.current?.finish(); } return; }
         if (participant?.identity !== hostIdRef.current) return;
         if (data?.type === 'lounge-ai') { aiSpeakingRef.current = Boolean(data.speaking); setAiSpeaking(Boolean(data.speaking)); if (typeof data.text === 'string') setHostText(data.text.slice(0, 600)); }
       });
-      room.on(RoomEvent.Reconnecting, () => { stopHost(); releaseMicrophone(); setConnected(false); });
+      room.on(RoomEvent.Reconnecting, () => { console.warn('[Lounge voice] reconnecting'); stopHost('reconnecting'); releaseMicrophone(); setConnected(false); });
       room.on(RoomEvent.Reconnected, () => { setConnected(true); sync(); });
       room.on(RoomEvent.Disconnected, reason => {
         if (roomRef.current !== room) return;
+        console.warn('[Lounge voice] disconnected', { reason: DisconnectReason[reason ?? 0] ?? reason });
         // The same account joined from another window or device, which makes the voice server drop this connection.
         // Joining straight back would drop that one in turn and the two would keep knocking each other out.
         if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
@@ -244,10 +247,11 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       // Phone microphones with noise suppression deliver a quieter signal than a desktop one.
       const voiceRms = isMobileDevice() ? 0.01 : 0.018;
       let started = 0, lastVoice = 0, lastFrame = performance.now(), bargeMs = 0;
-      const interruptHost = () => {
+      const interruptHost = (level: number, threshold: number) => {
         // Record this person right away; the AI audio stops locally or on the broadcasting device.
         aiSpeakingRef.current = false;
-        if (playback.current) { playback.current.finish(); return; }
+        console.warn('[Lounge voice] barge-in', { rms: Number(level.toFixed(3)), threshold, local: Boolean(playback.current) });
+        if (playback.current) { stopCause.current = 'barge-in'; playback.current.finish(); return; }
         void room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'lounge-barge-in' })), { reliable: true }).catch(() => {});
       };
       let utterance: { voicedFrames: number } | null = null;
@@ -290,7 +294,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (aiSpeakingRef.current && mayTalk) {
           const threshold = playback.current ? loungeBargeIn.localPlaybackRms : loungeBargeIn.remoteRms;
           bargeMs = rms > threshold ? bargeMs + elapsed : Math.max(0, bargeMs - elapsed);
-          if (bargeMs >= loungeBargeIn.sustainMs) { bargeMs = 0; interruptHost(); }
+          if (bargeMs >= loungeBargeIn.sustainMs) { bargeMs = 0; interruptHost(rms, threshold); }
         } else bargeMs = 0;
         if (rms > voiceRms && mayTalk && !aiSpeakingRef.current) {
           speechActivity.current.voicedMs += elapsed;
@@ -388,10 +392,13 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     const pcm = new Pcm16Decoder();
     const cancelRead = new AbortController();
     let stopped = false, first = true, lit = false;
+    const playStarted = performance.now();
     let currentText = '';
     const announce = (speaking: boolean) => { void room.localParticipant.publishData(new TextEncoder().encode(JSON.stringify({ type: 'lounge-ai', speaking, ...(speaking && currentText ? { text: currentText } : {}) })), { reliable: true }).catch(() => {}); };
     const finish = () => {
       if (stopped) return; stopped = true;
+      console.info('[Lounge voice] AI speech ended', { cause: stopCause.current ?? 'end', playedMs: Math.round(performance.now() - playStarted) });
+      stopCause.current = null;
       cancelRead.abort();
       queue.stop(); output.disconnect(); announce(false); aiSpeakingRef.current = false; setAiSpeaking(false);
       void room.localParticipant.unpublishTrack(track).catch(() => {}); track.stop();
@@ -449,7 +456,7 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
         if (!stopped && streamError) throw streamError;
         if (!stopped && first) throw new LoungeApiError('사회자 음성이 비어 있어요. 글로 대화를 이어갈게요.', 'lounge_invalid_audio');
       }
-    } catch (err) { if (!stopped) throw err; }
+    } catch (err) { if (!stopped) { stopCause.current ??= `error:${err instanceof Error ? err.name : 'unknown'}`; throw err; } }
     finally { finish(); void resumeMicrophoneAfterPlayback(); }
   }, [stopHost, pauseMicrophoneForPlayback, resumeMicrophoneAfterPlayback]);
 

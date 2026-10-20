@@ -813,6 +813,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (response.audio && !current.current.audio.speakers.length && current.current.room?.status === 'active') { spoke = true; await current.current.audio.playHost(response.audio); }
     } catch (err) {
       if (controller.signal.aborted) return;
+      console.warn('[Lounge host] turn failed', { reason, code: err instanceof LoungeApiError ? err.code : undefined, message: err instanceof Error ? err.message.slice(0, 120) : String(err) });
       if (err instanceof LoungeApiError) {
         hostBlocked.current = !err.retryable;
         nextHostAttempt.current = Date.now() + Math.max(3, err.retryAfterSeconds) * 1000;
