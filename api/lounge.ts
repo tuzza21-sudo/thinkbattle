@@ -22,7 +22,34 @@ const loungeKnowledgeEmbedding = { hedgeAfterMs: 400, timeoutMs: 1100 } as const
 const loungeKnowledgeThreshold = (name: string, fallback: number) => { const value = Number(process.env[name]); return Number.isFinite(value) && value >= 0 && value <= 1 && process.env[name]?.trim() ? value : fallback; };
 /** Whether a character has any usable knowledge entry, remembered for a minute so empty characters are never looked up. */
 const knowledgePresence = new Map<string, { present: boolean; at: number }>();
-const fetchTimed = (url: string, init: RequestInit, timeout = 25_000) => fetch(url, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout) });
+/**
+ * fetch with a deadline that covers the body too. The deadline and the caller's signal only reach a request that is
+ * still running: on 2026-10-20 a finished knowledge lookup's late timeout (1.1 s) and give-up (1.2 s) signals aborted
+ * the reply request that was streaming at that moment, so a signal firing after a request ends must not reach fetch.
+ */
+async function fetchTimed(url: string, init: RequestInit, timeout = 25_000) {
+  const running = new AbortController();
+  let finished = false;
+  const stop = (reason: unknown) => { if (!finished) running.abort(reason); };
+  const timer = setTimeout(() => stop(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), timeout);
+  const outer = init.signal;
+  const onAbort = () => stop(outer?.reason);
+  const finish = () => { finished = true; clearTimeout(timer); outer?.removeEventListener('abort', onAbort); };
+  if (outer?.aborted) onAbort(); else outer?.addEventListener('abort', onAbort, { once: true });
+  let response: Response;
+  try { response = await fetch(url, { ...init, signal: running.signal }); }
+  catch (error) { finish(); throw error; }
+  // A response without a body (204 from a void database function) is finished already.
+  if (!response.body || [101, 204, 205, 304].includes(response.status)) { finish(); return response; }
+  const reader = response.body.getReader();
+  return new Response(new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try { const { done, value } = await reader.read(); if (done) { finish(); controller.close(); } else controller.enqueue(value); }
+      catch (error) { finish(); controller.error(error); }
+    },
+    cancel(reason) { finish(); return reader.cancel(reason); },
+  }), { status: response.status, statusText: response.statusText, headers: response.headers });
+}
 /**
  * Runs `attempt`, and if it has not answered after `hedgeAfterMs` (or failed in a way worth retrying) runs it once more
  * in parallel; whichever answers first wins and the other is cancelled. OpenAI audio usually answers in about a second
@@ -814,9 +841,10 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           const send = (event: unknown) => { if (!cancelled.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
           let resolveText!: (value: string | null) => void;
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
-          const reply = (async () => {
+          let found = false;
+          const attemptReply = async () => {
             const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
-            let output: string, final: ModelResult | undefined, found = false;
+            let output: string, final: ModelResult | undefined;
             // Text per output message; speech starts from whichever message begins as the JSON answer.
             const messages = new Map<number, OutputMessage>();
             if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -834,6 +862,26 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
             } else { final = await readJson<ModelResult>(response, 'openai'); output = modelOutputText(final) ?? ''; }
             const usage = modelUsageLog(final, { host: host.id, mode: 'solo-stream' }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
             return parseHostAnswer(output || modelOutputText(final ?? {}), final);
+          };
+          // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
+          // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
+          // after the text has gone out to speech there is nothing to redo.
+          const reply = (async () => {
+            const attemptStarted = performance.now();
+            try {
+              try { return await attemptReply(); }
+              catch (error) {
+                if (found || req.signal.aborted || cancelled.signal.aborted || !transientUpstream(error) || performance.now() - attemptStarted > 10_000) throw error;
+                console.warn('[Lounge API] model request retried', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120) }));
+                return await attemptReply();
+              }
+            } catch (error) {
+              // Say it was the reply that failed (not the voice) and let the app try again soon instead of in a minute.
+              if (error instanceof LoungeUpstreamError || req.signal.aborted || cancelled.signal.aborted) throw error;
+              const slow = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+              console.error('[Lounge API] model request failed', JSON.stringify({ name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined, afterMs: Math.round(performance.now() - attemptStarted) }));
+              throw new LoungeUpstreamError(slow ? '사회자 답변이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요.' : '사회자 답변 연결이 끊겼어요. 잠시 뒤 다시 시도해 주세요.', slow ? 504 : 502, slow ? 'openai_reply_timeout' : 'openai_stream_interrupted', true, 5);
+            }
           })();
           reply.then(answer => resolveText(answer.text), () => resolveText(null));
           try {
@@ -852,7 +900,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
             await speech;
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {
-            console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error' }));
+            console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined }));
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
           } finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
