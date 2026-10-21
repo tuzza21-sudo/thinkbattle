@@ -9,7 +9,8 @@ import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
-import { getLoungeChatModel, loungeOfferedChatModels } from '../lib/loungeModels';
+import { getLoungeChatModel } from '../lib/loungeModels';
+import { LoungeModelPicker } from './LoungeModelPicker';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
@@ -249,7 +250,7 @@ function RoomView(props: RoomViewProps) {
         <p role="status">{props.helpRequested ? '요청했어요. 이야기가 잠깐 멈추면 짧게 도와드릴게요.' : 'AI는 사람들의 대화에 끼어들지 않아요. 필요할 때 불러 주세요.'}</p>
       </div>}
     </div>);
-  return <main className="lounge-room-main" data-theme={theme.id} style={{ '--lounge-accent': theme.accent, '--lounge-surface': theme.surface, '--lounge-scene-image': `url('${theme.image}')` } as CSSProperties} ref={roomElement}>
+  return <main className={`lounge-room-main ${props.chat ? 'lounge-chat-room' : ''}`} data-theme={theme.id} style={{ '--lounge-accent': theme.accent, '--lounge-surface': theme.surface, '--lounge-scene-image': `url('${theme.image}')` } as CSSProperties} ref={roomElement}>
     {restricted ? <p className="lounge-safety-notice" role="status">대화 보호를 위해 잠시 발언이 제한됐어요. 약 {Math.max(1, Math.ceil((Date.parse(ownSafety!.restrictedUntil!) - (props.now ?? 0)) / 1000))}초 뒤 다시 말할 수 있어요. 다른 분의 이야기는 계속 들을 수 있어요. 오판이라고 생각되면 방장에게 해제를 요청해 주세요.</p> : Boolean(ownSafety?.warnings) && <p className="lounge-safety-notice" role="status">{ownSafety?.warnings === 1 ? '인신공격 1차 경고: 2차 인신공격부터 발언권이 제한됩니다.' : '추가 인신공격이 감지되면 발언권이 다시 제한됩니다.'} 수위가 심한 발언은 경고 없이 즉시 제한됩니다. 서로 존중하며 이야기해 주세요.</p>}
     {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 참가자·AI 연결 없이 분위기를 둘러보는 화면이에요. 손들기와 대화 순서도 미리 살펴보세요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
     <div className="lounge-conversation-layout"><section className="lounge-stage" aria-label="풍경 위에서 함께하는 대화">
@@ -311,12 +312,7 @@ function RoomView(props: RoomViewProps) {
             {!sessionProps && !ended && props.topicPicker && <LoungeTopicPicker {...props.topicPicker} disabled={props.topicPicker.disabled || restricted} />}
             {!sessionProps && ((solo && !props.chat) || ended || space) && microphoneControl}
             {!sessionProps && voiceToggle}
-            {!sessionProps && solo && !ended && props.onModelChange && <label className="lounge-model-select" title="대화 상대가 답할 때 쓰는 AI 모델이에요">
-              <span>대화 모델</span>
-              <select value={props.chatModel ?? 'gpt'} disabled={props.modelBusy || props.pending} onChange={event => props.onModelChange!(event.target.value)}>
-                {loungeOfferedChatModels.map(model => <option key={model.id} value={model.id}>{model.label} · {model.description}</option>)}
-              </select>
-            </label>}
+            {!sessionProps && solo && !ended && props.onModelChange && <LoungeModelPicker value={props.chatModel ?? 'gpt'} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
             {!sessionProps && solo && props.chat && !ended && props.onPhotoRequest && <button type="button" className="lounge-ask-button lounge-photo-button" onClick={props.onPhotoRequest} disabled={props.photoPending || props.pending || restricted || props.photosLeft === 0} title={props.photosLeft === 0 ? '오늘 받을 수 있는 사진을 모두 받았어요' : undefined}>{props.photoPending ? <LoaderCircle size={17} className="lounge-spin" /> : <Camera size={17} />}지금 모습 보여줘{typeof props.photosLeft === 'number' && <small>오늘 {props.photosLeft}장</small>}</button>}
         {!sessionProps && assistanceControl}
             {!sessionProps && solo && !ended && !props.preview && props.replySuggest && <LoungeReplyButton state={reply} />}
@@ -352,6 +348,7 @@ function LoungePreview() {
   // The speaking demo would keep a one-to-one chat busy, so it starts paused there.
   const [demoPlaying, setDemoPlaying] = useState(capacity !== 1);
   const [previewVoice, setPreviewVoice] = useState(false);
+  const [previewModel, setPreviewModel] = useState('gpt');
   const [demoTurn, setDemoTurn] = useState(0);
   const avatarIndex = 0;
   const demoMembers = [{ id: 'me', name: '나 · 미리보기', muted: false, avatarIndex }, { id: 'demo-soyeon', name: '소연 · 예시', muted: false, avatarIndex: 1 }, { id: 'demo-jiwoo', name: '지우 · 예시', muted: false, avatarIndex: 2 }].slice(0, Math.min(capacity, 3));
@@ -411,7 +408,7 @@ function LoungePreview() {
     suggest: async () => [] as string[],
     send: async (text: string) => { setMessages(previous => [...previous, { id: Date.now(), room_id: 'preview', user_id: 'me', nickname: '나 · 미리보기', kind: 'human', text, created_at: new Date().toISOString() }]); reply(text); },
   } : undefined;
-  return <RoomView chat={capacity === 1 && !previewVoice} onVoiceToggle={capacity === 1 ? () => setPreviewVoice(value => !value) : undefined} replySuggest={previewChat} session={session} onSessionAction={previewSessionAction} theme={getLoungeTheme(params.get('theme')).id} hostId={host.id} topic={topic} capacity={capacity} messages={messages} members={demoMembers} speakers={demoPlaying && demoTurn > 0 && demoTurn <= demoMembers.length ? [demoMembers[demoTurn - 1].id] : []} aiSpeaking={demoPlaying && demoTurn === 0} pending={pending} status="active" remaining="60분 · 예시" preview micOn={false} connected={false} isHost error="" currentUserId="me" demoPlaying={demoPlaying} onDemoToggle={() => setDemoPlaying(value => !value)} onConnect={() => {}} onMic={() => {}} onAsk={() => reply(topic)} onStart={() => {}} onLeave={() => navigate('/lounge')} />;
+  return <RoomView chat={capacity === 1 && !previewVoice} onVoiceToggle={capacity === 1 ? () => setPreviewVoice(value => !value) : undefined} replySuggest={previewChat} chatModel={previewModel} onModelChange={capacity === 1 ? setPreviewModel : undefined} session={session} onSessionAction={previewSessionAction} theme={getLoungeTheme(params.get('theme')).id} hostId={host.id} topic={topic} capacity={capacity} messages={messages} members={demoMembers} speakers={demoPlaying && demoTurn > 0 && demoTurn <= demoMembers.length ? [demoMembers[demoTurn - 1].id] : []} aiSpeaking={demoPlaying && demoTurn === 0} pending={pending} status="active" remaining="60분 · 예시" preview micOn={false} connected={false} isHost error="" currentUserId="me" demoPlaying={demoPlaying} onDemoToggle={() => setDemoPlaying(value => !value)} onConnect={() => {}} onMic={() => {}} onAsk={() => reply(topic)} onStart={() => {}} onLeave={() => navigate('/lounge')} />;
 }
 
 /** In a space the AI's role follows who is present: one person gets the one-to-one role, two or more the group role. */
