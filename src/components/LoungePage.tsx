@@ -9,7 +9,7 @@ import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
-import { getLoungeChatModel, loungeChatModels } from '../lib/loungeModels';
+import { getLoungeChatModel, loungeOfferedChatModels } from '../lib/loungeModels';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
@@ -314,7 +314,7 @@ function RoomView(props: RoomViewProps) {
             {!sessionProps && solo && !ended && props.onModelChange && <label className="lounge-model-select" title="대화 상대가 답할 때 쓰는 AI 모델이에요">
               <span>대화 모델</span>
               <select value={props.chatModel ?? 'gpt'} disabled={props.modelBusy || props.pending} onChange={event => props.onModelChange!(event.target.value)}>
-                {loungeChatModels.map(model => <option key={model.id} value={model.id}>{model.label} · {model.description}</option>)}
+                {loungeOfferedChatModels.map(model => <option key={model.id} value={model.id}>{model.label} · {model.description}</option>)}
               </select>
             </label>}
             {!sessionProps && solo && props.chat && !ended && props.onPhotoRequest && <button type="button" className="lounge-ask-button lounge-photo-button" onClick={props.onPhotoRequest} disabled={props.photoPending || props.pending || restricted || props.photosLeft === 0} title={props.photosLeft === 0 ? '오늘 받을 수 있는 사진을 모두 받았어요' : undefined}>{props.photoPending ? <LoaderCircle size={17} className="lounge-spin" /> : <Camera size={17} />}지금 모습 보여줘{typeof props.photosLeft === 'number' && <small>오늘 {props.photosLeft}장</small>}</button>}

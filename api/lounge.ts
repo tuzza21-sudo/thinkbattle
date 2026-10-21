@@ -715,11 +715,12 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const knowledgeText = loungeKnowledgePrompt(knowledge);
     // In a chat the character may send a photo with the reply: photo is the scene (usually empty), photo_asked whether
     // the member asked for one. The fields come after text, which must stay first for the early reply.
-    const replyReasoning = ['low', 'medium', 'high'].includes(process.env.LOUNGE_REPLY_REASONING ?? '') ? process.env.LOUNGE_REPLY_REASONING! : 'none';
-    // The model the member chose for a one-to-one room (GPT unless they picked another). Gemini Pro took 10 to 14 s to the
-    // first words on 2026-10-21, too long to wait in silence, so a voice reply uses Gemini Flash instead.
+    // The model the member chose for a one-to-one room (the fast GPT unless they picked another). A slow model (GPT with
+    // reasoning, Gemini Pro) answers chats only; a voice reply uses its faster fallback instead of a long silence.
     const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
-    const chatModel = !chat && chosenModel.id === 'gemini-pro' ? getLoungeChatModel('gemini-flash') : chosenModel;
+    const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
+    // How hard the reasoning model thinks: medium by default, LOUNGE_REPLY_REASONING (low, medium, high) changes it.
+    const replyReasoning = chatModel.reasoning === 'none' ? 'none' : ['low', 'medium', 'high'].includes(process.env.LOUNGE_REPLY_REASONING ?? '') ? process.env.LOUNGE_REPLY_REASONING! : chatModel.reasoning;
     // Photos are kept per member, so a guest's character does not offer them; a member's character sends photos only
     // when its portrait was made by the AI (an uploaded portrait is never used to make photos).
     const chatPhotos = chat && !user.is_anonymous && (!custom || custom.portrait_source === 'ai');
@@ -729,8 +730,8 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const modelRequest = {
       // The reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
-      // GPT replies have run without reasoning since the lounge began as a voice service, where the wait before the first
-      // word matters most; LOUNGE_REPLY_REASONING (low, medium, high) turns it on. Reasoning counts toward the output limit.
+      // The fast model replies without reasoning (as since the lounge began as a voice service, where the wait before the
+      // first word matters most); the "deep" model reasons. Reasoning counts toward the output limit.
       model: 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0) + (replyReasoning === 'none' ? 0 : 2500), store: false,
       instructions: [
         `${persona ? `${persona}\n${loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,

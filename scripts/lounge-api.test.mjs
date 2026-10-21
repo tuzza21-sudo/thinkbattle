@@ -1769,6 +1769,24 @@ test('a member\'s character speaks as itself, with its own relationship type; an
   }
 });
 
+test('the deep model reasons in a chat; a voice reply and the fast model do not', async () => {
+  for (const [aiModel, voiceOn, effort] of [['gpt-reasoning', false, 'medium'], ['gpt-reasoning', true, 'none'], [null, false, 'none']]) {
+    let body;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_model: aiModel }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) { body = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그렇군요.', memory: '', ...(voiceOn ? {} : { photo: '', photo_asked: false }) }) }] }] }); }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+    assert.equal(body.reasoning.effort, effort, `${aiModel} ${voiceOn ? 'voice' : 'chat'}`);
+    assert.equal(body.max_output_tokens >= 3000, effort !== 'none', 'reasoning gets room in the output limit');
+  }
+});
+
 test('a room set to Gemini sends the same instructions and JSON shape there; if Gemini fails, GPT answers', async () => {
   const savedKey = process.env.GEMINI_API_KEY;
   process.env.GEMINI_API_KEY = 'gemini-key';
