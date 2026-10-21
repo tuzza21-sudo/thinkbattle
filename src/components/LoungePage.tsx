@@ -472,6 +472,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const hostRequest = useRef<AbortController | null>(null);
   const endingTurn = useRef<string | null>(null);
   const refreshAfterInput = useRef<() => Promise<void>>(async () => {});
+  const answerNow = useRef<() => Promise<void>>(async () => {});
   const reviewAfterInput = useCallback(async () => {
     if (!mounted.current || activeRoomId.current !== roomId || interactionBlockedRoom.current === roomId) return;
     const refresh = refreshAfterInput.current;
@@ -482,7 +483,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       setInteractionError(checked.voiceSyncPending ? '음성 서버에 발언 제한을 적용 중이에요.' : '');
       await refresh();
     } catch (err) { reportInteractionError(err); }
-    finally { console.info('[Lounge latency]', { interactionMs: Math.round(performance.now() - started) }); }
+    finally { console.info(`[Lounge latency] ${JSON.stringify({ interactionMs: Math.round(performance.now() - started) })}`); }
   }, [roomId, reportInteractionError]);
   // The browser that drives the AI: the owner of a created room, or in a space whoever holds the AI-voice lease.
   const [broadcaster, setBroadcaster] = useState<string | null>(null);
@@ -548,7 +549,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         });
         void reviewAfterInput();
       }
-      console.info('[Lounge latency]', { transcriptionMs: Math.round(performance.now() - started) });
+      console.info(`[Lounge latency] ${JSON.stringify({ transcriptionMs: Math.round(performance.now() - started) })}`);
     }
     catch (err) {
       if (err instanceof LoungeApiError) {
@@ -572,6 +573,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (user) trackMetaOnce('FirstConversation', user.id);
       if (!mounted.current || activeRoomId.current !== roomId) return;
       inputReadyAt.current = Date.now();
+      // A chat answers the message at once instead of after the room has been reloaded; a turn already under way picks
+      // it up when it ends, as before.
+      if (isLoungeChatRoom(current.current.room)) void answerNow.current();
       void refreshAfterInput.current().catch(err => { if (mounted.current && activeRoomId.current === roomId) setTranscriptError(errorText(err)); });
       void reviewAfterInput();
     },
@@ -879,10 +883,10 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const speech = state.audio.getSpeechActivity();
     const chatTurn = isLoungeChatRoom(state.room);
     if (busy.current || transcribing.current || speech.transcribing || !state.isHost || (!chatTurn && (!state.audio.connected || !state.audio.audioReady)) || state.room?.status !== 'active' || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording) return;
-    if (state.room.capacity === 1 && (Date.now() - Math.max(lastActivity.current, speech.lastVoiceAt) < loungeSoloTiming.endOfTurnMs || Date.now() - inputReadyAt.current < loungeSoloTiming.settleAfterTranscriptMs || Date.now() - lastHostEnded.current < loungeSoloTiming.afterAiMs)) return;
+    if (state.room.capacity === 1 && !chatTurn && (Date.now() - Math.max(lastActivity.current, speech.lastVoiceAt) < loungeSoloTiming.endOfTurnMs || Date.now() - inputReadyAt.current < loungeSoloTiming.settleAfterTranscriptMs || Date.now() - lastHostEnded.current < loungeSoloTiming.afterAiMs)) return;
     if (state.room.guided_session && !['ready', 'free'].includes(state.session?.state ?? '')) return;
     if (state.room.study_required && !state.room.topic_study) return;
-    if (Date.now() - lastAttempt.current < loungeHostCooldownMs(state.room.capacity)) return;
+    if (Date.now() - lastAttempt.current < loungeHostCooldownMs(state.room.capacity, chatTurn)) return;
     const requestAt = state.room.moderator_requested_at;
     const newRequest = reason === 'requested' && (!requestAt || requestAt !== lastModeratorRequest.current);
     if (newRequest) { hostBlocked.current = false; audioBlocked.current = false; nextHostAttempt.current = 0; lastModeratorRequest.current = requestAt ?? null; }
@@ -892,7 +896,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const started = performance.now(), requestedAt = Date.now();
     // Unprompted speech yields to people: if anyone starts talking, it is dropped instead of waiting.
     const unprompted = reason === 'silence';
-    let spoke = false, released = false;
+    let spoke = false, released = false, shownAt = 0;
     // Ends this turn for the page. A chat ends it once the reply is saved, while the stream goes on with the photo.
     const release = () => {
       if (released) return;
@@ -910,7 +914,11 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           // The photo is made separately (it takes longer than the reply) and appears in the conversation when ready.
           if (event.type === 'photo') { if (mounted.current) void photoRequest.current(event.asked ? 'request' : 'character', event.scene); continue; }
           // The sentence as it is being written: it starts typing out right away.
-          if (event.type === 'text') { if (mounted.current) { setChatHostText(event.text.slice(0, 1200)); setPending(false); } continue; }
+          if (event.type === 'text') {
+            if (!shownAt) { shownAt = performance.now(); console.info(`[Lounge latency] ${JSON.stringify({ firstTextMs: Math.round(shownAt - started) })}`); }
+            if (mounted.current) { setChatHostText(event.text.slice(0, 1200)); setPending(false); }
+            continue;
+          }
           // Saved: the room is reloaded with the reply and the next message can be answered, while the summary and
           // relationship are still being written after it.
           if (event.type === 'saved') {
@@ -936,7 +944,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         await current.current.audio.playHostStream(response.stream, () => {
           spoke = true;
           if (mounted.current) setPending(false);
-          console.info('[Lounge latency]', { ...timings, firstAudioMs: Math.round(performance.now() - started) });
+          console.info(`[Lounge latency] ${JSON.stringify({ ...timings, firstAudioMs: Math.round(performance.now() - started) })}`);
         }, value => { timings = value; }, () => {
           const latest = current.current, activity = latest.audio.getSpeechActivity();
           return !controller.signal.aborted && !latest.audio.speakers.length && !activity.recording && !activity.transcribing && latest.room?.status === 'active' && (!latest.room.guided_session || (latest.session?.turn_id === state.session?.turn_id && ['ready','free'].includes(latest.session?.state ?? ''))) && Date.now() - Math.max(lastActivity.current, activity.lastVoiceAt) >= (latest.room.capacity === 1 ? loungeSoloTiming.endOfTurnMs : 2000);
@@ -959,6 +967,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     }
     finally { release(); }
   }, [roomId, refreshAfterMessage]);
+  useEffect(() => { answerNow.current = () => hostTurn('followup'); }, [hostTurn]);
   useEffect(() => {
     const interval = setInterval(() => {
       const state = current.current;
