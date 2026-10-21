@@ -217,7 +217,7 @@ function RoomView(props: RoomViewProps) {
   const liveSpeakers = ended || props.status === 'lobby' ? [] : props.members.filter(member => props.speakers.includes(member.id));
   const hostSpeaking = props.aiSpeaking && !ended;
   // A reply that takes long says so. The AI can be slow to answer, or still waiting for a pause in the speech, and
-  // from the outside both look like a frozen room.
+  // from the outside both look like a frozen room. A chat shows its typing dots instead, which say the same.
   const [slowReply, setSlowReply] = useState(false);
   useEffect(() => {
     if (!props.pending) { setSlowReply(false); return; }
@@ -227,7 +227,7 @@ function RoomView(props: RoomViewProps) {
   const lastMessage = props.messages.at(-1);
   const waitingForReply = solo && !ended && props.status === 'active' && !props.pending && !hostSpeaking && lastMessage?.kind === 'human'
     && props.now !== undefined && props.now - Date.parse(lastMessage.created_at) > 15_000;
-  const replyDelayed = !ended && !hostSpeaking && (slowReply || waitingForReply);
+  const replyDelayed = !props.chat && !ended && !hostSpeaking && (slowReply || waitingForReply);
   const closeJournal = () => { setJournalOpen(false); journalToggle.current?.focus(); };
   const toggleJournal = (button: HTMLButtonElement) => {
     journalToggle.current = button;

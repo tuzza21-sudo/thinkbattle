@@ -21,6 +21,11 @@ const loungeKnowledgeWaitMs = 1200;
  */
 const loungeLookupWaitMs = 500;
 /**
+ * How long a one-to-one reply may think before writing anything; after that the fast model answers instead.
+ * LOUNGE_REPLY_STALL_MS changes it.
+ */
+const loungeReplyStallMs = () => Number(process.env.LOUNGE_REPLY_STALL_MS) || 15_000;
+/**
  * The embedding of the question usually answers in 150-500 ms but now and then takes longer; a single 700 ms limit lost
  * about one lookup in five. A second request after `hedgeAfterMs` takes whichever answers first.
  */
@@ -1077,29 +1082,42 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
             return parseHostAnswer(output, final, false);
           };
-          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai') => {
+          // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
+          // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
+          // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
+          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai', fast = false) => {
             if (provider === 'gemini') return geminiReply();
             partialLength = 0;
-            const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
-            let output: string, final: ModelResult | undefined;
-            // Text per output message; speech starts from whichever message begins as the JSON answer.
-            const messages = new Map<number, OutputMessage>();
-            if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
-              for await (const event of readModelEvents(response.body)) {
-                if (event.type === 'response.output_item.added') messages.set(event.output_index ?? messages.size, { phase: event.item?.phase, text: '' });
-                else if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
-                  const index = event.output_index ?? 0;
-                  const message = messages.get(index) ?? { text: '' };
-                  message.text += event.delta; messages.set(index, message);
-                  sendPartial(message.text);
-                  if (!found) { const early = replyTextSoFar(message.text); if (early !== undefined) { found = true; resolveText(early); } }
-                } else if (event.type === 'response.completed' || event.type === 'response.incomplete') final = event.response;
-                else if (event.type === 'response.failed' || event.type === 'error') throw new LoungeUpstreamError('AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, 'openai_request_failed', true, 60);
-              }
-              output = pickAnswerText([...messages.values()]) ?? '';
-            } else { final = await readJson<ModelResult>(response, 'openai'); output = modelOutputText(final) ?? ''; }
-            const usage = modelUsageLog(final, { host: host.id, mode: 'solo-stream' }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
-            return parseHostAnswer(output || modelOutputText(final ?? {}), final, false);
+            const request = fast && replyReasoning !== 'none' ? { ...modelRequest, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
+            const stall = new AbortController();
+            let begun = false;
+            const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('reply stalled', 'TimeoutError')); }, loungeReplyStallMs());
+            try {
+              const response = await openai('responses', JSON.stringify({ ...request, stream: true }), AbortSignal.any([req.signal, cancelled.signal, stall.signal]), 90_000);
+              let output: string, final: ModelResult | undefined;
+              // Text per output message; speech starts from whichever message begins as the JSON answer.
+              const messages = new Map<number, OutputMessage>();
+              if (response.body && response.headers.get('content-type')?.includes('text/event-stream')) {
+                for await (const event of readModelEvents(response.body)) {
+                  if (event.type === 'response.output_item.added') messages.set(event.output_index ?? messages.size, { phase: event.item?.phase, text: '' });
+                  else if (event.type === 'response.output_text.delta' && typeof event.delta === 'string') {
+                    begun = true;
+                    const index = event.output_index ?? 0;
+                    const message = messages.get(index) ?? { text: '' };
+                    message.text += event.delta; messages.set(index, message);
+                    sendPartial(message.text);
+                    if (!found) { const early = replyTextSoFar(message.text); if (early !== undefined) { found = true; resolveText(early); } }
+                  } else if (event.type === 'response.completed' || event.type === 'response.incomplete') final = event.response;
+                  else if (event.type === 'response.failed' || event.type === 'error') throw new LoungeUpstreamError('AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, 'openai_request_failed', true, 60);
+                }
+                output = pickAnswerText([...messages.values()]) ?? '';
+              } else { begun = true; final = await readJson<ModelResult>(response, 'openai'); output = modelOutputText(final) ?? ''; }
+              const usage = modelUsageLog(final, { host: host.id, mode: 'solo-stream', ...(fast ? { fast } : {}) }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
+              return parseHostAnswer(output || modelOutputText(final ?? {}), final, false);
+            } catch (error) {
+              if (stall.signal.aborted && !found) throw Object.assign(new Error('reply stalled'), { name: 'ReplyStall' });
+              throw error;
+            } finally { clearTimeout(stallTimer); }
           };
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
@@ -1116,6 +1134,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
                   console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                   return await attemptReply('openai');
                 }
+                // Nothing written yet: the fast model answers this turn instead of a longer silence.
+                if (error instanceof Error && error.name === 'ReplyStall') {
+                  console.warn('[Lounge API] reply stalled, answering without reasoning', JSON.stringify({ model: chatModel.id, afterMs: Math.round(performance.now() - attemptStarted) }));
+                  return await attemptReply('openai', true);
+                }
                 if (!transientUpstream(error) || performance.now() - attemptStarted > 10_000) throw error;
                 console.warn('[Lounge API] model request retried', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120) }));
                 return await attemptReply();
@@ -1123,12 +1146,13 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             } catch (error) {
               // Say it was the reply that failed (not the voice) and let the app try again soon instead of in a minute.
               if (error instanceof LoungeUpstreamError || req.signal.aborted || cancelled.signal.aborted) throw error;
-              const slow = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+              const slow = error instanceof Error && ['TimeoutError', 'AbortError', 'ReplyStall'].includes(error.name);
               console.error('[Lounge API] model request failed', JSON.stringify({ name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined, afterMs: Math.round(performance.now() - attemptStarted) }));
               throw new LoungeUpstreamError(slow ? '사회자 답변이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요.' : '사회자 답변 연결이 끊겼어요. 잠시 뒤 다시 시도해 주세요.', slow ? 504 : 502, slow ? 'openai_reply_timeout' : 'openai_stream_interrupted', true, 5);
             }
           })();
           reply.then(answer => resolveText(answer.text), () => resolveText(null));
+          let replySaved = false;
           try {
             const firstText = (await textReady)?.trim().slice(0, replyLimit);
             if (!firstText) { await reply; throw new LoungeUpstreamError('사회자 답변이 불완전하게 도착했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 60); }
@@ -1148,6 +1172,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
               .catch(error => { console.error('[Lounge API] reply not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); return false; });
             const after = afterReply(firstText, saved);
             const savedOk = await saved;
+            replySaved = savedOk;
             // Where a turn's wait went, from the request: the context (claim, reads, lookups), the first words of a chat,
             // the whole reply, and the save that lets the next turn start.
             console.info('[Lounge turn]', JSON.stringify({ host: host.id, model: chatModel.id, medium: chat ? 'chat' : 'voice', contextMs: Math.round(modelStarted - contextStarted), ...(firstPartialAt ? { firstTextMs: Math.round(firstPartialAt - contextStarted) } : {}), textMs: Math.round(textAt - contextStarted), savedMs: Math.round(performance.now() - contextStarted), chars: firstText.length }));
@@ -1162,6 +1187,10 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {
             console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined }));
+            // A turn that ended without a saved reply gives its claim back at once; otherwise the room took no new turn
+            // for 60 seconds and the conversation looked frozen after a failure or a page reload.
+            if (!replySaved) await rpc<void>('release_voice_lounge_host', { p_room: roomId, p_ticket: ticket }, true)
+              .catch(failure => { if (!(failure instanceof LoungeUpstreamError && failure.code === 'lounge_schema_not_ready')) console.warn('[Lounge API] turn not released', failure instanceof LoungeUpstreamError ? failure.code : 'error'); });
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
           } finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
