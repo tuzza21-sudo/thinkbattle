@@ -1,3 +1,5 @@
+import { isLoungeCustomCharacterId } from '../src/lib/lounge.js';
+import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
 import { loungePhotoBuckets, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
@@ -53,7 +55,8 @@ async function makeImage(context: Context, characterId: string, scene: string) {
   form.append('prompt', loungePhotoImagePrompt(characterId, scene));
   let references = 0;
   for (const [index, path] of loungePhotoReferences(characterId).entries()) {
-    const reference = await timed(`${context.origin}${path}`, {}).catch(() => null);
+    // House characters' photos are site files; a member's character's portrait is a full storage address.
+    const reference = await timed(/^https?:\/\//.test(path) ? path : `${context.origin}${path}`, {}).catch(() => null);
     if (!reference?.ok) continue;
     form.append('image[]', new Blob([await reference.arrayBuffer()], { type: reference.headers.get('content-type')?.split(';')[0] || 'image/webp' }), `reference-${index}.webp`);
     references++;
@@ -98,6 +101,13 @@ async function memberPhoto(context: Context, authorization: string, anon: string
   }
   const postId = claim.id, characterId = claim.character;
   try {
+    // A member's character: photos only from a portrait the AI made, never from an uploaded image.
+    if (isLoungeCustomCharacterId(characterId)) {
+      const response = await timed(`${context.base}/rest/v1/lounge_custom_characters?id=eq.${characterId}&select=*`, { headers: serviceHeaders(context) });
+      const [row] = response.ok ? await response.json() as LoungeCustomCharacterRow[] : [];
+      if (!row || row.portrait_source !== 'ai') throw new LoungePhotoError('이 캐릭터는 AI로 만든 대표 사진이 있어야 사진을 보낼 수 있어요.', 409, 'lounge_photo_no_ai_portrait');
+      registerLoungeCustomCharacterRow(row, loungeCustomPortraitUrl(context.base, row.portrait_path));
+    }
     const userHeaders = { apikey: anon, Authorization: authorization };
     const [messagesResponse, relationshipResponse] = await Promise.all([
       timed(`${context.base}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=12&select=kind,text`, { headers: userHeaders }),

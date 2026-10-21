@@ -8,6 +8,7 @@ import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSes
 import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
+import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
 import { LoungeSessionPanel } from './LoungeSessionPanel';
@@ -24,6 +25,7 @@ import { LoungeReplyButton, LoungeReplyPanel, useLoungeReplies } from './LoungeR
 import { LoungeAfterTalk, LoungeFriendsPage, LoungeProfileCard } from './LoungeSocial';
 import { useLoungeSocialStatus } from '../lib/useLoungeSocialStatus';
 import { LoungeCharacterPage } from './LoungeCharacterPage';
+import { LoungeCharacterCreator } from './LoungeCharacterCreator';
 import { useLoungeAudio } from '../lib/useLoungeAudio';
 import './LoungePage.css';
 import './LoungeRoom.css';
@@ -46,8 +48,9 @@ function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequ
   </header>;
 }
 export function LoungePage(props: Props) {
-  const { roomId, characterId, spaceId, entry } = useParams();
+  const { roomId, characterId, spaceId, entry, editId } = useParams();
   const location = useLocation();
+  const creating = location.pathname === '/lounge/create' || Boolean(editId);
   const introduction = roomId === 'about';
   const friendsPage = roomId === 'friends';
   const inRoom = Boolean(roomId && !introduction && !friendsPage);
@@ -63,7 +66,7 @@ export function LoungePage(props: Props) {
     setLoggingOut(true); setAccountError('');
     try { await props.onLogout(); setShowProfile(false); } catch (error) { setAccountError(errorText(error)); } finally { setLoggingOut(false); }
   };
-  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{characterId ? <LoungeCharacterPage key={characterId} id={characterId} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
+  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{creating ? <LoungeCharacterCreator key={editId ?? 'new'} user={props.user} editId={editId} onLoginRequest={props.onLoginRequest} /> : characterId ? <LoungeCharacterPage key={characterId} id={characterId} user={props.user} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
 }
 
 type RoomViewProps = { photos?: LoungePhotoView[]; photoPending?: boolean; photosLeft?: number | null; onPhotoRequest?: () => void; chat?: boolean; chatHostText?: string; onVoiceToggle?: () => void; voiceBusy?: boolean; voiceLocked?: boolean; replySuggest?: { suggest: () => Promise<string[]>; send: (text: string) => Promise<void> }; place?: string; topicPicker?: LoungeTopicPickerProps; relationship?: RelationshipView | null; topicBrief?: LoungeTopicBrief | null; now?: number; onReleaseRestriction?: (userId: string) => Promise<void>; guidedSession?: boolean; session?: LoungeSession | null; sessionNames?: Record<string, string>; onSessionAction?: (action: LoungeSessionAction) => Promise<void>; study?: LoungeTopicStudy | null; theme?: LoungeThemeId; liveHostText?: string; hostId: LoungeHostId; topic: string; capacity: number; messages: LoungeMessage[]; members: Array<{ id: string; name: string; muted: boolean; warnings?: number; restrictedUntil?: string | null; avatarIndex?: number; avatarUrl?: string }>; speakers: string[]; aiSpeaking: boolean; pending: boolean; status: string; remaining: string; preview?: boolean; micOn: boolean; connected: boolean; connecting?: boolean; audioReady?: boolean; starting?: boolean; isHost: boolean; error: string; onConnect: () => void; onMic: () => void; onAsk: (kind: Exclude<LoungeHelpKind, 'direct'>) => void; helpRequested?: boolean; onStart: () => void; onLeave: () => void; inviteUrl?: string; currentUserId?: string; demoPlaying?: boolean; onDemoToggle?: () => void; roomId?: string; socialMember?: boolean };
@@ -471,8 +474,11 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const isHost = room?.space_id ? broadcaster === user?.id : room?.host_id === user?.id;
   const viewRoom = room ? effectiveRoom(room, members, clock) : null;
   const chat = isLoungeChatRoom(room);
+  // A member's character is read and registered before the room is drawn with it.
+  const customCharacter = useLoungeCustomCharacter(room?.host_persona);
   // Photos are kept per member, so they come in the member's own chat and not for a guest.
-  const photoRoom = Boolean(chat && user && !user.isAnonymous && room?.host_id === user.id);
+  // A member's character sends photos only from a portrait the AI made.
+  const photoRoom = Boolean(chat && user && !user.isAnonymous && room?.host_id === user.id && (!customCharacter.row || customCharacter.row.portrait_source === 'ai'));
   useEffect(() => {
     if (!photoRoom) return;
     let cancelled = false;
@@ -972,6 +978,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   };
   if (!user) return <main className="lounge-join-gate"><span>☕</span><h1>친구들과 가볍게 이야기해요.</h1><p>이름을 준비하고 대화방에 들어갈게요.</p><button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 참여하기 <ArrowRight size={17} /></button><button className="lounge-preview-button" type="button" onClick={onLoginRequest}>로그인해서 참여하기</button>{error && <p className="lounge-error" role="alert">{error}</p>}</main>;
   if (!room) return <main className="lounge-join-gate"><Coffee size={42} /><h1>{error ? '대화방을 확인해 주세요' : '친구들의 자리를 준비해요…'}</h1>{error && <><p className="lounge-error" role="alert">{error}</p><button type="button" className="lounge-preview-button" onClick={() => { setError(''); setRetry(value => value + 1); }}><RefreshCw size={16} /> 다시 확인하기</button><Link to="/lounge">라운지로 돌아가기</Link></>}</main>;
+  if (customCharacter.missing) return <main className="lounge-join-gate"><Coffee size={42} /><h1>이 캐릭터를 찾을 수 없어요</h1><p>만든 사람이 지웠거나 더는 공개되지 않은 캐릭터예요.</p><Link to="/lounge">라운지로 돌아가기</Link></main>;
+  if (!customCharacter.ready) return <main className="lounge-join-gate"><LoaderCircle size={32} className="lounge-spin" /><h1>대화 상대를 불러오는 중…</h1></main>;
   const remaining = room.expires_at ? Math.max(0, Math.ceil((Date.parse(room.expires_at) - clock) / 1000)) : 3600;
   const present = loungePresentMembers(members, clock).length;
   const ownRestriction = members.find(member => member.user_id === user.id)?.speaking_restricted_until;

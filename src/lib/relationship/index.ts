@@ -14,13 +14,17 @@ export * from './events.js';
 export * from './engine.js';
 export * from './persistence.js';
 export * from './memory.js';
+export * from './templates.js';
 
 // Adding a character means adding a configuration here; the engine is unchanged.
 export const relationshipConfigs: Record<string, RelationshipConfig> = Object.fromEntries(
   [empathRelationship, witRelationship, auditorRelationship, closerRelationship, velvetKnifeRelationship, tricksterRelationship, diplomatRelationship, lawyerRelationship].map(config => [config.characterId, config]),
 );
+// Characters that members create get a configuration from their relationship type, registered when their data is read.
+const customConfigs = new Map<string, RelationshipConfig>();
+export const registerCustomRelationshipConfig = (config: RelationshipConfig) => { customConfigs.set(config.characterId, config); };
 export const getRelationshipConfig = (characterId?: string | null): RelationshipConfig | undefined =>
-  characterId ? relationshipConfigs[characterId] : undefined;
+  characterId ? relationshipConfigs[characterId] ?? customConfigs.get(characterId) : undefined;
 
 /** Instructions for classifying the user's latest message in the same model call as the reply. */
 export const relationshipEventInstructions = `events: 사용자의 가장 최근 발언 하나에서 실제로 드러난 행동만 아래 코드로 0~3개 분류한다. 그 이전 발언은 이미 분류됐으므로 다시 분류하지 않는다. 사용자의 새 발언이 없으면 빈 배열이다. 평범한 발언이면 빈 배열이 정상이다. 추측해서 만들지 않는다. confidence는 0~1, note는 무엇을 했는지 25자 이내 한국어로 쓴다.

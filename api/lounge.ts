@@ -1,6 +1,7 @@
 import { getLoungeCharacter, loungeCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
-import { getLoungeHost, isLoungeChatRoom, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -386,6 +387,16 @@ export default async function handler(req: Request): Promise<Response> {
       } catch { return null; }
     }
 
+    // A member's character is read and registered for this request, so everything after treats it like a house character.
+    const ensureCustomCharacter = async (id: string | undefined) => {
+      if (!isLoungeCustomCharacterId(id) || !serviceHeaders) return undefined;
+      const response = await fetchTimed(`${url}/rest/v1/lounge_custom_characters?id=eq.${id}&select=*`, { headers: serviceHeaders });
+      const [row] = response.ok ? await readJson<LoungeCustomCharacterRow[]>(response, 'lounge') : [];
+      if (!row) throw new LoungeUpstreamError('이 캐릭터를 찾을 수 없어요. 만든 사람이 지웠을 수 있어요.', 404, 'lounge_character_missing', false);
+      registerLoungeCustomCharacterRow(row, loungeCustomPortraitUrl(url, row.portrait_path));
+      return row;
+    };
+
     if (body.action === 'relationship') {
       const user = await readJson<{ id: string; email?: string }>(auth, 'lounge');
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,ai_mood,space_id`, { headers });
@@ -398,6 +409,7 @@ export default async function handler(req: Request): Promise<Response> {
         const present = response.ok ? loungePresentMembers(await readJson<Array<{ user_id: string; last_seen: string }>>(response, 'lounge'), Date.now()) : [];
         shown = present.some(member => member.user_id === user.id);
       }
+      if (shown) await ensureCustomCharacter(room.host_persona);
       const config = shown ? getRelationshipConfig(room.host_persona) : undefined;
       if (!config) return json({ enabled: false });
       const stored = await readRelationship(user.id, config.characterId);
@@ -445,6 +457,7 @@ export default async function handler(req: Request): Promise<Response> {
       const [member] = await readJson<Array<{ user_id: string }>>(responses[2], 'lounge');
       if (!room || !member) throw new LoungeUpstreamError('방 참가 상태를 확인해 주세요. 라운지에 다시 입장해 주세요.', 403, 'lounge_access_denied', false);
       if (room.status === 'ended' || (room.expires_at && Date.parse(room.expires_at) <= Date.now())) throw new LoungeUpstreamError('끝난 대화에서는 추천받을 수 없어요.', 410, 'lounge_replies_room_ended', false);
+      await ensureCustomCharacter(room.host_persona);
       const host = getLoungeHost(room.host_persona);
       const recent = (await readJson<Array<{ user_id: string | null; nickname: string; kind: string; text: string }>>(responses[1], 'lounge')).reverse()
         .map(message => ({ speaker: message.kind === 'host' ? host.name : message.user_id === user.id ? '나' : message.nickname, text: message.text.slice(0, 240) }));
@@ -491,6 +504,7 @@ export default async function handler(req: Request): Promise<Response> {
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
     if (room.study_required && !room.topic_study) throw new LoungeUpstreamError('사회자가 주제 자료를 먼저 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.', 503, 'lounge_study_pending', true, 60);
+    const custom = await ensureCustomCharacter(room.host_persona);
     const host = getLoungeHost(room.host_persona);
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
@@ -672,8 +686,9 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const knowledgeText = loungeKnowledgePrompt(knowledge);
     // In a chat the character may send a photo with the reply: photo is the scene (usually empty), photo_asked whether
     // the member asked for one. The fields come after text, which must stay first for the early reply.
-    // Photos are kept per member, so a guest's character does not offer them.
-    const chatPhotos = chat && !user.is_anonymous;
+    // Photos are kept per member, so a guest's character does not offer them; a member's character sends photos only
+    // when its portrait was made by the AI (an uploaded portrait is never used to make photos).
+    const chatPhotos = chat && !user.is_anonymous && (!custom || custom.portrait_source === 'ai');
     const withChatPhoto = <T extends { properties: object; required: readonly string[] }>(schema: T) => chatPhotos
       ? { ...schema, properties: { ...schema.properties, photo: { type: 'string' }, photo_asked: { type: 'boolean' } }, required: [...schema.required, 'photo', 'photo_asked'] }
       : schema;

@@ -6,6 +6,7 @@ import loungeHandler from './api/lounge'
 import loungeInteractionHandler from './api/lounge-interaction'
 import loungeKnowledgeHandler from './api/lounge-knowledge'
 import loungeImagesHandler from './api/lounge-images'
+import loungeCharactersHandler from './api/lounge-characters'
 
 const readRequestBody = (request: NodeJS.ReadableStream) => new Promise<Buffer>((resolve, reject) => {
   const chunks: Buffer[] = []
@@ -48,6 +49,8 @@ export default defineConfig(({ mode }) => {
     'LOUNGE_IMAGE_QUALITY',
     'LOUNGE_ASSET_ORIGIN',
     'LOUNGE_DAILY_POSTS',
+    'LOUNGE_CHARACTER_MODEL',
+    'LOUNGE_PORTRAIT_MODEL',
     'CRON_SECRET',
     'VITE_SUPABASE_URL',
     'VITE_SUPABASE_ANON_KEY',
@@ -84,6 +87,19 @@ export default defineConfig(({ mode }) => {
       {
         name: 'thinkfit-lounge-dev',
         configureServer(server) {
+          server.middlewares.use('/api/lounge-characters', async (request, response) => {
+            try {
+              const body = await readRequestBody(request)
+              if (body.length > 4_200_000) { response.statusCode = 413; response.end(JSON.stringify({ error: '요청이 너무 커요.' })); return }
+              const headers = toHeaders(request.headers)
+              const result = await loungeCharactersHandler(new Request(`${headers.get('x-forwarded-proto') || 'http'}://${headers.get('host') || 'localhost'}/api/lounge-characters`, {
+                method: request.method, headers, body: body.length ? new Uint8Array(body) : undefined,
+              }))
+              response.statusCode = result.status
+              result.headers.forEach((value, name) => response.setHeader(name, value))
+              response.end(Buffer.from(await result.arrayBuffer()))
+            } catch { response.statusCode = 502; response.end(JSON.stringify({ error: '캐릭터 서버 연결을 확인해 주세요.' })) }
+          })
           server.middlewares.use('/api/lounge-images', async (request, response) => {
             try {
               const body = await readRequestBody(request)

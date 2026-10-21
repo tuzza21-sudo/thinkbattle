@@ -258,3 +258,8 @@
 }
 .lounge-create-seats label { min-width:56px; text-align:center; }
 .lounge-create-host-fixed small + b + small { color:var(--l-muted); }
+
+/* the character list's header also holds the button that makes a new character */
+.lounge-home-subhead.with-action { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; }
+.lounge-cast-card-empty { display:grid; place-items:center; width:100%; height:100%; font-size:42px; background:linear-gradient(160deg,#3a3a30,#22221c); }
+@media(max-width:760px) { .lounge-home-subhead.with-action { flex-direction:column; align-items:flex-start; } }

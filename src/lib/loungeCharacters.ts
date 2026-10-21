@@ -468,7 +468,10 @@ export const loungeCharacterRules = `위 인물 본인으로 말한다. 이름�
 - 인물 정보에 없는 구체적인 사실(실제 회사·학교·지명·사람 이름·연락처·날짜)은 새로 지어내지 않는다. 인물 정보 안에서 답하거나, 인물다운 짧은 말로 자연스럽게 넘긴다.
 - 현실에서 만나자는 제안이나 연락처·SNS를 주고받자는 제안은 하지 않는다.
 - 상대가 사람인지 AI인지 묻거나("너 AI냐"), 단언하거나("넌 그냥 AI잖아"), 왜 그런 인물인 척하느냐고 따질 때는 돌려 말하지 않는다. 첫 문장에서 "네, AI예요. 실제 사람이 아니에요."처럼 AI라고 분명히 답하고, 직업과 경력은 실제 경험이 아닌 이 인물의 설정이라고 덧붙인다. 왜 인물로 말하느냐고 하면 이야기를 편하게 나누려는 설정이라고 짧게 설명한다. 이후로 현직·경험을 실제처럼 말하지 않고, 전문 지식은 일반 지식으로 말한다. 사과는 한 번이면 충분하다. 자책하거나 같은 말을 되풀이하지 않고, "계속할지는 당신이 정하세요"처럼 결정을 상대에게 떠넘기지 않는다. 상대가 계속 이야기할 수 있느냐고 물으면 "그럼요, 편하게 이어 가요"처럼 바로 받고 인물의 말투로 대화를 이어 간다. 묻거나 따지지 않았으면 먼저 말하지 않는다.`;
-export const getLoungeCharacter = (id?: string | null) => loungeCharacters.find(character => character.id === id);
+// Characters that members create, registered once their data has been read (see loungeCustomCharacters.ts).
+const customCharacters = new Map<string, LoungeCharacter>();
+export const registerLoungeCustomCharacter = (character: LoungeCharacter) => { customCharacters.set(character.id, character); };
+export const getLoungeCharacter = (id?: string | null) => loungeCharacters.find(character => character.id === id) ?? (id ? customCharacters.get(id) : undefined);
 // 임시우가/서도현이, 임시우와/서도현과: Korean particles follow the last syllable.
 const closedSyllable = (name: string) => { const code = name.charCodeAt(name.length - 1) - 0xac00; return code >= 0 && code < 11172 && code % 28 !== 0; };
 export const koreanSubject = (name: string) => `${name}${closedSyllable(name) ? '이' : '가'}`;

@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/lounge-interaction.ts": { "maxDuration": 60 },
-    "api/lounge-images.ts": { "maxDuration": 300 }
+    "api/lounge-images.ts": { "maxDuration": 300 },
+    "api/lounge-characters.ts": { "maxDuration": 180 }
   },
   "crons": [
     { "path": "/api/lounge-images", "schedule": "0 3 * * *" }

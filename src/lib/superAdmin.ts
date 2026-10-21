@@ -73,6 +73,22 @@ export const setLoungeImageSettings = async (enabled: boolean, daily: number) =>
   if (error) throw new Error(error.message.includes('daily out of range') ? '하루 장수는 0~100 사이로 입력해 주세요.' : '사진 설정을 저장하지 못했습니다.');
 };
 
+/** Member characters waiting to go public, and the decision on one. */
+export type LoungeCharacterReview = {
+  id: string; name: string; owner: string | null; template: string; flirtation: boolean; voice: string; theme: string; updatedAt: string;
+  portraitPath: string | null; portraitSource: 'ai' | 'upload' | null;
+  sheet: { age: number; gender: string; job: string; tagline: string; role: string; story: string[]; personality: Array<{ label: string; text: string }>; habits: string[]; look: string; boundaries: string[]; greeting: string };
+};
+export const listLoungeCharacterReviews = async (): Promise<LoungeCharacterReview[]> => {
+  const { data, error } = await supabase.rpc('admin_list_lounge_character_reviews');
+  if (error) throw new Error(error.message.includes('not authorized') ? '슈퍼 관리자 권한을 확인하지 못했습니다.' : '검수 목록을 불러오지 못했습니다. 사용자 캐릭터 마이그레이션이 적용되었는지 확인해 주세요.');
+  return (data ?? []) as LoungeCharacterReview[];
+};
+export const reviewLoungeCharacter = async (id: string, approve: boolean, note: string) => {
+  const { error } = await supabase.rpc('admin_review_lounge_custom_character', { p_character: id, p_approve: approve, p_note: note });
+  if (error) throw new Error('검수 결과를 저장하지 못했습니다.');
+};
+
 export const addLoungeBetaTester = async (email: string, note: string) => {
   const { error } = await supabase.rpc('admin_add_lounge_beta_tester', { p_email: email.trim().toLowerCase(), p_note: note.trim() });
   if (error) throw new Error(betaErrorMessage(error.message));
