@@ -1783,8 +1783,11 @@ test('a chat reply is text only and the model is told it is a chat', async () =>
   assert.match(instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
   assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
-  // Going somewhere or doing something together is played out as a scene, not refused as "I am an AI".
-  assert.match(instructions, /이야기 속에서 그 장면으로 함께 옮겨 가 지금 실제로 겪는 것처럼 이어 간다. 'AI라서 못 한다'/);
+  // Going somewhere or doing something together follows the relationship; accepted, it is played out as a scene, and
+  // a refusal is the character's, never "I am an AI".
+  assert.match(instructions, /받아들일지는 relationship.outing을 따른다/);
+  assert.match(instructions, /거절할 때도 'AI라서 못 한다'/);
+  assert.match(instructions, /받아들이면 이야기 속에서 그 장면으로 함께 옮겨 가/);
   assert.match(instructions, /상황극은 현실의 만남이 아니므로 이 규칙에 해당하지 않는다/);
   assert.match(instructions, /memory 첫 줄에 '지금 장면: '/);
   assert.deepEqual(spoken, [], 'no speech is made for a chat');
