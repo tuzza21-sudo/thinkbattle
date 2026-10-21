@@ -1,5 +1,6 @@
-// Long-term memory for one-to-one characters. The model proposes memory operations in the same call as the reply;
-// this module chooses what the model sees and validates what it proposes. Each character has its own memories.
+// Long-term memory for one-to-one characters. The model proposes memory operations (in the reply's call, or in the
+// one-to-one stream in the call after the reply); this module chooses what the model sees and validates what it
+// proposes. Each character has its own memories.
 
 export const memoryKinds = ['project', 'preference', 'decision', 'event', 'open_thread'] as const;
 export type MemoryKind = typeof memoryKinds[number];
@@ -17,6 +18,10 @@ export type MemoryOp =
 export const memorySettings = {
   /** Long-term memories shown to the model per reply. */
   promptLimit: 6,
+  /** Shown when they can be chosen by what is being talked about: more fit, since they are the ones that matter now. */
+  relevantPromptLimit: 8,
+  /** How much a memory's closeness to what was just said (cosine, about 0.2 to 0.6) counts against importance (0 to 1). */
+  relevanceWeight: 2,
   /** Open threads among them, so follow-ups never crowd out everything else. */
   openThreadLimit: 3,
   /** Proposed memories below this importance are dropped. */
@@ -41,14 +46,20 @@ export function similarity(a: string, b: string) {
   return shared / (x.size + y.size - shared);
 }
 
-/** Open threads first (most recent), then the rest by importance, recency and how often they came up. */
-export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId: string, now: Date) {
+/**
+ * Open threads first (most recent), then the rest by importance, recency and how often they came up. With `relevance`
+ * (memory id to its closeness to what was just said) the rest are chosen mostly by that, so a memory that fits the
+ * conversation is shown even among many; a memory with no closeness yet (not embedded) counts as unrelated.
+ */
+export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId: string, now: Date, relevance?: ReadonlyMap<string, number>) {
   const active = rows.filter(row => row.character_id === characterId && (row.status ?? 'active') === 'active');
   const threads = active.filter(row => row.kind === 'open_thread')
     .sort((a, b) => Date.parse(b.updated_at ?? '') - Date.parse(a.updated_at ?? ''))
     .slice(0, memorySettings.openThreadLimit);
-  const score = (row: MemoryRow) => Number(row.importance) + 0.3 * Math.exp(-days(row.last_confirmed_at ?? row.updated_at, now) / 30) + 0.05 * Math.log(row.mention_count ?? 1);
-  const rest = active.filter(row => !threads.includes(row)).sort((a, b) => score(b) - score(a)).slice(0, memorySettings.promptLimit - threads.length);
+  const limit = relevance?.size ? memorySettings.relevantPromptLimit : memorySettings.promptLimit;
+  const score = (row: MemoryRow) => Number(row.importance) + 0.3 * Math.exp(-days(row.last_confirmed_at ?? row.updated_at, now) / 30) + 0.05 * Math.log(row.mention_count ?? 1)
+    + memorySettings.relevanceWeight * Math.max(0, relevance?.get(row.id) ?? 0);
+  const rest = active.filter(row => !threads.includes(row)).sort((a, b) => score(b) - score(a)).slice(0, limit - threads.length);
   const chosen = [...threads, ...rest];
   const refs = new Map<string, string>();
   const forPrompt: PromptMemory[] = chosen.map((row, index) => {
@@ -57,6 +68,9 @@ export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId:
   });
   return { forPrompt, refs, chosen };
 }
+
+/** The text a memory is found by: what it says and, for an open thread, what to ask next. */
+export const memoryEmbeddingText = (row: Pick<MemoryRow, 'summary' | 'follow_up'>) => row.follow_up ? `${row.summary} / ${row.follow_up}` : row.summary;
 
 /** Everything the user can see this character remembers: open threads first, then by importance. */
 export function memoriesForView(rows: readonly MemoryRow[], characterId: string) {

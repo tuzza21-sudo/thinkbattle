@@ -892,7 +892,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const started = performance.now(), requestedAt = Date.now();
     // Unprompted speech yields to people: if anyone starts talking, it is dropped instead of waiting.
     const unprompted = reason === 'silence';
-    let spoke = false;
+    let spoke = false, released = false;
+    // Ends this turn for the page. A chat ends it once the reply is saved, while the stream goes on with the photo.
+    const release = () => {
+      if (released) return;
+      released = true;
+      if (spoke) lastHostEnded.current = Date.now(); if (hostRequest.current === controller) hostRequest.current = null; busy.current = false; if (mounted.current) { setPending(false); if (chatTurn) setChatHostText(''); }
+    };
     try {
       const kind = reason === 'requested' ? requestKind ?? state.room.moderator_request_kind ?? undefined : undefined;
       const response = await requestLoungeHost(roomId, reason, controller.signal, kind);
@@ -902,14 +908,21 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         // A chat reply is text only: show it as soon as it arrives, then reload the room once it is saved.
         for await (const event of readLoungeStream(response.stream, controller.signal)) {
           // The photo is made separately (it takes longer than the reply) and appears in the conversation when ready.
-          if (event.type === 'photo') { void photoRequest.current(event.asked ? 'request' : 'character', event.scene); continue; }
+          if (event.type === 'photo') { if (mounted.current) void photoRequest.current(event.asked ? 'request' : 'character', event.scene); continue; }
           // The sentence as it is being written: it starts typing out right away.
           if (event.type === 'text') { if (mounted.current) { setChatHostText(event.text.slice(0, 1200)); setPending(false); } continue; }
+          // Saved: the room is reloaded with the reply and the next message can be answered, while the summary and
+          // relationship are still being written after it.
+          if (event.type === 'saved') {
+            if (mounted.current) await refreshAfterMessage();
+            console.info(`[Lounge latency] ${JSON.stringify({ savedMs: Math.round(performance.now() - started) })}`);
+            release(); continue;
+          }
           if (event.type !== 'host' || !mounted.current) continue;
           spoke = true; setChatHostText(event.text.slice(0, 1200)); setPending(false);
-          console.info('[Lounge latency]', { ...event.timings, firstTextMs: Math.round(performance.now() - started) });
+          console.info(`[Lounge latency] ${JSON.stringify({ ...event.timings, textDoneMs: Math.round(performance.now() - started) })}`);
         }
-        if (mounted.current) await refreshAfterMessage();
+        if (mounted.current && !released) await refreshAfterMessage();
       } else if (response.stream) {
         const guided = state.room.guided_session;
         const canWaitForAudio = () => {
@@ -933,7 +946,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (response.audioError) setError('사회자 음성을 준비하지 못했어요. 대화 기록에서 사회자의 말을 확인해 주세요.');
       if (response.audio && !current.current.audio.speakers.length && current.current.room?.status === 'active') { spoke = true; await current.current.audio.playHost(response.audio); }
     } catch (err) {
-      if (controller.signal.aborted) return;
+      // After the reply was saved, a broken stream only loses the photo; the conversation has moved on.
+      if (controller.signal.aborted || released) return;
       console.warn('[Lounge host] turn failed', { reason, code: err instanceof LoungeApiError ? err.code : undefined, message: err instanceof Error ? err.message.slice(0, 120) : String(err) });
       if (err instanceof LoungeApiError) {
         hostBlocked.current = !err.retryable;
@@ -943,9 +957,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       const yielded = err instanceof LoungeApiError && err.code === 'lounge_audio_deferred' && reason !== 'requested';
       if (mounted.current && !yielded) setError(errorText(err));
     }
-    finally {
-      if (spoke) lastHostEnded.current = Date.now(); if (hostRequest.current === controller) hostRequest.current = null; busy.current = false; if (mounted.current) { setPending(false); if (chatTurn) setChatHostText(''); }
-    }
+    finally { release(); }
   }, [roomId, refreshAfterMessage]);
   useEffect(() => {
     const interval = setInterval(() => {
