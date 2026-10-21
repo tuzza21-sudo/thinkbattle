@@ -224,6 +224,31 @@ export function replyTextSoFar(output: string): string | undefined {
   return undefined;
 }
 
+const jsonEscapes: Record<string, string> = { n: '\n', t: '\t', r: '', b: '', f: '', '"': '"', '\\': '\\', '/': '/' };
+/**
+ * The reply sentence while the model is still writing it: the decoded part of the `text` string so far, stopping before
+ * an escape that has not fully arrived. A chat shows it as it grows instead of waiting for the whole sentence.
+ */
+export function replyTextPartial(output: string): string | undefined {
+  const start = /^\s*\{\s*"text"\s*:\s*"/.exec(output);
+  if (!start) return undefined;
+  let text = '';
+  for (let index = start[0].length; index < output.length; index++) {
+    const char = output[index];
+    if (char === '"') return text;
+    if (char !== '\\') { text += char; continue; }
+    const next = output[index + 1];
+    if (next === undefined) break;
+    if (next === 'u') {
+      const hex = output.slice(index + 2, index + 6);
+      if (!/^[0-9a-fA-F]{4}$/.test(hex)) break;
+      text += String.fromCharCode(parseInt(hex, 16)); index += 5; continue;
+    }
+    text += jsonEscapes[next] ?? next; index++;
+  }
+  return text;
+}
+
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
 function isRelationshipDeveloper(user: { id: string; email?: string }) {
   const allowed = (process.env.LOUNGE_RELATIONSHIP_DEBUG_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
@@ -887,8 +912,21 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           let resolveText!: (value: string | null) => void;
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
           let found = false;
+          // In a chat the sentence goes out as it is written (about every 50 ms) and starts appearing within a second,
+          // instead of all at once when it is complete. Each attempt starts over, so a retry replaces what was shown.
+          let partialLength = 0, partialAt = 0;
+          const sendPartial = (written: string) => {
+            if (!chat || found) return;
+            const partial = replyTextPartial(written);
+            if (!partial || partial.length <= partialLength) return;
+            const now = performance.now();
+            if (now - partialAt < 50 && partial.length - partialLength < 12) return;
+            partialLength = partial.length; partialAt = now;
+            send({ type: 'text', text: partial.slice(0, replyLimit) });
+          };
           // The same instructions, input and JSON shape sent to Gemini; its streamed text feeds the same early reply.
           const geminiReply = async () => {
+            partialLength = 0;
             const pro = chatModel.id === 'gemini-pro';
             const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
             const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
@@ -910,6 +948,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
               const event = raw as unknown as GeminiEvent, candidate = event.candidates?.[0];
               if (event.promptFeedback?.blockReason) blocked = true;
               output += (candidate?.content?.parts ?? []).filter(part => !part.thought).map(part => part.text ?? '').join('');
+              sendPartial(output);
               if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
               if (candidate?.finishReason) finish = candidate.finishReason;
               if (event.usageMetadata) usage = event.usageMetadata;
@@ -922,6 +961,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           };
           const attemptReply = async (provider: 'openai' | 'gemini' = 'openai') => {
             if (provider === 'gemini') return geminiReply();
+            partialLength = 0;
             const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
             let output: string, final: ModelResult | undefined;
             // Text per output message; speech starts from whichever message begins as the JSON answer.
@@ -933,6 +973,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
                   const index = event.output_index ?? 0;
                   const message = messages.get(index) ?? { text: '' };
                   message.text += event.delta; messages.set(index, message);
+                  sendPartial(message.text);
                   if (!found) { const early = replyTextSoFar(message.text); if (early !== undefined) { found = true; resolveText(early); } }
                 } else if (event.type === 'response.completed' || event.type === 'response.incomplete') final = event.response;
                 else if (event.type === 'response.failed' || event.type === 'error') throw new LoungeUpstreamError('AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, 'openai_request_failed', true, 60);

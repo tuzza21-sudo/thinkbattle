@@ -827,3 +827,10 @@
 .has-room .lounge-model-select select { max-width:190px; padding:6px 4px; border:0; background:transparent; color:#fff5e8; font:inherit; font-size:11px; cursor:pointer; }
 .has-room .lounge-model-select select option { color:#26301f; }
 @media (max-width:760px) { .has-room .lounge-model-select select { font-size:16px; max-width:150px; } }
+
+/* a chat reply typing out: each new bit lands with a small pop, and a caret blinks until the sentence is done */
+.lounge-type-fresh { display:inline; animation:lounge-type-pop .22s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes lounge-type-pop { 0% { opacity:0; filter:blur(2px); } 60% { opacity:1; filter:none; text-shadow:0 0 10px #fff8, var(--lounge-bubble-text-shadow,0 1px 4px #000c); } 100% { opacity:1; } }
+.lounge-type-caret { display:inline-block; width:2px; height:1.05em; margin-left:2px; vertical-align:-.15em; background:currentColor; opacity:.8; animation:lounge-type-caret .9s steps(1) infinite; }
+@keyframes lounge-type-caret { 50% { opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .lounge-type-fresh,.lounge-type-caret { animation:none; } }

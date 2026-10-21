@@ -4,6 +4,8 @@ export type LoungeStreamEvent =
   | { type: 'host'; text: string; timings: Record<string, number> }
   | { type: 'audio'; audio: string }
   | { type: 'done' }
+  /** A chat reply's sentence so far, while the model is still writing it; `host` follows with the whole sentence. */
+  | { type: 'text'; text: string }
   /** A chat reply that comes with a photo: the scene to ask api/lounge-images.ts for, and whether the member asked. */
   | { type: 'photo'; scene: string; asked?: boolean }
   | { type: 'error'; error: string; code?: string; retryable?: boolean; retryAfterSeconds?: number };
@@ -27,7 +29,7 @@ export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, sign
         if (!line.trim()) continue;
         let event: LoungeStreamEvent;
         try { event = JSON.parse(line); } catch { throw new LoungeApiError('사회자 음성 응답이 끊겼어요. 다시 시도해 주세요.', 'lounge_invalid_stream'); }
-        if (!event || !['host', 'audio', 'photo', 'done', 'error'].includes(event.type)) throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
+        if (!event || !['host', 'text', 'audio', 'photo', 'done', 'error'].includes(event.type)) throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
         if (event.type === 'error') throw new LoungeApiError(event.error, event.code, event.retryable !== false, event.retryAfterSeconds);
         if (event.type === 'audio' && typeof event.audio !== 'string') throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
         yield event;
