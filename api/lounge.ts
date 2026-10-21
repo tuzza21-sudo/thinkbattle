@@ -1,6 +1,7 @@
 import { getLoungeCharacter, loungeCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
+import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
@@ -498,7 +499,7 @@ export default async function handler(req: Request): Promise<Response> {
       fetchTimed(`${url}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomId)}&active=eq.true&select=user_id,nickname,last_seen`, { headers }),
     ]);
     if (responses.some(response => !response.ok)) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; voice_on?: boolean }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; voice_on?: boolean; ai_model?: string | null }>>(responses[0], 'lounge');
     const messages = await readJson<Array<{ nickname: string; kind: string; text: string }>>(responses[1], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[2], 'lounge');
     const room = rooms[0];
@@ -689,6 +690,10 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const knowledgeText = loungeKnowledgePrompt(knowledge);
     // In a chat the character may send a photo with the reply: photo is the scene (usually empty), photo_asked whether
     // the member asked for one. The fields come after text, which must stay first for the early reply.
+    // The model the member chose for a one-to-one room (GPT unless they picked another). Gemini Pro took 10 to 14 s to the
+    // first words on 2026-10-21, too long to wait in silence, so a voice reply uses Gemini Flash instead.
+    const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
+    const chatModel = !chat && chosenModel.id === 'gemini-pro' ? getLoungeChatModel('gemini-flash') : chosenModel;
     // Photos are kept per member, so a guest's character does not offer them; a member's character sends photos only
     // when its portrait was made by the AI (an uploaded portrait is never used to make photos).
     const chatPhotos = chat && !user.is_anonymous && (!custom || custom.portrait_source === 'ai');
@@ -879,7 +884,41 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           let resolveText!: (value: string | null) => void;
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
           let found = false;
-          const attemptReply = async () => {
+          // The same instructions, input and JSON shape sent to Gemini; its streamed text feeds the same early reply.
+          const geminiReply = async () => {
+            const pro = chatModel.id === 'gemini-pro';
+            const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
+            const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
+              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: AbortSignal.any([req.signal, cancelled.signal]),
+              body: JSON.stringify({
+                systemInstruction: { parts: [{ text: modelRequest.instructions }] },
+                contents: [{ role: 'user', parts: [{ text: modelRequest.input }] }],
+                // Thinking counts toward the output limit, so Pro (which always thinks) gets more room.
+                generationConfig: { responseMimeType: 'application/json', responseJsonSchema: modelRequest.text.format.schema, maxOutputTokens: modelRequest.max_output_tokens + (pro ? 4000 : 1500), thinkingConfig: { thinkingLevel: 'low' } },
+              }),
+            }, pro ? 60_000 : 30_000);
+            if (!response.ok || !response.body) {
+              console.warn('[Lounge model] gemini failed', JSON.stringify({ model, status: response.status }));
+              throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'gemini_rate_limit' : 'gemini_request_failed', true, 5);
+            }
+            type GeminiEvent = { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> }; finishReason?: string }>; promptFeedback?: { blockReason?: string }; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; cachedContentTokenCount?: number } };
+            let output = '', finish = '', blocked = false, usage: GeminiEvent['usageMetadata'];
+            for await (const raw of readModelEvents(response.body)) {
+              const event = raw as unknown as GeminiEvent, candidate = event.candidates?.[0];
+              if (event.promptFeedback?.blockReason) blocked = true;
+              output += (candidate?.content?.parts ?? []).filter(part => !part.thought).map(part => part.text ?? '').join('');
+              if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
+              if (candidate?.finishReason) finish = candidate.finishReason;
+              if (event.usageMetadata) usage = event.usageMetadata;
+            }
+            if (blocked || ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION'].includes(finish)) throw new LoungeUpstreamError('이 모델이 이번 답을 건너뛰었어요. 다시 말을 걸어 주세요.', 502, 'gemini_blocked', true, 5);
+            const final: ModelResult = { status: finish === 'MAX_TOKENS' ? 'incomplete' : 'completed', ...(finish === 'MAX_TOKENS' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
+              usage: { input_tokens: usage?.promptTokenCount, output_tokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0), input_tokens_details: { cached_tokens: usage?.cachedContentTokenCount ?? 0 } } };
+            const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
+            return parseHostAnswer(output, final);
+          };
+          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai') => {
+            if (provider === 'gemini') return geminiReply();
             const response = await openai('responses', JSON.stringify({ ...modelRequest, stream: true }), AbortSignal.any([req.signal, cancelled.signal]), 30_000);
             let output: string, final: ModelResult | undefined;
             // Text per output message; speech starts from whichever message begins as the JSON answer.
@@ -903,12 +942,19 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
+          const provider = chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
             try {
-              try { return await attemptReply(); }
+              try { return await attemptReply(provider); }
               catch (error) {
-                if (found || req.signal.aborted || cancelled.signal.aborted || !transientUpstream(error) || performance.now() - attemptStarted > 10_000) throw error;
+                if (found || req.signal.aborted || cancelled.signal.aborted) throw error;
+                // A chosen Gemini model that fails before any text: GPT answers this turn, so the conversation goes on.
+                if (provider === 'gemini') {
+                  console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                  return await attemptReply('openai');
+                }
+                if (!transientUpstream(error) || performance.now() - attemptStarted > 10_000) throw error;
                 console.warn('[Lounge API] model request retried', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120) }));
                 return await attemptReply();
               }
@@ -937,7 +983,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
             else console.warn('[Lounge API] spoken reply was not saved');
             await speech;
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
-            const photo = chatPhotos && saved && typeof answer?.photo === 'string' ? answer.photo.trim().slice(0, 200) : '';
+            const photo = chatPhotos && saved && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
             if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {
