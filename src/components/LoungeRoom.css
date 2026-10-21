@@ -843,8 +843,13 @@
 .lounge-model-menu small { font-size:11px; line-height:1.45; color:#fff5e8b3; }
 .lounge-model-check { color:var(--lounge-accent); }
 
-/* a one-to-one chat reads like a messenger: the conversation and the message box form one column in the middle */
-.has-room .lounge-chat-room .lounge-participant-speech,.has-room .lounge-chat-room .lounge-participant-controls { width:100%; max-width:760px; justify-self:center; }
+/* a one-to-one room, chat or voice, reads like a messenger: the conversation and the message box form one column in
+   the middle, and every button under the box has the size of the microphone button */
+.has-room .lounge-one-to-one .lounge-participant-speech,.has-room .lounge-one-to-one .lounge-participant-controls { width:100%; max-width:760px; justify-self:center; }
+@media (min-width:761px) and (min-height:501px) {
+  .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls button:not([role=menuitemradio]) { min-height:0; padding:8px 10px; gap:6px; font-size:10px; font-weight:500; line-height:1.4; border-radius:24px; }
+  .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls button:not([role=menuitemradio]) svg { width:14px; height:14px; }
+}
 
 /* a chat reply typing out: each new bit lands with a small pop, and a caret blinks until the sentence is done */
 .lounge-type-fresh { display:inline; animation:lounge-type-pop .22s cubic-bezier(.2,.9,.3,1.4); }
