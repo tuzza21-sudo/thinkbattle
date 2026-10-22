@@ -424,3 +424,16 @@ test('invitations to go somewhere together open up with the relationship: not at
   }
   assert.match(relationship.relationshipOutingGuidance(2, 4), /대부분의 제안/);
 });
+
+test('every one-to-one character shows what it feels when flirted with, as far as the stage allows, never explicitly', () => {
+  for (const config of Object.values(relationship.relationshipConfigs)) {
+    for (const rules of [relationship.relationshipReplyInstructionsFor(config), relationship.relationshipResponseInstructionsFor(config)]) {
+      assert.ok(rules.includes(relationship.attractionReactionRule), `${config.characterId}`);
+    }
+  }
+  const unflirting = relationship.relationshipFromTemplate('warm', { characterId: `c_${'e'.repeat(32)}`, displayName: '가', core: ['차분하다'], flirtation: false });
+  assert.ok(relationship.relationshipReplyInstructionsFor(unflirting).includes(relationship.attractionReactionRule), 'a member character without flirting still reacts');
+  assert.match(relationship.attractionReactionRule, /흔들린 걸 감추려다 들키는/);
+  assert.match(relationship.attractionReactionRule, /노골적인 성행위나 신체 부위는 묘사하지 않고/);
+  assert.match(relationship.attractionReactionRule, /상대가 멈추자고 하면 바로 멈춘다/);
+});
