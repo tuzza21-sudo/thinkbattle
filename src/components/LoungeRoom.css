@@ -857,3 +857,9 @@
 .lounge-type-caret { display:inline-block; width:2px; height:1.05em; margin-left:2px; vertical-align:-.15em; background:currentColor; opacity:.8; animation:lounge-type-caret .9s steps(1) infinite; }
 @keyframes lounge-type-caret { 50% { opacity:0; } }
 @media (prefers-reduced-motion:reduce) { .lounge-type-fresh,.lounge-type-caret { animation:none; } }
+
+/* a story room: the prologue told before the first scene, at the top of the conversation */
+.lounge-prologue { margin:0 0 18px; padding:16px 18px; border:1px solid #ffffff30; border-radius:16px; background:#00000059; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff5e8; text-shadow:none; }
+.lounge-prologue>span { display:block; margin-bottom:8px; font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--lounge-accent); }
+.lounge-prologue>p { margin:0; font-size:14.5px; line-height:1.75; }
+.lounge-prologue>small { display:block; margin-top:10px; font-size:12px; color:#fff5e8b3; }

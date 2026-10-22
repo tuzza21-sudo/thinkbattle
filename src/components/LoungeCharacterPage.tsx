@@ -9,6 +9,7 @@ import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { LoungeCharacterGallery } from './LoungeCharacterGallery';
+import { LoungeScenarioCards } from './LoungeScenarioCards';
 import './LoungeCharacter.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -86,6 +87,8 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
       <h2>취향</h2>
       <div className="lounge-character-traits">{character.tastes.split('\n').map(line => line.trim()).filter(Boolean).map((line, index) => { const [label, ...rest] = line.split(/[:：]/); return rest.length ? <article key={index}><h3>{label.trim()}</h3><p>{rest.join(':').trim()}</p></article> : <article key={index}><p>{line}</p></article>; })}</div>
     </section>}
+
+    {!made && <LoungeScenarioCards characterId={character.id} user={user} />}
 
     <LoungeCharacterGallery characterId={character.id} name={character.name} />
   </main>;

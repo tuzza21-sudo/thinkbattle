@@ -4,6 +4,7 @@ import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './lou
 import type { RelationshipView } from './relationship/types';
 import type { LoungeCharacterPost } from './loungePhotos';
 import type { LoungeCustomCharacterRow, LoungeCustomSheet } from './loungeCustomCharacters';
+import type { LoungeScenarioRow } from './loungeScenarios';
 
 export class LoungeApiError extends Error {
   code: string | undefined;
@@ -215,6 +216,13 @@ export const saveLoungeCharacter = (character: { id?: string; sheet: LoungeCusto
 export const makeLoungeCharacterPortrait = (id: string) => loungeCharacterRequest<{ path: string; url: string }>({ action: 'portrait', id });
 export const chooseLoungeCharacterPortrait = (id: string, path: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'choose', id, path });
 export const uploadLoungeCharacterPortrait = (id: string, image: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'upload', id, image, consent: true });
+/** The active stories (scenarios) a member can start with a character, in their order. Empty if none can be read. */
+export async function listLoungeScenarios(characterId: string): Promise<LoungeScenarioRow[]> {
+  const { data, error } = await supabase.from('lounge_scenarios').select('*').eq('character_id', characterId).order('sort').order('created_at');
+  return error ? [] : (data ?? []) as LoungeScenarioRow[];
+}
+/** Opens (or continues) a one-to-one chat in a scenario; returns the room id. */
+export const startLoungeScenario = (id: string, nickname: string) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname });
 /** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
 export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc<string>('start_lounge_custom_chat', { p_character: id, p_nickname: nickname });
 export const setLoungeCustomStatus = (id: string, action: 'submit' | 'private' | 'delete') => loungeRpc<string>('set_lounge_custom_character_status', { p_character: id, p_action: action });
