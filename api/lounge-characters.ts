@@ -1,6 +1,6 @@
 import { isLoungeCustomCharacterId } from '../src/lib/lounge.js';
 import {
-  loungeCustomBucket, loungeCustomDraftInstructions, loungeCustomDraftSchema, loungeCustomPortraitPrompt, loungeCustomPortraitUrl, loungeCustomReviewInstructions,
+  loungeCustomBucket, loungeCustomDraftInstructions, loungeCustomDraftSchema, loungeCustomExtrasInstructions, loungeCustomExtrasSchema, loungeCustomPortraitPrompt, loungeCustomPortraitUrl, loungeCustomReviewInstructions,
   loungeCustomReviewSchema, loungeCustomThemes, loungeCustomUploadReviewInstructions, loungeCustomUploadReviewSchema, loungeVoicePresets,
   normalizeLoungeCustomSheet, validateLoungeCustomBasics, validateLoungeCustomSheet, type LoungeCustomCharacterRow, type LoungeCustomSheet,
 } from '../src/lib/loungeCustomCharacters.js';
@@ -9,8 +9,10 @@ import { relationshipTemplateIds } from '../src/lib/relationship/index.js';
 /**
  * Characters that members create (a Node function: portraits take up to a minute).
  * POST with the member's session, one of:
- *   draft   {name, age, gender, job, concept}: the AI writes the rest of the sheet; nothing is stored.
- *   save    {id?, sheet, template, flirtation, voice, theme}: the rules and an AI review, then the character is stored.
+ *   draft   {name, age, gender, job, concept?}: the AI writes the introduction, personality and tastes (and the tagline,
+ *           look and greeting); nothing is stored.
+ *   save    {id?, sheet, template, flirtation, voice, theme}: the rules (the AI writes a missing tagline, look or
+ *           greeting), an AI review, then the character is stored.
  *   portrait {id}: a portrait draft from the sheet's look (10 a day); choose {id, path} makes it the portrait.
  *   upload  {id, image (data URL), consent}: an image the member made, checked, used as the portrait only.
  */
@@ -65,7 +67,7 @@ async function draft(context: Context, body: Record<string, unknown>) {
   const problems = validateLoungeCustomBasics(basics);
   if (problems.length) throw new LoungeCharacterError('기본 정보를 확인해 주세요.', 400, 'lounge_character_basics', problems);
   const written = await modelJson<Record<string, unknown>>(context, 'lounge_character_draft', loungeCustomDraftInstructions,
-    { name: basics.name, age: basics.age, gender: basics.gender, job: basics.job, concept: basics.concept }, loungeCustomDraftSchema, 3500);
+    { name: basics.name, age: basics.age, gender: basics.gender, job: basics.job, concept: basics.concept }, loungeCustomDraftSchema, 3000);
   return json({ sheet: normalizeLoungeCustomSheet({ ...written, name: basics.name, age: basics.age, gender: basics.gender, job: basics.job, concept: basics.concept }) });
 }
 
@@ -79,8 +81,16 @@ async function save(context: Context, body: Record<string, unknown>) {
   if (!voice) problems.push({ field: 'voice', message: '목소리를 골라 주세요.' });
   if (!theme) problems.push({ field: 'theme', message: '대화할 장소를 골라 주세요.' });
   if (problems.length) throw new LoungeCharacterError('채워야 할 항목이 있어요.', 400, 'lounge_character_incomplete', problems);
+  // A sheet written by hand has no tagline, look or greeting yet: the AI writes the ones that are empty from the rest.
+  if (!sheet.tagline || !sheet.look || !sheet.greeting) {
+    const extras = normalizeLoungeCustomSheet(await modelJson<Record<string, unknown>>(context, 'lounge_character_extras', loungeCustomExtrasInstructions,
+      { name: sheet.name, age: sheet.age, gender: sheet.gender, job: sheet.job, intro: sheet.intro, personality: sheet.personality, tastes: sheet.tastes, empty: ['tagline', 'look', 'greeting'].filter(field => !sheet[field as 'tagline' | 'look' | 'greeting']) }, loungeCustomExtrasSchema, 600));
+    sheet.tagline ||= extras.tagline; sheet.look ||= extras.look; sheet.greeting ||= extras.greeting;
+    const filled = validateLoungeCustomSheet(sheet);
+    if (filled.length) throw new LoungeCharacterError('AI가 쓴 항목을 확인하지 못했어요. 한 줄 소개, 외모, 첫 인사를 직접 적거나 다시 저장해 주세요.', 502, 'lounge_character_extras', filled);
+  }
   const review = await modelJson<{ allowed: boolean; problems: Array<{ field: string; message: string }> }>(context, 'lounge_character_review', loungeCustomReviewInstructions, sheet, loungeCustomReviewSchema, 900);
-  if (!review.allowed) throw new LoungeCharacterError('검수에서 고칠 점이 나왔어요.', 422, 'lounge_character_review', review.problems.length ? review.problems.slice(0, 6) : [{ field: 'concept', message: '설정을 조금 더 구체적이고 안전하게 다듬어 주세요.' }]);
+  if (!review.allowed) throw new LoungeCharacterError('검수에서 고칠 점이 나왔어요.', 422, 'lounge_character_review', review.problems.length ? review.problems.slice(0, 6) : [{ field: 'intro', message: '설정을 조금 더 구체적이고 안전하게 다듬어 주세요.' }]);
   const fields = { name: sheet.name, sheet, template, flirtation: body.flirtation !== false, voice, theme };
   if (body.id !== undefined) {
     const row = await ownCharacter(context, body.id);

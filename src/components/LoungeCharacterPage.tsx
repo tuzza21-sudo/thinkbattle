@@ -82,6 +82,11 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
       <div className="lounge-character-traits">{character.personality.map(item => <article key={item.label}><h3>{item.label}</h3><p>{item.text}</p></article>)}</div>
     </section>
 
+    {character.tastes && <section className="lounge-character-section">
+      <h2>취향</h2>
+      <div className="lounge-character-traits">{character.tastes.split('\n').map(line => line.trim()).filter(Boolean).map((line, index) => { const [label, ...rest] = line.split(/[:：]/); return rest.length ? <article key={index}><h3>{label.trim()}</h3><p>{rest.join(':').trim()}</p></article> : <article key={index}><p>{line}</p></article>; })}</div>
+    </section>}
+
     <LoungeCharacterGallery characterId={character.id} name={character.name} />
   </main>;
 }
