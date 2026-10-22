@@ -2014,12 +2014,12 @@ test('a chat reply can come with a photo: the scene goes to the browser after th
 test('a chat reply is text only and the model is told it is a chat', async () => {
   const { spoken, input, instructions, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
-  // A chat reply has the character's actions only where they mean something, never the same prop or gesture again;
-  // the member's actions and thoughts are read from context.
-  assert.match(instructions, /지문\(별표로 감싼 네 행동·표정·몸짓\)은 의미가 있을 때만 0~2개 넣는다/);
-  assert.match(instructions, /그런 순간이 아니면 지문 없이 대사만 쓴다/);
-  assert.match(instructions, /recent에서 네가 최근에 쓴 동작·소품·표정은 다시 쓰지 않는다/);
-  assert.doesNotMatch(instructions, /거의 모든 답변에/);
+  // Almost every chat reply has an action, and it is a reaction to what the member just said or did, never a prop
+  // touched for its own sake or the same gesture again; the member's actions and thoughts are read from context.
+  assert.match(instructions, /거의 모든 답에 별표로 감싼 지문을 1~2개 넣는다. 지문은 방금 상대가 한 말이나 행동에 대한 네 반응이다/);
+  assert.match(instructions, /상대가 행동을 썼으면 그 행동에 몸으로 반응한다/);
+  assert.match(instructions, /반응 없이 소품만 만지거나 바라보는 동작\(잔·시계 만지기, 창밖 보기\)은 지문으로 쓰지 않는다/);
+  assert.match(instructions, /recent에서 네 최근 두 답에 쓴 동작·소품·표정은 다시 쓰지 않는다/);
   // Reactions are big but stay in character; voice replies react in words instead of stage directions.
   assert.match(instructions, /반응을 미지근하게 하지 않는다/);
   assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
@@ -2045,7 +2045,10 @@ test('a chat reply may run to 1200 characters; a voice reply keeps the 600-chara
   const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long });
   assert.equal(chat.events[0].text.length, 1200);
-  assert.match(chat.instructions, /채팅의 대사는 보통 3~5문장, 많으면 6문장까지 쓰고 지문을 빼고 400자 이내다/);
+  assert.match(chat.instructions, /채팅의 대사는 지문을 빼고 보통 3~5문장, 200~400자다/);
+  // A dry character keeps its tone, not a shorter reply; the one-to-one 140 characters are for voice.
+  assert.match(chat.instructions, /'짧고 건조한 한 문장' 같은 버릇은 문장 하나하나의 호흡과 결을 말하는 것이고 답의 분량이 아니다/);
+  assert.match(chat.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
   assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long });
   assert.equal(voice.events[0].text.length, 600);
