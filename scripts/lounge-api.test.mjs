@@ -2045,10 +2045,11 @@ test('a chat reply may run to 1200 characters; a voice reply keeps the 600-chara
   const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long });
   assert.equal(chat.events[0].text.length, 1200);
-  assert.match(chat.instructions, /채팅의 대사는 지문을 빼고 보통 3~5문장, 200~400자다/);
+  assert.match(chat.instructions, /채팅의 대사는 지문을 빼고 최소 5문장, 보통 5~7문장\(200~450자\)이다. 4문장 이하로 짧게 끝내지 않는다/);
   // A dry character keeps its tone, not a shorter reply; the one-to-one 140 characters are for voice.
   assert.match(chat.instructions, /'짧고 건조한 한 문장' 같은 버릇은 문장 하나하나의 호흡과 결을 말하는 것이고 답의 분량이 아니다/);
   assert.match(chat.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
+  assert.match(chat.instructions, /목소리로 말할 때는 공감 한마디, 내 생각 한 가지, 떠오른 연상이나 가벼운 반응만으로 끝내도 된다/);
   assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long });
   assert.equal(voice.events[0].text.length, 600);
