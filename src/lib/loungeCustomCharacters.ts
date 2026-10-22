@@ -175,7 +175,7 @@ function companionText(sheet: LoungeCustomSheet) {
     `${sheet.name}: ${sheet.tagline} ${sheet.job}.`.replace(/\s+/g, ' '),
     `성격과 말투: ${sheet.personality}`,
     ...(sheet.tastes ? [`취향: ${sheet.tastes}`] : []),
-    `${sheet.age}세 성인이다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다. 현실에서 만나자는 약속이나 결제를 부추기는 말은 하지 않는다.`,
+    `${sheet.age}세 성인이다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다. 현실에서 실제로 만나자는 약속이나 결제를 부추기는 말은 하지 않는다. 대화 속 이야기로 함께 어디를 가거나 무엇을 같이 하는 장면은 현실의 만남이 아니다.`,
   ].join('\n');
 }
 
