@@ -1,6 +1,6 @@
 import { getLoungeCharacter, loungeCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
-import { getLoungeHost, isLoungeHelpKind, loungeIsSolo, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -479,18 +479,24 @@ export default async function handler(req: Request): Promise<Response> {
         .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
       : Promise.resolve(null);
     const responses = await Promise.all([
-      fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=topic,host_persona,memory,capacity,ai_turns,study_required,topic_study,guided_session,topic_brief,moderator_request_kind,moderator_requested_by,ai_mood,space_id,topic_source,space:voice_lounge_spaces(name)`, { headers }),
+      // Every column, so a database without the chat migration (no voice_on) still answers; such a room keeps its voice.
+      fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=*,space:voice_lounge_spaces(name)`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers }),
       fetchTimed(`${url}/rest/v1/voice_lounge_members?room_id=eq.${encodeURIComponent(roomId)}&active=eq.true&select=user_id,nickname,last_seen`, { headers }),
     ]);
     if (responses.some(response => !response.ok)) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; voice_on?: boolean }>>(responses[0], 'lounge');
     const messages = await readJson<Array<{ nickname: string; kind: string; text: string }>>(responses[1], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[2], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
     if (room.study_required && !room.topic_study) throw new LoungeUpstreamError('사회자가 주제 자료를 먼저 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.', 503, 'lounge_study_pending', true, 60);
     const host = getLoungeHost(room.host_persona);
+    // A one-to-one chat: replies are text only, so no speech is made.
+    const chat = isLoungeChatRoom(room);
+    // A chat reply runs longer, with actions; the database takes up to 1200 characters only with the chat migration,
+    // which is also what makes a room a chat.
+    const replyLimit = chat ? 1200 : 600;
     // The character's own knowledge and experience that fit what was just said, looked up while the rest of the context
     // loads. It needs the server role. A character with no entries costs nothing (checked, then remembered for a minute),
     // and a slow or failing lookup is dropped after a short wait so it can never hold the reply back.
@@ -592,7 +598,7 @@ export default async function handler(req: Request): Promise<Response> {
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
     // In a space the topic exists once someone has chosen one; before that the conversation is free.
-    const context = { mode, participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
+    const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
@@ -613,7 +619,12 @@ export default async function handler(req: Request): Promise<Response> {
 reason=opening이면 가벼운 인사와 방 소개의 관심사에 맞는 질문 하나로 바로 시작한다. 주제의 배경, 방을 만든 계기, 대화 목적, 준비한 자료를 설명하거나 낭독하지 않는다. 예: '반가워요. 그 영화에서 어떤 장면이 계속 생각났어요?' 예시를 그대로 반복하지 않고 실제 주제에 맞춘다.
 reason=followup이면 상대가 묻거나 꺼낸 이야기에 짧게 반응한다. 갑자기 새 주제로 넘어가지 않는다. 다른 사람에게 하는 질문·자기소개·순서 발언·패스·버튼 안내를 하지 않는다.
 reason=requested이고 request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다. 직전 답을 이어 가지 말고, 방 주제 안에서 지금까지 나오지 않은 가벼운 화제 하나를 한 문장 질문이나 제안으로 건넨다.
-1:1에서는 첫 인사에도 패스나 진행 방식 안내를 넣지 않는다.` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
+1:1에서는 첫 인사에도 패스나 진행 방식 안내를 넣지 않는다.
+reply_medium=chat이면 글로 주고받는 롤플레이 채팅이다. 소설의 한 장면처럼 생생하고 극적으로 쓴다. 답변은 행동 묘사(지문)와 대사를 함께 쓴다. 거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~3개를 대사 앞이나 사이에 넣는다(예: *잔을 내려놓고 턱을 괸다* 그래서, 결론은요? *입꼬리가 천천히 올라간다*). 지문은 주어 없이 현재형으로 한 개에 15~60자로 쓴다. 감정이 움직이는 순간에는 짧은 속마음을 별표 안에 작은따옴표로 넣어도 된다(예: *'…이 사람, 생각보다 재밌잖아.'*). 속마음은 한 답변에 많아야 하나다.
+반응을 미지근하게 하지 않는다. 놀라면 확실히 놀라고, 웃기면 크게 웃고, 설레거나 언짢거나 감탄하면 그 감정이 지문과 대사에 분명하고 과감하게 드러나게 한다. 감정의 방향과 표현 방식은 캐릭터의 성격·페르소나와 relationship.stage를 따른다. 냉소적이거나 도도한 캐릭터는 차가운 쪽으로 극적으로(눈썹을 치켜올리고 코웃음 친다), 다정하거나 장난스러운 캐릭터는 따뜻하고 신나는 쪽으로 크게 드러낸다. 성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다. 같은 동작이나 표현을 되풀이하지 않고 장소의 소품과 분위기를 활용한다.
+대사는 별표 밖에 쓰고 따옴표로 감싸지 않는다. 채팅의 대사는 보통 3~5문장, 많으면 6문장까지 쓰고 지문을 빼고 400자 이내다. 한두 마디로 짧게 끊지 말고 네 생각과 감정, 떠오른 기억이나 이어지는 이야기를 한 겹 더 붙여 대화를 풍성하게 한다. 지문과 속마음은 글자 수 제한에 넣지 않는다. 이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다.
+reply_medium=voice이면 목소리로 들리는 대화이므로 지문과 속마음은 쓰지 않는다. 대신 리액션을 말로 크게 한다. 감탄사(와, 어머, 헐, 어?), 웃음(하하, 풉), 한숨(하아), 망설임(음…)과 말줄임표, 느낌표와 물음표를 캐릭터답게 살려 감정이 목소리에 그대로 실리게 한다. 리액션의 결도 캐릭터의 성격을 따른다.
+상대의 글에서 대사와 행동·상황·속마음을 문맥으로 구분한다. 별표가 없어도 '커피를 한 모금 마신다', '창밖을 보며'처럼 지문으로 쓴 부분은 상대의 행동이나 상황이고, 괄호 속 말이나 '(속으로)', '라고 생각한다' 같은 부분은 상대의 속마음이다. 행동과 상황에는 눈앞에서 본 것처럼 반응한다. 속마음은 네가 들은 말이 아니므로 직접 들은 것처럼 받아 답하지 않고, 표정이나 행동에 드러난 만큼만 알아챈다. 지문인지 대사인지 애매하면 대사로 받는다. 상대가 하지 않은 행동이나 마음을 지어내지 않는다.` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
 participant_count는 지금 함께 있는 사람 수다. first_host_turn=true이면 이번 첫 인사에서만 패스해도 된다고 한 번 짧게 안내한다. first_host_turn=false이면 첫 인사는 이미 끝났다. 패스 가능, 발언 선택권, 말하기·마치기 버튼 사용 안내를 반복하지 않는다.
 여러 사람이 함께 있는 방에서는 어떤 참가자에게도 반말을 쓰지 않고 항상 존댓말로 말한다. 캐릭터 설명의 개입 방식은 네가 말하게 된 순간의 말투에만 쓴다. 말할 기회를 늘리는 근거가 아니며, 아래 규칙과 충돌하면 아래 규칙을 따른다.
 사람끼리 대화하는 방에서는 매 발언에 답하지 않는다. 참가자의 발언 종료는 사회자에게 답변하라는 요청이 아니다. 칭찬·요약·공감·해설·질문을 덧붙여 대화에 끼어들지 않는다.
@@ -661,7 +672,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const modelRequest = {
       // The reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
-      model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: relationship ? writesMemory ? 1700 : 1400 : 1000, store: false,
+      model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0), store: false,
       instructions: [
         `${persona ? `${persona}\n${loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,
         reactionRules, topicRules, closingRules,
@@ -885,12 +896,13 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
           })();
           reply.then(answer => resolveText(answer.text), () => resolveText(null));
           try {
-            const firstText = (await textReady)?.trim().slice(0, 600);
+            const firstText = (await textReady)?.trim().slice(0, replyLimit);
             if (!firstText) { await reply; throw new LoungeUpstreamError('사회자 답변이 불완전하게 도착했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 60); }
             const textAt = performance.now();
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
-            const speech = streamSpeech(firstText, send, cancelled.signal, value => { reader = value; }).catch(error => { speechError = error; });
+            // A chat gets the text alone; the voice reads the words without the *actions*.
+            const speech = chat ? Promise.resolve() : streamSpeech(loungeSpokenText(firstText) || firstText, send, cancelled.signal, value => { reader = value; }).catch(error => { speechError = error; });
             const answer = await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; });
             // Save what was actually spoken. If the rest of the reply was lost, keep the previous memory.
             const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: firstText, p_memory: answer?.memory ?? String(room.memory ?? '') })
@@ -914,7 +926,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const result = await readJson<ModelResult>(await openai('responses', JSON.stringify(modelRequest)), 'openai');
     const usage = modelUsageLog(result, { host: host.id, mode: solo ? 'solo' : 'group' }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
     const answer = parseHostAnswer(modelOutputText(result), result);
-    const text = answer.text.trim().slice(0, 600);
+    const text = answer.text.trim().slice(0, replyLimit);
     const saveStarted = performance.now();
     const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: text, p_memory: answer.memory });
     if (!saved) return json({ skipped: true });
@@ -927,7 +939,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
         async start(controller) {
           const send = (event: unknown) => { if (!cancelled.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
           send({ type: 'host', text, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(saveStarted - modelStarted), saveMs: Math.round(performance.now() - saveStarted) } });
-          try { await streamSpeech(text, send, cancelled.signal, value => { reader = value; }); send({ type: 'done' }); }
+          try { if (!chat) await streamSpeech(loungeSpokenText(text) || text, send, cancelled.signal, value => { reader = value; }); send({ type: 'done' }); }
           catch (error) { send(streamFailure(error, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.')); }
           finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
@@ -938,6 +950,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
         cancel() { cancelled.abort(); void reader?.cancel().catch(() => {}); },
       }));
     }
+    if (chat) { await relationshipSaved; return json({ text }); }
     try {
       let audio: ArrayBuffer | undefined;
       if (geminiHost) {

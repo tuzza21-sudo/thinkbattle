@@ -796,3 +796,21 @@
 /* shown when the AI's reply is late */
 .lounge-slow-note { display:flex; align-items:center; gap:8px; margin:10px 0 0; padding:10px 14px; border:1px solid #ffffff30; border-radius:14px; background:#ffffff12; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); color:#fff5e9; font-size:12.5px; line-height:1.6; text-shadow:0 1px 4px #000d; }
 .lounge-slow-note svg { flex-shrink:0; }
+
+/* one-to-one chat: the message box above the bottom bar, *actions* in the conversation, and the typing dots */
+.lounge-chat-composer { display:flex; align-items:flex-end; gap:8px; margin:0 0 10px; padding:6px 6px 6px 14px; border:1px solid #ffffff38; border-radius:22px; background:#ffffff14; backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+.lounge-chat-composer:focus-within { border-color:#ffffff80; }
+.lounge-chat-composer textarea { flex:1; min-width:0; max-height:132px; margin:0; padding:7px 0; border:0; outline:none; background:none; color:#fff5e9; font:inherit; font-size:15px; line-height:1.55; resize:none; text-shadow:0 1px 4px #000d; }
+.lounge-chat-composer textarea::placeholder { color:#fff5e9a8; }
+.lounge-chat-composer button { display:grid; place-items:center; flex-shrink:0; width:38px; height:38px; border:0; border-radius:50%; background:var(--lounge-accent); color:var(--lounge-surface); cursor:pointer; }
+.lounge-chat-composer button:disabled { opacity:.45; cursor:default; }
+.lounge-chat-composer-error { margin:0 0 8px; color:#ffc9bf; font-size:12.5px; text-shadow:0 1px 4px #000d; }
+.lounge-action-text { font-style:italic; opacity:.8; }
+.lounge-typing-dots { display:inline-flex; align-items:center; gap:4px; height:1.85em; padding:0 2px; }
+.lounge-typing-dots i { width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.3; animation:lounge-typing 1.1s ease-in-out infinite; }
+.lounge-typing-dots i:nth-child(2) { animation-delay:.15s; }
+.lounge-typing-dots i:nth-child(3) { animation-delay:.3s; }
+@keyframes lounge-typing { 0%,70%,100% { opacity:.3; transform:none; } 35% { opacity:1; transform:translateY(-3px); } }
+@media (prefers-reduced-motion:reduce) { .lounge-typing-dots i { animation:none; opacity:.7; } }
+/* 16px keeps phones from zooming into the box */
+@media (max-width:760px) { .lounge-chat-composer textarea { font-size:16px; } }

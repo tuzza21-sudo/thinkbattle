@@ -1398,7 +1398,8 @@ test('group help follows the requested kind and each scheduled announcement stay
   for (const item of cases) await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_reason, item.reason); return result('ticket'); }
-    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /moderator_request_kind/); return result([{ topic: '책 이야기', host_persona: 'jaeseok', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
+    // Every column is read (moderator_request_kind among them), so a database without newer columns still answers.
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /select=\*/); return result([{ topic: '책 이야기', host_persona: 'jaeseok', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
     if (url.includes('voice_lounge_sessions?')) return result([{ turn_kind: 'basic', speaker_id: null, ...item.session }]);
     if (url.includes('voice_lounge_messages?')) { assert.doesNotMatch(url, /kind=eq.human/, 'no whole-round summary read'); return result([{ nickname: '소연', kind: 'human', text: '저는 결말이 좋았어요.' }]); }
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'a', nickname: '민수', last_seen: '' }, { user_id: 'b', nickname: '소연', last_seen: '' }, { user_id: 'c', nickname: '지우', last_seen: '' }]);
@@ -1687,6 +1688,75 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
       assert.equal(bytes, 4_194_304, 'more than the former 3MB cap');
     });
   } finally { globalThis.setTimeout = originalSetTimeout; }
+});
+
+test('a one-to-one room is a chat until its voice is turned on; *actions* are shown, never read aloud', () => {
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null, voice_on: false }), true);
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null, voice_on: true }), false);
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null }), false, 'a room from before the chat migration keeps its voice');
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 4, space_id: null, voice_on: false }), false, 'rooms with other people use voice');
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: 'rooftop', voice_on: false }), false, 'a space table uses voice');
+  assert.deepEqual(lounge.splitLoungeActions('*잔을 내려놓으며* 그래서, 결론은요?'), [{ action: true, text: '잔을 내려놓으며' }, { action: false, text: ' 그래서, 결론은요?' }]);
+  assert.deepEqual(lounge.splitLoungeActions('별표 *하나만 있으면 그대로'), [{ action: false, text: '별표 *하나만 있으면 그대로' }]);
+  assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
+  assert.equal(lounge.loungeSpokenText('*조용히 웃는다*'), '');
+  assert.equal(lounge.loungeSpokenText("*'…생각보다 재밌잖아.'* 좋아요."), '좋아요.', 'a thought is not read aloud either');
+  // Every voice plays out the feeling in the words, in its own character.
+  assert.ok(lounge.loungeSpeechRequest('velvet', '와, 진짜요?', 'pcm').instructions.includes(lounge.loungeSpeechExpression));
+  assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
+});
+
+const chatTurn = async ({ voiceOn, replyText }) => {
+  const spoken = [];
+  let input, instructions, events;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) { ({ instructions } = JSON.parse(init.body)); input = JSON.parse(JSON.parse(init.body).input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '' }) }] }] }); }
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+  });
+  return { spoken, input, instructions, events };
+};
+
+test('a chat reply is text only and the model is told it is a chat', async () => {
+  const { spoken, input, instructions, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
+  assert.equal(input.reply_medium, 'chat');
+  // A chat reply comes with the character's actions, and the member's actions and thoughts are read from context.
+  assert.match(instructions, /거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~3개/);
+  // Reactions are big but stay in character; voice replies react in words instead of stage directions.
+  assert.match(instructions, /반응을 미지근하게 하지 않는다/);
+  assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
+  assert.match(instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
+  assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
+  assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
+  assert.deepEqual(spoken, [], 'no speech is made for a chat');
+  assert.deepEqual(events.map(event => event.type), ['host', 'done']);
+  assert.equal(events[0].text, '*잔을 내려놓으며* 그래서, 결론은요?');
+});
+
+test('a chat reply may run to 1200 characters; a voice reply keeps the 600-character limit', async () => {
+  const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
+  const chat = await chatTurn({ voiceOn: false, replyText: long });
+  assert.equal(chat.events[0].text.length, 1200);
+  assert.match(chat.instructions, /채팅의 대사는 보통 3~5문장, 많으면 6문장까지 쓰고 지문을 빼고 400자 이내다/);
+  assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
+  const voice = await chatTurn({ voiceOn: true, replyText: long });
+  assert.equal(voice.events[0].text.length, 600);
+});
+
+test('with the voice on, the reply is spoken without its *actions*', async () => {
+  const { spoken, input, events } = await chatTurn({ voiceOn: true, replyText: '*웃으며* 좋아요, 그렇게 해요.' });
+  assert.equal(input.reply_medium, 'voice');
+  assert.deepEqual(spoken, ['좋아요, 그렇게 해요.']);
+  assert.equal(events.at(-1).type, 'done');
+  assert.ok(events.some(event => event.type === 'audio'));
 });
 
 test('a signal that fires after a request has finished never reaches that request', async () => {

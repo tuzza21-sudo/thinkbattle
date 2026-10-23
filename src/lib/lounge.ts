@@ -274,7 +274,7 @@ export type LoungeFilmCard = {
 export type LoungeFilmResearch = { version: 2; coverage: 'scene_grounded' | 'limited'; materials: Array<{ title: string; url: string; provider: string; retrieved_at: string }>; cards: LoungeFilmCard[] };
 export type LoungeTopicStudy = { title: string; confidence: 'verified' | 'uncertain'; overview: string; facts: string[]; angles: string[]; questions: string[]; clarification: string; sources: Array<{ title: string; url: string }>; film_research?: LoungeFilmResearch };
 export const loungeNeedsStudy = (topic: string) => !loungeTopics.some(item => item.question === topic.trim());
-export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null };
+export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null; voice_on?: boolean };
 /** A space in 상상의 집: always open, hosted by one character. Tables (rooms) open inside it as people arrive. */
 export type LoungeSpace = { id: string; name: string; host_persona: LoungeHostId; theme: LoungeThemeId; capacity: number; present_count: number; table_count: number; topic: string | null; participants: string[]; seat_free: boolean; waiting: number };
 /**
@@ -335,10 +335,12 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
   return choices[hash % choices.length];
 }
 export const getLoungeHost = (id: string) => loungeHosts.find(host => host.id === id) ?? loungeHosts[0];
+/** Added to every character's voice: the feeling in the words is played out in full, in that character's own voice. */
+export const loungeSpeechExpression = '문장에 담긴 감정과 리액션(감탄사, 웃음, 놀람, 한숨, 망설임, 장난기)을 이 캐릭터의 음색과 성격 안에서 최대한 실감 나고 크게 살린다. 억양의 높낮이, 강약, 쉼에 분명한 변화를 주고 밋밋하게 읽지 않는다.';
 export function loungeSpeechRequest(hostId: LoungeHostId, input: string, responseFormat: 'pcm' | 'mp3') {
   const host = getLoungeHost(hostId);
   return { model: 'gpt-4o-mini-tts', voice: host.voice, input, response_format: responseFormat,
-    speed: host.speechSpeed, instructions: host.speechInstruction + ' 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.' };
+    speed: host.speechSpeed, instructions: `${host.speechInstruction} ${loungeSpeechExpression} 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.` };
 }
 
 /**
@@ -351,7 +353,7 @@ export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string) {
   const host = getLoungeHost(hostId);
   return {
-    contents: [{ parts: [{ text: `${host.speechInstruction}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
+    contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore' } } } },
   };
 }
@@ -376,6 +378,29 @@ export function loungeSpeechLimits(input: string) {
   const audioSeconds = Math.min(240, Math.max(45, Math.ceil(input.length / 3) + 15));
   return { timeoutMs: Math.min(120_000, 30_000 + input.length * 150), maxPcmBytes: audioSeconds * 24_000 * 2 };
 }
+
+/**
+ * A one-to-one room is a chat until its owner turns the voice on. Rooms with other people always use voice, and a room
+ * that does not report the setting (before the chat migration) keeps the voice it always had.
+ */
+export const isLoungeChatRoom = (room: Pick<LoungeRoom, 'capacity' | 'space_id' | 'voice_on'> | null | undefined) =>
+  Boolean(room && room.capacity === 1 && !room.space_id && room.voice_on === false);
+
+/** Chat text with `*actions*` (what someone does, how they look, the scene) marked apart from what is said. */
+export function splitLoungeActions(text: string): Array<{ action: boolean; text: string }> {
+  const parts: Array<{ action: boolean; text: string }> = [];
+  let last = 0;
+  for (const match of text.matchAll(/\*([^*\n]+)\*/g)) {
+    if (match.index > last) parts.push({ action: false, text: text.slice(last, match.index) });
+    parts.push({ action: true, text: match[1] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ action: false, text: text.slice(last) });
+  return parts;
+}
+
+/** What the voice reads aloud: the words only, without `*actions*`. */
+export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */
 export type LoungeHelpKind = 'spark' | 'question' | 'opinion' | 'topic' | 'summary' | 'direct';

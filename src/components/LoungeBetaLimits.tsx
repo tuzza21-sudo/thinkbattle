@@ -71,7 +71,7 @@ export const LoungeBetaLimits = () => {
       <div className="super-admin-form-grid">
         <form className="super-admin-form-card" onSubmit={saveLimits}>
           <div className="super-admin-form-title"><Timer size={20} /><strong>하루 이용 시간</strong></div>
-          <label className="admin-label" htmlFor="beta-solo">캐릭터 1:1 대화 (분)</label>
+          <label className="admin-label" htmlFor="beta-solo">캐릭터 1:1 음성 대화 (분 · 채팅은 제한 없음)</label>
           <input id="beta-solo" className="input-field" type="number" min={1} max={1440} value={solo} onChange={event => setSolo(event.target.value)} required />
           <label className="admin-label" htmlFor="beta-group">함께하는 대화방 (분)</label>
           <input id="beta-group" className="input-field" type="number" min={1} max={1440} value={group} onChange={event => setGroup(event.target.value)} required />
@@ -110,7 +110,7 @@ export const LoungeBetaLimits = () => {
       <h3 style={{ marginTop: '1.5rem' }}>오늘 제한 대상 회원의 이용 시간</h3>
       <div className="super-admin-table-wrap">
         <table className="super-admin-table">
-          <thead><tr>{['닉네임', '이메일', '1:1 대화', '함께하는 대화방'].map(label => <th key={label}>{label}</th>)}</tr></thead>
+          <thead><tr>{['닉네임', '이메일', '1:1 음성', '함께하는 대화방'].map(label => <th key={label}>{label}</th>)}</tr></thead>
           <tbody>{(data?.today ?? []).map(row => (
             <tr key={row.userId}>
               <td>{row.nickname ?? '게스트'}</td><td>{row.email ?? '—'}</td>
