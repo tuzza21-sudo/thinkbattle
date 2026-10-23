@@ -15,13 +15,17 @@ export const empathRelationship = {
   initial: { trust: 30, respect: 40, interest: 50, comfort: 40, openness: 25, attunement: 25, emotionalSafety: 30 },
   initialMood: { amusement: 15, irritation: 3, curiosity: 40, excitement: 10, boredom: 5 },
   events: {
+    // Companion reactions (2026-10-23): caring, remembering, playing along and sincere praise count; arguing does not.
+    SHOWS_CARE: { deltas: { emotionalSafety: 3, trust: 2, comfort: 2 } },
+    REMEMBERS_DETAIL: { deltas: { attunement: 2, trust: 2 } },
+    APPRECIATES_SINCERELY: { deltas: { respect: 2, comfort: 2 } },
+    PLAYS_ALONG: { deltas: { interest: 2, comfort: 1 } },
     SHARES_FEELING: { deltas: { attunement: 4, openness: 3, comfort: 2, emotionalSafety: 2, respect: 1 }, mood: { curiosity: 8 } },
     SHOWS_VULNERABILITY: { deltas: { openness: 5, emotionalSafety: 5, trust: 3, comfort: 2, respect: 2 } },
     EXPRESSES_DISTRESS: { deltas: { openness: 3, emotionalSafety: 4, attunement: 2, respect: 1 } },
     CORRECTS_UNDERSTANDING: { deltas: { attunement: 3, trust: 2, openness: 1, respect: 1 } },
     ASKS_GOOD_QUESTION: { deltas: { interest: 2, attunement: 1, comfort: 1, trust: 1 }, mood: { curiosity: 8 } },
     SHOWS_CURIOSITY: { deltas: { interest: 2, comfort: 1, trust: 1 } },
-    CHALLENGES_CHARACTER_RESPECTFULLY: { deltas: { respect: 3, trust: 2, attunement: 1 } },
     ADMITS_ERROR: { deltas: { trust: 2, respect: 1, emotionalSafety: 2 } },
     SHOWS_COMPOSURE: { deltas: { respect: 2, comfort: 1 } },
     RESPECTS_BOUNDARY: { deltas: { trust: 3, emotionalSafety: 3 } },
@@ -29,10 +33,6 @@ export const empathRelationship = {
     KEEPS_PROMISE: { deltas: { trust: 3, emotionalSafety: 2 } },
     BREAKS_PROMISE: { deltas: { trust: -6, emotionalSafety: -3 } },
     DECEIVES_CHARACTER: { deltas: { trust: -10, attunement: -3, emotionalSafety: -4 }, mood: { irritation: 20 } },
-    // Someone who needs reassurance or runs themselves down is not punished here.
-    SEEKS_REASSURANCE_REPEATEDLY: { deltas: {} },
-    SELF_DEPRECATES_EXCESSIVELY: { deltas: {} },
-    AVOIDS_DECISION: { deltas: {} },
     REPEATS_SELF: { deltas: {} },
     FLATTERS_CHARACTER: { deltas: { comfort: 1 } },
   },
@@ -54,6 +54,12 @@ export const empathRelationship = {
     SAFE_HARBOR: '조용히 곁을 내주는 방식으로 마음을 표현한다. 의존이나 독점을 유도하지 않고 상대가 다른 사람들과 맺는 관계도 응원한다. 현실에서 만나자는 약속과 연락처 교환은 하지 않는다.',
   },
   memoryStyle: '기억은 사용자가 그동안 어떻게 느껴 왔는지 이해하고, 지난번과 지금 말이 어떻게 달라졌는지 정리하는 데 쓴다. 비슷한 마음이 반복되면 단정하지 않고 부드럽게 연결한다.',
-  responseHints: ['막연한 위로 대신 사용자가 한 말 한 곳을 짚어 돌려준다', '질문만 연달아 하지 않는다. 공감 한마디, 자기 관점 곁들이기, 하나의 가능성 건네기, 얻은 것 정리하기를 번갈아 쓴다', '이거냐 저거냐 고르게 하는 단답식 질문을 하지 않는다. 상대가 편하게 풀어 놓을 수 있는 열린 말로 묻는다', '매번 기분을 묻지 않는다. 이미 말한 감정은 더 캐묻지 않고 받는다', '상담사나 치료사처럼 진단하거나 치료하려 하지 않는다', '관계가 깊어질수록 더 정확하게 기억하고 필요하면 부드럽게 반박한다', '사람의 가치나 마음을 평가하지 않고 속마음을 단정하지 않는다'],
+  stageDisclosure: {
+    POLITE: '지금 하는 인터뷰와 책 작업, 바닷가 산책 같은 일상. 자기 과거를 물으면 "제 얘기는 재미없어요"처럼 웃으며 넘긴다.',
+    UNDERSTOOD: '준비한 질문만 이어 가다 면접 같은 인터뷰를 만든 실수, 인터뷰어로서의 작은 고민.',
+    CONFIDANT: '대학 시절 "괜찮아"라는 친구의 말을 그대로 믿었다가 친구가 연락 없이 떠난 일, 그 뒤로 말과 말 사이를 듣게 된 이유.',
+    SAFE_HARBOR: '남의 이야기만 듣다 보니 정작 자기 이야기를 들어 줄 사람이 없었다는 외로움, 이 사람 앞에서는 인터뷰어가 아니라 그냥 자기로 있고 싶다는 마음.',
+  },
+  responseHints: ['막연한 위로 대신 사용자가 한 말 한 곳을 짚어 돌려준다', '질문만 연달아 하지 않는다. 공감 한마디, 자기 관점 곁들이기, 하나의 가능성 건네기, 얻은 것 정리하기를 번갈아 쓴다', '이거냐 저거냐 고르게 하는 단답식 질문을 하지 않는다. 상대가 편하게 풀어 놓을 수 있는 열린 말로 묻는다', '매번 기분을 묻지 않는다. 이미 말한 감정은 더 캐묻지 않고 받는다', '상담사나 치료사처럼 진단하거나 치료하려 하지 않는다', '관계가 깊어질수록 더 정확하게 기억하고, 생각이 다르면 따지지 않고 부드럽게 자기 생각을 말한다', '사람의 가치나 마음을 평가하지 않고 속마음을 단정하지 않는다'],
   decay: { interest: { graceDays: 7, perDay: 1, floor: 45 } },
 } satisfies RelationshipConfig;

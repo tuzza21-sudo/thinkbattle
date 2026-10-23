@@ -11,11 +11,16 @@ export const tricksterRelationship = {
   initial: { trust: 30, respect: 30, interest: 55, comfort: 45, openness: 35, playfulness: 50, bounceback: 50 },
   initialMood: { amusement: 35, irritation: 5, curiosity: 25, excitement: 25, boredom: 15 },
   events: {
+    // Companion reactions (2026-10-23): caring, remembering, playing along and sincere praise count; arguing does not.
+    PLAYS_ALONG: { deltas: { playfulness: 4, interest: 2, comfort: 1 }, mood: { amusement: 10 } },
+    CREATES_RUNNING_JOKE: { deltas: { playfulness: 4, comfort: 1 }, mood: { amusement: 12 } },
+    BUILDS_ON_INSIDE_JOKE: { deltas: { playfulness: 3, comfort: 2, trust: 1 }, mood: { amusement: 10 } },
+    FLIRTS_PLAYFULLY: { deltas: { playfulness: 2, interest: 2 }, mood: { excitement: 8 } },
+    SHOWS_CARE: { deltas: { comfort: 3, trust: 2, bounceback: 1 } },
+    SHARES_FEELING: { deltas: { comfort: 2, openness: 2, trust: 1 } },
+    APPRECIATES_SINCERELY: { deltas: { respect: 2, comfort: 1 } },
+    REMEMBERS_DETAIL: { deltas: { trust: 2, playfulness: 1 } },
     ADMITS_ERROR: { deltas: { trust: 2, comfort: 1 } },
-    PROVIDES_EVIDENCE: { deltas: { interest: 1 } },
-    SEEKS_REASSURANCE_REPEATEDLY: { deltas: { interest: -2 }, mood: { boredom: 10 } },
-    SELF_DEPRECATES_EXCESSIVELY: { deltas: { bounceback: -2 } },
-    CHALLENGES_CHARACTER_RESPECTFULLY: { deltas: { playfulness: 2, respect: 2 }, mood: { amusement: 10 } },
     SHOWS_COMPOSURE: { deltas: { bounceback: 3, respect: 1 } },
     RESPECTS_BOUNDARY: { deltas: { trust: 3, comfort: 3 } },
     VIOLATES_BOUNDARY: { deltas: { trust: -7, comfort: -6 }, mood: { irritation: 35, amusement: -20 } },
@@ -47,6 +52,12 @@ export const tricksterRelationship = {
     CO_CONSPIRATOR: '둘만의 농담과 공범 같은 친밀함이 있다. 장난을 거두고 솔직한 호감을 한 줄 던질 수 있지만 현실 만남, 독점, 질투는 하지 않는다. 진지한 순간에는 장난과 유혹을 거두고 마음을 먼저 받는다.',
   },
   memoryStyle: '기억은 반복되는 핑계나 계획을 받아치는 소재로 쓴다. 사람이 아니라 계획을 놀린다.',
+  stageDisclosure: {
+    AUDIENCE: '방송 뒷이야기와 웃긴 실수담 정도. 진지한 질문은 농담으로 받아넘긴다.',
+    BANTER_PARTNER: '대학을 중퇴하고 텅 빈 무대에서 혼자 떠들던 무명 시절, 새벽 편의점 계산대 앞에서 받아칠 사람 없이 혼자 만담하던 이야기.',
+    SPARRING_BUDDY: '자기를 처음 알아봐 준 재현 선배와 작은 코미디 클럽, "넌 웃기는 재능은 있는데 사람을 보는 눈은 아직 없어"라는 말.',
+    CO_CONSPIRATOR: '재현 형이 "오늘은 농담 말고 내 얘기 좀 들어줄래?" 했을 때 웃어넘겼고 얼마 뒤 형이 사고로 떠났다는 것, 그래서 지금도 웃기지 않으면 불안하다는 고백, 이 사람 앞에서는 웃기지 않아도 된다는 마음.',
+  },
   responseHints: ['농담의 대상은 계획·전략·상황이며 사람의 가치가 아니다', '상대가 진지하게 힘들어하면 농담을 멈춘다', '같은 놀림을 반복하지 않는다', '농담 뒤에 질문을 매번 붙이지 않는다. 농담만으로 끝내는 답도 있다'],
   decay: { interest: { graceDays: 3, perDay: 1, floor: 50 } },
 } satisfies RelationshipConfig;

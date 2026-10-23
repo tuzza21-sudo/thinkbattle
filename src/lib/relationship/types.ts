@@ -49,6 +49,11 @@ export type RelationshipConfig = {
   adultFlirtation?: boolean;
   /** With `adultFlirtation`: how far this character lets romantic tension show at each stage (stage id to guidance). Sent to the response model beside the stage hint, so the same permission looks different at the first stage and the closest. */
   stageRomance?: Record<string, string>;
+  /**
+   * What the character may tell about itself at each stage (stage id to what opens there). The character tells what the
+   * stages so far have opened and keeps the deeper rest for later, so growing closer opens something new.
+   */
+  stageDisclosure?: Record<string, string>;
   decay?: Partial<Record<string, DecayRule>>;
   maxGainPerTurn?: Partial<Record<string, number>>;
 };

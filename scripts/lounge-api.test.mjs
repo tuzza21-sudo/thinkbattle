@@ -899,13 +899,13 @@ test('a relationship character reads stored state, classifies events in the same
       assert.ok(context.relationship.character_core.includes('칭찬은 아끼며 얻어야 한다'));
       assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
       assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
-      assert.match(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
+      assert.match(body.instructions, /SHARES_FEELING: /); assert.doesNotMatch(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
       assert.match(body.instructions, /사람의 가치나 인격은 평가하지 않는다/);
       assert.ok(body.instructions.includes(lounge.getLoungeHost('velvet').companion));
       assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
       assert.equal(body.max_output_tokens, 1400, 'events and a long memory must not truncate the JSON reply');
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반박이 있네. 근거부터 들어 보지.', memory: '', events: [
-        { type: 'CHALLENGES_CHARACTER_RESPECTFULLY', confidence: 0.92, note: '근거를 들어 침착하게 반박함' },
+        { type: 'SHARES_FEELING', confidence: 0.92, note: '서운했던 이유를 솔직하게 말함' },
         { type: 'INVENTED_EVENT', confidence: 0.99, note: '' },
       ] }) }] }] });
     }
@@ -917,7 +917,7 @@ test('a relationship character reads stored state, classifies events in the same
       assert.equal(body.p_user, 'user-1'); assert.equal(body.p_character, 'velvet'); assert.equal(body.p_room, roomId);
       assert.equal(body.p_expected_version, 4, 'optimistic version from the stored row');
       assert.equal(body.p_state.scores.respect, 45); assert.equal(body.p_state.scores.intrigue, 62);
-      assert.equal(body.p_state.turnCount, 7); assert.equal(body.p_state.recentEvents.at(-1).type, 'CHALLENGES_CHARACTER_RESPECTFULLY');
+      assert.equal(body.p_state.turnCount, 7); assert.equal(body.p_state.recentEvents.at(-1).type, 'SHARES_FEELING');
       assert.ok(body.p_state.memories.some(memory => memory.summary === '근거를 들어 침착하게 반박함'));
       assert.ok(body.p_mood.curiosity > 0);
       return result(5);
@@ -1596,7 +1596,7 @@ const typesOf = events => events.map(event => event.type);
 
 test('one-to-one speech starts once the reply sentence is complete; the reply is saved at once and the call after it writes the summary and events', async () => {
   const reply = { text: '네 주장이지. "근거"는 아직이야.' };
-  const later = { memory: '사용자는 마케팅 탓을 했다.', events: [{ type: 'MAKES_UNSUPPORTED_CLAIM', confidence: 0.95, note: '근거 없이 단정' }] };
+  const later = { memory: '사용자는 마케팅 탓을 했다.', events: [{ type: 'FLATTERS_CHARACTER', confidence: 0.95, note: '내용 없이 칭찬' }] };
   const json = JSON.stringify(reply);
   let release, speechStartedBeforeRelease = false, released = false, finish, summary, saved, replyBody, afterBody;
   const gate = new Promise(resolve => { release = () => { released = true; resolve(); }; });
@@ -1638,12 +1638,12 @@ test('one-to-one speech starts once the reply sentence is complete; the reply is
     assert.equal(JSON.parse(afterBody.input).recent.at(-1).text, reply.text, 'the call after the reply reads it');
     assert.match(afterBody.instructions, /events: 사용자의 가장 최근 발언/);
     assert.deepEqual(summary, { p_room: roomId, p_memory: later.memory, p_turn: 3 }, 'the summary is saved with its turn, so an older one never replaces a newer');
-    assert.equal(saved.p_state.recentEvents.at(-1).type, 'MAKES_UNSUPPORTED_CLAIM', 'events from the call after the reply update the relationship');
+    assert.equal(saved.p_state.recentEvents.at(-1).type, 'FLATTERS_CHARACTER', 'events from the call after the reply update the relationship');
     // The chat's status card gets the saved state and what the message changed, before the stream ends.
     const changed = events.find(event => event.type === 'relationship');
     assert.ok(events.indexOf(changed) < events.length - 1);
     assert.equal(changed.relationship.macroState.id, saved.p_state.stage);
-    assert.deepEqual(changed.change.events, [{ type: 'MAKES_UNSUPPORTED_CLAIM', label: '섣불리 단정함', up: false }]);
+    assert.deepEqual(changed.change.events, [{ type: 'FLATTERS_CHARACTER', label: '빈 칭찬', up: false }]);
     assert.ok(Object.values(changed.change.delta).every(value => Number.isInteger(value) && value !== 0) && Object.values(changed.change.delta).some(value => value < 0));
   }));
 });
