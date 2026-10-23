@@ -513,6 +513,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const nextHostAttempt = useRef(0);
   // The member's latest message when an AI turn last failed: a newer one asks again (see hostTurn).
   const failedAtMessage = useRef(0);
+  // A call the member just placed from the chat: the character picks up first, once, when the call is connected.
+  const callPlaced = useRef(false);
   const lastModeratorRequest = useRef<string | null>(null);
   const audioBlocked = useRef(false);
   const nextAudioAttempt = useRef(0);
@@ -876,6 +878,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     setVoiceBusy(true); setError('');
     try {
       await setLoungeVoice(roomId, on);
+      callPlaced.current = on;
       // Turning the voice on connects and prepares the microphone again, as on entering a voice room.
       if (on) { autoConnectAttempted.current = false; autoMicAttempted.current = false; }
       setMicPrepared(false);
@@ -977,7 +980,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     return () => clearTimeout(timer);
   }, [room, roomId, isHost, chat, audio.connected, audio.audioReady, micPrepared, ended, refreshAfterMessage]);
 
-  const hostTurn = useCallback(async (reason: LoungeHostReason, requestKind?: LoungeHelpKind) => {
+  const hostTurn = useCallback(async (reason: LoungeHostReason, requestKind?: LoungeHelpKind, callStart = false) => {
     const state = current.current;
     if (state.room && state.restrictedIds.includes(state.room.host_id)) return;
     const speech = state.audio.getSpeechActivity();
@@ -996,6 +999,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     if (state.room.capacity === 1 && (hostBlocked.current || nextHostAttempt.current) && latestHuman > failedAtMessage.current) { hostBlocked.current = false; nextHostAttempt.current = 0; }
     if (hostBlocked.current || Date.now() < nextHostAttempt.current) return;
     busy.current = true; lastAttempt.current = Date.now(); setPending(true);
+    if (callStart) callPlaced.current = false;
     const controller = new AbortController(); hostRequest.current = controller;
     const started = performance.now(), requestedAt = Date.now();
     // Unprompted speech yields to people: if anyone starts talking, it is dropped instead of waiting.
@@ -1010,7 +1014,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     try {
       const kind = reason === 'requested' ? requestKind ?? state.room.moderator_request_kind ?? undefined : undefined;
       // A voice reply speaks with the engine the member chose (none chosen: the character's own).
-      const response = await requestLoungeHost(roomId, reason, controller.signal, kind, chatTurn ? undefined : speechEngine.current ?? undefined);
+      const response = await requestLoungeHost(roomId, reason, controller.signal, kind, chatTurn ? undefined : speechEngine.current ?? undefined, callStart);
       if (!mounted.current || controller.signal.aborted) { await response.stream?.cancel(); return; }
       if (!response.skipped) setError('');
       if (response.stream && chatTurn) {
@@ -1108,6 +1112,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         }
         return;
       }
+      // A call just placed from the chat: the character answers the phone first. A conversation that has not begun opens
+      // as before.
+      if (callPlaced.current && state.room.capacity === 1 && state.messages.some(message => message.kind === 'host')) { void hostTurn('opening', undefined, true); return; }
       const reason = nextLoungeHostReason(state.room, state.messages, Date.now(), Math.max(lastActivity.current, speech.lastVoiceAt), lastAttempt.current, lastHostEnded.current, inputReadyAt.current);
       if (reason) void hostTurn(reason);
     }, viewRoom?.capacity === 1 ? loungeSoloTiming.pollMs : room?.guided_session ? 500 : 3000);
