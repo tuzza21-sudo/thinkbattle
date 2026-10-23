@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Headphones, LoaderCircle, MessageCircle, Mic, MicOff, PhoneOff, Sparkles } from 'lucide-react';
 import type { LoungeHostId } from '../lib/lounge';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
+import { useScreenWakeLock } from '../lib/useScreenWakeLock';
 import './LoungeCall.css';
 
 export type LoungeCallProps = {
@@ -24,6 +25,8 @@ const clock = (ms: number) => { const seconds = Math.max(0, Math.floor(ms / 1000
  * call buttons. Nothing of what is said is written on the screen; the conversation is kept and can be read in the chat.
  */
 export function LoungeCall(props: LoungeCallProps) {
+  // A call keeps the screen on, as a phone call does: a screen turning off stopped the page and dropped the call.
+  useScreenWakeLock(!props.preview);
   const live = !props.preview && !props.lobby && !props.needsConnection;
   // The call time counts from the moment the call is connected, as on a phone.
   const startedAt = useRef<number | null>(null);
