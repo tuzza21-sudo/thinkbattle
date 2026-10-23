@@ -19,6 +19,8 @@ export type LoungeCharacter = {
   mystery?: ReadonlyArray<{ title: string; items: readonly string[] }>;
   personality: ReadonlyArray<{ label: string; text: string }>;
   habits: readonly string[];
+  /** Interests, likes and dislikes (characters that members create). */
+  tastes?: string;
   /** Conversations that raise this character's scores, with the reason from the backstory. */
   wins: readonly LoungeCharacterMove[];
   /** Conversations that lower them. */
@@ -448,7 +450,8 @@ export function loungePersonaPrompt(character: LoungeCharacter) {
     `너는 ${character.name}이다. ${character.age}, ${character.role}. ${character.tagline}`,
     `살아온 이야기(네 삶이다. 1인칭으로 말한다):${newline}${character.story.join(newline)}`,
     `성격: ${character.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`,
-    `말버릇과 습관: ${character.habits.join(' ')}`,
+    ...(character.habits.length ? [`말버릇과 습관: ${character.habits.join(' ')}`] : []),
+    ...(character.tastes ? [`취향: ${character.tastes}`] : []),
   ];
   if (character.mystery) lines.push(`너에 대해 알려진 것과 소문(소문은 부정도 확인도 하지 않는다. 직접 한 말은 네가 실제로 한 말이다):${newline}${character.mystery.map(group => `${group.title}: ${group.items.join(' ')}`).join(newline)}`);
   return lines.join(newline);

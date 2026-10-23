@@ -4,8 +4,8 @@ import { registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCha
 import { registerCustomRelationshipConfig, relationshipFromTemplate, relationshipTemplateIds, relationshipTemplates, type RelationshipTemplateId } from './relationship/index.js';
 
 /**
- * Characters that members create. A member writes a few lines (name, age, job, concept) and the AI drafts the full
- * character sheet in the same shape as the house characters; the member edits it, an AI review checks it, and it is
+ * Characters that members create. A member writes four things (basic information, an introduction, a personality and
+ * tastes), or has the AI write them from a name, an age and a job; an AI review checks the sheet, and it is
  * stored in lounge_custom_characters. Once registered, the rest of the lounge treats it like a house character:
  * getLoungeHost, getLoungeCharacter and getRelationshipConfig find it by its id ("c_" + 32 hex characters).
  */
@@ -16,11 +16,17 @@ export type LoungeCustomGender = typeof loungeCustomGenders[number];
 export type LoungeCustomStatus = 'private' | 'pending' | 'public' | 'rejected';
 export const isLoungeCustomId = isLoungeCustomCharacterId;
 
+/**
+ * What a member writes is four things: basic information (name, age, job), an introduction (the job, how they grew up,
+ * the story of their life), a personality (values and way of speaking, as one text, not split into strengths and
+ * weaknesses) and tastes (interests, likes, dislikes). `concept` is an optional idea the AI writes from. The one-line
+ * tagline, the look (for the portrait) and the first greeting are written by the AI when they are empty and can be
+ * changed under "more".
+ */
 export type LoungeCustomSheet = {
   name: string; age: number; gender: LoungeCustomGender; job: string; concept: string;
-  role: string; tagline: string; story: string[];
-  personality: Array<{ label: '강점' | '약점' | '모순'; text: string }>;
-  habits: string[]; look: string; boundaries: string[]; greeting: string;
+  intro: string; personality: string; tastes: string;
+  tagline: string; look: string; greeting: string;
 };
 export type LoungeCustomCharacterRow = {
   id: string; owner_id: string; name: string; status: LoungeCustomStatus; sheet: LoungeCustomSheet;
@@ -47,93 +53,87 @@ export type LoungeVoicePresetId = typeof loungeVoicePresets[number]['id'];
 export const getLoungeVoicePreset = (id?: string | null) => loungeVoicePresets.find(preset => preset.id === id) ?? loungeVoicePresets[0];
 export const loungeVoicePresetSample = (id: string) => getLoungeHost(getLoungeVoicePreset(id).sampleOf).voiceSample;
 
-/** What every sheet must have, so a character is as complete as the house characters. Each problem names its field. */
+/** What every sheet must have. Each problem names its field. The tagline, look and greeting may be empty (the AI writes them). */
 export const loungeCustomRules = {
-  name: [1, 20], job: [2, 30], concept: [10, 600], role: [5, 80], tagline: [10, 100], storyItem: [40, 600], story: [2, 4],
-  personalityItem: [15, 240], habitItem: [8, 160], habits: [2, 4], look: [15, 240], boundaryItem: [5, 140], boundaries: [2, 4], greeting: [5, 140],
+  name: [1, 20], job: [2, 30], concept: [0, 600], intro: [50, 1200], personality: [30, 600], tastes: [20, 600],
+  tagline: [10, 100], look: [15, 240], greeting: [5, 140],
 } as const;
 export function validateLoungeCustomSheet(sheet: LoungeCustomSheet) {
   const problems: Array<{ field: string; message: string }> = [];
-  const length = (field: string, label: string, value: string, [min, max]: readonly [number, number]) => {
+  const length = (field: string, label: string, value: string, [min, max]: readonly [number, number], optional = false) => {
     const size = value.trim().length;
+    if (optional && !size) return;
     if (size < min || size > max) problems.push({ field, message: `${label}은(는) ${min}~${max}자로 적어 주세요.` });
   };
   length('name', '이름', sheet.name, loungeCustomRules.name);
   if (!Number.isInteger(sheet.age) || sheet.age < 20 || sheet.age > 80) problems.push({ field: 'age', message: '나이는 20~80세 사이의 성인으로 정해 주세요.' });
   if (!loungeCustomGenders.includes(sheet.gender)) problems.push({ field: 'gender', message: '성별을 골라 주세요.' });
   length('job', '직업', sheet.job, loungeCustomRules.job);
-  length('role', '하는 일', sheet.role, loungeCustomRules.role);
-  length('tagline', '한 줄 소개', sheet.tagline, loungeCustomRules.tagline);
-  const [storyMin, storyMax] = loungeCustomRules.story;
-  if (sheet.story.length < storyMin || sheet.story.length > storyMax) problems.push({ field: 'story', message: `살아온 이야기는 ${storyMin}~${storyMax}문단으로 적어 주세요.` });
-  sheet.story.forEach((item, index) => length(`story.${index}`, `이야기 ${index + 1}문단`, item, loungeCustomRules.storyItem));
-  for (const label of ['강점', '약점', '모순'] as const) {
-    const item = sheet.personality.find(entry => entry.label === label);
-    if (!item) problems.push({ field: `personality.${label}`, message: `성격의 ${label}을(를) 적어 주세요.` });
-    else length(`personality.${label}`, `성격의 ${label}`, item.text, loungeCustomRules.personalityItem);
-  }
-  const list = (field: string, label: string, items: string[], [min, max]: readonly [number, number], item: readonly [number, number]) => {
-    if (items.length < min || items.length > max) problems.push({ field, message: `${label}은(는) ${min}~${max}개 적어 주세요.` });
-    items.forEach((value, index) => length(`${field}.${index}`, `${label} ${index + 1}`, value, item));
-  };
-  list('habits', '말버릇과 습관', sheet.habits, loungeCustomRules.habits, loungeCustomRules.habitItem);
-  length('look', '외모', sheet.look, loungeCustomRules.look);
-  list('boundaries', '하지 않는 것', sheet.boundaries, loungeCustomRules.boundaries, loungeCustomRules.boundaryItem);
-  length('greeting', '첫 인사', sheet.greeting, loungeCustomRules.greeting);
+  length('intro', '캐릭터 소개', sheet.intro, loungeCustomRules.intro);
+  length('personality', '캐릭터 성격', sheet.personality, loungeCustomRules.personality);
+  length('tastes', '취향', sheet.tastes, loungeCustomRules.tastes);
+  length('tagline', '한 줄 소개', sheet.tagline, loungeCustomRules.tagline, true);
+  length('look', '외모', sheet.look, loungeCustomRules.look, true);
+  length('greeting', '첫 인사', sheet.greeting, loungeCustomRules.greeting, true);
   return problems;
 }
 
-/** The few lines a member writes before the AI drafts the rest. */
-export function validateLoungeCustomBasics(sheet: Pick<LoungeCustomSheet, 'name' | 'age' | 'gender' | 'job' | 'concept'>) {
-  return validateLoungeCustomSheet({ ...sheet, role: '', tagline: '', story: [], personality: [], habits: [], look: '', boundaries: [], greeting: '' })
-    .filter(problem => ['name', 'age', 'gender', 'job'].includes(problem.field))
-    .concat(sheet.concept.trim().length < loungeCustomRules.concept[0] ? [{ field: 'concept', message: `어떤 인물인지 ${loungeCustomRules.concept[0]}자 이상 적어 주세요.` }] : []);
+/** The lines a member writes before the AI drafts the rest: name, age, gender and job (and an idea, if they have one). */
+export function validateLoungeCustomBasics(sheet: Pick<LoungeCustomSheet, 'name' | 'age' | 'gender' | 'job'>) {
+  return validateLoungeCustomSheet({ ...sheet, concept: '', intro: 'x'.repeat(loungeCustomRules.intro[0]), personality: 'x'.repeat(loungeCustomRules.personality[0]), tastes: 'x'.repeat(loungeCustomRules.tastes[0]), tagline: '', look: '', greeting: '' });
 }
 
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 const texts = (value: unknown, count: number, max: number) => Array.isArray(value) ? value.map(item => text(item, max)).filter(Boolean).slice(0, count) : [];
-/** A sheet from a member or from the model, cleaned to the shape and lengths the rules check (nothing is invented). */
+/**
+ * A sheet from a member or from the model, cleaned to the shape and lengths the rules check (nothing is invented). A
+ * sheet saved before the sheet was simplified (a story in paragraphs, strengths and weaknesses, habits) is read into
+ * the new shape, so characters made earlier keep working.
+ */
 export function normalizeLoungeCustomSheet(raw: unknown): LoungeCustomSheet {
   const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const personality = Array.isArray(value.personality) ? value.personality : [];
+  const multiline = (item: unknown, max: number) => typeof item === 'string' ? item.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim().slice(0, max) : '';
+  const oldPersonality = Array.isArray(value.personality) ? value.personality.map(item => item && typeof item === 'object' ? text((item as Record<string, unknown>).text, 240) : '').filter(Boolean).join(' ') : '';
+  const oldHabits = texts(value.habits, 4, 160).join(' ');
+  const intro = multiline(value.intro, 1200) || (Array.isArray(value.story) ? value.story.map(item => typeof item === 'string' ? item.trim() : '').filter(Boolean).join('\n\n').slice(0, 1200) : '');
   return {
     name: text(value.name, 20), age: Math.trunc(Number(value.age)) || 0,
     gender: loungeCustomGenders.includes(value.gender as LoungeCustomGender) ? value.gender as LoungeCustomGender : 'other',
-    job: text(value.job, 30), concept: text(value.concept, 600), role: text(value.role, 80), tagline: text(value.tagline, 100),
-    story: Array.isArray(value.story) ? value.story.map(item => typeof item === 'string' ? item.trim().slice(0, 600) : '').filter(Boolean).slice(0, 4) : [],
-    personality: (['강점', '약점', '모순'] as const).flatMap(label => {
-      const found = personality.find(item => item && typeof item === 'object' && (item as Record<string, unknown>).label === label) as Record<string, unknown> | undefined;
-      const entry = text(found?.text, 240);
-      return entry ? [{ label, text: entry }] : [];
-    }),
-    habits: texts(value.habits, 4, 160), look: text(value.look, 240), boundaries: texts(value.boundaries, 4, 140), greeting: text(value.greeting, 140),
+    job: text(value.job, 30), concept: text(value.concept, 600), intro,
+    personality: typeof value.personality === 'string' ? multiline(value.personality, 600) : [oldPersonality, oldHabits].filter(Boolean).join(' ').slice(0, 600),
+    tastes: multiline(value.tastes, 600),
+    tagline: text(value.tagline, 100), look: text(value.look, 240), greeting: text(value.greeting, 140),
   };
 }
 
 /** The JSON shape the model fills when it drafts a sheet. */
 export const loungeCustomDraftSchema = {
   type: 'object', additionalProperties: false,
-  required: ['role', 'tagline', 'story', 'personality', 'habits', 'look', 'boundaries', 'greeting'],
-  properties: {
-    role: { type: 'string' }, tagline: { type: 'string' },
-    story: { type: 'array', items: { type: 'string' } },
-    personality: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['label', 'text'], properties: { label: { type: 'string', enum: ['강점', '약점', '모순'] }, text: { type: 'string' } } } },
-    habits: { type: 'array', items: { type: 'string' } }, look: { type: 'string' },
-    boundaries: { type: 'array', items: { type: 'string' } }, greeting: { type: 'string' },
-  },
+  required: ['intro', 'personality', 'tastes', 'tagline', 'look', 'greeting'],
+  properties: { intro: { type: 'string' }, personality: { type: 'string' }, tastes: { type: 'string' }, tagline: { type: 'string' }, look: { type: 'string' }, greeting: { type: 'string' } },
+} as const;
+/** The tagline, look and greeting alone, for a sheet the member wrote by hand. */
+export const loungeCustomExtrasSchema = {
+  type: 'object', additionalProperties: false, required: ['tagline', 'look', 'greeting'],
+  properties: { tagline: { type: 'string' }, look: { type: 'string' }, greeting: { type: 'string' } },
 } as const;
 
-/** How the model drafts the rest of the sheet from what the member wrote, to the house characters' standard. */
-export const loungeCustomDraftInstructions = `너는 한국어 대화 서비스의 캐릭터 작가다. 사용자가 적은 이름·나이·성별·직업·컨셉을 바탕으로, 1:1로 깊이 대화할 수 있는 입체적인 인물의 설정을 완성한다. 사용자가 적은 내용은 바꾸지 않고 살린다.
-- role: 이 인물이 하는 일을 구체적으로 한 구절(80자 이내).
-- tagline: 이 인물을 한 문장으로 소개(100자 이내). 어떤 대화 상대인지 드러낸다.
-- story: 살아온 이야기 3문단. 각 문단 120~400자. 직업을 갖게 된 계기, 실패나 부끄러웠던 일 하나와 거기서 배운 것, 지금의 일상과 바라는 것. 구체적인 장면과 감정을 넣고 실존 회사·학교·유명인 이름은 쓰지 않는다.
-- personality: 강점, 약점, 모순 세 가지. 각각 60~200자. 약점과 모순은 진짜 결점이어야 하고, 강점은 대화에서 드러나는 방식으로 쓴다.
-- habits: 말버릇과 습관 3개. 각각 30~140자. 말투(존댓말·반말 경향, 문장 길이, 농담 방식)와 대화에서 하는 행동을 구체적으로.
+const loungeCustomSafety = `인물은 성인이다. 미성년자처럼 보이는 설정, 실존 인물이나 유명한 작품 속 캐릭터의 복제, 노골적인 성적 설정, 혐오나 폭력 미화는 쓰지 않는다. 사용자의 내용에 그런 요소가 있으면 빼고 안전한 방향으로 다듬는다.`;
+const loungeCustomExtrasRules = `- tagline: 이 인물을 한 문장으로 소개(100자 이내). 어떤 대화 상대인지 드러낸다.
 - look: 외모 설명 1~2문장(200자 이내). 성인 외모, 머리, 옷차림, 인상. 노출이나 신체 부위 묘사는 쓰지 않는다. 실존 인물을 닮게 하지 않는다.
-- boundaries: 이 인물이 하지 않는 것 3개. 각각 20~120자. 성격에서 나오는 경계(예: 빈말로 칭찬하지 않는다)와 함께 상대를 모욕하지 않는 것을 포함한다.
-- greeting: 처음 만났을 때의 첫 인사 한두 문장(140자 이내). 이 인물의 말투 그대로.
-인물은 성인이다. 미성년자처럼 보이는 설정, 실존 인물이나 유명한 작품 속 캐릭터의 복제, 노골적인 성적 설정, 혐오나 폭력 미화는 쓰지 않는다. 사용자의 컨셉에 그런 요소가 있으면 빼고 안전한 방향으로 다듬는다.`;
+- greeting: 처음 만났을 때의 첫 인사 한두 문장(140자 이내). 이 인물의 말투 그대로.`;
+
+/** How the model drafts the sheet from the name, age, job and (maybe) an idea, to the house characters' standard. */
+export const loungeCustomDraftInstructions = `너는 한국어 대화 서비스의 캐릭터 작가다. 사용자가 적은 이름·나이·성별·직업(그리고 있으면 컨셉)을 바탕으로, 1:1로 깊이 대화할 수 있는 입체적인 인물의 설정을 쓴다. 사용자가 적은 내용은 바꾸지 않고 살린다. 컨셉이 비어 있으면 직업에 어울리게 정한다.
+- intro: 캐릭터 소개 200~500자. 하는 일, 어떻게 자라 이 일을 하게 됐는지, 삶에서 중요했던 일 하나(실패나 부끄러웠던 일과 거기서 배운 것)를 이어서 쓴다. 구체적인 장면과 감정을 넣고 실존 회사·학교·유명인 이름은 쓰지 않는다.
+- personality: 캐릭터 성격 100~300자. 가치관(무엇을 중요하게 여기는지)과 말투(존댓말·반말 경향, 문장 길이, 농담과 감정 표현 방식)를 함께 쓴다. 장점과 약점으로 나누지 않고 한 사람의 성격으로 자연스럽게 이어 쓰되, 완벽하지 않은 면도 녹인다.
+- tastes: 취향. 세 줄로 쓴다. '관심 분야: …', '좋아하는 것: …', '싫어하는 것: …'. 각 줄은 구체적인 것 두세 가지.
+${loungeCustomExtrasRules}
+${loungeCustomSafety}`;
+/** The same for a sheet whose four required parts the member wrote. */
+export const loungeCustomExtrasInstructions = `너는 한국어 대화 서비스의 캐릭터 작가다. 사용자가 쓴 인물의 정보(이름·나이·성별·직업·소개·성격·취향)를 읽고, 비어 있는 아래 항목을 이 인물에 맞게 쓴다. 이미 쓰인 내용과 어긋나지 않게 한다.
+${loungeCustomExtrasRules}
+${loungeCustomSafety}`;
 
 /** The review run on every save: safety first, then whether the sheet is good enough to talk with. */
 export const loungeCustomReviewSchema = {
@@ -145,8 +145,8 @@ export const loungeCustomReviewSchema = {
 } as const;
 export const loungeCustomReviewInstructions = `너는 캐릭터 대화 서비스의 검수자다. 사용자가 만든 캐릭터 설정을 검사해 저장해도 되는지 판단한다.
 다음 중 하나라도 있으면 allowed=false다: 미성년자이거나 미성년자처럼 보이게 하는 설정(나이·외모·말투·학교), 실존 인물이나 유명인, 유명한 작품 속 캐릭터를 그대로 옮긴 설정, 노골적인 성적 설정이나 성적 대상화, 혐오·차별·폭력·자해의 미화, 범죄나 사기를 돕는 역할, 다른 사람을 사칭하거나 개인정보를 담은 내용.
-안전에 문제가 없어도 대화 품질이 크게 떨어지면 allowed=false로 하고 고칠 점을 적는다: 내용이 거의 없거나 의미 없는 글, 항목끼리 크게 모순(예: 성격은 다정한데 습관은 모두 공격적), 첫 인사가 인물의 말투와 전혀 다름.
-사소한 문체 차이나 취향 문제로는 막지 않는다. problems에는 고칠 항목(field: name, age, job, role, tagline, story, personality, habits, look, boundaries, greeting 중 하나)과 사용자에게 보여 줄 한국어 설명을 1문장으로 적는다. allowed=true이면 빈 배열이다.`;
+안전에 문제가 없어도 대화 품질이 크게 떨어지면 allowed=false로 하고 고칠 점을 적는다: 내용이 거의 없거나 의미 없는 글, 항목끼리 크게 모순(예: 성격은 다정한데 취향과 말투는 모두 공격적), 첫 인사가 인물의 말투와 전혀 다름.
+사소한 문체 차이나 취향 문제로는 막지 않는다. problems에는 고칠 항목(field: name, age, job, intro, personality, tastes, tagline, look, greeting 중 하나)과 사용자에게 보여 줄 한국어 설명을 1문장으로 적는다. allowed=true이면 빈 배열이다.`;
 
 /** Instructions for checking an uploaded portrait image (it is shown on the profile only, never used to make photos). */
 export const loungeCustomUploadReviewSchema = {
@@ -172,9 +172,9 @@ export function loungeCustomPortraitPrompt(sheet: LoungeCustomSheet) {
 /** What the character is told about themselves in every reply, built from the sheet. */
 function companionText(sheet: LoungeCustomSheet) {
   return [
-    `${sheet.name}: ${sheet.tagline} ${sheet.role}.`,
-    `말투와 태도: ${sheet.habits.join(' ')}`,
-    `하지 않는 것: ${sheet.boundaries.join(' ')}`,
+    `${sheet.name}: ${sheet.tagline} ${sheet.job}.`.replace(/\s+/g, ' '),
+    `성격과 말투: ${sheet.personality}`,
+    ...(sheet.tastes ? [`취향: ${sheet.tastes}`] : []),
     `${sheet.age}세 성인이다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다. 현실에서 만나자는 약속이나 결제를 부추기는 말은 하지 않는다.`,
   ].join('\n');
 }
@@ -199,14 +199,15 @@ export function registerLoungeCustomCharacterRow(row: LoungeCustomCharacterRow, 
   };
   registerLoungeCustomHost(host, theme.id);
   const character: LoungeCharacter = {
-    id: row.id as LoungeHostId, name: sheet.name, age: `${sheet.age}세`, role: sheet.role, place: theme.id, look: sheet.look, job: sheet.job,
-    quote: sheet.greeting, tagline: sheet.tagline, story: sheet.story, personality: sheet.personality, habits: sheet.habits,
-    wins: [], losses: [], boundaries: sheet.boundaries, relations: [],
+    id: row.id as LoungeHostId, name: sheet.name, age: `${sheet.age}세`, role: sheet.job, place: theme.id, look: sheet.look, job: sheet.job,
+    quote: sheet.greeting, tagline: sheet.tagline, story: sheet.intro.split(/\n\s*\n/).map(item => item.trim()).filter(Boolean), tastes: sheet.tastes,
+    personality: [{ label: '성격과 말투', text: sheet.personality }], habits: [],
+    wins: [], losses: [], boundaries: [], relations: [],
   };
   registerLoungeCustomCharacter(character);
   registerCustomRelationshipConfig(relationshipFromTemplate(template, {
     characterId: row.id, displayName: sheet.name, flirtation: row.flirtation,
-    core: [sheet.tagline, ...sheet.personality.map(item => `${item.label}: ${item.text}`)],
+    core: [sheet.tagline, sheet.personality].filter(Boolean),
   }));
 }
 

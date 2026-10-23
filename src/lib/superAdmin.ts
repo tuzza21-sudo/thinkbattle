@@ -77,7 +77,8 @@ export const setLoungeImageSettings = async (enabled: boolean, daily: number) =>
 export type LoungeCharacterReview = {
   id: string; name: string; owner: string | null; template: string; flirtation: boolean; voice: string; theme: string; updatedAt: string;
   portraitPath: string | null; portraitSource: 'ai' | 'upload' | null;
-  sheet: { age: number; gender: string; job: string; tagline: string; role: string; story: string[]; personality: Array<{ label: string; text: string }>; habits: string[]; look: string; boundaries: string[]; greeting: string };
+  /** As stored: the simple shape, or the older one (story, strengths and weaknesses, habits) of characters made before it. */
+  sheet: Record<string, unknown>;
 };
 export const listLoungeCharacterReviews = async (): Promise<LoungeCharacterReview[]> => {
   const { data, error } = await supabase.rpc('admin_list_lounge_character_reviews');

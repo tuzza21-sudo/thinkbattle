@@ -183,3 +183,11 @@
   .lounge-creator-field :is(input,select,textarea) { font-size:16px; }
   .lounge-creator-field>span { flex-wrap:wrap; }
 }
+
+/* the simple character form: the AI helper under the basics, and the optional extras folded away above the save button */
+.lounge-creator-ai { display:grid; gap:10px; justify-items:start; margin-top:14px; }
+.lounge-creator-ai .lounge-creator-field { width:100%; }
+.lounge-creator-more details { margin-bottom:18px; }
+.lounge-creator-more summary { cursor:pointer; font-size:15px; font-weight:700; padding:6px 0; }
+.lounge-creator-more summary small { margin-left:8px; font-size:12px; font-weight:400; opacity:.7; }
+.lounge-creator-more details[open] summary { margin-bottom:14px; }
