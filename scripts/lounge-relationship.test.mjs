@@ -436,7 +436,10 @@ test('touch opens up with the relationship: none at first, hands and a hug next,
     assert.match(intimacy(stages[2]), /키스도 성격에 따라/, `${config.characterId} third stage`);
     assert.match(intimacy(stages[2]), /잠자리는 아직 이르다/, `${config.characterId} not yet a night together`);
     assert.match(intimacy(stages[3]), /잠자리까지 받아들일 수 있다/, `${config.characterId} fourth stage`);
-    assert.match(intimacy(stages[3]), /성행위와 몸은 묘사하지 않는다.*장면을 끊고.*시간을 건너뛰어/, `${config.characterId} told by cutting away`);
+    assert.match(intimacy(stages[3]), /성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.*장면을 끊고.*시간을 건너뛰어/, `${config.characterId} told by cutting away`);
+    assert.match(intimacy(stages[3]), /이야기부터 하자며 미루지 않고/, `${config.characterId} does not put it off`);
+    assert.match(intimacy(stages[3]), /한 문장으로 끊지 않고 충분히 그린다/, `${config.characterId} the scene up to the cut is told fully`);
+    assert.match(intimacy(stages[3]), /여운 장면도 다정하고 적극적으로/, `${config.characterId} and the morning after`);
   }
   assert.match(relationship.relationshipIntimacyGuidance(3, false), /키스나 그 이상은 하지 않고/, 'without adult flirtation a hug is the most');
   assert.match(relationship.attractionReactionRule, /relationship.intimacy를 따르고/);
