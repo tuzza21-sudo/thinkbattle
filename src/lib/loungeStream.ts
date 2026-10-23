@@ -1,4 +1,5 @@
 import { LoungeApiError, loungeConnectionError } from './loungeApi';
+import type { RelationshipChange, RelationshipView } from './relationship/types';
 
 export type LoungeStreamEvent =
   | { type: 'host'; text: string; timings: Record<string, number> }
@@ -10,8 +11,10 @@ export type LoungeStreamEvent =
   | { type: 'photo'; scene: string; asked?: boolean }
   /** The reply is saved: the next turn may start while the summary, relationship and memories are written after it. */
   | { type: 'saved' }
+  /** After the reply, once the relationship is saved: the new state and what the member's message changed (the chat's status card). */
+  | { type: 'relationship'; relationship: RelationshipView; change: RelationshipChange }
   | { type: 'error'; error: string; code?: string; retryable?: boolean; retryAfterSeconds?: number };
-const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'done', 'error'];
+const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'relationship', 'done', 'error'];
 
 // NDJSON frames may split anywhere, including inside a Korean UTF-8 character.
 export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, signal?: AbortSignal) {

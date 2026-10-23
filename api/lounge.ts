@@ -9,7 +9,7 @@ import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, lo
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipRow } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -873,7 +873,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // Runs once the reply is written, alongside its speech. What it writes is saved only if the reply was (`saved`). A
     // failure loses this turn's summary and events, never the reply. It is not cancelled with the request: the member
     // leaving right after a reply should not lose what the reply changed.
-    const afterReply = async (reply: string, saved: Promise<boolean>) => {
+    const afterReply = async (reply: string, saved: Promise<boolean>): Promise<{ answer?: AfterReply; relationship?: { relationship: RelationshipView; change: RelationshipChange } }> => {
       const started = performance.now();
       let answer: AfterReply | undefined;
       try {
@@ -882,16 +882,16 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         const parsed = JSON.parse(modelOutputText(result) ?? '') as AfterReply;
         if (typeof parsed?.memory === 'string') answer = parsed;
       } catch (error) { console.warn('[Lounge after reply] not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
-      if (!await saved) return undefined;
+      if (!await saved) return {};
       const memory = answer?.memory.trim();
-      await Promise.all([
+      const [, relationshipSaved] = await Promise.all([
         memory ? rpc<boolean>('save_voice_lounge_room_memory', { p_room: roomId, p_memory: memory, p_turn: room.ai_turns ?? 0 })
           .catch(error => { console.warn('[Lounge after reply] summary not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); }) : undefined,
         saveRelationship(answer, true),
       ]);
       await fillMemoryEmbeddings();
       console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer) }));
-      return answer;
+      return { answer, relationship: relationshipSaved };
     };
     // Memories without an embedding (new, changed, or from before memories had one) get one, a few per reply.
     const fillMemoryEmbeddings = async () => {
@@ -913,9 +913,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // synthesis so the first audio is not delayed, and a failure never breaks the reply.
     // After a split reply the relationship is read again first (`fresh`): the next turn may have started meanwhile, and
     // the save is refused if another turn saved in between.
-    const saveRelationship = async (answer: { events?: unknown; memory_ops?: unknown } | undefined, fresh = false) => {
+    // Returns the saved state and what this turn changed, which a chat shows on its status card.
+    const saveRelationship = async (answer: { events?: unknown; memory_ops?: unknown } | undefined, fresh = false): Promise<{ relationship: RelationshipView; change: RelationshipChange } | undefined> => {
       if (!relationship) return;
       const memorySaved = saveMemories(answer?.memory_ops);
+      let saved: { relationship: RelationshipView; change: RelationshipChange } | undefined;
       try {
         const stored = fresh ? await readRelationship(user.id, relationship.config.characterId) : undefined;
         const record = stored?.ok ? applyDecay(relationshipFromRow(relationship.config, stored.row), relationship.config, new Date()) : relationship.record;
@@ -926,8 +928,10 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           p_state: relationshipState(turn.record), p_mood: turn.mood,
         }) });
         if (!response.ok || await response.json() === null) console.warn('[Lounge relationship] not saved', response.status);
+        else saved = { relationship: describeRelationship(turn.record, relationship.config, { mood: turn.mood, debug: isRelationshipDeveloper(user) }), change: describeTurnChange(turn.log, relationship.config) };
       } catch (error) { console.warn('[Lounge relationship] not saved', error instanceof Error ? error.name : 'error'); }
       await memorySaved;
+      return saved;
     };
     // Validated memory operations from the reply, applied after the speech has started. Only a real user turn counts.
     async function saveMemories(raw: unknown) {
@@ -1225,7 +1229,9 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             else console.warn('[Lounge API] spoken reply was not saved');
             await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); });
             await speech;
-            const answer = await after;
+            const { answer, relationship: relationshipSaved } = await after;
+            // The chat's status card: the new stage and scores, and what the member's message changed.
+            if (relationshipSaved) send({ type: 'relationship', ...relationshipSaved });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
             const photo = chatPhotos && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
             if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });

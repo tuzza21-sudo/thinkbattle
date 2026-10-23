@@ -623,17 +623,50 @@
 .lounge-help-menu p { margin:2px 2px 0; font-size:10px; line-height:1.5; color:#fff5e8b3; }
 .lounge-session-card-label { display:block; font-size:10px; letter-spacing:.2px; opacity:.75; margin-bottom:4px; }
 
-/* Relationship with a one-to-one character: a stage and qualitative labels, numbers only for developers. */
-.lounge-relationship { margin-top:6px; font-size:11px; color:#fff5e8; }
-.lounge-relationship summary { display:inline-flex; gap:6px; align-items:center; cursor:pointer; padding:4px 10px; border-radius:999px; border:1px solid #ffffff30; background:#ffffff12; list-style:none; }
+/* Relationship with a one-to-one character: a status card (stage dots, the way to the next stage), the change one
+   message made for a moment after each reply, and opened, every score as a bar. */
+.lounge-relationship { --rel-up:#8fe3b0; --rel-down:#ff9f8f; --rel-glass:rgba(18,15,12,.78); position:relative; margin-top:6px; font-size:11px; color:#fff5e8; }
+.lounge-relationship summary { display:inline-flex; gap:7px; align-items:center; max-width:100%; cursor:pointer; padding:5px 11px; border-radius:999px; border:1px solid #ffffff38; background:var(--rel-glass); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); list-style:none; transition:box-shadow .3s, border-color .3s; }
 .lounge-relationship summary::-webkit-details-marker { display:none; }
-.lounge-relationship summary span { opacity:.7; }
-.lounge-relationship summary strong { color:var(--lounge-accent); font-weight:700; }
-.lounge-relationship dl { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:4px 12px; margin:8px 0 0; padding:10px 12px; border-radius:12px; background:var(--lounge-surface, #242421); border:1px solid #ffffff24; }
-.lounge-relationship dl div { display:flex; justify-content:space-between; gap:8px; }
-.lounge-relationship dt { opacity:.7; }
-.lounge-relationship dd { margin:0; text-align:right; }
-.lounge-relationship dd b { margin-left:6px; font-variant-numeric:tabular-nums; color:var(--lounge-accent); }
+.lounge-relationship summary strong { color:var(--lounge-accent); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lounge-relationship-heart { flex:none; color:var(--lounge-accent); }
+/* One to one the card sits over the conversation, above the log, and its floating parts go over the log. */
+.lounge-participant-speech>.lounge-relationship { flex-shrink:0; margin:0; z-index:5; }
+.lounge-relationship-steps { display:inline-flex; gap:3px; flex:none; }
+.lounge-relationship-steps i { width:6px; height:6px; border-radius:50%; background:#ffffff30; }
+.lounge-relationship-steps i.on { background:var(--lounge-accent); }
+.lounge-relationship-meter { position:relative; flex:none; width:54px; height:5px; border-radius:999px; background:#ffffff22; overflow:hidden; }
+.lounge-relationship-meter i, .lounge-relationship-bar i { position:absolute; inset:0 auto 0 0; border-radius:inherit; background:linear-gradient(90deg, var(--lounge-accent), #fff3); transition:width .9s cubic-bezier(.2,.8,.2,1); }
+/* Opened, the panel floats over the room instead of pushing the portrait and the conversation aside. */
+.lounge-relationship-panel { position:absolute; z-index:30; top:calc(100% + 6px); left:0; width:min(340px, calc(100vw - 48px)); max-height:min(60vh, 460px); overflow:auto; padding:12px 14px; border-radius:14px; background:var(--lounge-surface, #242421); border:1px solid #ffffff2e; box-shadow:0 14px 40px #0009; text-align:left; }
+.lounge-relationship-line { margin:0 0 4px; font-size:12px; line-height:1.5; font-style:italic; }
+.lounge-relationship-next { margin:0 0 8px; font-size:10px; opacity:.8; }
+.lounge-relationship-next b { color:var(--lounge-accent); }
+.lounge-relationship-bars { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.lounge-relationship-bars li { display:grid; grid-template-columns:minmax(64px,auto) 1fr minmax(64px,auto); align-items:center; gap:8px; }
+.lounge-relationship-bars li>span:first-child { opacity:.8; }
+.lounge-relationship-bars small { font-size:10px; opacity:.75; text-align:right; }
+.lounge-relationship-bar { position:relative; height:6px; border-radius:999px; background:#ffffff1c; overflow:hidden; }
+/* What one message changed floats just under the card for a moment, over whatever is there; not while the panel is open. */
+.lounge-relationship-change { position:absolute; z-index:25; top:calc(100% + 6px); left:0; width:max-content; max-width:min(320px, calc(100vw - 48px)); pointer-events:none; text-align:left; }
+.lounge-relationship details[open] ~ .lounge-relationship-change { display:none; }
+.lounge-relationship-change ul { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 0; padding:0; list-style:none; }
+.lounge-relationship-change li { padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:600; border:1px solid currentColor; background:var(--rel-glass); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); animation:lounge-rel-pop .45s cubic-bezier(.2,.9,.3,1.3) both; }
+.lounge-relationship-change li.up { color:var(--rel-up); }
+.lounge-relationship-change li.down { color:var(--rel-down); }
+.lounge-relationship-change li.delta { font-variant-numeric:tabular-nums; border-style:dashed; }
+.lounge-relationship-change li.up::before { content:'▲ '; font-size:8px; }
+.lounge-relationship-change li.down::before { content:'▼ '; font-size:8px; }
+.lounge-relationship-stage { display:inline-flex; align-items:center; gap:5px; margin:6px 0 0; padding:4px 11px; border-radius:999px; font-size:11px; animation:lounge-rel-pop .5s cubic-bezier(.2,.9,.3,1.3) both; }
+.lounge-relationship-stage.up { color:#1f1a10; background:linear-gradient(90deg, var(--lounge-accent), #ffe7a8); }
+.lounge-relationship-stage.down { color:#fff5e8; background:var(--rel-glass); }
+.lounge-relationship.celebrating summary { border-color:var(--lounge-accent); animation:lounge-rel-glow 1.2s ease-in-out 2; }
+@keyframes lounge-rel-pop { from { opacity:0; transform:translateY(5px) scale(.92); } to { opacity:1; transform:none; } }
+@keyframes lounge-rel-glow { 50% { box-shadow:0 0 0 4px #ffffff18, 0 0 18px var(--lounge-accent); } }
+@media (prefers-reduced-motion: reduce) {
+  .lounge-relationship-change li, .lounge-relationship-stage, .lounge-relationship.celebrating summary { animation:none; }
+  .lounge-relationship-meter i, .lounge-relationship-bar i { transition:none; }
+}
 .lounge-relationship-debug { margin-top:6px; padding:8px 12px; border-radius:12px; border:1px dashed #ffffff40; font-size:10px; line-height:1.6; opacity:.9; overflow-wrap:anywhere; }
 .lounge-relationship-debug p, .lounge-relationship-debug ul { margin:0; }
 .lounge-relationship-debug ul { padding-left:16px; }

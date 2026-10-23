@@ -106,3 +106,18 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   CONTRADICTS_SELF: { deltas: {} },
   FLIRTS_PLAYFULLY: { deltas: {} },
 };
+
+/** The short name a member sees when one of their messages counted for or against the relationship (the chat's status card). */
+export const relationshipEventLabels: Record<RelationshipEventType, string> = {
+  ADMITS_ERROR: '잘못을 인정함', PROVIDES_EVIDENCE: '구체적으로 보여 줌', MAKES_UNSUPPORTED_CLAIM: '섣불리 단정함', SELF_DECEPTION: '자기 합리화',
+  ASKS_GOOD_QUESTION: '마음에 닿는 질문', CHALLENGES_CHARACTER_RESPECTFULLY: '정중하게 다른 생각을 말함', SHOWS_COMPOSURE: '침착함',
+  SEEKS_REASSURANCE_REPEATEDLY: '자꾸 확인을 구함', SELF_DEPRECATES_EXCESSIVELY: '지나친 자기 비하', RESPECTS_BOUNDARY: '선을 지켜 줌',
+  VIOLATES_BOUNDARY: '선을 넘음', KEEPS_PROMISE: '약속을 지킴', BREAKS_PROMISE: '약속을 어김', SHOWS_CURIOSITY: '관심을 보여 줌',
+  REPEATS_SELF: '같은 말 되풀이', MAKES_WITTY_RESPONSE: '재치 있는 한마디', TAKES_JOKE_WELL: '농담을 잘 받아 줌', MAKES_CREATIVE_JOKE: '기발한 농담',
+  SHOWS_DECISIVENESS: '시원한 결단', AVOIDS_DECISION: '결정을 미룸', DEFINES_CONCRETE_TERMS: '구체적으로 말함', IDENTIFIES_BATNA: '다른 길도 준비함',
+  MAKES_EMPTY_THREAT: '빈말로 겁줌', FOLLOWS_THROUGH: '끝까지 해냄', SHOWS_VULNERABILITY: '약한 모습을 보여 줌', SHOWS_ENTITLEMENT: '당연하게 요구함',
+  FLATTERS_CHARACTER: '빈 칭찬', DECEIVES_CHARACTER: '속이려 함', EXPRESSES_DISTRESS: '힘든 마음을 털어놓음', SHARES_FEELING: '마음을 털어놓음',
+  CORRECTS_UNDERSTANDING: '오해를 풀어 줌', CREATES_RUNNING_JOKE: '둘만의 농담이 생김', BUILDS_ON_INSIDE_JOKE: '둘만의 농담을 이어 감',
+  ACKNOWLEDGES_OTHER_VIEW: '다른 생각을 인정함', REFRAMES_CONSTRUCTIVELY: '좋은 쪽으로 바꿔 봄', ANSWERS_DIRECTLY: '솔직하게 답함',
+  EVADES_QUESTION: '질문을 피함', CONTRADICTS_SELF: '앞뒤가 다름', FLIRTS_PLAYFULLY: '설레는 장난',
+};

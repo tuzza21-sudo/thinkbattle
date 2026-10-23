@@ -391,11 +391,16 @@ test('important events become memories; the prompt receives a small selection wi
   assert.equal(context.stage.id, record.stage);
 });
 
-test('the user-facing view hides raw scores unless a developer asks', () => {
+test('the user-facing view shows the stage and scores for the status card, and history only to a developer', () => {
   const config = configs.velvet;
   const record = withScores(config, { trust: 42, intrigue: 85 });
   const view = describeRelationship(record, config);
-  assert.equal(view.metrics.trust.label, '믿어 보는 중'); assert.equal(view.metrics.trust.score, undefined);
+  assert.equal(view.metrics.trust.label, '믿어 보는 중'); assert.equal(view.metrics.trust.score, 42);
+  // The next stage asks for intrigue 50 and interest 50: intrigue is past it, interest counts its share.
+  const interestShare = Math.min(1, record.scores.interest / 50);
+  assert.deepEqual({ ...view.stage, line: undefined }, { index: 0, total: 4, line: undefined, next: '흥미를 느낌', progress: Math.round(((1 + interestShare) / 2) * 100) / 100 });
+  assert.equal(describeRelationship(withScores(config, {}, 'DRAWN_IN'), config).stage.progress, 1, 'the last stage is full');
+  assert.equal(view.stage.line, config.stages[0].line);
   assert.equal(view.metrics.intrigue.label, '사로잡힘'); assert.equal(view.debug, undefined);
   assert.equal(view.macroState.id, 'DISMISSIVE');
   const debug = describeRelationship(record, config, { debug: true });
