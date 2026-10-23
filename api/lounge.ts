@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -34,6 +34,8 @@ const loungeKnowledgeEmbedding = { hedgeAfterMs: 400, timeoutMs: 1100 } as const
 /** How close a question must be to a fact or an experience (0 to 1, a dot product of unit vectors). An experience is held to more because it is a story, not a fact; both can be tuned with LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE and LOUNGE_KNOWLEDGE_MIN_EXPERIENCE. */
 const loungeKnowledgeThreshold = (name: string, fallback: number) => { const value = Number(process.env[name]); return Number.isFinite(value) && value >= 0 && value <= 1 && process.env[name]?.trim() ? value : fallback; };
 /** Whether a character has any usable knowledge entry, remembered for a minute so empty characters are never looked up. */
+// ElevenLabs refuses library voices on a free plan (402). After that its premade voices speak for ten minutes, without asking the library voice first.
+let elevenLibraryRefusedUntil = 0;
 const knowledgePresence = new Map<string, { present: boolean; at: number }>();
 /**
  * fetch with a deadline that covers the body too. The deadline and the caller's signal only reach a request that is
@@ -281,7 +283,22 @@ function isRelationshipDeveloper(user: { id: string; email?: string }) {
   return allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
 }
 
-export default async function handler(req: Request): Promise<Response> {
+/**
+ * Keeps the function running until `work` settles, also after the reader of the response went away: Vercel's
+ * waitUntil, read from the request context the way @vercel/functions reads it, or from the handler's (older) context
+ * argument. Without it an Edge function stops the moment the connection drops: on 2026-10-23 a phone left the page
+ * while a chat reply was being written, and the reply was neither saved nor its turn given back.
+ */
+type LoungeWaitUntil = (promise: Promise<unknown>) => void;
+function loungeKeepAlive(context?: { waitUntil?: LoungeWaitUntil }): LoungeWaitUntil {
+  const store = (globalThis as unknown as Record<symbol, { get?: () => { waitUntil?: LoungeWaitUntil } | undefined } | undefined>)[Symbol.for('@vercel/request-context')];
+  const fromStore = store?.get?.()?.waitUntil;
+  const wait = typeof fromStore === 'function' ? fromStore : context && typeof context.waitUntil === 'function' ? context.waitUntil.bind(context) : undefined;
+  return promise => { promise.catch(() => {}); wait?.(promise); };
+}
+
+export default async function handler(req: Request, context?: { waitUntil?: LoungeWaitUntil }): Promise<Response> {
+  const keepAlive = loungeKeepAlive(context);
   if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
   const origin = req.headers.get('origin');
   const allowed = (process.env.APP_ORIGIN || '').split(',').map(value => value.trim());
@@ -315,7 +332,7 @@ export default async function handler(req: Request): Promise<Response> {
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -422,6 +439,19 @@ export default async function handler(req: Request): Promise<Response> {
     // Relationship state is read and written only with the server role, never from the browser.
     const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const serviceHeaders = service ? { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' } : undefined;
+    // What a member has left in a premium voice engine this month. A guest has none, and an allowance that cannot be read
+    // (the table is missing, the server role is not set) counts as used, so a premium voice is never spent unchecked.
+    const readSpeechAllowance = async (engine: LoungePremiumSpeechEngine, user: { id: string; is_anonymous?: boolean }) => {
+      const limits = loungePremiumSpeechLimits(engine, process.env), available = Boolean(engine === 'typecast' ? process.env.TYPECAST_API_KEY : process.env.ELEVENLABS_API_KEY);
+      const none = (extra: Record<string, unknown> = {}) => ({ available, member: !user.is_anonymous, allowed: false, used: 0, left: 0, limit: limits.member, ...extra });
+      if (user.is_anonymous) return none();
+      if (!serviceHeaders) return none({ unavailable: true });
+      const response = await fetchTimed(`${url}/rest/v1/rpc/lounge_speech_usage_status`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_engine: engine }) }, 4_000);
+      if (!response.ok) { console.warn('[Lounge speech] allowance not read', engine, response.status); return none({ unavailable: true }); }
+      const used = await readJson<{ member: number; total: number }>(response, 'lounge');
+      const allowance = loungeSpeechAllowance(limits, used);
+      return { available, member: true, allowed: allowance.allowed, used: used.member, left: allowance.left, limit: limits.member, ...(allowance.reason ? { reason: allowance.reason } : {}) };
+    };
     const readRelationship = async (userId: string, characterId: string) => {
       if (!serviceHeaders) return { ok: false as const };
       const response = await fetchTimed(`${url}/rest/v1/voice_lounge_relationships?user_id=eq.${encodeURIComponent(userId)}&character_id=eq.${encodeURIComponent(characterId)}&select=*`, { headers: serviceHeaders });
@@ -448,6 +478,14 @@ export default async function handler(req: Request): Promise<Response> {
       registerLoungeCustomCharacterRow(row, loungeCustomPortraitUrl(url, row.portrait_path));
       return row;
     };
+
+    // The premium voice engines and what the member has left of each (the voice picker).
+    if (body.action === 'speech') {
+      const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
+      const engines = Object.keys(loungePremiumSpeech) as LoungePremiumSpeechEngine[];
+      const status = await Promise.all(engines.map(engine => readSpeechAllowance(engine, user).catch(() => ({ available: false, member: !user.is_anonymous, allowed: false, used: 0, left: 0, limit: 0, unavailable: true }))));
+      return json({ engines: Object.fromEntries(engines.map((engine, index) => [engine, status[index]])) });
+    }
 
     if (body.action === 'relationship') {
       const user = await readJson<{ id: string; email?: string }>(auth, 'lounge');
@@ -532,8 +570,8 @@ export default async function handler(req: Request): Promise<Response> {
     // character's knowledge and the user's memories) starts at once instead of after the rest of the context. On
     // 2026-10-21 the knowledge lookup started only after it and added 0.25-1.28 s (0.68 s on average) to every reply.
     const lookupGiveUp = new AbortController();
-    const messagesRead = fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers })
-      .then(response => response.ok ? readJson<Array<{ nickname: string; kind: string; text: string }>>(response, 'lounge') : null);
+    const messagesRead = fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text,created_at`, { headers })
+      .then(response => response.ok ? readJson<Array<{ nickname: string; kind: string; text: string; created_at?: string }>>(response, 'lounge') : null);
     messagesRead.catch(() => {});
     const lookupQuery = messagesRead.then(rows => rows ? loungeKnowledgeQuery([...rows].reverse().filter(message => message.kind === 'human').map(message => message.text)) : '', () => '');
     let embedMs: number | undefined, embedHedged = false;
@@ -697,6 +735,9 @@ export default async function handler(req: Request): Promise<Response> {
       memories: askerRows ? selectMemoriesForPrompt(askerRows, groupConfig.characterId, new Date()).forPrompt : [],
     } : undefined;
     const recent = messages.reverse();
+    // A conversation picked up again after a while (the chat list opens it where it was left): how long the member was
+    // away before their latest message, so the character notices that time has passed.
+    const timeAway = loungeTimeAway(recent.map(message => ({ kind: message.kind, at: Date.parse(message.created_at ?? '') })));
     const fullHumanMessages = new Set(recent.filter(message => message.kind === 'human').slice(-2));
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
@@ -705,9 +746,9 @@ export default async function handler(req: Request): Promise<Response> {
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(scenario ? { scenario } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
-      first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind,
+      first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
       ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
-      recent: recent.map(message => ({ ...message, text: fullHumanMessages.has(message) ? message.text.slice(0, 1200)
+      recent: recent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(recent[index]) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
     const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character) : '';
@@ -831,6 +872,7 @@ ${photoRule}`;
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
+        timeAway ? loungeTimeAwayInstruction : '',
         longMemory ? (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         story ? storyInstruction : roleInstruction,
         // A story room with the voice on keeps to the story, in the voice rules.
@@ -953,14 +995,35 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // The speech engine the member chose in a one-to-one voice room (or the character's own). It speaks only with its
     // key and a voice for this character; otherwise, and whenever it fails, OpenAI speaks.
     const chosenSpeech: LoungeSpeechEngine = isLoungeSpeechEngine(body.speech) ? body.speech : loungeDefaultSpeechEngine(host.id);
-    const speechFamily = chosenSpeech === 'gemini' ? 'gemini' : chosenSpeech === 'typecast' ? 'typecast' : chosenSpeech === 'openai' ? undefined : 'eleven';
-    const speechVoice = speechFamily ? loungeEngineVoice(speechFamily, host.id, process.env.LOUNGE_VOICE_IDS) : undefined;
-    const speechKey = speechFamily === 'gemini' ? geminiKey : speechFamily === 'eleven' ? process.env.ELEVENLABS_API_KEY : speechFamily === 'typecast' ? process.env.TYPECAST_API_KEY : undefined;
-    const speechEngine: LoungeSpeechEngine = speechFamily && speechKey && speechVoice ? chosenSpeech : 'openai';
-    let speechProvider = 'openai';
+    type SpeechPlan = { engine: LoungeSpeechEngine; family?: 'gemini' | 'eleven' | 'typecast'; voice?: string; key?: string };
+    const planSpeech = (choice: LoungeSpeechEngine): SpeechPlan => {
+      const family = choice === 'gemini' ? 'gemini' : choice === 'typecast' ? 'typecast' : choice === 'openai' ? undefined : 'eleven';
+      const voice = family ? loungeEngineVoice(family, host.id, process.env.LOUNGE_VOICE_IDS) : undefined;
+      const key = family === 'gemini' ? geminiKey : family === 'eleven' ? process.env.ELEVENLABS_API_KEY : family === 'typecast' ? process.env.TYPECAST_API_KEY : undefined;
+      return family && key && voice ? { engine: choice, family, voice, key } : { engine: 'openai' };
+    };
+    let speech = planSpeech(chosenSpeech);
+    // A premium engine speaks only while the member's monthly allowance lasts; past it (or for a guest, or when the
+    // allowance cannot be read) the character's ordinary voice speaks. The allowance is read while the reply is written.
+    const premiumSpeech = isLoungePremiumSpeech(speech.engine) ? speech.engine : undefined;
+    const speechGate: Promise<void> = premiumSpeech
+      ? readSpeechAllowance(premiumSpeech, user)
+        .then(status => { if (!status.allowed) { console.info('[Lounge speech] premium voice not used', JSON.stringify({ engine: premiumSpeech, guest: !status.member, used: status.used, limit: status.limit })); speech = planSpeech(loungeDefaultSpeechEngine(host.id)); } })
+        .catch(() => { console.warn('[Lounge speech] allowance not read, ordinary voice'); speech = planSpeech(loungeDefaultSpeechEngine(host.id)); })
+      : Promise.resolve();
+    let speechProvider = 'openai', spentChars = 0;
+    // The characters a premium voice spoke are added to the member's month (after the reply, so the next one sees them).
+    const recordSpeech = async () => {
+      const chars = spentChars; spentChars = 0;
+      if (!chars || !premiumSpeech || !serviceHeaders || user.is_anonymous) return;
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/rpc/add_lounge_speech_usage`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_engine: premiumSpeech, p_chars: chars }) }, 4_000);
+        if (!response.ok) console.warn('[Lounge speech] usage not saved', response.status);
+      } catch (error) { console.warn('[Lounge speech] usage not saved', error instanceof Error ? error.name : 'error'); }
+    };
     const geminiFailure = () => new LoungeUpstreamError('사회자 음성 서버에서 음성을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_audio_failed', true, 30);
     const geminiSpeechStream = async (text: string, signal: AbortSignal, timeout: number) => {
-      const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${loungeGeminiSpeechModel}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeGeminiSpeechRequest(host.id, text, speechFamily === 'gemini' ? speechVoice : undefined)), signal }, timeout);
+      const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${loungeGeminiSpeechModel}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeGeminiSpeechRequest(host.id, text, speech.family === 'gemini' ? speech.voice : undefined)), signal }, timeout);
       if (!response.ok || !response.body) throw geminiFailure();
       const upstream = response.body.getReader(), decoder = new TextDecoder();
       let buffer = '';
@@ -993,14 +1056,18 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     };
     // ElevenLabs streams 24 kHz PCM as it is; Typecast streams 32 kHz WAV, turned into 24 kHz PCM on the way.
     const engineSpeechStream = async (text: string, signal: AbortSignal, timeout: number): Promise<ReadableStream<Uint8Array>> => {
-      if (speechEngine === 'gemini') return geminiSpeechStream(text, signal, timeout);
-      if (speechEngine === 'typecast') {
-        const response = await fetchTimed('https://api.typecast.ai/v1/text-to-speech/stream', { method: 'POST', headers: { 'X-API-KEY': speechKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeTypecastSpeechRequest(host.id, speechVoice!, text)), signal }, timeout);
+      if (speech.engine === 'gemini') return geminiSpeechStream(text, signal, timeout);
+      if (speech.engine === 'typecast') {
+        const response = await fetchTimed('https://api.typecast.ai/v1/text-to-speech/stream', { method: 'POST', headers: { 'X-API-KEY': speech.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeTypecastSpeechRequest(host.id, speech.voice!, text)), signal }, timeout);
         if (!response.ok || !response.body) throw new Error(`typecast ${response.status}`);
         const convert = createLoungePcmConverter(32_000);
         return response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(chunk, controller) { const pcm = convert(chunk); if (pcm.length) controller.enqueue(pcm); } }));
       }
-      const response = await fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(speechVoice!)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': speechKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(host.id, text, speechEngine as 'eleven-flash' | 'eleven-v3')), signal }, timeout);
+      const premade = loungeElevenPremadeVoice(host.id);
+      const speak = (voice: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': speech.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text)), signal }, timeout);
+      let response = await speak(premade && Date.now() < elevenLibraryRefusedUntil ? premade : speech.voice!);
+      // A free account may not use library voices through the API: the premade voice speaks, and the library voice is not asked again for a while.
+      if (response.status === 402 && premade && premade !== speech.voice) { elevenLibraryRefusedUntil = Date.now() + 10 * 60_000; console.warn('[Lounge speech] elevenlabs library voice refused (paid plan needed), using the premade voice'); response = await speak(premade); }
       if (!response.ok || !response.body) throw new Error(`elevenlabs ${response.status}`);
       return response.body;
     };
@@ -1014,16 +1081,18 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       } catch (error) { await reader.cancel().catch(() => {}); reader.releaseLock(); throw error; }
     };
     const openSpeech = async (text: string, signal: AbortSignal, hedge: AbortSignal) => {
+      if (premiumSpeech) await speechGate;
       const stall = new AbortController();
       const timer = setTimeout(() => stall.abort(new DOMException('speech stalled', 'TimeoutError')), loungeSpeechStall.firstAudioMs);
       try {
         const signals = AbortSignal.any([req.signal, signal, hedge, stall.signal]), timeout = loungeSpeechLimits(text).timeoutMs;
         let opened: Awaited<ReturnType<typeof firstAudio>> | undefined;
-        if (speechEngine !== 'openai') {
-          try { opened = await firstAudio(await engineSpeechStream(text, signals, timeout)); speechProvider = speechEngine; }
+        if (speech.engine !== 'openai') {
+          const engine = speech.engine;
+          try { opened = await firstAudio(await engineSpeechStream(text, signals, timeout)); speechProvider = engine; }
           catch (error) {
             if (signals.aborted) throw error;
-            console.warn(`[Lounge speech] ${speechEngine} failed, speaking with openai`, error instanceof Error ? error.message.slice(0, 80) : 'error');
+            console.warn(`[Lounge speech] ${engine} failed, speaking with openai`, error instanceof Error ? error.message.slice(0, 80) : 'error');
           }
         }
         if (!opened) {
@@ -1080,7 +1149,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           } finally { clearTimeout(timer); }
         }
       } catch (error) { stats.failed = true; throw error; }
-      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed, ...(speechEngine !== 'openai' ? { provider: speechProvider } : {}) })); }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed, ...(speech.engine !== 'openai' ? { provider: speechProvider } : {}) })); if (isLoungePremiumSpeech(speechProvider)) spentChars += text.length; }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'
@@ -1096,10 +1165,15 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     if (split) {
       const encoder = new TextEncoder();
       const cancelled = new AbortController();
+      // A chat reply is written and saved even if the member's connection drops (a phone leaving the page): it waits in
+      // the conversation when they come back. A voice reply stops with its listener, as speech is for someone listening.
+      const replyStop = chat ? new AbortController().signal : AbortSignal.any([req.signal, cancelled.signal]);
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       return ndjson(new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const send = (event: unknown) => { if (!cancelled.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
+        start(controller) {
+          const work = (async () => {
+          // Once the reader is gone there is nobody to send to; the turn goes on.
+          const send = (event: unknown) => { if (cancelled.signal.aborted) return; try { controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); } catch { cancelled.abort(); } };
           let resolveText!: (value: string | null) => void;
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
           let found = false;
@@ -1134,7 +1208,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             const pro = chatModel.id === 'gemini-pro';
             const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
             const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
-              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: AbortSignal.any([req.signal, cancelled.signal]),
+              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: replyStop,
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: modelRequest.instructions }] },
                 contents: [{ role: 'user', parts: [{ text: modelRequest.input }] }],
@@ -1174,7 +1248,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             let begun = false;
             const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('reply stalled', 'TimeoutError')); }, loungeReplyStallMs());
             try {
-              const response = await openai('responses', JSON.stringify({ ...request, stream: true }), AbortSignal.any([req.signal, cancelled.signal, stall.signal]), 90_000);
+              const response = await openai('responses', JSON.stringify({ ...request, stream: true }), AbortSignal.any([replyStop, stall.signal]), 90_000);
               let output: string, final: ModelResult | undefined;
               // Text per output message; speech starts from whichever message begins as the JSON answer.
               const messages = new Map<number, OutputMessage>();
@@ -1210,7 +1284,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
               try { return await attemptReply(provider); }
               catch (error) {
                 // Once the first sentence is being spoken a new attempt would say something else after it.
-                if (found || earlySpeech || req.signal.aborted || cancelled.signal.aborted) throw error;
+                if (found || earlySpeech || replyStop.aborted) throw error;
                 // A chosen Gemini model that fails before any text: GPT answers this turn, so the conversation goes on.
                 if (provider === 'gemini') {
                   console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
@@ -1227,7 +1301,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
               }
             } catch (error) {
               // Say it was the reply that failed (not the voice) and let the app try again soon instead of in a minute.
-              if (error instanceof LoungeUpstreamError || req.signal.aborted || cancelled.signal.aborted) throw error;
+              if (error instanceof LoungeUpstreamError || replyStop.aborted) throw error;
               const slow = error instanceof Error && ['TimeoutError', 'AbortError', 'ReplyStall'].includes(error.name);
               console.error('[Lounge API] model request failed', JSON.stringify({ name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined, afterMs: Math.round(performance.now() - attemptStarted) }));
               throw new LoungeUpstreamError(slow ? '사회자 답변이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요.' : '사회자 답변 연결이 끊겼어요. 잠시 뒤 다시 시도해 주세요.', slow ? 504 : 502, slow ? 'openai_reply_timeout' : 'openai_stream_interrupted', true, 5);
@@ -1285,8 +1359,12 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
           } finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
-            if (!cancelled.signal.aborted) controller.close();
+            await recordSpeech();
+            if (!cancelled.signal.aborted) try { controller.close(); } catch { /* the reader is gone */ }
           }
+          })();
+          keepAlive(work);
+          return work;
         },
         cancel() { cancelled.abort(); void reader?.cancel().catch(() => {}); },
       }));
@@ -1312,6 +1390,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           catch (error) { send(streamFailure(error, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.')); }
           finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
+            await recordSpeech();
             await relationshipSaved;
             if (!cancelled.signal.aborted) controller.close();
           }

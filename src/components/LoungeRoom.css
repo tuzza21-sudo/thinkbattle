@@ -875,6 +875,9 @@
 .lounge-model-menu strong { font-size:13px; font-weight:700; }
 .lounge-model-menu small { font-size:11px; line-height:1.45; color:#fff5e8b3; }
 .lounge-model-check { color:var(--lounge-accent); }
+.lounge-model-menu small.lounge-model-note { color:var(--lounge-accent); font-weight:600; }
+.has-room .lounge-room-controls .lounge-model-menu button:disabled { opacity:.5; cursor:not-allowed; }
+.has-room .lounge-room-controls .lounge-model-menu button:disabled:hover { background:transparent; }
 
 /* a one-to-one room, chat or voice, reads like a messenger: the conversation and the message box form one column in
    the middle, and every button under the box has the size of the microphone button */
@@ -896,3 +899,12 @@
 .lounge-prologue>span { display:block; margin-bottom:8px; font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--lounge-accent); }
 .lounge-prologue>p { margin:0; font-size:14.5px; line-height:1.75; }
 .lounge-prologue>small { display:block; margin-top:10px; font-size:12px; color:#fff5e8b3; }
+
+/* The button that starts a call from a chat: the one thing in the bar that is not like the others. */
+.has-room .lounge-participant-controls .lounge-mic-button.lounge-call-start,.has-room .lounge-mic-button.lounge-call-start { gap:8px; padding:12px 20px; border:0; background:#2fbf71; color:#06210f; font-size:14px; font-weight:800; letter-spacing:-.01em; box-shadow:0 0 0 0 #2fbf7180,0 6px 20px #2fbf714d; animation:lounge-call-start-pulse 2.4s ease-out infinite; }
+.has-room .lounge-mic-button.lounge-call-start:hover:not(:disabled) { background:#3ad680; }
+.has-room .lounge-mic-button.lounge-call-start:disabled { animation:none; box-shadow:none; opacity:.55; }
+.has-room .lounge-mic-button.lounge-call-start svg { animation:lounge-call-start-ring 2.4s ease-in-out infinite; transform-origin:50% 50%; }
+@keyframes lounge-call-start-pulse { 0% { box-shadow:0 0 0 0 #2fbf7180,0 6px 20px #2fbf714d; } 70%,100% { box-shadow:0 0 0 14px #2fbf7100,0 6px 20px #2fbf714d; } }
+@keyframes lounge-call-start-ring { 0%,60%,100% { transform:rotate(0); } 66% { transform:rotate(-14deg); } 72% { transform:rotate(12deg); } 78% { transform:rotate(-10deg); } 84% { transform:rotate(8deg); } 90% { transform:rotate(0); } }
+@media (prefers-reduced-motion:reduce) { .has-room .lounge-mic-button.lounge-call-start,.has-room .lounge-mic-button.lounge-call-start svg { animation:none; } }

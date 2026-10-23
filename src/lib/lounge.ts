@@ -380,11 +380,10 @@ export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceNa
  * cannot (no key, no voice for the character, a failed request).
  */
 export const loungeSpeechEngines = [
-  { id: 'openai', label: 'OpenAI', description: '안정적인 기본 목소리' },
-  { id: 'gemini', label: 'Gemini', description: '자연스럽고 표현이 풍부한 목소리' },
-  { id: 'eleven-flash', label: 'ElevenLabs Flash', description: '가장 빠른 고품질 목소리' },
-  { id: 'eleven-v3', label: 'ElevenLabs v3', description: '감정 표현이 가장 풍부한 목소리 (조금 느림)' },
-  { id: 'typecast', label: 'Typecast', description: '한국어 감정 연기가 좋은 목소리' },
+  { id: 'openai', label: 'OpenAI', description: '안정적인 기본 목소리', premium: false },
+  { id: 'gemini', label: 'Gemini', description: '자연스럽고 표현이 풍부한 목소리', premium: false },
+  { id: 'eleven-v4-turbo', label: 'ElevenLabs v4 Turbo', description: '빠르고 감정이 풍부한 프리미엄 목소리', premium: true },
+  { id: 'typecast', label: 'Typecast', description: '한국어 감정 연기가 좋은 프리미엄 목소리', premium: true },
 ] as const;
 export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
 export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
@@ -399,8 +398,37 @@ export const loungeSpeechStorageKey = 'lounge.speechEngine';
  * code stays so this one switch can open them again.
  */
 export const loungeGroupRoomsEnabled = false;
-export const loungeElevenModels = { 'eleven-flash': 'eleven_flash_v2_5', 'eleven-v3': 'eleven_v3' } as const;
+export const loungeElevenModel = 'eleven_v4_turbo';
 export const loungeTypecastModel = 'ssfm-v30';
+
+/**
+ * The engines that cost money per character. Each member has a monthly allowance of characters spoken in each (the
+ * month in Korea), and the engine can have a limit for everyone together; past either, the character speaks in its
+ * ordinary voice (see loungeDefaultSpeechEngine). Both are set with environment variables (a number; 0 = none):
+ * LOUNGE_ELEVEN_MONTHLY_CHARS / LOUNGE_TYPECAST_MONTHLY_CHARS per member, and LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS /
+ * LOUNGE_TYPECAST_TOTAL_MONTHLY_CHARS for everyone. ElevenLabs charges one credit per character, so a member's default
+ * 5,000 characters are about 15 minutes of a character speaking.
+ */
+export const loungePremiumSpeech = {
+  'eleven-v4-turbo': { member: 'LOUNGE_ELEVEN_MONTHLY_CHARS', total: 'LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS', defaultMember: 5000 },
+  typecast: { member: 'LOUNGE_TYPECAST_MONTHLY_CHARS', total: 'LOUNGE_TYPECAST_TOTAL_MONTHLY_CHARS', defaultMember: 5000 },
+} as const satisfies Partial<Record<LoungeSpeechEngine, { member: string; total: string; defaultMember: number }>>;
+export type LoungePremiumSpeechEngine = keyof typeof loungePremiumSpeech;
+export const isLoungePremiumSpeech = (engine: string): engine is LoungePremiumSpeechEngine => engine in loungePremiumSpeech;
+/** Korean speech runs at about this many characters a minute; what a member sees of the allowance is in minutes. */
+export const loungeSpeechCharsPerMinute = 330;
+/** The monthly limits of a premium engine from the environment (an unset or invalid value is the default; for the total, 0 is no limit). */
+export function loungePremiumSpeechLimits(engine: LoungePremiumSpeechEngine, env: Record<string, string | undefined>) {
+  const read = (name: string, fallback: number) => { const value = Number(env[name]); return env[name]?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback; };
+  const config = loungePremiumSpeech[engine];
+  return { member: read(config.member, config.defaultMember), total: read(config.total, 0) };
+}
+/** Where a premium engine stands for a member: the characters left, and whether it may speak. */
+export function loungeSpeechAllowance(limits: { member: number; total: number }, used: { member: number; total: number }) {
+  const memberLeft = Math.max(0, limits.member - used.member);
+  const totalLeft = limits.total > 0 ? Math.max(0, limits.total - used.total) : Infinity;
+  return { allowed: memberLeft > 0 && totalLeft > 0, left: Math.min(memberLeft, totalLeft), reason: memberLeft <= 0 ? 'member' as const : totalLeft <= 0 ? 'total' as const : undefined };
+}
 
 // A voice for each character in each engine. A member's character (and anyone missing here) gets the engine's voice
 // for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
@@ -411,25 +439,31 @@ const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage',
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
   gemini: { jaeseok: 'Charon', ina: 'Vindemiatrix', auditor: 'Umbriel', closer: 'Orus', velvet: 'Gacrux', trickster: 'Puck', diplomat: 'Despina', lawyer: 'Algenib', female: 'Kore', male: 'Charon' },
   eleven: {
-    jaeseok: 'JBFqnCBsd6RMkjVDRZzb', ina: 'XrExE9yKIg1WjnnlVkGX', auditor: 'TX3LPaxmHKxFdv7VOQHJ', closer: 'nPczCjzI2devNBz1zQrb', velvet: 'XB0fDUnXU5powFXDhCwa',
-    trickster: 'IKne3meq5aSn9XLyUdCD', diplomat: 'cgSgspJ2msm6clMCkdW9', lawyer: 'onwK4e9ZLuTAKqWW03F9', female: 'EXAVITQu4vr4xnSDxMaL', male: 'cjVigY5qzO86Huf0OWal',
+    // Korean voices from the ElevenLabs voice library. They need a paid plan through the API (a free account is refused
+    // with 402 "paid_plan_required"), and then loungeElevenPremadeVoices speak.
+    jaeseok: 'ZJCNdZEjYwkOElxugmW2', ina: 'JQaWvPoEUkcuOTfxFYpJ', auditor: 'nbrxrAz3eYm9NgojrmFK', closer: 'jB1Cifc2UQbq1gR3wnb0', velvet: 'gnWujHp24oqX3I03lRbU',
+    trickster: '1W00IGEmNmwmsDeYy7ag', diplomat: '8jHHF8rMqMlg8if2mOUe', lawyer: 'Ir7oQcBXWiq4oFGROCfj', female: 'uyVNoMrnUku1dZyVEXwD', male: 'PDoCXqBQFGsvfO0hNkEs',
   },
   typecast: {},
+};
+/** ElevenLabs premade voices (every account has them, a free one too), in the same places; they speak when a library voice is refused. */
+export const loungeElevenPremadeVoices: Partial<Record<string, string>> = {
+  jaeseok: 'JBFqnCBsd6RMkjVDRZzb', ina: 'XrExE9yKIg1WjnnlVkGX', auditor: 'TX3LPaxmHKxFdv7VOQHJ', closer: 'nPczCjzI2devNBz1zQrb', velvet: 'pFZP5JQG7iQjIQuC4Bku',
+  trickster: 'IKne3meq5aSn9XLyUdCD', diplomat: 'cgSgspJ2msm6clMCkdW9', lawyer: 'onwK4e9ZLuTAKqWW03F9', female: 'EXAVITQu4vr4xnSDxMaL', male: 'cjVigY5qzO86Huf0OWal',
 };
 /** The voice of a character in an engine (undefined when the engine has none for it), with LOUNGE_VOICE_IDS overrides. */
 export function loungeEngineVoice(engine: 'gemini' | 'eleven' | 'typecast', hostId: string, overrides?: string) {
   let extra: Partial<Record<string, Partial<Record<string, string>>>> = {};
   try { extra = overrides ? JSON.parse(overrides) : {}; } catch { extra = {}; }
   const voices = { ...loungeEngineVoices[engine], ...(extra[engine] ?? {}) };
-  const gender = houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
-  return voices[hostId] ?? voices[gender];
+  return voices[hostId] ?? voices[loungeHostGender(hostId)];
 }
-/** ElevenLabs: Flash speaks at the character's pace; v3 takes only its own stability steps and no speed. */
-export function loungeElevenSpeechRequest(hostId: string, input: string, engine: 'eleven-flash' | 'eleven-v3') {
-  const host = getLoungeHost(hostId);
-  return engine === 'eleven-v3'
-    ? { text: input, model_id: loungeElevenModels[engine], language_code: 'ko', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }
-    : { text: input, model_id: loungeElevenModels[engine], language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true, speed: Math.min(1.2, Math.max(0.7, host.speechSpeed)) } };
+const loungeHostGender = (hostId: string) => houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
+/** The ElevenLabs premade voice of a character, for when its library voice is refused (an account without a paid plan). */
+export const loungeElevenPremadeVoice = (hostId: string) => loungeElevenPremadeVoices[hostId] ?? loungeElevenPremadeVoices[loungeHostGender(hostId)];
+/** ElevenLabs v4 Turbo in Korean. It takes the stability settings; a "speed" setting is accepted but changes nothing (measured 2026-10-23), so none is sent. */
+export function loungeElevenSpeechRequest(input: string) {
+  return { text: input, model_id: loungeElevenModel, language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8 } };
 }
 /** Typecast reads the feeling from the sentence itself ("smart" emotion) at the character's pace. */
 export function loungeTypecastSpeechRequest(hostId: string, voiceId: string, input: string) {
@@ -539,6 +573,20 @@ export function loungeFirstSpokenSentence(partial: string) {
   const match = /^(.*?[.!?…~][.!?…~"”’'」)]*)\s+\S/.exec(spoken);
   return match && match[1].replace(/[\s"“”'‘’]/g, '').length >= 2 ? match[1].trim() : undefined;
 }
+/**
+ * How long a member was away before their latest message, in words, when it is long enough to notice (3 hours or
+ * more): a conversation picked up again from the chat list. Messages are oldest first, with their times.
+ */
+export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
+  let latest = -1;
+  for (let index = messages.length - 1; index >= 0; index--) if (messages[index].kind === 'human') { latest = index; break; }
+  if (latest < 1) return undefined;
+  const gap = messages[latest].at - messages[latest - 1].at;
+  if (!Number.isFinite(gap) || gap < 3 * 3_600_000) return undefined;
+  const hours = Math.round(gap / 3_600_000), days = Math.round(gap / 86_400_000);
+  return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
+}
+export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다.';
 export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */

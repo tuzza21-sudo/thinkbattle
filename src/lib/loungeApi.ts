@@ -148,6 +148,15 @@ export async function loadLounge(id: string) {
   }
   return { room, session, members: results[1].data as LoungeMember[], messages: (results[2].data as LoungeMessage[]).reverse() };
 }
+/**
+ * Whether a room has a message newer than `afterId`: one id at most, the cheap check a one-to-one room makes every
+ * second instead of reading the room, its members and sixty messages (about 15 KB a second per open room before).
+ */
+export async function hasNewLoungeMessage(id: string, afterId: number) {
+  const result = await supabase.from('voice_lounge_messages').select('id').eq('room_id', id).gt('id', afterId).limit(1);
+  if (result.error) throw loungeConnectionError(new Error(result.error.message), '대화방 상태 서버');
+  return (result.data?.length ?? 0) > 0;
+}
 export async function reviewLoungeInteraction(roomId: string, messageId?: number) {
   return interactionRequest({ roomId, action: 'review', ...(messageId ? { messageId } : {}) });
 }
@@ -224,6 +233,11 @@ export async function listLoungeScenarios(characterId: string): Promise<LoungeSc
 /** Opens (or continues) a one-to-one chat in a scenario; returns the room id. */
 export const startLoungeScenario = (id: string, nickname: string) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname });
 /** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
+/** A member's one-to-one conversation in their chat list: the latest with each character they have talked with. */
+export type LoungeChatSummary = { room_id: string; character_id: string; story: string | null; last_text: string; last_kind: string; last_at: string; open: boolean; character_name: string | null; character_portrait: string | null };
+export const listLoungeChats = () => loungeRpc<LoungeChatSummary[]>('list_my_lounge_chats', {});
+/** Opens a member's own one-to-one conversation again and returns the room to open (a long one goes on in a new room). */
+export const resumeLoungeChat = (roomId: string) => loungeRpc<string>('resume_lounge_chat', { p_room: roomId });
 export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc<string>('start_lounge_custom_chat', { p_character: id, p_nickname: nickname });
 export const setLoungeCustomStatus = (id: string, action: 'submit' | 'private' | 'delete') => loungeRpc<string>('set_lounge_custom_character_status', { p_character: id, p_action: action });
 export type LoungePhotoUsage = { enabled: boolean; daily: number; used: number };
@@ -235,6 +249,9 @@ export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean
 /** Puts text into the conversation as the member's own turn, like a spoken one. */
 export const postLoungeText = (roomId: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: roomId, p_text: text.trim().slice(0, 1200) });
 export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'topics', roomId }) as Promise<{ topics?: string[]; skipped?: boolean }>;
+/** What a member has left in each premium voice engine this month (characters), from the server. */
+export type LoungeSpeechUsage = Record<string, { available: boolean; member: boolean; allowed: boolean; used: number; left: number; limit: number; unavailable?: boolean; reason?: 'member' | 'total' }>;
+export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage }>;
 export const loadLoungeRelationship = (roomId: string) => apiRequest({ action: 'relationship', roomId }) as Promise<{ enabled: boolean; relationship?: RelationshipView }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {

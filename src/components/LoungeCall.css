@@ -1,0 +1,66 @@
+/* A one-to-one voice conversation as a phone call (LoungeCall.tsx): the room's place, blurred and dark, behind the
+   character's portrait; no words on the screen. */
+.lounge-call-screen { position:relative; flex:1; min-height:0; display:grid; grid-template-rows:auto 1fr auto; border-radius:22px; border:1px solid #ffffff1a; background:var(--lounge-surface,#242421); color:#fff5e8; isolation:isolate; }
+/* The blurred place is clipped to the screen; the screen itself is not, so the voice menu can open above it. */
+.lounge-call-backdrop { position:absolute; inset:0; z-index:-1; overflow:hidden; border-radius:inherit; }
+.lounge-call-backdrop>span { position:absolute; inset:-40px; background:linear-gradient(180deg,#0b0d0ccc 0%,#0b0d0c80 40%,#0b0d0ce6 100%),var(--lounge-scene-image) center / cover no-repeat; filter:blur(26px) saturate(1.15); }
+.lounge-call-top { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 20px 0; font-size:12px; color:#fff5e8a6; }
+.lounge-call-place { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lounge-call-remaining { flex-shrink:0; font-variant-numeric:tabular-nums; }
+.lounge-call-screen .lounge-safety-notice { margin:10px 20px 0; }
+
+.lounge-call-person { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:12px 20px; text-align:center; min-height:0; }
+.lounge-call-portrait { position:relative; flex-shrink:0; width:clamp(72px, 24vh, 200px); aspect-ratio:1; margin-bottom:14px; }
+.lounge-call-portrait .lounge-host-photo { position:relative; z-index:1; display:grid; place-items:center; width:100%; height:100%; border-radius:50%; overflow:hidden; border:3px solid #ffffff2e; box-shadow:0 20px 50px #00000080; font-size:56px; }
+.lounge-call-portrait .lounge-host-photo img { width:100%; height:100%; object-fit:cover; }
+/* While the character speaks, rings go out from the portrait, like a voice. */
+.lounge-call-ring { position:absolute; inset:0; border-radius:50%; border:2px solid var(--lounge-accent,#ead0a3); opacity:0; }
+.host-speaking .lounge-call-ring { animation:lounge-call-ring 1.8s ease-out infinite; }
+.host-speaking .lounge-call-ring.second { animation-delay:.9s; }
+.host-speaking .lounge-call-portrait .lounge-host-photo { border-color:var(--lounge-accent,#ead0a3); }
+@keyframes lounge-call-ring { from { transform:scale(1); opacity:.7; } to { transform:scale(1.45); opacity:0; } }
+.lounge-call-person h1 { margin:0; font-size:clamp(24px, 4vh, 32px); font-weight:700; letter-spacing:-.01em; }
+.lounge-call-job { margin:0; font-size:14px; color:#fff5e8a6; }
+.lounge-call-time { margin:10px 0 0; font-size:15px; font-variant-numeric:tabular-nums; color:#fff5e8d9; letter-spacing:.04em; }
+.lounge-call-status { margin:0; min-height:20px; font-size:14px; color:var(--lounge-accent,#ead0a3); }
+.user-speaking .lounge-call-status { color:#9fe3b4; }
+.lounge-call-connect { display:inline-flex; align-items:center; gap:8px; margin-top:10px; padding:11px 20px; border:0; border-radius:999px; background:var(--lounge-accent,#ead0a3); color:#1b201d; font-size:14px; font-weight:700; cursor:pointer; }
+.lounge-call-connect:disabled { opacity:.6; cursor:default; }
+
+.lounge-call-dock { display:flex; flex-direction:column; align-items:center; gap:16px; padding:0 20px 24px; }
+.lounge-call-error { margin:0; max-width:420px; padding:8px 12px; border-radius:12px; background:#e5484d26; color:#ffd1d2; font-size:12px; line-height:1.5; text-align:center; }
+.has-room .lounge-room-controls.lounge-call-options { position:relative; display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+/* The menus open centred over the row of pickers (not over one picker), so they stay on a narrow screen. */
+.lounge-call-options .lounge-model-picker { position:static; }
+.lounge-call-options .lounge-model-menu { max-height:min(66vh, 460px); overflow-y:auto; }
+.lounge-call-buttons { display:flex; justify-content:center; gap:clamp(18px, 6vw, 40px); }
+.lounge-call-button { display:flex; flex-direction:column; align-items:center; gap:8px; width:84px; white-space:nowrap; padding:0; border:0; background:none; color:#fff5e8d9; font-size:12px; cursor:pointer; }
+.lounge-call-button>span { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:#ffffff1f; backdrop-filter:blur(10px); transition:background .15s; }
+.lounge-call-button:hover:not(:disabled)>span { background:#ffffff33; }
+.lounge-call-button.muted>span { background:#fff5e8; color:#1b201d; }
+.lounge-call-button:disabled { opacity:.45; cursor:default; }
+.lounge-call-button:focus-visible>span,.lounge-call-hangup:focus-visible { outline:2px solid var(--lounge-accent,#ead0a3); outline-offset:3px; }
+.lounge-call-button:focus-visible { outline:none; }
+.lounge-call-hangup { display:grid; place-items:center; width:70px; height:70px; border:0; border-radius:50%; background:#e5484d; color:#fff; box-shadow:0 10px 30px #e5484d55; cursor:pointer; transition:background .15s; }
+.lounge-call-hangup:hover { background:#d13a40; }
+
+@media (max-width:760px) {
+  .lounge-call-screen { border-radius:18px; }
+  .lounge-call-top { padding:12px 16px 0; }
+  .lounge-call-dock { padding:0 16px 18px; gap:12px; }
+  .lounge-call-button>span { width:56px; height:56px; }
+  .lounge-call-hangup { width:64px; height:64px; }
+}
+/* A short screen (a phone on its side): everything gets smaller so the portrait never runs into the buttons. */
+@media (max-height:600px) {
+  .lounge-call-person { gap:2px; padding:4px 16px; }
+  .lounge-call-portrait { width:clamp(64px, 20vh, 120px); margin-bottom:6px; }
+  .lounge-call-person h1 { font-size:20px; }
+  .lounge-call-job { font-size:12px; }
+  .lounge-call-time { margin-top:2px; font-size:13px; }
+  .lounge-call-dock { gap:8px; padding-bottom:12px; }
+  .lounge-call-button { gap:4px; font-size:11px; }
+  .lounge-call-button>span { width:46px; height:46px; }
+  .lounge-call-hangup { width:54px; height:54px; }
+}
+@media (prefers-reduced-motion:reduce) { .host-speaking .lounge-call-ring { animation:none; opacity:.6; transform:scale(1.08); } .host-speaking .lounge-call-ring.second { display:none; } }

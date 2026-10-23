@@ -2603,11 +2603,11 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
   'RIFF'.split('').forEach((c, i) => typecastWav[i] = c.charCodeAt(0)); 'WAVEfmt '.split('').forEach((c, i) => typecastWav[8 + i] = c.charCodeAt(0));
   view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 32000, true); 'data'.split('').forEach((c, i) => typecastWav[36 + i] = c.charCodeAt(0));
   const scenarios = {
-    'eleven-flash': { env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length, model: 'eleven_flash_v2_5' },
-    'eleven-v3': { env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length, model: 'eleven_v3' },
-    'eleven-flash without a key': { speech: 'eleven-flash', env: {}, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
-    'typecast without a voice': { speech: 'typecast', env: { TYPECAST_API_KEY: 'tc-key' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
-    typecast: { env: { TYPECAST_API_KEY: 'tc-key', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 0, typecast: 1, openai: 0, bytes: 2400 * 2 },
+    'eleven-v4-turbo': { env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
+    'eleven-v4-turbo without a key': { speech: 'eleven-v4-turbo', env: { SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    'a retired engine (eleven-flash)': { speech: 'eleven-flash', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    'typecast without a voice': { speech: 'typecast', env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    typecast: { env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 0, typecast: 1, openai: 0, bytes: 2400 * 2 },
     'an unknown engine': { speech: 'nope', env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
@@ -2621,13 +2621,15 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
         if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
         if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
         if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그건 좀 다르게 찍고 싶네요.' }) }] }] });
+        if (url.includes('lounge_speech_usage_status')) return result({ member: 0, total: 0 });
+        if (url.includes('add_lounge_speech_usage')) return result(16);
         if (url.startsWith('https://api.elevenlabs.io/')) {
           calls.eleven++;
-          assert.ok(url.startsWith('https://api.elevenlabs.io/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb/stream?output_format=pcm_24000'), url);
+          assert.ok(url.startsWith('https://api.elevenlabs.io/v1/text-to-speech/ZJCNdZEjYwkOElxugmW2/stream?output_format=pcm_24000'), 'the Korean library voice of this character: ' + url);
           assert.equal(init.headers['xi-api-key'], 'el-key');
           const body = JSON.parse(init.body);
-          assert.equal(body.model_id, scenario.model); assert.equal(body.language_code, 'ko'); assert.equal(body.text, '그건 좀 다르게 찍고 싶네요.');
-          assert.equal('speed' in body.voice_settings, scenario.model === 'eleven_flash_v2_5', 'v3 takes no speed');
+          assert.equal(body.model_id, 'eleven_v4_turbo'); assert.equal(body.language_code, 'ko'); assert.equal(body.text, '그건 좀 다르게 찍고 싶네요.');
+          assert.equal('speed' in body.voice_settings, false, 'v4 Turbo takes no speed');
           return new Response(pcm);
         }
         if (url.startsWith('https://api.typecast.ai/')) {
@@ -2650,6 +2652,89 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
       });
     } finally { for (const key of Object.keys(scenario.env)) delete process.env[key]; }
   }
+});
+
+test('a premium voice speaks only within the member\'s monthly allowance, and its characters are counted', async () => {
+  const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
+  const library = 'ZJCNdZEjYwkOElxugmW2', premade = 'JBFqnCBsd6RMkjVDRZzb';
+  const scenarios = {
+    'within the allowance': { status: { member: 1200, total: 9000 }, eleven: [library], openai: 0, recorded: [16] },
+    'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], openai: 1, recorded: [] },
+    'everyone together used the month': { env: { LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' }, status: { member: 0, total: 100 }, eleven: [], openai: 1, recorded: [] },
+    'a larger allowance from the environment': { env: { LOUNGE_ELEVEN_MONTHLY_CHARS: '20000' }, status: { member: 5000, total: 5000 }, eleven: [library], openai: 0, recorded: [16] },
+    'a guest': { user: { id: 'user-1', is_anonymous: true }, status: { member: 0, total: 0 }, eleven: [], openai: 1, recorded: [], statusCalls: 0 },
+    'an allowance that cannot be read': { statusFailure: true, eleven: [], openai: 1, recorded: [] },
+    'a free ElevenLabs plan (library voice refused)': { status: { member: 0, total: 0 }, refuseLibrary: true, eleven: [library, premade], openai: 0, recorded: [16] },
+  };
+  for (const [name, scenario] of Object.entries(scenarios)) {
+    const calls = { eleven: [], openai: 0, recorded: [], status: 0 };
+    Object.assign(process.env, { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service', ...(scenario.env ?? {}) });
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result(scenario.user ?? { id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그건 좀 다르게 찍고 싶네요.' }) }] }] });
+        if (url.includes('lounge_speech_usage_status')) {
+          calls.status++;
+          assert.deepEqual(JSON.parse(init.body), { p_user: 'user-1', p_engine: 'eleven-v4-turbo' });
+          return scenario.statusFailure ? new Response('nope', { status: 500 }) : result(scenario.status);
+        }
+        if (url.includes('add_lounge_speech_usage')) { const body = JSON.parse(init.body); assert.equal(body.p_engine, 'eleven-v4-turbo'); assert.equal(body.p_user, 'user-1'); calls.recorded.push(body.p_chars); return result(body.p_chars); }
+        if (url.startsWith('https://api.elevenlabs.io/')) {
+          const voice = url.split('/text-to-speech/')[1].split('/')[0];
+          calls.eleven.push(voice);
+          if (scenario.refuseLibrary && voice === library) return new Response(JSON.stringify({ detail: { code: 'paid_plan_required' } }), { status: 402 });
+          return new Response(pcm);
+        }
+        if (url.endsWith('/audio/speech')) { calls.openai++; return new Response(fallback); }
+        if (url.includes('finish_voice_lounge_reply') || url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true, speech: 'eleven-v4-turbo' }));
+        assert.equal(response.status, 200, name);
+        const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.equal(heard.length, scenario.openai ? fallback.length : pcm.length, `${name}: who speaks`);
+        assert.equal(events.at(-1).type, 'done', name);
+        assert.deepEqual({ eleven: calls.eleven, openai: calls.openai, recorded: calls.recorded }, { eleven: scenario.eleven, openai: scenario.openai, recorded: scenario.recorded }, name);
+        if (scenario.statusCalls !== undefined) assert.equal(calls.status, scenario.statusCalls, `${name}: the allowance is not looked up`);
+      });
+    } finally { for (const key of ['ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', ...Object.keys(scenario.env ?? {})]) delete process.env[key]; }
+  }
+});
+
+test('the speech action tells the picker what each premium voice has left this month', async () => {
+  const wanted = { 'user-1': { member: 3300, total: 3300 }, guest: { member: 0, total: 0 } };
+  for (const [name, user, env] of [['a member', { id: 'user-1' }, { ELEVENLABS_API_KEY: 'el-key' }], ['a guest', { id: 'guest', is_anonymous: true }, { ELEVENLABS_API_KEY: 'el-key' }], ['no key', { id: 'user-1' }, {}]]) {
+    Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ...env });
+    try {
+      await run(async url => {
+        if (url.includes('/auth/')) return result(user);
+        if (url.includes('lounge_speech_usage_status')) return result(wanted[user.id]);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const response = await handler(request({ action: 'speech', roomId }));
+        assert.equal(response.status, 200, name);
+        const { engines } = await response.json();
+        assert.deepEqual(Object.keys(engines).sort(), ['eleven-v4-turbo', 'typecast']);
+        const eleven = engines['eleven-v4-turbo'];
+        if (name === 'a member') assert.deepEqual(eleven, { available: true, member: true, allowed: true, used: 3300, left: 1700, limit: 5000 });
+        if (name === 'a guest') assert.deepEqual([eleven.member, eleven.allowed], [false, false]);
+        if (name === 'no key') assert.deepEqual([eleven.available, eleven.allowed], [false, true], 'the allowance is real; the engine is not set up');
+        assert.equal(engines.typecast.available, false);
+      });
+    } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', ...Object.keys(env)]) delete process.env[key]; }
+  }
+  const limits = lounge.loungePremiumSpeechLimits('eleven-v4-turbo', { LOUNGE_ELEVEN_MONTHLY_CHARS: '12000', LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '500000' });
+  assert.deepEqual(limits, { member: 12000, total: 500000 });
+  assert.deepEqual(lounge.loungePremiumSpeechLimits('eleven-v4-turbo', {}), { member: 5000, total: 0 }, 'the defaults');
+  assert.deepEqual(lounge.loungePremiumSpeechLimits('eleven-v4-turbo', { LOUNGE_ELEVEN_MONTHLY_CHARS: 'lots', LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '-5' }), { member: 5000, total: 0 }, 'a bad value is the default');
+  assert.deepEqual(lounge.loungeSpeechAllowance({ member: 5000, total: 0 }, { member: 4999, total: 9e9 }), { allowed: true, left: 1, reason: undefined });
+  assert.equal(lounge.loungeSpeechAllowance({ member: 5000, total: 0 }, { member: 5000, total: 0 }).reason, 'member');
+  assert.equal(lounge.loungeSpeechAllowance({ member: 5000, total: 100 }, { member: 0, total: 100 }).reason, 'total');
 });
 
 test('a voice reply starts speaking its first sentence while the rest is still being written, and never says it twice', async () => {
@@ -2731,4 +2816,66 @@ test('reply suggestions need a seat in the room, are spaced out and return spoke
     const response = await handler(request({ action: 'replies', roomId: 'lounge-00000000-0000-4000-8000-0000000000bb' }));
     assert.equal(response.status, 403); assert.equal(paid, 0, 'a non-member never reaches the model');
   });
+});
+
+test('a conversation picked up after a while tells the character how long the member was away', async () => {
+  const hour = 3_600_000, at = Date.parse('2026-10-20T12:00:00Z');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 2 * hour }]), undefined, 'two hours is the same sitting');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 5 * hour }]), '5시간');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'human', at }, { kind: 'host', at: at + 60_000 }, { kind: 'human', at: at + 3 * 24 * hour }]), '3일');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 65 * 24 * hour }]), '2달');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'human', at }]), undefined, 'nothing before it');
+  let context;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 9 }]);
+    if (url.includes('voice_lounge_messages?')) {
+      assert.ok(url.includes('created_at'), 'the times are read');
+      return result([{ id: 2, kind: 'human', nickname: '나', text: '나 왔어', created_at: new Date(Date.now() - 60_000).toISOString() }, { id: 1, kind: 'host', nickname: 'AI', text: '내일 봐요.', created_at: new Date(Date.now() - 2 * 24 * hour).toISOString() }]);
+    }
+    if (url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      if (!context) { context = JSON.parse(body.input); assert.ok(body.instructions.includes('time_away'), 'the instruction says what it means'); }
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '오랜만이네요.', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
+    return result(null);
+  }, async () => {
+    await handler(request({ action: 'host', roomId, reason: 'followup', stream: true })).then(response => response.text());
+  });
+  assert.equal(context.time_away, '2일');
+  assert.ok(context.recent.every(message => !('created_at' in message)), 'the times themselves are not sent to the model');
+});
+
+test('a chat reply is still written and saved when the connection drops while it is being written', async () => {
+  const reply = { text: '잠깐만요, 금방 답할게요.' };
+  const json = JSON.stringify(reply), split = 12;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const kept = [], saved = []; let modelSignal;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3, voice_on: false }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+    if (url.endsWith('/responses')) { modelSignal = init.signal; return sse([...deltas(json, split).slice(0, 1), 'gate', deltas(json, split)[1], { type: 'response.completed', response: { status: 'completed' } }], gate); }
+    if (url.includes('finish_voice_lounge_reply')) { saved.push(JSON.parse(init.body).p_text); return result(true); }
+    if (url.includes('release_voice_lounge_host')) throw new Error('the turn must not be given back');
+    if (url.includes('save_voice_lounge')) return result(true);
+    throw new Error('Unexpected call ' + url);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }), { waitUntil: promise => kept.push(promise) });
+    const reader = response.body.getReader();
+    void reader.read();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await reader.cancel(); // the phone leaves the page while the reply is being written
+    release();
+    await Promise.all(kept);
+  });
+  assert.equal(kept.length, 1, 'the work is handed to waitUntil');
+  assert.deepEqual(saved, [reply.text], 'the whole reply is saved');
+  assert.equal(modelSignal.aborted, false, 'the model request is not cancelled with the reader');
 });
