@@ -8,7 +8,10 @@ export type LoungeStreamEvent =
   | { type: 'text'; text: string }
   /** A chat reply that comes with a photo: the scene to ask api/lounge-images.ts for, and whether the member asked. */
   | { type: 'photo'; scene: string; asked?: boolean }
+  /** The reply is saved: the next turn may start while the summary, relationship and memories are written after it. */
+  | { type: 'saved' }
   | { type: 'error'; error: string; code?: string; retryable?: boolean; retryAfterSeconds?: number };
+const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'done', 'error'];
 
 // NDJSON frames may split anywhere, including inside a Korean UTF-8 character.
 export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, signal?: AbortSignal) {
@@ -29,7 +32,9 @@ export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, sign
         if (!line.trim()) continue;
         let event: LoungeStreamEvent;
         try { event = JSON.parse(line); } catch { throw new LoungeApiError('사회자 음성 응답이 끊겼어요. 다시 시도해 주세요.', 'lounge_invalid_stream'); }
-        if (!event || !['host', 'text', 'audio', 'photo', 'done', 'error'].includes(event.type)) throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
+        if (!event || typeof event.type !== 'string') throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
+        // A newer server may send kinds of events this page does not know yet; they are skipped.
+        if (!eventTypes.includes(event.type)) continue;
         if (event.type === 'error') throw new LoungeApiError(event.error, event.code, event.retryable !== false, event.retryAfterSeconds);
         if (event.type === 'audio' && typeof event.audio !== 'string') throw new LoungeApiError('사회자 음성 응답이 올바르지 않아요.', 'lounge_invalid_stream');
         yield event;
