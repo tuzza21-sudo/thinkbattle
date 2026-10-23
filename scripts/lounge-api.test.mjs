@@ -2849,3 +2849,33 @@ test('a conversation picked up after a while tells the character how long the me
   assert.equal(context.time_away, '2일');
   assert.ok(context.recent.every(message => !('created_at' in message)), 'the times themselves are not sent to the model');
 });
+
+test('a chat reply is still written and saved when the connection drops while it is being written', async () => {
+  const reply = { text: '잠깐만요, 금방 답할게요.' };
+  const json = JSON.stringify(reply), split = 12;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const kept = [], saved = []; let modelSignal;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3, voice_on: false }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+    if (url.endsWith('/responses')) { modelSignal = init.signal; return sse([...deltas(json, split).slice(0, 1), 'gate', deltas(json, split)[1], { type: 'response.completed', response: { status: 'completed' } }], gate); }
+    if (url.includes('finish_voice_lounge_reply')) { saved.push(JSON.parse(init.body).p_text); return result(true); }
+    if (url.includes('release_voice_lounge_host')) throw new Error('the turn must not be given back');
+    if (url.includes('save_voice_lounge')) return result(true);
+    throw new Error('Unexpected call ' + url);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }), { waitUntil: promise => kept.push(promise) });
+    const reader = response.body.getReader();
+    void reader.read();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await reader.cancel(); // the phone leaves the page while the reply is being written
+    release();
+    await Promise.all(kept);
+  });
+  assert.equal(kept.length, 1, 'the work is handed to waitUntil');
+  assert.deepEqual(saved, [reply.text], 'the whole reply is saved');
+  assert.equal(modelSignal.aborted, false, 'the model request is not cancelled with the reader');
+});

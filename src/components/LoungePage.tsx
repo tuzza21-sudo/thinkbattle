@@ -1054,6 +1054,12 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         nextHostAttempt.current = Date.now() + Math.max(3, err.retryAfterSeconds) * 1000;
         failedAtMessage.current = current.current.messages.filter(message => message.kind === 'human').at(-1)?.id ?? 0;
       }
+      // A chat whose connection dropped while the reply was being written: the server finishes and saves the reply
+      // anyway, and the room's refresh shows it. The page waits for it quietly instead of showing an error.
+      if (chatTurn && err instanceof LoungeApiError && ['lounge_stream_interrupted', 'lounge_network_error'].includes(err.code ?? '')) {
+        hostBlocked.current = false; nextHostAttempt.current = Date.now() + 20_000;
+        return;
+      }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.
       const yielded = err instanceof LoungeApiError && err.code === 'lounge_audio_deferred' && reason !== 'requested';
       if (mounted.current && !yielded) setError(errorText(err));

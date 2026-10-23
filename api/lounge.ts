@@ -283,7 +283,22 @@ function isRelationshipDeveloper(user: { id: string; email?: string }) {
   return allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
 }
 
-export default async function handler(req: Request): Promise<Response> {
+/**
+ * Keeps the function running until `work` settles, also after the reader of the response went away: Vercel's
+ * waitUntil, read from the request context the way @vercel/functions reads it, or from the handler's (older) context
+ * argument. Without it an Edge function stops the moment the connection drops: on 2026-10-23 a phone left the page
+ * while a chat reply was being written, and the reply was neither saved nor its turn given back.
+ */
+type LoungeWaitUntil = (promise: Promise<unknown>) => void;
+function loungeKeepAlive(context?: { waitUntil?: LoungeWaitUntil }): LoungeWaitUntil {
+  const store = (globalThis as unknown as Record<symbol, { get?: () => { waitUntil?: LoungeWaitUntil } | undefined } | undefined>)[Symbol.for('@vercel/request-context')];
+  const fromStore = store?.get?.()?.waitUntil;
+  const wait = typeof fromStore === 'function' ? fromStore : context && typeof context.waitUntil === 'function' ? context.waitUntil.bind(context) : undefined;
+  return promise => { promise.catch(() => {}); wait?.(promise); };
+}
+
+export default async function handler(req: Request, context?: { waitUntil?: LoungeWaitUntil }): Promise<Response> {
+  const keepAlive = loungeKeepAlive(context);
   if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
   const origin = req.headers.get('origin');
   const allowed = (process.env.APP_ORIGIN || '').split(',').map(value => value.trim());
@@ -1150,10 +1165,15 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     if (split) {
       const encoder = new TextEncoder();
       const cancelled = new AbortController();
+      // A chat reply is written and saved even if the member's connection drops (a phone leaving the page): it waits in
+      // the conversation when they come back. A voice reply stops with its listener, as speech is for someone listening.
+      const replyStop = chat ? new AbortController().signal : AbortSignal.any([req.signal, cancelled.signal]);
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       return ndjson(new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const send = (event: unknown) => { if (!cancelled.signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); };
+        start(controller) {
+          const work = (async () => {
+          // Once the reader is gone there is nobody to send to; the turn goes on.
+          const send = (event: unknown) => { if (cancelled.signal.aborted) return; try { controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); } catch { cancelled.abort(); } };
           let resolveText!: (value: string | null) => void;
           const textReady = new Promise<string | null>(resolve => { resolveText = resolve; });
           let found = false;
@@ -1188,7 +1208,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             const pro = chatModel.id === 'gemini-pro';
             const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
             const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
-              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: AbortSignal.any([req.signal, cancelled.signal]),
+              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: replyStop,
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: modelRequest.instructions }] },
                 contents: [{ role: 'user', parts: [{ text: modelRequest.input }] }],
@@ -1228,7 +1248,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             let begun = false;
             const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('reply stalled', 'TimeoutError')); }, loungeReplyStallMs());
             try {
-              const response = await openai('responses', JSON.stringify({ ...request, stream: true }), AbortSignal.any([req.signal, cancelled.signal, stall.signal]), 90_000);
+              const response = await openai('responses', JSON.stringify({ ...request, stream: true }), AbortSignal.any([replyStop, stall.signal]), 90_000);
               let output: string, final: ModelResult | undefined;
               // Text per output message; speech starts from whichever message begins as the JSON answer.
               const messages = new Map<number, OutputMessage>();
@@ -1264,7 +1284,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
               try { return await attemptReply(provider); }
               catch (error) {
                 // Once the first sentence is being spoken a new attempt would say something else after it.
-                if (found || earlySpeech || req.signal.aborted || cancelled.signal.aborted) throw error;
+                if (found || earlySpeech || replyStop.aborted) throw error;
                 // A chosen Gemini model that fails before any text: GPT answers this turn, so the conversation goes on.
                 if (provider === 'gemini') {
                   console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
@@ -1281,7 +1301,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
               }
             } catch (error) {
               // Say it was the reply that failed (not the voice) and let the app try again soon instead of in a minute.
-              if (error instanceof LoungeUpstreamError || req.signal.aborted || cancelled.signal.aborted) throw error;
+              if (error instanceof LoungeUpstreamError || replyStop.aborted) throw error;
               const slow = error instanceof Error && ['TimeoutError', 'AbortError', 'ReplyStall'].includes(error.name);
               console.error('[Lounge API] model request failed', JSON.stringify({ name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined, afterMs: Math.round(performance.now() - attemptStarted) }));
               throw new LoungeUpstreamError(slow ? '사회자 답변이 늦어지고 있어요. 잠시 뒤 다시 시도해 주세요.' : '사회자 답변 연결이 끊겼어요. 잠시 뒤 다시 시도해 주세요.', slow ? 504 : 502, slow ? 'openai_reply_timeout' : 'openai_stream_interrupted', true, 5);
@@ -1340,8 +1360,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           } finally {
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
             await recordSpeech();
-            if (!cancelled.signal.aborted) controller.close();
+            if (!cancelled.signal.aborted) try { controller.close(); } catch { /* the reader is gone */ }
           }
+          })();
+          keepAlive(work);
+          return work;
         },
         cancel() { cancelled.abort(); void reader?.cancel().catch(() => {}); },
       }));
