@@ -437,3 +437,13 @@ test('every one-to-one character shows what it feels when flirted with, as far a
   assert.match(relationship.attractionReactionRule, /노골적인 성행위나 신체 부위는 묘사하지 않고/);
   assert.match(relationship.attractionReactionRule, /상대가 멈추자고 하면 바로 멈춘다/);
 });
+
+test('every one-to-one character answers a threat or being forced as a frightened or furious person, and the scene never goes on', () => {
+  for (const config of Object.values(relationship.relationshipConfigs)) {
+    assert.ok(relationship.relationshipReplyInstructionsFor(config).includes(relationship.coercionReactionRule), `${config.characterId}`);
+  }
+  assert.match(relationship.coercionReactionRule, /침착한 안내문이나 상담하듯 말하지 않는다/);
+  assert.match(relationship.coercionReactionRule, /이야기 밖의 말.*로 끊지 않고 인물로서 거부한다/);
+  assert.match(relationship.coercionReactionRule, /그 장면은 폭력이나 성행위로 이어지지 않는다/);
+  assert.match(relationship.coercionReactionRule, /관계가 깊어도 강요는 받아들이지 않는다/);
+});
