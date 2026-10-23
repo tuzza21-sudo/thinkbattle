@@ -1899,6 +1899,49 @@ test('the deep model reasons in a chat; a voice reply and the fast model do not'
   }
 });
 
+test('a deep reply that writes nothing in time is answered by the fast model; a failed turn gives its claim back at once', async () => {
+  process.env.LOUNGE_REPLY_STALL_MS = '80';
+  const room = [{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: false, ai_model: 'gpt-reasoning', ai_turns: 2 }];
+  try {
+    const sent = []; let events, released;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result(room);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+      if (url.endsWith('/responses')) {
+        const body = JSON.parse(init.body); sent.push(body);
+        // The deep reply keeps thinking and writes nothing; only the abort ends it.
+        if (body.reasoning.effort === 'medium') return new Response(new ReadableStream({ start(controller) { init.signal.addEventListener('abort', () => controller.error(init.signal.reason)); } }), { headers: { 'Content-Type': 'text/event-stream' } });
+        const json = JSON.stringify({ text: '빠르게 답할게요.' });
+        return sse([...deltas(json, 6), { type: 'response.completed', response: { status: 'completed' } }]);
+      }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      if (url.includes('release_voice_lounge_host')) { released = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line)); });
+    assert.deepEqual(sent.map(body => body.reasoning.effort), ['medium', 'none']);
+    assert.equal(sent[1].max_output_tokens, sent[0].max_output_tokens - 2500);
+    assert.equal(events.find(event => event.type === 'host').text, '빠르게 답할게요.');
+    assert.equal(events.at(-1).type, 'done');
+    assert.equal(released, undefined, 'a reply that was saved keeps its claim until it is finished');
+    // A reply that fails before anything is saved gives the turn back, so the next message is answered right away.
+    let failedEvents;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result(room);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return result({ error: { code: 'insufficient_quota', type: 'insufficient_quota' } }, 429);
+      if (url.includes('release_voice_lounge_host')) { released = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { failedEvents = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line)); });
+    assert.equal(failedEvents[0].type, 'error');
+    assert.deepEqual(released, { p_room: roomId, p_ticket: 'ticket' });
+  } finally { delete process.env.LOUNGE_REPLY_STALL_MS; }
+});
+
 test('a room set to Gemini sends the same instructions and JSON shape there; if Gemini fails, GPT answers', async () => {
   const savedKey = process.env.GEMINI_API_KEY;
   process.env.GEMINI_API_KEY = 'gemini-key';
