@@ -159,7 +159,9 @@ test('solo starts and continues a brief conversation without group introductions
         const character = charactersLib.getLoungeCharacter(host.id);
         assert.ok(payload.instructions.includes(`너는 ${character.name}이다`) && payload.instructions.includes(character.role), `${host.id} knows who they are`);
         assert.ok(payload.instructions.includes(character.tagline) && payload.instructions.includes(character.habits[0]) && payload.instructions.includes(character.story[0]), `${host.id} always knows the full profile, including the past`);
-        assert.ok(payload.instructions.includes(charactersLib.loungeCharacterRules));
+        // One to one, a character reacts by the moment and how close the two are; it does not argue its ground or ask for proof.
+        assert.ok(payload.instructions.includes(charactersLib.loungeOneToOneCharacterRules));
+        assert.ok(!payload.instructions.includes(charactersLib.loungeDebateStanceRule) && !payload.instructions.includes('평가하고 반박할 수 있다'));
         assert.doesNotMatch(payload.instructions, /음성 대화방의 AI다|AI 도우미다|인 척하지 않는다/);
         assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
         assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
@@ -1761,6 +1763,16 @@ test('the reply sentence is read from a partial JSON stream only once its string
   assert.equal(replyTextSoFar('{"text":"그건 \\"근거\\"가 아니야.\\n다시.","mem'), '그건 "근거"가 아니야.\n다시.');
   assert.equal(replyTextSoFar('{ "text" : "끝\\\\", "memory": ""}'), '끝\\');
   assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), undefined, 'another key first waits for the full reply');
+});
+
+test('a reply that runs on past its end with a brace and garbage is cut there, as it streams and when saved', () => {
+  const { replyTextSoFar, replyTextPartial, withoutRunawayTail } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
+  // Seen on 2026-10-23: a curly quote and a brace inside the text, then other scripts.
+  const runaway = '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”}RGCTX}જરાત_final 北京赛车投注 eriwa} William';
+  assert.equal(withoutRunawayTail(runaway), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
+  assert.equal(withoutRunawayTail('그냥 평범한 답.'), '그냥 평범한 답.');
+  assert.equal(replyTextSoFar(JSON.stringify({ text: runaway }).slice(0, -1) + ',"x'), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
+  assert.equal(replyTextPartial(JSON.stringify({ text: runaway }).slice(0, -10)), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
 });
 
 test('a chat shows the reply sentence while it is written, decoding escapes and waiting for half-arrived ones', () => {
