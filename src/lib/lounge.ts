@@ -1,3 +1,5 @@
+import type { LoungeRoomScenario } from './loungeScenarios.js';
+
 export const loungeHosts = [
   {
     id: 'jaeseok', name: '영화감독', tag: '선택과 불신을 파고드는', emoji: '🎬', color: '#ffe0a3',
@@ -214,7 +216,8 @@ export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina'] },
   { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'] },
 ] as const;
-export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '');
+// Every character a member creates has a relationship too (from the type they picked).
+export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '') || isLoungeCustomCharacterId(id);
 /** What each character is like, shown on the lobby cards. */
 export const loungeCharacterProfiles: Record<string, { traits: readonly string[]; summary: string }> = {
   ina: { traits: ['말 속의 모순 발견', '내 경험도 나누는 대화', '끝에 생각 정리'], summary: '누군가와 깊이 이야기하고 싶을 때. 질문만 하지 않고, 말하지 않은 생각을 짚고 오늘 얻은 것을 정리해 줘요.' },
@@ -274,7 +277,7 @@ export type LoungeFilmCard = {
 export type LoungeFilmResearch = { version: 2; coverage: 'scene_grounded' | 'limited'; materials: Array<{ title: string; url: string; provider: string; retrieved_at: string }>; cards: LoungeFilmCard[] };
 export type LoungeTopicStudy = { title: string; confidence: 'verified' | 'uncertain'; overview: string; facts: string[]; angles: string[]; questions: string[]; clarification: string; sources: Array<{ title: string; url: string }>; film_research?: LoungeFilmResearch };
 export const loungeNeedsStudy = (topic: string) => !loungeTopics.some(item => item.question === topic.trim());
-export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null };
+export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null; voice_on?: boolean; ai_model?: string | null ; /** A one-to-one chat started from a story (see loungeScenarios.ts). */ scenario?: LoungeRoomScenario | null };
 /** A space in 상상의 집: always open, hosted by one character. Tables (rooms) open inside it as people arrive. */
 export type LoungeSpace = { id: string; name: string; host_persona: LoungeHostId; theme: LoungeThemeId; capacity: number; present_count: number; table_count: number; topic: string | null; participants: string[]; seat_free: boolean; waiting: number };
 /**
@@ -329,16 +332,31 @@ export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
  * the same room computes the same one, and different rooms spread across the list.
  */
 export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
-  const choices = loungeHostThemes[hostId]?.length ? loungeHostThemes[hostId] : [loungeThemes[0].id];
+  const custom = customHostThemes.get(hostId);
+  const choices = custom ? [custom] : loungeHostThemes[hostId]?.length ? loungeHostThemes[hostId] : [loungeThemes[0].id];
   let hash = 0;
   for (let index = 0; index < roomId.length; index++) hash = (hash * 31 + roomId.charCodeAt(index)) >>> 0;
   return choices[hash % choices.length];
 }
-export const getLoungeHost = (id: string) => loungeHosts.find(host => host.id === id) ?? loungeHosts[0];
+/** A host's fields, widened from the house list so a character a member creates can have the same shape. */
+export type LoungeHost = {
+  id: LoungeHostId; name: string; tag: string; emoji: string; color: string; portrait: string; voiceSample: string; voiceLabel: string;
+  description: string; greeting: string; instruction: string; companion: string; voice: string; speechSpeed: number; speechInstruction: string; sampleText: string;
+};
+// Characters that members create (ids "c_..."), registered once their data has been read (see loungeCustomCharacters.ts).
+const customLoungeHosts = new Map<string, LoungeHost>();
+const customHostThemes = new Map<string, LoungeThemeId>();
+export const isLoungeCustomCharacterId = (id?: string | null) => /^c_[0-9a-f]{32}$/.test(id ?? '');
+export function registerLoungeCustomHost(host: LoungeHost, theme: LoungeThemeId) {
+  customLoungeHosts.set(host.id, host); customHostThemes.set(host.id, theme);
+}
+export const getLoungeHost = (id: string): LoungeHost => loungeHosts.find(host => host.id === id) ?? customLoungeHosts.get(id) ?? loungeHosts[0];
+/** Added to every character's voice: the feeling in the words is played out in full, in that character's own voice. */
+export const loungeSpeechExpression = '문장에 담긴 감정과 리액션(감탄사, 웃음, 놀람, 한숨, 망설임, 장난기)을 이 캐릭터의 음색과 성격 안에서 최대한 실감 나고 크게 살린다. 억양의 높낮이, 강약, 쉼에 분명한 변화를 주고 밋밋하게 읽지 않는다.';
 export function loungeSpeechRequest(hostId: LoungeHostId, input: string, responseFormat: 'pcm' | 'mp3') {
   const host = getLoungeHost(hostId);
   return { model: 'gpt-4o-mini-tts', voice: host.voice, input, response_format: responseFormat,
-    speed: host.speechSpeed, instructions: host.speechInstruction + ' 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.' };
+    speed: host.speechSpeed, instructions: `${host.speechInstruction} ${loungeSpeechExpression} 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.` };
 }
 
 /**
@@ -351,7 +369,7 @@ export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string) {
   const host = getLoungeHost(hostId);
   return {
-    contents: [{ parts: [{ text: `${host.speechInstruction}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
+    contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore' } } } },
   };
 }
@@ -377,6 +395,29 @@ export function loungeSpeechLimits(input: string) {
   return { timeoutMs: Math.min(120_000, 30_000 + input.length * 150), maxPcmBytes: audioSeconds * 24_000 * 2 };
 }
 
+/**
+ * A one-to-one room is a chat until its owner turns the voice on. Rooms with other people always use voice, and a room
+ * that does not report the setting (before the chat migration) keeps the voice it always had.
+ */
+export const isLoungeChatRoom = (room: Pick<LoungeRoom, 'capacity' | 'space_id' | 'voice_on'> | null | undefined) =>
+  Boolean(room && room.capacity === 1 && !room.space_id && room.voice_on === false);
+
+/** Chat text with `*actions*` (what someone does, how they look, the scene) marked apart from what is said. */
+export function splitLoungeActions(text: string): Array<{ action: boolean; text: string }> {
+  const parts: Array<{ action: boolean; text: string }> = [];
+  let last = 0;
+  for (const match of text.matchAll(/\*([^*\n]+)\*/g)) {
+    if (match.index > last) parts.push({ action: false, text: text.slice(last, match.index) });
+    parts.push({ action: true, text: match[1] });
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push({ action: false, text: text.slice(last) });
+  return parts;
+}
+
+/** What the voice reads aloud: the words only, without `*actions*`. */
+export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */
 export type LoungeHelpKind = 'spark' | 'question' | 'opinion' | 'topic' | 'summary' | 'direct';
 export const loungeHelpOptions: ReadonlyArray<{ kind: Exclude<LoungeHelpKind, 'direct'>; label: string; description: string }> = [
@@ -388,7 +429,11 @@ export const loungeHelpOptions: ReadonlyArray<{ kind: Exclude<LoungeHelpKind, 'd
 ];
 export const isLoungeHelpKind = (value: unknown): value is LoungeHelpKind => ['spark', 'question', 'opinion', 'topic', 'summary', 'direct'].includes(String(value));
 export const loungeMinimumParticipants = (capacity: number) => capacity === 1 ? 1 : 2;
-export const loungeHostCooldownMs = (capacity: number) => capacity === 1 ? 5000 : 10_000;
+/**
+ * The least time between two AI turns. A chat answers each message as it comes: its reply is saved before the next
+ * turn starts, so it needs only a short guard against a loop; the 5 seconds made quick replies wait (2026-10-21).
+ */
+export const loungeHostCooldownMs = (capacity: number, chat = false) => chat ? 1000 : capacity === 1 ? 5000 : 10_000;
 /**
  * One-to-one pacing. A 1-second pause ends the user's turn (people can talk over the AI to
  * take it back), the reply starts 0.3 seconds after the transcript is saved, and the AI may
@@ -409,11 +454,13 @@ export const loungeGroupSilenceGapMs = 120_000;
 // Groups are people talking to each other: the AI speaks when asked, and at most
 // once into a real silence after people have spoken since its last words.
 export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0): 'opening' | 'followup' | 'silence' | 'requested' | null {
-  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity)) return null;
+  const chat = isLoungeChatRoom(room);
+  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity, chat)) return null;
   const human = messages.filter(message => message.kind === 'human').at(-1);
   const host = messages.filter(message => message.kind === 'host').at(-1);
   if (room.capacity === 1) {
-    if (now - lastHostEnded < loungeSoloTiming.afterAiMs || now - inputReadyAt < loungeSoloTiming.settleAfterTranscriptMs || now - lastActivity < loungeSoloTiming.endOfTurnMs) return null;
+    // These pauses wait out speech (the person finishing, the AI's voice ending); a chat has none to wait for.
+    if (!chat && (now - lastHostEnded < loungeSoloTiming.afterAiMs || now - inputReadyAt < loungeSoloTiming.settleAfterTranscriptMs || now - lastActivity < loungeSoloTiming.endOfTurnMs)) return null;
     if (human && (!host || human.id > host.id)) return 'followup';
     if (!host && now - Date.parse(room.started_at || room.created_at) >= 1500) return 'opening';
     return null;

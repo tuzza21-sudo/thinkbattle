@@ -51,7 +51,11 @@ async function handle(req: Request) {
       const pending = await rpc<Array<{ user_id: string; speaking_restricted_until: string | null; safety_updated_at: string }>>('pending_voice_lounge_voice_sync', { p_room: roomId, p_actor: user.id });
       if (!pending.length) return;
       const voice = new RoomServiceClient(voiceUrl.replace(/^ws:/, 'http:').replace(/^wss:/, 'https:'), voiceKey, voiceSecret);
-      const present = await voice.listParticipants(roomId);
+      // A one-to-one chat has no voice room; there is nobody to update there.
+      const present = await voice.listParticipants(roomId).catch((error: { status?: number; code?: string }) => {
+        if (error?.status === 404 || error?.code === 'not_found') return [];
+        throw error;
+      });
       for (const member of pending) {
         const participant = present.find(item => item.identity === member.user_id);
         const canPublish = !(Date.parse(member.speaking_restricted_until || '') > Date.now());
@@ -67,6 +71,12 @@ async function handle(req: Request) {
     if (!process.env.OPENAI_API_KEY) return json({ error: 'AI 대화 보호 서버 설정을 확인해 주세요.', code: 'lounge_interaction_not_configured', retryable: false }, 503);
     const claim = await rpc<{ ticket: string; message_id: number; speaker_id: string; text: string; members: LoungeInteractionMember[]; topic: string; recent: unknown[]; host_persona?: string; group?: boolean } | null>('claim_voice_lounge_interaction', { p_room: roomId, p_actor: user.id, p_message: body.messageId ?? null });
     if (!claim) return json({ skipped: true });
+    // Alone with the character and restrictions paused, the review has nothing to decide (nobody to warn, nobody else to
+    // address), so the message is accepted without an inference call.
+    if (process.env.LOUNGE_MODERATION !== 'on' && !claim.group && claim.members.length < 2) {
+      const applied = await rpc<Record<string, unknown>>('finish_voice_lounge_interaction', { p_room: roomId, p_message: claim.message_id, p_ticket: claim.ticket, p_decision: { moderation: 'allow', reason: 'none', target_id: null, question: null } });
+      return json(applied);
+    }
     const relationshipConfig = claim.group ? getRelationshipConfig(claim.host_persona) : undefined;
     try {
       const schema = relationshipConfig ? { ...loungeInteractionSchema, properties: { ...loungeInteractionSchema.properties, events: relationshipEventsSchema }, required: [...loungeInteractionSchema.required, 'events'] } : loungeInteractionSchema;
@@ -78,7 +88,11 @@ async function handle(req: Request) {
       }) });
       if (!response.ok) throw new Error('interaction_ai_failed');
       const result = await response.json() as Parameters<typeof readLoungeInteraction>[0];
-      const decision = readLoungeInteraction(result, claim.members, claim.speaker_id, claim.text);
+      const reviewed = readLoungeInteraction(result, claim.members, claim.speaker_id, claim.text);
+      // Speaking restrictions are paused (2026-10-21): nobody is warned, restricted or has words hidden unless
+      // LOUNGE_MODERATION=on. What the review would have done is still logged.
+      const decision = process.env.LOUNGE_MODERATION === 'on' || reviewed.moderation === 'allow' ? reviewed : { ...reviewed, moderation: 'allow' as const, reason: 'none' as const };
+      if (decision !== reviewed) console.info('[Lounge moderation] paused', JSON.stringify({ moderation: reviewed.moderation, reason: reviewed.reason }));
       const applied = await rpc<Record<string, unknown>>('finish_voice_lounge_interaction', { p_room: roomId, p_message: claim.message_id, p_ticket: claim.ticket, p_decision: decision });
       // The speaker's relationship with the character; a failure never affects the safety decision.
       if (relationshipConfig) {
@@ -96,11 +110,13 @@ async function handle(req: Request) {
       // A committed decision is never counted again if the voice server is down.
       try { await sync(); } catch { return json({ ...applied, voiceSyncPending: true }); }
       return json(applied);
-    } catch {
+    } catch (error) {
+      console.error('[Lounge interaction] review failed', error instanceof Error ? `${error.name}: ${error.message.slice(0, 120)}` : 'error');
       await rpc('fail_voice_lounge_interaction', { p_room: roomId, p_message: claim.message_id, p_ticket: claim.ticket }, true).catch(() => {});
       return json({ error: 'AI 대화 보호 확인이 지연됐어요. 잘못된 발언 제한 없이 다시 확인할게요.', code: 'lounge_interaction_failed', retryable: true }, 502);
     }
-  } catch {
+  } catch (error) {
+    console.error('[Lounge interaction] failed', error instanceof Error ? `${error.name}: ${error.message.slice(0, 120)}` : 'error');
     return json({ error: '대화 보호와 음성 권한 연결을 확인해 주세요.', code: 'lounge_interaction_sync_failed', retryable: true }, 502);
   }
 }

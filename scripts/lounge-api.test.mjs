@@ -10,7 +10,9 @@ const compile = (path, require = () => {}) => {
   new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require);
   return exports;
 };
-const lounge = compile('../src/lib/lounge.ts');
+// Loaded through loadTs so the lounge module is the same instance the character registry writes to.
+const lounge = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+const customLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCustomCharacters.ts', import.meta.url)));
 const study = compile('../src/lib/loungeStudy.ts');
 const filmStudy = compile('../src/lib/loungeFilmStudy.ts');
 const sessionLib = compile('../src/lib/loungeSession.ts');
@@ -18,7 +20,9 @@ const knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const repliesLib = compile('../src/lib/loungeReplies.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const modelsLib = compile('../src/lib/loungeModels.ts');
+const scenariosLib = compile('../src/lib/loungeScenarios.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -155,7 +159,9 @@ test('solo starts and continues a brief conversation without group introductions
         const character = charactersLib.getLoungeCharacter(host.id);
         assert.ok(payload.instructions.includes(`너는 ${character.name}이다`) && payload.instructions.includes(character.role), `${host.id} knows who they are`);
         assert.ok(payload.instructions.includes(character.tagline) && payload.instructions.includes(character.habits[0]) && payload.instructions.includes(character.story[0]), `${host.id} always knows the full profile, including the past`);
-        assert.ok(payload.instructions.includes(charactersLib.loungeCharacterRules));
+        // One to one, a character reacts by the moment and how close the two are; it does not argue its ground or ask for proof.
+        assert.ok(payload.instructions.includes(charactersLib.loungeOneToOneCharacterRules));
+        assert.ok(!payload.instructions.includes(charactersLib.loungeDebateStanceRule) && !payload.instructions.includes('평가하고 반박할 수 있다'));
         assert.doesNotMatch(payload.instructions, /음성 대화방의 AI다|AI 도우미다|인 척하지 않는다/);
         assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
         assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
@@ -221,7 +227,9 @@ test('a question about the field of the character brings the closest knowledge a
   await scenario({ text: '', expectKnowledge: false });
   assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'nothing is looked up when no one has said anything');
   await scenario({ text: '증거능력이 정확히 뭐예요?', off: true, expectKnowledge: false });
-  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'LOUNGE_KNOWLEDGE=off turns the lookup off');
+  assert.deepEqual(calls, { embeddings: 1, match: 0, presence: 0 }, 'LOUNGE_KNOWLEDGE=off turns the lookup off (the embedding still finds memories)');
+  await scenario({ text: '증거능력이 정확히 뭐예요?', off: true, expectKnowledge: false, env: { LOUNGE_LONG_MEMORY: 'off' } });
+  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'with long-term memory off too, nothing is embedded');
   // A failing lookup never stops the reply.
   await scenario({ text: '증거능력이 정확히 뭐예요?', embeddingStatus: 500, expectKnowledge: false });
   await scenario({ text: '증거능력이 정확히 뭐예요?', rpcStatus: 500, expectKnowledge: false });
@@ -234,13 +242,14 @@ test('a question about the field of the character brings the closest knowledge a
   await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '0.1', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0.2' }, thresholds: [0.1, 0.2] });
   await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: 'abc', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '1.5' }, thresholds: [0.33, 0.45] });
   await scenario({ text: '증거능력이 정확히 뭐예요?', expectKnowledge: true, env: { LOUNGE_KNOWLEDGE_MIN_KNOWLEDGE: '', LOUNGE_KNOWLEDGE_MIN_EXPERIENCE: '0' }, thresholds: [0.33, 0] });
-  // A character with no entries costs nothing: no embedding, no lookup. The empty answer is remembered, so the next turn does not even ask.
+  // A character with no entries is never looked up. The empty answer is remembered, so the next turn does not even ask.
+  // The question is still embedded as the request starts (before the character is known), since it also finds memories.
   await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'none', expectKnowledge: false });
-  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 1 }, 'an empty character is not looked up');
+  assert.deepEqual(calls, { embeddings: 1, match: 0, presence: 1 }, 'an empty character is not looked up');
   await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'none', expectKnowledge: false, host: 'diplomat', cacheMs: '60000' });
   assert.equal(calls.presence, 1);
   await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'some', expectKnowledge: false, host: 'diplomat', cacheMs: '60000' });
-  assert.deepEqual(calls, { embeddings: 0, match: 0, presence: 0 }, 'the empty answer is remembered for a while');
+  assert.deepEqual(calls, { embeddings: 1, match: 0, presence: 0 }, 'the empty answer is remembered for a while');
   // If the presence check cannot be read, look up anyway.
   await scenario({ text: '증거능력이 정확히 뭐예요?', presence: 'error', expectKnowledge: true });
   assert.deepEqual(calls, { embeddings: 1, match: 1, presence: 1 });
@@ -890,13 +899,13 @@ test('a relationship character reads stored state, classifies events in the same
       assert.ok(context.relationship.character_core.includes('칭찬은 아끼며 얻어야 한다'));
       assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
       assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
-      assert.match(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
+      assert.match(body.instructions, /SHARES_FEELING: /); assert.doesNotMatch(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
       assert.match(body.instructions, /사람의 가치나 인격은 평가하지 않는다/);
       assert.ok(body.instructions.includes(lounge.getLoungeHost('velvet').companion));
       assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
       assert.equal(body.max_output_tokens, 1400, 'events and a long memory must not truncate the JSON reply');
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반박이 있네. 근거부터 들어 보지.', memory: '', events: [
-        { type: 'CHALLENGES_CHARACTER_RESPECTFULLY', confidence: 0.92, note: '근거를 들어 침착하게 반박함' },
+        { type: 'SHARES_FEELING', confidence: 0.92, note: '서운했던 이유를 솔직하게 말함' },
         { type: 'INVENTED_EVENT', confidence: 0.99, note: '' },
       ] }) }] }] });
     }
@@ -908,7 +917,7 @@ test('a relationship character reads stored state, classifies events in the same
       assert.equal(body.p_user, 'user-1'); assert.equal(body.p_character, 'velvet'); assert.equal(body.p_room, roomId);
       assert.equal(body.p_expected_version, 4, 'optimistic version from the stored row');
       assert.equal(body.p_state.scores.respect, 45); assert.equal(body.p_state.scores.intrigue, 62);
-      assert.equal(body.p_state.turnCount, 7); assert.equal(body.p_state.recentEvents.at(-1).type, 'CHALLENGES_CHARACTER_RESPECTFULLY');
+      assert.equal(body.p_state.turnCount, 7); assert.equal(body.p_state.recentEvents.at(-1).type, 'SHARES_FEELING');
       assert.ok(body.p_state.memories.some(memory => memory.summary === '근거를 들어 침착하게 반박함'));
       assert.ok(body.p_mood.curiosity > 0);
       return result(5);
@@ -1022,6 +1031,61 @@ test('a greeting without a new user message never saves memories, and later turn
   assert.ok(later.context.relationship.user_memories.length > 0);
 });
 
+test('in a one-to-one stream one embedding finds memories by what was just said, and the call after the reply records their changes and embeddings', async () => {
+  const unit = Array.from({ length: 256 }, (_, index) => index === 0 ? 1 : 0);
+  const memory = (id, summary, importance, extra = {}) => ({ id, character_id: 'velvet', kind: 'preference', summary, follow_up: null, importance, status: 'active', mention_count: 1, updated_at: '2026-10-07T00:00:00Z', last_confirmed_at: '2026-10-07T00:00:00Z', ...extra });
+  const jazz = memory('55555555-5555-4555-8555-555555555555', '사용자는 재즈 바를 좋아한다.', 0.55);
+  const rows = [memoryRows[0], ...Array.from({ length: 9 }, (_, index) => memory(`4444444${index}-4444-4444-8444-444444444444`, `다른 중요한 이야기 ${index}`, 0.95)), jazz];
+  const embedded = [], applied = []; let reply, after, stored;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_memories?') && url.includes('embedding=is.null')) return result([{ id: jazz.id, summary: jazz.summary, follow_up: null }]);
+    if (url.includes('voice_lounge_memories?')) return result(rows);
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null })]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '오늘 재즈 듣고 싶다.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.includes('/rest/v1/lounge_character_knowledge?')) return result([{ id: 'k1' }]);
+    if (url.includes('pick_lounge_character_knowledge')) return result([]);
+    if (url.endsWith('/embeddings')) { const { input } = JSON.parse(init.body); embedded.push(input); return result({ data: (Array.isArray(input) ? input : [input]).map((_, index) => ({ index, embedding: unit })) }); }
+    if (url.includes('score_voice_lounge_memories')) { const body = JSON.parse(init.body); assert.equal(body.p_character, 'velvet'); assert.equal(body.p_query.length, 256); return result([{ id: jazz.id, score: 0.6 }, ...rows.slice(1, 10).map(row => ({ id: row.id, score: 0.1 }))]); }
+    if (url.endsWith('/responses') && isAfterReply(init)) {
+      after = JSON.parse(init.body);
+      const ref = JSON.parse(after.input).relationship.user_memories.find(item => item.summary === jazz.summary).ref;
+      return modelAnswer({ memory: '재즈 이야기를 했다.', events: [], memory_ops: [{ op: 'update', ref, kind: '', summary: '사용자는 재즈 바, 특히 피아노 트리오를 좋아한다.', importance: 0.7, follow_up: '' }] });
+    }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*잔을 밀어 주며* 재즈라, 좋지.' }); }
+    if (url.includes('apply_voice_lounge_memory_ops')) { applied.push(JSON.parse(init.body)); return result(1); }
+    if (url.includes('set_voice_lounge_memory_embeddings')) { stored = JSON.parse(init.body); return result(1); }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship')) return result(true);
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  const shown = JSON.parse(reply.input).relationship.user_memories;
+  assert.equal(shown.length, relationshipLib.memorySettings.relevantPromptLimit, 'more memories fit once they are chosen by relevance');
+  assert.equal(shown[0].follow_up, '인터뷰 결과', 'the open thread is always shown');
+  assert.equal(shown[1].summary, jazz.summary, 'the memory that fits what was just said comes before more important ones');
+  assert.deepEqual(embedded[0], '오늘 재즈 듣고 싶다.', 'one embedding of the question serves the knowledge and the memories');
+  assert.equal(embedded.filter(input => typeof input === 'string').length, 1);
+  assert.match(reply.instructions, /user_memories는 이 사용자가/); assert.doesNotMatch(reply.instructions, /memory_ops:/, 'the reply only uses memories');
+  assert.match(after.instructions, /memory_ops:/);
+  assert.deepEqual(applied[0].p_ops, [{ op: 'update', id: jazz.id, summary: '사용자는 재즈 바, 특히 피아노 트리오를 좋아한다.', importance: 0.7 }]);
+  assert.deepEqual(embedded[1], [jazz.summary], 'memories without an embedding get one after the reply');
+  assert.equal(stored.p_items[0].id, jazz.id); assert.equal(stored.p_items[0].embedding.length, 256);
+});
+
+test('a memory close to what was just said is chosen over a more important one; without relevance the choice is as before', () => {
+  const now = new Date('2026-10-08T12:00:00Z');
+  const row = (id, importance) => ({ id, character_id: 'velvet', kind: 'preference', summary: id, follow_up: null, importance, status: 'active', mention_count: 1, updated_at: '2026-10-07T00:00:00Z', last_confirmed_at: '2026-10-07T00:00:00Z' });
+  const rows = [...Array.from({ length: 10 }, (_, index) => row(`important-${index}`, 0.95)), row('related', 0.55)];
+  assert.equal(relationshipLib.selectMemoriesForPrompt(rows, 'velvet', now).forPrompt.some(item => item.summary === 'related'), false);
+  const relevant = relationshipLib.selectMemoriesForPrompt(rows, 'velvet', now, new Map([['related', 0.6]]));
+  assert.equal(relevant.forPrompt[0].summary, 'related');
+  assert.equal(relevant.forPrompt.length, relationshipLib.memorySettings.relevantPromptLimit);
+  assert.equal(relationshipLib.memoryEmbeddingText({ summary: '인터뷰하기로 했다', follow_up: '결과' }), '인터뷰하기로 했다 / 결과');
+});
+
 test('LOUNGE_LONG_MEMORY=off turns memory reading, prompting and saving off', async () => {
   const { body, context, applied } = await memoryTurn({ env: { LOUNGE_LONG_MEMORY: 'off' }, memoryOps: [{ op: 'add', ref: '', kind: 'event', summary: '저장되면 안 됨', importance: 0.9, follow_up: '' }] });
   assert.equal(context.relationship.user_memories, undefined);
@@ -1107,7 +1171,7 @@ test('rooms with other people never receive relationship context or events, whic
   }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200)));
 });
 
-test('the relationship endpoint returns labels to players and raw scores only to listed developers, without paid calls', async () => {
+test('the relationship endpoint returns the stage, labels and scores to players, and mood and history only to listed developers, without paid calls', async () => {
   for (const [developer, owner, persona, capacity] of [[false, true, 'velvet', 1], [true, true, 'velvet', 1], [false, false, 'velvet', 1], [false, true, 'velvet', 4]]) {
     let body;
     await withServiceKey(() => run(async (url, init) => {
@@ -1120,7 +1184,9 @@ test('the relationship endpoint returns labels to players and raw scores only to
     assert.equal(body.relationship.macroState.id, 'INTRIGUED');
     assert.equal(body.relationship.macroState.label, '흥미를 느낌');
     assert.equal(body.relationship.metrics.trust.label, '조심스러움');
-    assert.equal(body.relationship.metrics.trust.score, developer ? 30 : undefined);
+    assert.equal(body.relationship.metrics.trust.score, 30, 'the status card draws every score as a bar');
+    assert.equal(body.relationship.stage.index, 1); assert.equal(body.relationship.stage.total, 4); assert.equal(body.relationship.stage.next, '인정하는 상대');
+    assert.ok(body.relationship.stage.progress > 0 && body.relationship.stage.progress < 1);
     assert.equal(Boolean(body.relationship.debug), developer);
     if (developer) { assert.equal(body.relationship.debug.mood.amusement, 40); assert.equal(body.relationship.debug.version, 4); }
   }
@@ -1325,6 +1391,12 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 200), null, 'settle after transcription is saved');
   assert.equal(lounge.loungeSpeechPauseMs(1), 1000);
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
+  // A chat has no voice to wait out: a message is answered right after the last reply, guarded only against a loop.
+  const chat = { ...room, space_id: null, voice_on: false };
+  assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 1500, now - 100, now - 50), 'followup');
+  assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 500, now - 100, now - 50), null, 'one second between two turns');
+  assert.equal(lounge.nextLoungeHostReason({ ...chat, voice_on: true }, messages, now, now - 100, now - 1500, now - 100, now - 50), null, 'with the voice on it waits as before');
+  assert.equal(lounge.loungeHostCooldownMs(1, true), 1000); assert.equal(lounge.loungeHostCooldownMs(1), 5000);
 });
 
 test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
@@ -1398,7 +1470,8 @@ test('group help follows the requested kind and each scheduled announcement stay
   for (const item of cases) await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
     if (url.includes('claim_voice_lounge_host')) { assert.equal(JSON.parse(init.body).p_reason, item.reason); return result('ticket'); }
-    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /moderator_request_kind/); return result([{ topic: '책 이야기', host_persona: 'jaeseok', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
+    // Every column is read (moderator_request_kind among them), so a database without newer columns still answers.
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /select=\*/); return result([{ topic: '책 이야기', host_persona: 'jaeseok', memory: '', capacity: 4, ai_turns: 5, guided_session: true, topic_brief: topicBrief, moderator_request_kind: item.stored ?? null }]); }
     if (url.includes('voice_lounge_sessions?')) return result([{ turn_kind: 'basic', speaker_id: null, ...item.session }]);
     if (url.includes('voice_lounge_messages?')) { assert.doesNotMatch(url, /kind=eq.human/, 'no whole-round summary read'); return result([{ nickname: '소연', kind: 'human', text: '저는 결말이 좋았어요.' }]); }
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'a', nickname: '민수', last_seen: '' }, { user_id: 'b', nickname: '소연', last_seen: '' }, { user_id: 'c', nickname: '지우', last_seen: '' }]);
@@ -1515,11 +1588,17 @@ const sse = (events, gate) => new Response(new ReadableStream({ async start(cont
   controller.close();
 } }), { headers: { 'Content-Type': 'text/event-stream' } });
 const deltas = (json, split) => [json.slice(0, split), json.slice(split)].map(delta => ({ type: 'response.output_text.delta', delta }));
+// A one-to-one reply writes only its text; the call after it (told apart by its format name) writes the summary,
+// relationship events, memory changes and photo.
+const isAfterReply = init => JSON.parse(init.body).text?.format?.name === 'lounge_after_reply';
+const modelAnswer = answer => result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify(answer) }] }] });
+const typesOf = events => events.map(event => event.type);
 
-test('one-to-one speech starts once the reply sentence is complete, before the memory and events are written', async () => {
-  const reply = { text: '네 주장이지. "근거"는 아직이야.', memory: '사용자는 마케팅 탓을 했다.', events: [{ type: 'MAKES_UNSUPPORTED_CLAIM', confidence: 0.95, note: '근거 없이 단정' }] };
+test('one-to-one speech starts once the reply sentence is complete; the reply is saved at once and the call after it writes the summary and events', async () => {
+  const reply = { text: '네 주장이지. "근거"는 아직이야.' };
+  const later = { memory: '사용자는 마케팅 탓을 했다.', events: [{ type: 'FLATTERS_CHARACTER', confidence: 0.95, note: '내용 없이 칭찬' }] };
   const json = JSON.stringify(reply);
-  let release, speechStartedBeforeRelease = false, released = false, finish, saved;
+  let release, speechStartedBeforeRelease = false, released = false, finish, summary, saved, replyBody, afterBody;
   const gate = new Promise(resolve => { release = () => { released = true; resolve(); }; });
   await withServiceKey(() => run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'user-1' });
@@ -1528,10 +1607,12 @@ test('one-to-one speech starts once the reply sentence is complete, before the m
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'auditor', memory: '이전 기억', capacity: 1, ai_turns: 3 }]);
     if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '다 마케팅 탓이야.' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/responses') && isAfterReply(init)) { afterBody = JSON.parse(init.body); return modelAnswer(later); }
     if (url.endsWith('/responses')) {
-      assert.equal(JSON.parse(init.body).stream, true);
-      // The text field closes in the first chunk; the rest waits on the gate.
-      return sse([...deltas(json, json.indexOf(',"memory"') + 3).slice(0, 1), 'gate', deltas(json, json.indexOf(',"memory"') + 3)[1], { type: 'response.completed', response: { status: 'completed' } }], gate);
+      replyBody = JSON.parse(init.body);
+      assert.equal(replyBody.stream, true);
+      // The text string closes in the first chunk; the end of the JSON waits on the gate.
+      return sse([...deltas(json, json.length - 1).slice(0, 1), 'gate', deltas(json, json.length - 1)[1], { type: 'response.completed', response: { status: 'completed' } }], gate);
     }
     if (url.endsWith('/audio/speech')) {
       speechStartedBeforeRelease = !released;
@@ -1539,18 +1620,31 @@ test('one-to-one speech starts once the reply sentence is complete, before the m
       setTimeout(release, 20);
       return new Response(new Uint8Array([0, 1, 2, 3]));
     }
-    if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+    if (url.includes('finish_voice_lounge_reply')) { finish = JSON.parse(init.body); return result(true); }
+    if (url.includes('save_voice_lounge_room_memory')) { summary = JSON.parse(init.body); return result(true); }
     if (url.includes('save_voice_lounge_relationship')) { saved = JSON.parse(init.body); return result(1); }
     throw new Error('Unexpected fetch ' + url);
   }, async () => {
     const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
     assert.equal(response.status, 200);
     const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
-    assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+    assert.deepEqual(typesOf(events).sort(), ['audio', 'done', 'host', 'relationship', 'saved']);
+    assert.equal(events[0].type, 'host'); assert.equal(events.at(-1).type, 'done');
     assert.equal(events[0].text, reply.text, 'escaped quotes in the reply survive early extraction');
-    assert.ok(speechStartedBeforeRelease, 'speech started while the memory and events were still being generated');
-    assert.equal(finish.p_text, reply.text); assert.equal(finish.p_memory, reply.memory, 'the full memory is saved before the stream closes');
-    assert.equal(saved.p_state.recentEvents.at(-1).type, 'MAKES_UNSUPPORTED_CLAIM', 'events written after the text still update the relationship');
+    assert.ok(speechStartedBeforeRelease, 'speech started before the reply call had finished');
+    assert.deepEqual(Object.keys(replyBody.text.format.schema.properties), ['text'], 'the reply writes only what is said');
+    assert.doesNotMatch(replyBody.instructions, /events: 사용자의 가장 최근 발언/, 'the reply is not asked to classify');
+    assert.deepEqual(finish, { p_room: roomId, p_ticket: 'ticket', p_text: reply.text }, 'the reply is saved without the summary');
+    assert.equal(JSON.parse(afterBody.input).recent.at(-1).text, reply.text, 'the call after the reply reads it');
+    assert.match(afterBody.instructions, /events: 사용자의 가장 최근 발언/);
+    assert.deepEqual(summary, { p_room: roomId, p_memory: later.memory, p_turn: 3 }, 'the summary is saved with its turn, so an older one never replaces a newer');
+    assert.equal(saved.p_state.recentEvents.at(-1).type, 'FLATTERS_CHARACTER', 'events from the call after the reply update the relationship');
+    // The chat's status card gets the saved state and what the message changed, before the stream ends.
+    const changed = events.find(event => event.type === 'relationship');
+    assert.ok(events.indexOf(changed) < events.length - 1);
+    assert.equal(changed.relationship.macroState.id, saved.p_state.stage);
+    assert.deepEqual(changed.change.events, [{ type: 'FLATTERS_CHARACTER', label: '빈 칭찬', up: false }]);
+    assert.ok(Object.values(changed.change.delta).every(value => Number.isInteger(value) && value !== 0) && Object.values(changed.change.delta).some(value => value < 0));
   }));
 });
 
@@ -1566,22 +1660,24 @@ test('a plain commentary message before the JSON answer is ignored, streamed or 
   ];
   const whole = { status: 'completed', output: [{ phase: 'commentary', content: [{ type: 'output_text', text: commentary }] }, { phase: 'final_answer', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }] };
   for (const stream of [true, false]) {
-    let finish;
+    let finish, memory;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1' });
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '요즘 고민', host_persona: 'auditor', memory: '', capacity: 1, ai_turns: 1 }]);
       if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: reply.memory, events: [] });
       if (url.endsWith('/responses')) return stream ? sse(streamed) : result(whole);
       if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
-      if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+      if (url.includes('finish_voice_lounge_')) { finish = JSON.parse(init.body); memory ??= finish.p_memory; return result(true); }
+      if (url.includes('save_voice_lounge_room_memory')) { memory = JSON.parse(init.body).p_memory; return result(true); }
       throw new Error('Unexpected fetch ' + url);
     }, async () => {
       const response = await handler(request({ action: 'host', roomId, reason: 'opening', stream }));
-      if (stream) assert.deepEqual((await response.text()).trim().split('\n').map(line => JSON.parse(line).type), ['host', 'audio', 'done']);
+      if (stream) assert.deepEqual(typesOf((await response.text()).trim().split('\n').map(line => JSON.parse(line))).filter(type => type !== 'saved'), ['host', 'audio', 'done']);
       else assert.equal(response.status, 200);
     });
-    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(finish.p_memory, reply.memory, `stream=${stream}`);
+    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(memory, reply.memory, `stream=${stream}`);
   }
 });
 
@@ -1594,42 +1690,64 @@ test('a JSON answer that arrives in a commentary message is still used, streamed
   ];
   const whole = { status: 'completed', output: [{ phase: 'commentary', content: [{ type: 'output_text', text: JSON.stringify(reply) }] }] };
   for (const stream of [true, false]) {
-    let finish;
+    let finish, memory;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1' });
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '요즘 고민', host_persona: 'auditor', memory: '', capacity: 1, ai_turns: 2 }]);
       if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: reply.memory, events: [] });
       if (url.endsWith('/responses')) return stream ? sse(streamed) : result(whole);
       if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
-      if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+      if (url.includes('finish_voice_lounge_')) { finish = JSON.parse(init.body); memory ??= finish.p_memory; return result(true); }
+      if (url.includes('save_voice_lounge_room_memory')) { memory = JSON.parse(init.body).p_memory; return result(true); }
       throw new Error('Unexpected fetch ' + url);
     }, async () => {
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream }));
-      if (stream) assert.deepEqual((await response.text()).trim().split('\n').map(line => JSON.parse(line).type), ['host', 'audio', 'done']);
+      if (stream) assert.deepEqual(typesOf((await response.text()).trim().split('\n').map(line => JSON.parse(line))).filter(type => type !== 'saved'), ['host', 'audio', 'done']);
       else assert.equal(response.status, 200);
     });
-    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(finish.p_memory, reply.memory, `stream=${stream}`);
+    assert.equal(finish.p_text, reply.text, `stream=${stream}`); assert.equal(memory, reply.memory, `stream=${stream}`);
   }
 });
 
-test('if the reply is cut off after its sentence, the spoken sentence is saved and the previous memory is kept', async () => {
+test('if the reply is cut off after its sentence, the spoken sentence is saved; a failed call after it keeps the previous summary', async () => {
   const head = JSON.stringify({ text: '좋아, 그 근거는 볼 만해.', memory: '' }).replace(/"memory":""\}$/, '"memory":"사용자는 전환율');
-  let finish;
+  let finish, summary;
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'user-1' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'ina', memory: '이전 기억', capacity: 1, ai_turns: 3 }]);
     if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return result({ error: { code: 'server_error' } }, 500);
     if (url.endsWith('/responses')) return sse([{ type: 'response.output_text.delta', delta: head }, { type: 'response.incomplete', response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' } } }]);
     if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
-    if (url.includes('finish_voice_lounge_host')) { finish = JSON.parse(init.body); return result(true); }
+    if (url.includes('finish_voice_lounge_reply')) { finish = JSON.parse(init.body); return result(true); }
+    if (url.includes('save_voice_lounge_room_memory')) { summary = JSON.parse(init.body); return result(true); }
     throw new Error('Unexpected fetch ' + url);
   }, async () => {
     const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
-    assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+    assert.deepEqual(typesOf(events).filter(type => type !== 'saved'), ['host', 'audio', 'done'], 'a failed call after the reply is not an error for the conversation');
     assert.equal(finish.p_text, '좋아, 그 근거는 볼 만해.');
-    assert.equal(finish.p_memory, '이전 기억');
+    assert.equal(summary, undefined, 'the summary saved before stays');
+  });
+  // A database without the migration saves the reply the old way, keeping the summary.
+  let legacy;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '실패 원인', host_persona: 'ina', memory: '이전 기억', capacity: 1, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '새 요약' });
+    if (url.endsWith('/responses')) return modelAnswer({ text: '좋아, 그 근거는 볼 만해.' });
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([0, 1]));
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result({ code: 'PGRST202' }, 404);
+    if (url.includes('finish_voice_lounge_host')) { legacy = JSON.parse(init.body); return result(true); }
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => {
+    const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.ok(typesOf(events).includes('saved'));
+    assert.deepEqual(legacy, { p_room: roomId, p_ticket: 'ticket', p_text: '좋아, 그 근거는 볼 만해.', p_memory: '이전 기억' });
   });
   // A failure before any sentence becomes a stream error, as before.
   await run(async url => {
@@ -1655,10 +1773,33 @@ test('the reply sentence is read from a partial JSON stream only once its string
   assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), undefined, 'another key first waits for the full reply');
 });
 
+test('a reply that runs on past its end with a brace and garbage is cut there, as it streams and when saved', () => {
+  const { replyTextSoFar, replyTextPartial, withoutRunawayTail } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
+  // Seen on 2026-10-23: a curly quote and a brace inside the text, then other scripts.
+  const runaway = '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”}RGCTX}જરાત_final 北京赛车投注 eriwa} William';
+  assert.equal(withoutRunawayTail(runaway), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
+  assert.equal(withoutRunawayTail('그냥 평범한 답.'), '그냥 평범한 답.');
+  assert.equal(replyTextSoFar(JSON.stringify({ text: runaway }).slice(0, -1) + ',"x'), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
+  assert.equal(replyTextPartial(JSON.stringify({ text: runaway }).slice(0, -10)), '*나는 빈손을 들어 보인다.* “문 닫으실 때까지 여기 있겠습니다.”');
+});
+
+test('a chat shows the reply sentence while it is written, decoding escapes and waiting for half-arrived ones', () => {
+  const { replyTextPartial } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
+  assert.equal(replyTextPartial('{"tex'), undefined);
+  assert.equal(replyTextPartial('{"text":"'), '');
+  assert.equal(replyTextPartial('{"text":"*잔을 내려놓으며* 그건 \\"근거\\"'), '*잔을 내려놓으며* 그건 "근거"');
+  assert.equal(replyTextPartial('{"text":"줄바꿈\\'), '줄바꿈', 'a backslash whose letter has not arrived waits');
+  assert.equal(replyTextPartial('{"text":"하트 \\u2764'), '하트 ❤');
+  assert.equal(replyTextPartial('{"text":"하트 \\u27'), '하트 ', 'a half-arrived \\u escape waits');
+  assert.equal(replyTextPartial('{"text":"다 썼어.","memory":"'), '다 썼어.', 'stops at the end of the sentence');
+  assert.equal(replyTextPartial('{"memory":"먼저","text":"나중"'), undefined);
+});
+
 test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
-  const originalTimeout = AbortSignal.timeout;
+  // A request's deadline is the last timer set before its fetch.
+  const originalSetTimeout = globalThis.setTimeout;
   const deadlines = [];
-  AbortSignal.timeout = milliseconds => { const controller = new AbortController(); deadlines.push({ milliseconds, controller }); return controller.signal; };
+  globalThis.setTimeout = (callback, milliseconds, ...args) => { deadlines.push({ milliseconds }); return originalSetTimeout(callback, milliseconds, ...args); };
   const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 600);
   const spokenInputs = [];
   try {
@@ -1685,7 +1826,353 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
       const bytes = events.filter(event => event.type === 'audio').reduce((size, event) => size + Buffer.from(event.audio, 'base64').length, 0);
       assert.equal(bytes, 4_194_304, 'more than the former 3MB cap');
     });
-  } finally { AbortSignal.timeout = originalTimeout; }
+  } finally { globalThis.setTimeout = originalSetTimeout; }
+});
+
+test('a one-to-one room is a chat until its voice is turned on; *actions* are shown, never read aloud', () => {
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null, voice_on: false }), true);
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null, voice_on: true }), false);
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: null }), false, 'a room from before the chat migration keeps its voice');
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 4, space_id: null, voice_on: false }), false, 'rooms with other people use voice');
+  assert.equal(lounge.isLoungeChatRoom({ capacity: 1, space_id: 'rooftop', voice_on: false }), false, 'a space table uses voice');
+  assert.deepEqual(lounge.splitLoungeActions('*잔을 내려놓으며* 그래서, 결론은요?'), [{ action: true, text: '잔을 내려놓으며' }, { action: false, text: ' 그래서, 결론은요?' }]);
+  assert.deepEqual(lounge.splitLoungeActions('별표 *하나만 있으면 그대로'), [{ action: false, text: '별표 *하나만 있으면 그대로' }]);
+  assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
+  assert.equal(lounge.loungeSpokenText('*조용히 웃는다*'), '');
+  assert.equal(lounge.loungeSpokenText("*'…생각보다 재밌잖아.'* 좋아요."), '좋아요.', 'a thought is not read aloud either');
+  // Every voice plays out the feeling in the words, in its own character.
+  assert.ok(lounge.loungeSpeechRequest('velvet', '와, 진짜요?', 'pcm').instructions.includes(lounge.loungeSpeechExpression));
+  assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
+});
+
+const chatTurn = async ({ voiceOn, replyText, photo, anonymous = false }) => {
+  const spoken = [];
+  let input, instructions, schema, events, after, summary;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host', is_anonymous: anonymous });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 2 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '영화 이야기를 했다.', ...(photo ?? {}) }); }
+    if (url.endsWith('/responses')) { const body = JSON.parse(init.body); ({ instructions } = body); schema = body.text.format.schema; input = JSON.parse(body.input); return modelAnswer({ text: replyText }); }
+    if (url.includes('finish_voice_lounge_reply')) return result(true);
+    if (url.includes('save_voice_lounge_room_memory')) { summary = JSON.parse(init.body); return result(true); }
+    if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+  });
+  return { spoken, input, instructions, schema, events, after, summary };
+};
+
+test('a member\'s character speaks as itself, with its own relationship type; an uploaded portrait sends no photos', async () => {
+  const id = `c_${'c'.repeat(32)}`;
+  const sheet = { name: '한지안', age: 31, gender: 'female', job: '새벽 라디오 PD', concept: '', role: '새벽 음악 방송을 만든다', tagline: '사연을 끝까지 듣는 새벽 라디오 PD',
+    story: ['대학 방송국에서 처음 마이크를 잡았다.', '첫 생방송에서 사연을 잘못 읽은 적이 있다.'], personality: [{ label: '강점', text: '끝까지 듣는다' }, { label: '약점', text: '자기 이야기를 안 한다' }, { label: '모순', text: '귀찮아하면서 사연을 기다린다' }],
+    habits: ['짧게 웃고 말한다.', '노래 제목을 붙여 준다.'], look: '검은 단발과 회색 니트', boundaries: ['빈말로 칭찬하지 않는다.', '모욕하지 않는다.'], greeting: '이 시간에 깨어 있네요.' };
+  for (const portraitSource of ['ai', 'upload']) {
+    let body, after;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('lounge_custom_characters?id=eq.')) return result([{ id, owner_id: 'user-1', name: '한지안', status: 'private', sheet, template: 'slow_burn', flirtation: true, voice: 'low_female', theme: 'river', portrait_path: `${id}/p.webp`, portrait_source: portraitSource, review_note: '' }]);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유', host_persona: id, memory: '', capacity: 1, space_id: null, voice_on: false }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '', events: [], ...(after.text.format.schema.properties.photo ? { photo: '', photo_asked: false } : {}) }); }
+      if (url.endsWith('/responses')) { body = JSON.parse(init.body); return modelAnswer({ text: '반가워요.' }); }
+      if (url.includes('finish_voice_lounge_reply')) return result(true);
+      if (url.includes('save_voice_lounge_relationship')) return result(1);
+      return result([]);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'opening', stream: true }));
+      assert.equal(response.status, 200);
+      await response.text();
+    }));
+    assert.match(body.instructions, /너는 한지안이다/);
+    assert.match(body.instructions, /사연을 끝까지 듣는 새벽 라디오 PD/);
+    assert.equal(JSON.parse(body.input).relationship.stage.id, 'DISMISSIVE', 'the slow-burn type starts at a distance');
+    assert.equal(Boolean(after.text.format.schema.properties.photo), portraitSource === 'ai');
+    assert.equal(JSON.parse(body.input).photos, portraitSource === 'ai', 'the reply knows whether it can send a photo');
+  }
+});
+
+test('the deep model reasons in a chat; a voice reply and the fast model do not', async () => {
+  for (const [aiModel, voiceOn, effort] of [['gpt-reasoning', false, 'medium'], ['gpt-reasoning', true, 'none'], [null, false, 'none']]) {
+    let body, after;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_model: aiModel }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '', ...(voiceOn ? {} : { photo: '', photo_asked: false }) }); }
+      if (url.endsWith('/responses')) { body = JSON.parse(init.body); return modelAnswer({ text: '그렇군요.' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+    assert.equal(body.reasoning.effort, effort, `${aiModel} ${voiceOn ? 'voice' : 'chat'}`);
+    assert.equal(body.max_output_tokens >= 3000, effort !== 'none', 'reasoning gets room in the output limit');
+    // Nobody waits for the call after the reply, so it reasons a little whichever model answers.
+    assert.equal(after.reasoning.effort, 'low');
+    // Each kind of request keeps to one cache.
+    assert.equal(body.prompt_cache_key, 'lounge-ina'); assert.equal(after.prompt_cache_key, 'lounge-after-reply');
+  }
+});
+
+test('a deep reply that writes nothing in time is answered by the fast model; a failed turn gives its claim back at once', async () => {
+  process.env.LOUNGE_REPLY_STALL_MS = '80';
+  const room = [{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: false, ai_model: 'gpt-reasoning', ai_turns: 2 }];
+  try {
+    const sent = []; let events, released;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result(room);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+      if (url.endsWith('/responses')) {
+        const body = JSON.parse(init.body); sent.push(body);
+        // The deep reply keeps thinking and writes nothing; only the abort ends it.
+        if (body.reasoning.effort === 'medium') return new Response(new ReadableStream({ start(controller) { init.signal.addEventListener('abort', () => controller.error(init.signal.reason)); } }), { headers: { 'Content-Type': 'text/event-stream' } });
+        const json = JSON.stringify({ text: '빠르게 답할게요.' });
+        return sse([...deltas(json, 6), { type: 'response.completed', response: { status: 'completed' } }]);
+      }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      if (url.includes('release_voice_lounge_host')) { released = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line)); });
+    assert.deepEqual(sent.map(body => body.reasoning.effort), ['medium', 'none']);
+    assert.equal(sent[1].max_output_tokens, sent[0].max_output_tokens - 2500);
+    assert.equal(events.find(event => event.type === 'host').text, '빠르게 답할게요.');
+    assert.equal(events.at(-1).type, 'done');
+    assert.equal(released, undefined, 'a reply that was saved keeps its claim until it is finished');
+    // A reply that fails before anything is saved gives the turn back, so the next message is answered right away.
+    let failedEvents;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result(room);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses')) return result({ error: { code: 'insufficient_quota', type: 'insufficient_quota' } }, 429);
+      if (url.includes('release_voice_lounge_host')) { released = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { failedEvents = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line)); });
+    assert.equal(failedEvents[0].type, 'error');
+    assert.deepEqual(released, { p_room: roomId, p_ticket: 'ticket' });
+  } finally { delete process.env.LOUNGE_REPLY_STALL_MS; }
+});
+
+test('a room set to Gemini sends the same instructions and JSON shape there; if Gemini fails, GPT answers', async () => {
+  const savedKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = 'gemini-key';
+  const sse = events => new Response(events.map(event => `data: ${JSON.stringify(event)}\r\n\r\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
+  try {
+    for (const geminiWorks of [true, false]) {
+      let geminiBody, openaiCalled = false;
+      const events = [];
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: false, ai_model: 'gemini-flash' }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+        if (url.includes(':streamGenerateContent')) {
+          assert.match(url, /models\/gemini-3\.8-flash:streamGenerateContent\?alt=sse/); assert.equal(init.headers['x-goog-api-key'], 'gemini-key');
+          geminiBody = JSON.parse(init.body);
+          if (!geminiWorks) return result({ error: { code: 503 } }, 503);
+          return sse([
+            { candidates: [{ content: { parts: [{ text: '{"text": "*컵을 내려놓으며* 그 장면, ' }] } }] },
+            { candidates: [{ content: { parts: [{ text: '저도 오래 남았어요."}' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 9000, candidatesTokenCount: 60, cachedContentTokenCount: 8800 } },
+          ]);
+        }
+        // The call after the reply is always GPT: it is cheap with its cache, and nobody waits for it.
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', photo: '없음', photo_asked: false });
+        if (url.endsWith('/responses')) { openaiCalled = true; return modelAnswer({ text: 'GPT가 대신 답해요.' }); }
+        if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+        throw new Error(`Unexpected ${url}`);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+        events.push(...(await response.text()).trim().split('\n').map(line => JSON.parse(line)));
+      });
+      assert.equal(geminiBody.generationConfig.responseMimeType, 'application/json');
+      assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'text', 'the same JSON shape, text first');
+      assert.match(geminiBody.systemInstruction.parts[0].text, /reply_medium=chat이면/, 'the same instructions');
+      assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
+      if (geminiWorks) {
+        assert.equal(openaiCalled, false);
+        // The sentence goes out while it is written, then whole.
+        assert.deepEqual(events.filter(event => event.type === 'text').map(event => event.text), ['*컵을 내려놓으며* 그 장면, ']);
+        assert.deepEqual(events.filter(event => event.type !== 'text').map(event => event.type), ['host', 'saved', 'done'], '"없음" is not a photo');
+        assert.equal(events.find(event => event.type === 'host').text, '*컵을 내려놓으며* 그 장면, 저도 오래 남았어요.');
+      } else {
+        assert.equal(openaiCalled, true, 'GPT answers when Gemini fails');
+        assert.equal(events[0].text, 'GPT가 대신 답해요.');
+      }
+    }
+  } finally { if (savedKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = savedKey; }
+});
+
+test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
+  const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
+  // The reply shows the photo being sent; the call after it writes the scene from that.
+  assert.deepEqual(asked.schema.required, ['text']);
+  assert.equal(asked.input.photos, true);
+  assert.match(asked.instructions, /사진은 채팅에서 photos=true일 때만 보낼 수 있다/);
+  assert.deepEqual(asked.after.text.format.schema.required.slice(-2), ['photo', 'photo_asked']);
+  assert.match(asked.after.instructions, /photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만/);
+  assert.deepEqual(typesOf(asked.events), ['host', 'saved', 'photo', 'done']);
+  assert.deepEqual(asked.events[2], { type: 'photo', scene: '작업실 창가에서 야경을 등지고 찍은 셀카', asked: true });
+  const none = await chatTurn({ voiceOn: false, replyText: '그래서요?', photo: { photo: '', photo_asked: false } });
+  assert.deepEqual(typesOf(none.events), ['host', 'saved', 'done']);
+  // A guest's character does not offer photos, and a voice reply has no photo either.
+  for (const turn of [await chatTurn({ voiceOn: false, replyText: '그래서요?', anonymous: true }), await chatTurn({ voiceOn: true, replyText: '그래서요?' })]) {
+    assert.equal(turn.after.text.format.schema.properties.photo, undefined);
+    assert.notEqual(turn.input.photos, true);
+    assert.equal(turn.events.some(event => event.type === 'photo'), false);
+  }
+});
+
+test('a chat started from a story is told as a story; with the voice on it stays in the story under the voice rules', async () => {
+  const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '선우령이 연출한 전시의 오프닝 파티. 당신은 이 전시를 혹평한 평론가다.', user_role: '전시를 혹평한 미술 평론가', relationship: '서로를 의식하는 앙숙', place: '갤러리 홀' };
+  for (const voiceOn of [false, true]) {
+    let reply, after;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '혹평의 밤', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 1, scenario }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 갤러리 홀, 대담 직전' }); }
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*샴페인 잔이 부딪친다* 오셨네요, 평론가님.' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'opening', stream: true }))).text(); });
+    assert.deepEqual(JSON.parse(reply.input).scenario, scenario, 'the story and the role of the member reach the model');
+    if (!voiceOn) {
+      assert.match(reply.instructions, /채팅으로 진행되는 롤플레이 소설이다/);
+      assert.match(reply.instructions, /reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다/);
+      assert.match(reply.instructions, /scenario.relationship에서 시작하고, relationship\(stage, outing, intimacy\)은 그 위에서 마음을 얼마나 열고 스킨십을 어디까지 받아들일지 정한다/);
+      // What the first try showed: the same paragraph order, the same prop, too little dialogue, every advance turned aside.
+      assert.match(reply.instructions, /답의 모양을 매번 바꾼다/);
+      assert.match(reply.instructions, /시그니처 동작\(예: 손목시계, 잔\)은 한 대화에서 많아야 두 번/);
+      assert.match(reply.instructions, /대사가 답의 절반 가까이 되게 하고/);
+      assert.match(reply.instructions, /매번 말로 비켜 가지 않는다/);
+      assert.match(reply.instructions, /질문으로 끝내지 않는다/);
+      // Narration in plain style, dialogue spoken the way a person would in that moment.
+      assert.match(reply.instructions, /'나는 ~한다'처럼 평서체로 쓰고 존댓말로 쓰지 않는다/);
+      assert.match(reply.instructions, /안내문이나 상담하는 말투/);
+      assert.doesNotMatch(reply.instructions, /채팅의 대사는 지문을 빼고 최소 5문장/, 'the conversation rules are left out');
+      assert.doesNotMatch(reply.instructions, /이거냐 저거냐/);
+      assert.ok(reply.max_output_tokens >= 2200, 'a story reply has room for its length');
+      assert.match(after.instructions, /'줄거리: 지금까지 일어난 일/, 'the summary keeps the plot');
+      assert.deepEqual(JSON.parse(after.input).scenario, scenario);
+    } else {
+      assert.doesNotMatch(reply.instructions, /롤플레이 소설이다/);
+      assert.match(reply.instructions, /scenario가 있으면 이 대화는 그 이야기 속 장면이다/);
+    }
+  }
+});
+
+test('a story keeps the real memories of the member out and does not save what happens in it as facts about them', async () => {
+  const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다. 오늘 밤 둘이 같은 무대에 선다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
+  let reply, after;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_memories?')) return result(memoryRows);
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null, scenario })]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '오늘 무대 꽤 멋있던데.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
+    if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 무대', events: [] }); }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*마이크를 내린다* 그래요?' }); }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship')) return result(true);
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  const relationshipContext = JSON.parse(reply.input).relationship;
+  assert.ok(relationshipContext.stage, 'the relationship still shapes the story');
+  assert.equal(relationshipContext.user_memories, undefined);
+  assert.equal(relationshipContext.opening_follow_up, undefined);
+  assert.equal(after.text.format.schema.properties.memory_ops, undefined, 'nothing from the story is saved as a fact about the member');
+  assert.ok(after.text.format.schema.properties.events, 'relationship events are still classified');
+  assert.match(reply.instructions, /답의 마지막 문장은 물음표로 끝나지 않는다/);
+});
+
+test('a chat reply is text only and the model is told it is a chat', async () => {
+  const { spoken, input, instructions, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
+  assert.equal(input.reply_medium, 'chat');
+  // Almost every chat reply has an action, and it is a reaction to what the member just said or did, never a prop
+  // touched for its own sake or the same gesture again; the member's actions and thoughts are read from context.
+  assert.match(instructions, /거의 모든 답에 별표로 감싼 지문을 1~2개 넣는다. 지문은 방금 상대가 한 말이나 행동에 대한 네 반응이다/);
+  assert.match(instructions, /상대가 행동을 썼으면 그 행동에 몸으로 반응한다/);
+  assert.match(instructions, /반응 없이 소품만 만지거나 바라보는 동작\(잔·시계 만지기, 창밖 보기\)은 지문으로 쓰지 않는다/);
+  assert.match(instructions, /recent에서 네 최근 두 답에 쓴 동작·소품·표정은 다시 쓰지 않는다/);
+  // Reactions are big but stay in character; voice replies react in words instead of stage directions.
+  assert.match(instructions, /반응을 미지근하게 하지 않는다/);
+  assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
+  assert.match(instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
+  assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
+  assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
+  // Going somewhere or doing something together follows the relationship; accepted, it is played out as a scene, and
+  // a refusal is the character's, never "I am an AI".
+  assert.match(instructions, /받아들일지는 relationship.outing을 따른다/);
+  assert.match(instructions, /거절할 때도 'AI라서 못 한다'/);
+  assert.match(instructions, /받아들이면 이야기 속에서 그 장면으로 함께 옮겨 가/);
+  assert.match(instructions, /상황극은 현실의 만남이 아니므로 이 규칙에 해당하지 않는다/);
+  // The scene in play is kept on the summary's first line, written by the call after the reply and read by the next one.
+  assert.match(after.instructions, /memory 첫 줄에 '지금 장면: '/);
+  assert.match(instructions, /첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다/);
+  assert.equal(summary.p_memory, '영화 이야기를 했다.');
+  assert.deepEqual(spoken, [], 'no speech is made for a chat');
+  assert.deepEqual(typesOf(events), ['host', 'saved', 'done']);
+  assert.equal(events[0].text, '*잔을 내려놓으며* 그래서, 결론은요?');
+});
+
+test('a chat reply may run to 1200 characters; a voice reply keeps the 600-character limit', async () => {
+  const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
+  const chat = await chatTurn({ voiceOn: false, replyText: long });
+  assert.equal(chat.events[0].text.length, 1200);
+  assert.match(chat.instructions, /채팅의 대사는 지문을 빼고 최소 5문장, 보통 5~7문장\(200~450자\)이다. 4문장 이하로 짧게 끝내지 않는다/);
+  // A dry character keeps its tone, not a shorter reply; the one-to-one 140 characters are for voice.
+  assert.match(chat.instructions, /'짧고 건조한 한 문장' 같은 버릇은 문장 하나하나의 호흡과 결을 말하는 것이고 답의 분량이 아니다/);
+  assert.match(chat.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
+  assert.match(chat.instructions, /목소리로 말할 때는 공감 한마디, 내 생각 한 가지, 떠오른 연상이나 가벼운 반응만으로 끝내도 된다/);
+  assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
+  const voice = await chatTurn({ voiceOn: true, replyText: long });
+  assert.equal(voice.events[0].text.length, 600);
+});
+
+test('with the voice on, the reply is spoken without its *actions*', async () => {
+  const { spoken, input, events } = await chatTurn({ voiceOn: true, replyText: '*웃으며* 좋아요, 그렇게 해요.' });
+  assert.equal(input.reply_medium, 'voice');
+  assert.deepEqual(spoken, ['좋아요, 그렇게 해요.']);
+  assert.equal(events.at(-1).type, 'done');
+  assert.ok(events.some(event => event.type === 'audio'));
+});
+
+test('a signal that fires after a request has finished never reaches that request', async () => {
+  const signals = [];
+  const client = new AbortController();
+  await run(async (url, init) => {
+    signals.push(init.signal);
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '좋아요.', memory: '' }) }] }] });
+    if (url.includes('finish_voice_lounge_host')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+    throw new Error('Unexpected fetch');
+  }, async () => {
+    const response = await handler(new Request(request({ action: 'host', roomId, reason: 'followup', stream: true }), { signal: client.signal }));
+    await response.text();
+    // A finished lookup's late timeout or give-up once aborted the reply that was streaming at that moment.
+    client.abort();
+    assert.ok(signals.length > 3);
+    assert.deepEqual(signals.filter(signal => signal.aborted), [], 'a finished request was aborted');
+  });
 });
 
 test('speech still cancels an oversized PCM response with an explicit error code', async () => {
@@ -1719,14 +2206,15 @@ test('a transient TTS failure before the first audio retries the same saved text
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1 }]);
       if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
-      if (url.endsWith('/responses')) { models++; return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '마지막 선택은 어떻게 느꼈어요?', memory: '' }) }] }] }); }
-      if (url.includes('finish_voice_lounge_host')) { saves++; return result(true); }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+      if (url.endsWith('/responses')) { models++; return modelAnswer({ text: '마지막 선택은 어떻게 느꼈어요?' }); }
+      if (url.includes('finish_voice_lounge_reply')) { saves++; return result(true); }
       if (url.endsWith('/audio/speech')) { speech++; inputs.push(JSON.parse(init.body)); return speech === 1 ? firstFailure() : new Response(new Uint8Array([0, 32, 0, 32])); }
       throw new Error('Unexpected fetch');
     }, async () => {
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
-      assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
+      assert.deepEqual(typesOf(events).filter(type => type !== 'saved'), ['host', 'audio', 'done']);
       assert.equal(models, 1); assert.equal(saves, 1); assert.equal(speech, 2);
       assert.deepEqual(inputs[0], inputs[1], 'TTS recovery must preserve text, voice and persona');
     });
@@ -1936,6 +2424,15 @@ test('NDJSON, PCM byte boundaries, scheduled playback and cancellation work with
   assert.equal(sources.at(-1).startTime, 1.12, 'rebuffered audio gets a fresh playback lead');
   assert.deepEqual(automation.slice(-4, -2).map(event => event.slice(0, 2)), [['set', 0], ['ramp', 1]], 'a jitter gap fades in without a hard edge');
   assert.ok(Math.abs(automation.at(-3)[2] - 1.128) < 1e-12); delayed.stop();
+});
+
+test('the stream passes on that the reply is saved and skips kinds of events it does not know', async () => {
+  const client = compile('../src/lib/loungeApi.ts', () => ({}));
+  const streaming = compile('../src/lib/loungeStream.ts', () => client);
+  const lines = [{ type: 'host', text: '네', timings: {} }, { type: 'saved', saveMs: 80 }, { type: 'from_a_newer_server' }, { type: 'done' }].map(event => JSON.stringify(event) + '\n').join('');
+  const events = []; for await (const event of streaming.readLoungeStream(new Response(lines).body)) events.push(event.type);
+  assert.deepEqual(events, ['host', 'saved', 'done']);
+  await assert.rejects(async () => { for await (const event of streaming.readLoungeStream(new Response('{"text":"no type"}\n').body)) void event; }, error => error.code === 'lounge_invalid_stream');
 });
 
 test('delayed onset packets preserve each first syllable once and join without silence', () => {

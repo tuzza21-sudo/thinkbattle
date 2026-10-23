@@ -33,7 +33,11 @@ const assets = {
       id: character.id, name: character.name, age: character.age, job: character.job, role: character.role,
       tagline: character.tagline, quote: character.quote, traits: profile?.traits ?? [], summary: profile?.summary ?? '',
       voice: host.voiceLabel, greeting: host.greeting,
+      // What the site itself sends to the speech model, so a reel sounds like the character does in a room.
+      tts: { model: 'gpt-4o-mini-tts', voice: host.voice, speed: host.speechSpeed, instructions: `${host.speechInstruction} 입력된 문장만 읽고 설명이나 새로운 문장은 추가하지 않는다. 실제 인물의 목소리를 모방하지 않는다.` },
       images: { portrait: url(host.portrait), fullBody: url(character.fullBody) },
+      // Characters the site voices with Google first (OpenAI is their fallback there).
+      ...(lounge.loungeGeminiSpeech[character.id] ? { geminiTts: { model: lounge.loungeGeminiSpeechModel, voiceName: lounge.loungeGeminiSpeech[character.id].voiceName, instructions: host.speechInstruction } } : {}),
       voiceSample: url(host.voiceSample),
       place: place ? { id: place.id, name: place.name, caption: place.caption, image: url(place.image) } : null,
     };

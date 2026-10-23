@@ -49,6 +49,11 @@ export type RelationshipConfig = {
   adultFlirtation?: boolean;
   /** With `adultFlirtation`: how far this character lets romantic tension show at each stage (stage id to guidance). Sent to the response model beside the stage hint, so the same permission looks different at the first stage and the closest. */
   stageRomance?: Record<string, string>;
+  /**
+   * What the character may tell about itself at each stage (stage id to what opens there). The character tells what the
+   * stages so far have opened and keeps the deeper rest for later, so growing closer opens something new.
+   */
+  stageDisclosure?: Record<string, string>;
   decay?: Partial<Record<string, DecayRule>>;
   maxGainPerTurn?: Partial<Record<string, number>>;
 };
@@ -83,11 +88,22 @@ export type TurnLog = {
 };
 
 export type MetricView = { label: string; score?: number };
+/** What one turn changed, sent to the page as soon as it is saved: what the member did, the scores it moved, a stage change. */
+export type RelationshipChange = {
+  events: Array<{ type: string; label: string; up: boolean }>;
+  delta: Record<string, number>;
+  stage: 'promoted' | 'demoted' | null;
+};
 export type RelationshipView = {
   characterId: string;
   /** What the character remembers about the user, shown to the user. */
   remembered?: Array<{ kind: string; label: string; summary: string; followUp?: string }>;
   macroState: { id: string; label: string };
+  /**
+   * The stage for the chat's status card: its place among the enabled stages (from 0), how many there are, its line,
+   * the next stage's name and how close the scores are to it (0-1; 1 at the last stage).
+   */
+  stage: { index: number; total: number; line: string; next?: string; progress: number };
   metrics: Record<string, MetricView & { name: string }>;
   debug?: {
     scores: Scores;

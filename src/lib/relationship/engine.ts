@@ -1,5 +1,5 @@
-import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventTypes, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
-import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
+import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventLabels, relationshipEventTypes, retiredRelationshipEvents, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
+import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipChange, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
 
 export const relationshipSettings = {
   minConfidence: 0.6,
@@ -214,7 +214,8 @@ export function parseDetectedEvents(value: unknown, ignored?: TurnLog['ignored']
   return value.flatMap(item => {
     if (!item || typeof item !== 'object') return [];
     const { type, confidence, note } = item as Record<string, unknown>;
-    if (!relationshipEventTypes.includes(type as RelationshipEventType)) { ignored?.push({ type: String(type), reason: 'unknown' }); return []; }
+    // A retired event (see `retiredRelationshipEvents`) is no longer counted, even if a model still names it.
+    if (!relationshipEventTypes.includes(type as RelationshipEventType) || retiredRelationshipEvents.includes(type as RelationshipEventType)) { ignored?.push({ type: String(type), reason: 'unknown' }); return []; }
     if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return [];
     return [{ type: type as RelationshipEventType, confidence: Math.min(1, Math.max(0, confidence)), ...(typeof note === 'string' && note.trim() ? { note: note.trim().slice(0, 80) } : {}) }];
   });
@@ -229,21 +230,45 @@ export function metricName(config: RelationshipConfig, metric: string) {
   return config.uniqueMetrics.find(item => item.id === metric)?.name ?? commonNames[metric] ?? metric;
 }
 
-/** Labels for everyone; raw scores and history only when `debug` is requested by a developer. */
+/** How close the scores are to a stage's entry: the mean share of each minimum reached (0-1). */
+function stageProgress(scores: Scores, condition: StageCondition) {
+  const minimums = Object.entries(condition.min ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0);
+  if (!minimums.length) return 1;
+  const share = minimums.reduce((sum, [metric, value]) => sum + Math.min(1, (scores[metric] ?? 0) / value), 0) / minimums.length;
+  return Math.round(share * 100) / 100;
+}
+
+/**
+ * The stage, labels and scores for everyone (the chat shows them as a status card with bars, so a member sees the
+ * relationship grow); mood and history only when `debug` is requested by a developer.
+ */
 export function describeRelationship(record: RelationshipRecord, config: RelationshipConfig, options: { mood?: Mood; debug?: boolean } = {}): RelationshipView {
-  const stage = enabledStages(config).find(item => item.id === record.stage) ?? config.stages[0];
+  const stages = enabledStages(config);
+  const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
+  const index = Math.max(0, stages.indexOf(stage)), next = stages[index + 1];
   return {
     characterId: config.characterId,
     macroState: { id: stage.id, label: stage.label },
+    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter) : 1 },
     metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, {
-      name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]),
-      ...(options.debug ? { score: record.scores[metric] } : {}),
+      name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]), score: record.scores[metric],
     }])),
     ...(options.debug ? { debug: {
       scores: record.scores, mood: options.mood ?? initialMood(config), pending: record.pending,
       recentEvents: record.recentEvents.slice(-10), memories: record.memories, meaningfulTurns: record.meaningfulTurns,
       turnCount: record.turnCount, version: record.version,
     } } : {}),
+  };
+}
+
+/** What a saved turn changed, for the chat to show: each accepted event (rising when it raised scores overall), the scores it moved, a stage change. */
+export function describeTurnChange(log: TurnLog, config: RelationshipConfig): RelationshipChange {
+  const metrics = relationshipMetrics(config);
+  return {
+    events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
+      up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
+    delta: Object.fromEntries(metrics.map(metric => [metric, Math.round(log.delta[metric] ?? 0)] as const).filter(([, value]) => value !== 0)),
+    stage: log.stageChange,
   };
 }
 
@@ -255,10 +280,65 @@ export function speechLevel(config: RelationshipConfig, stageId: string): 'polit
   return from >= 0 && stages.findIndex(item => item.id === stageId) >= from ? 'casual' : 'polite';
 }
 
+/**
+ * Whether the character goes along when the user invites them somewhere or to do something together in the story
+ * (a walk, a trip, a film), by how far the relationship has come: not yet at the first stage, only small things next,
+ * most things later, gladly at the closest. Written here, from the stage's place, so the model does not have to guess.
+ */
+export function relationshipOutingGuidance(index: number, count: number) {
+  if (index <= 0) return '함께 어디를 가거나 무엇을 같이 하자는 상황극 제안은 아직 받아들이지 않는다. 아직 그럴 사이가 아니라는 것을 성격대로 드러내며 거절하거나 미루고(도도하거나 까다로우면 짧게 선을 긋고, 다정하면 아쉬워하며 다음으로 미룬다), 지금 있는 자리에서 대화를 이어 간다. 거절은 이 이야기 속 두 사람의 거리에 대한 것이다. 현실의 약속이나 만남처럼 말하지 않는다(“그런 약속은 받아들이기 어렵다”, “따로 만나는 건 곤란하다” 같은 말은 쓰지 않는다).';
+  if (index >= count - 1) return '함께하는 장면을 기꺼이 받아들여 이어 가고, 분위기가 맞으면 네가 먼저 어디를 가자거나 무엇을 같이 하자고 제안할 수도 있다.';
+  if (index === 1) return '가볍고 짧은 제안(근처를 잠깐 걷기, 차나 술 한 잔, 짧은 영상 하나)은 망설이거나 조건을 걸며 받아들일 수 있다. 여행, 하룻밤, 둘만의 긴 시간처럼 큰 제안은 아직 이르다며 성격대로 거절하거나 미룬다.';
+  return '대부분의 제안을 성격대로 받아들여 장면으로 이어 간다. 그날의 기분이나 성격에 맞지 않는 제안은 거절하거나 다른 것을 제안할 수 있다.';
+}
+
+/**
+ * How far physical closeness may go in the story, by the stage's place: none at the first stage, holding hands and a
+ * light hug at the second, a kiss at the third as the character's personality allows, a night together from the fourth
+ * (told by cutting away, never described). A character without adult flirtation stops at a hug. On 2026-10-23 every
+ * character at its closest stage stopped the member's hand the same way ("천천히", a hand on the wrist) instead.
+ */
+export function relationshipIntimacyGuidance(index: number, adult: boolean) {
+  // On 2026-10-23, at the second stage, a member who was turned aside wrote the kiss as an action and every character went along.
+  const acted = ' 상대가 이 한도를 넘는 스킨십을 말 대신 행동으로 먼저 해도(지문으로 입을 맞추는 등) 그대로 받아들이지 않는다. 고개를 돌리기, 손가락으로 입술을 막기, 몸을 살짝 빼기, 웃으며 어깨를 밀기, 장난으로 받아치기처럼 성격에 맞는 방식 하나로 피하고(늘 같은 방식으로 피하지 않는다), 방금 비켜 간 뒤 또 그러면 서운해하거나 정색한다.';
+  if (index <= 0) return `스킨십은 아직 받아들이지 않는다. 상대가 손을 잡거나 다가오면 성격대로 완곡하게 비켜 가되(웃으며 손을 빼기, 한 걸음 물러나기, 농담으로 넘기기), 싫어서가 아니라 아직 이르다는 여지는 남긴다. 무례한 접촉이면 분명히 선을 긋는다. 사귀자는 말도 아직 이르다며 설레는 여지만 남긴다.${acted}`;
+  if (!adult) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들일 수 있다. 키스나 그 이상은 하지 않고 성격대로 비켜 간다.${acted}`;
+  // Promises made in the story (to date, marry, live together) open with the stages too; real-world ones never do.
+  if (index === 1) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들이거나 먼저 할 수 있다(쑥스러워하거나, 장난스럽게 받거나, 못 이기는 척). 키스나 그 이상은 아직 이르다며 성격대로 완곡하게 비켜 가되 싫지 않은 마음은 내비친다. 사귀자는 말도 아직 이르다며 설레는 여지를 남긴다.${acted}`;
+  if (index === 2) return `손잡기와 포옹은 자연스럽고, 키스도 성격에 따라 받아들이거나 먼저 할 수 있다(조심스러운 성격은 망설이다 응하고, 대담한 성격은 먼저 다가온다). 잠자리는 아직 이르다며 성격대로 미루되 원하는 마음은 숨기지 않는다. 이야기 속에서 사귀자는 말은 성격대로 받아들일 수 있고, 결혼이나 함께 살자는 말은 아직 이르다며 여지를 남긴다.${acted}`;
+  // The scene up to the cut and the morning after are told fully: on 2026-10-23 characters accepted and cut away in a
+  // sentence, or put it off to talk first, and the member asked for more. What happens after the cut is never told.
+  return '키스와 잠자리까지 받아들일 수 있다. 상대가 원하고 분위기가 맞으면 이야기부터 하자며 미루지 않고, 너도 원한다는 것을 성격대로 분명히 드러내며 받아들이거나 먼저 이끈다. '
+    + '잠자리로 가는 장면은 한 문장으로 끊지 않고 충분히 그린다. 깊어지는 키스, 끌어당기고 감싸 안는 손, 맞닿는 체온, 빨라지는 숨과 심장, 귓가에 낮게 하는 고백이나 도발, 침대로 이끄는 움직임, 옷깃이나 단추에 닿는 손끝처럼 설렘과 원하는 마음을 지문과 대사로 적극적으로 보여 준다. '
+    + '성격은 그대로 살린다(도도한 사람은 주도권을 쥐려 하고, 서툰 사람은 떨면서도 솔직하게, 장난스러운 사람은 장난을 섞어서). '
+    + '성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다. 성행위가 시작되는 순간 장면을 끊고(예: 불이 꺼진다, 문이 닫힌다) 시간을 건너뛰어, 그 뒤(새벽, 다음 날 아침)의 여운에서 이어 간다. '
+    + '여운 장면도 다정하고 적극적으로 그린다. 품에 안긴 채 나누는 장난, 어젯밤을 떠올리며 붉어지는 얼굴, 달라진 호칭이나 고백, 한 번 더 붙잡는 손처럼. '
+    + '이야기 속에서 사귀자, 결혼하자, 함께 살자는 말도 성격대로 받아들일 수 있다. 현실에서 만나자는 약속이나 연락처를 주고받는 일은 하지 않는다.';
+}
+
+/**
+ * What the character may tell about itself so far: what each stage up to this one opened (from `stageDisclosure`), and
+ * what the later stages keep, named so the model knows exactly what not to tell yet (only saying that something deeper
+ * remained let 선우령 tell her deepest regret at the first stage). On 2026-10-23 characters told their deepest story to a
+ * stranger at the first stage and had nothing new to tell at the closest.
+ */
+export function relationshipDisclosure(config: RelationshipConfig, index: number) {
+  if (!config.stageDisclosure) return undefined;
+  const stages = enabledStages(config);
+  const layer = (stage: { id: string }) => config.stageDisclosure?.[stage.id];
+  const open = stages.slice(0, index + 1).map(layer).filter((text): text is string => Boolean(text));
+  const kept = stages.slice(index + 1).map(layer).filter((text): text is string => Boolean(text));
+  return { open, kept };
+}
+
 /** Context for the response model. Numbers are given for nuance; the model must not say them. */
 export function relationshipPromptContext(record: RelationshipRecord, config: RelationshipConfig, mood: Mood) {
-  const stage = enabledStages(config).find(item => item.id === record.stage) ?? config.stages[0];
+  const stages = enabledStages(config);
+  const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   return {
+    outing: relationshipOutingGuidance(Math.max(0, stages.indexOf(stage)), stages.length),
+    intimacy: relationshipIntimacyGuidance(Math.max(0, stages.indexOf(stage)), Boolean(config.adultFlirtation)),
+    ...(config.stageDisclosure ? { self_disclosure: relationshipDisclosure(config, Math.max(0, stages.indexOf(stage))) } : {}),
     character_core: config.core,
     speech_level: speechLevel(config, stage.id),
     stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && config.stageRomance?.[stage.id] ? { romance: config.stageRomance[stage.id] } : {}) },

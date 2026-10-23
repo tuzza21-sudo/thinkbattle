@@ -8,7 +8,7 @@ import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
 import { captureMetaClickId, initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
 import { captureFirstTouch, saveFirstTouch } from './lib/attribution';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
-import { SUPER_ADMIN_EMAIL } from './lib/superAdmin';
+import { isSuperAdminUser } from './lib/superAdmin';
 import { applySeo, seoFor } from './lib/seo';
 import {
   clearOAuthCallbackError,
@@ -201,6 +201,8 @@ function App() {
         <Route path="/lounge" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/spaces/:spaceId/:entry" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/create" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/create/:editId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/characters/:characterId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
@@ -215,8 +217,8 @@ function App() {
         <Route path="/simulation/personalize" element={requireAuth(user ? <PersonalTrainingPage user={user} /> : null)} />
         <Route path="/simulation/:missionId" element={requireAuth(user ? <SimulationSessionPage user={user} /> : null)} />
         <Route path="/admin" element={requireAuth(<AdminDashboard />, false)} />
-        <Route path="/super-admin" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <SuperAdminDashboard /> : <Navigate to="/" replace />} />
-        <Route path="/super-admin/lounge-knowledge" element={user?.email.toLowerCase() === SUPER_ADMIN_EMAIL ? <LoungeKnowledgePage /> : <Navigate to="/" replace />} />
+        <Route path="/super-admin" element={isSuperAdminUser(user) ? <SuperAdminDashboard /> : <Navigate to="/" replace />} />
+        <Route path="/super-admin/lounge-knowledge" element={isSuperAdminUser(user) ? <LoungeKnowledgePage /> : <Navigate to="/" replace />} />
       </Routes>
       </Suspense>
 
