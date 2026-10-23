@@ -8,6 +8,7 @@ import {
   type LoungeFriend, type LoungeNote, type LoungePerson, type LoungeProfile,
 } from '../lib/loungeSocial';
 import { useDialog } from '../lib/useDialog';
+import { loungeGroupRoomsEnabled } from '../lib/lounge';
 import './LoungeSocial.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -165,10 +166,10 @@ function FriendRow({ friend, onProfile, onNote, onRemove }: { friend: LoungeFrie
     </button>
     <div className="lounge-friend-status">
       <span className={friend.online ? 'online' : ''}>{friend.online ? '지금 접속 중' : friend.lastSeen ? `마지막 접속 ${loungeSince(friend.lastSeen)}` : '접속 상태 비공개'}</span>
-      {friend.room && <p><Users size={13} aria-hidden="true" /> <b>{friend.room.topic}</b><small>{friend.room.spaceName} · {friend.room.count}/{friend.room.capacity}명</small></p>}
+      {loungeGroupRoomsEnabled && friend.room && <p><Users size={13} aria-hidden="true" /> <b>{friend.room.topic}</b><small>{friend.room.spaceName} · {friend.room.count}/{friend.room.capacity}명</small></p>}
     </div>
     <div className="lounge-friend-actions">
-      {friend.room && (full ? <span className="lounge-friend-full">가득 찼어요</span> : <Link to={`/lounge/spaces/${friend.room.spaceId}/join?table=${encodeURIComponent(friend.room.id)}`} className="primary">함께 대화하기 <ArrowRight size={14} /></Link>)}
+      {loungeGroupRoomsEnabled && friend.room && (full ? <span className="lounge-friend-full">가득 찼어요</span> : <Link to={`/lounge/spaces/${friend.room.spaceId}/join?table=${encodeURIComponent(friend.room.id)}`} className="primary">함께 대화하기 <ArrowRight size={14} /></Link>)}
       <button type="button" onClick={onNote} aria-label={`${friend.nickname}님께 쪽지 보내기`}><MessageSquare size={15} /> 쪽지</button>
       <button type="button" className="quiet" onClick={onRemove} aria-label={`${friend.nickname}님을 친구에서 빼기`}><UserMinus size={15} /></button>
     </div>

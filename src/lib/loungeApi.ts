@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
+import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
 import type { LoungeCharacterPost } from './loungePhotos';
@@ -184,7 +184,7 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
-export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**

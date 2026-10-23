@@ -10,6 +10,10 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
+import { loungeGroupRoomsEnabled } from '../lib/lounge';
+
+/** With group rooms closed there are no open tables to fetch. */
+const noTables = async (): Promise<LoungeOpenTable[]> => [];
 import { currentLoungeWait, setLoungeWaitAhead, startLoungeWait, stopLoungeWait, useLoungeWait } from '../lib/loungeWait';
 import './LoungeSpaces.css';
 
@@ -122,7 +126,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const navigate = useNavigate();
   const location = useLocation();
   const { spaces, failed, retry } = useLoungeSpaces();
-  const rooms = usePolled(listLoungeOpenTables, 15_000);
+  const rooms = usePolled(loungeGroupRoomsEnabled ? listLoungeOpenTables : noTables, 15_000);
   const tables = rooms.value;
   const [creating, setCreating] = useState<{ space?: string; host?: LoungeHostId } | null>(null);
   const selected = loungeCharacters.find(character => character.id === params.get('character'));
@@ -132,7 +136,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   // Places with no open room follow the rooms, each inviting the first room there.
   const quietPlaces = spaces?.filter(space => !tables?.some(table => table.space_id === space.id)) ?? [];
   return <main className="lounge-lobby lounge-home">
-    <section className="lounge-home-section" aria-labelledby="lounge-rooms-title">
+    {loungeGroupRoomsEnabled && <section className="lounge-home-section" aria-labelledby="lounge-rooms-title">
       <header className="lounge-home-intro">
         <div>
           <h1 id="lounge-rooms-title">함께 대화하는 공간</h1>
@@ -148,13 +152,13 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
             <span className="lounge-room-card-body"><strong>아직 열린 대화방이 없어요</strong><small>{getLoungeTheme(space.theme).subtitle}</small><span className="lounge-room-card-open"><Plus size={13} /> 이 장소에서 첫 대화방 열기</span></span>
           </button></li>)}
         </LoungeRow>}
-    </section>
+    </section>}
 
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
-      <header className="lounge-home-subhead with-action">
+      <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
-          <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2>
-          <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>
+          {loungeGroupRoomsEnabled ? <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2> : <h1 id="lounge-cast-title">누구와 이야기할까요?</h1>}
+          <p>{loungeGroupRoomsEnabled ? '대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.' : '캐릭터를 골라 둘만의 이야기를 시작해요. 채팅으로도, 목소리로도 이어 갈 수 있어요.'}</p>
         </div>
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
@@ -166,7 +170,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
               <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
               <span><strong>{character.name}</strong><small>{character.job}</small></span>
             </button>
-            <p className="lounge-cast-count"><Users size={13} aria-hidden="true" /> {tables ? count ? `${count}개 방에서 대화 중` : '지금은 쉬는 중' : '확인 중'}</p>
+            {loungeGroupRoomsEnabled && <p className="lounge-cast-count"><Users size={13} aria-hidden="true" /> {tables ? count ? `${count}개 방에서 대화 중` : '지금은 쉬는 중' : '확인 중'}</p>}
           </li>;
         })}
       </LoungeRow>
@@ -234,14 +238,14 @@ function LoungeCharacterSheet({ character, spaces, tables, onCreate, onClose }: 
         <p className="lounge-sheet-tagline">{character.tagline}</p>
         {profile && <ul className="lounge-sheet-traits">{profile.traits.map(trait => <li key={trait}>{trait}</li>)}</ul>}
         {profile && <p className="lounge-sheet-summary">{profile.summary}</p>}
-        <div className="lounge-sheet-status"><Users size={14} aria-hidden="true" />
+        {loungeGroupRoomsEnabled && <div className="lounge-sheet-status"><Users size={14} aria-hidden="true" />
           <span>{!tables ? '대화방을 확인하고 있어요.' : rooms.length ? `지금 ${rooms.length}개 대화방에서 ${koreanSubject(character.name)} 대화를 돕고 있어요.` : `지금은 ${koreanSubject(character.name)} 함께하는 대화방이 없어요.`}
             {rooms.length > 0 && <ul className="lounge-sheet-rooms">{rooms.slice(0, 3).map(table => <li key={table.id}>
               <Link to={`/lounge/spaces/${table.space_id}/join?table=${encodeURIComponent(table.id)}`}><b>{table.topic ?? '주제 없이 자유롭게'}</b><small>{table.space_name} · {table.present_count}/{table.capacity}명 · 남 {table.male_count} · 여 {table.female_count}</small></Link>
             </li>)}</ul>}</span>
-        </div>
+        </div>}
         <div className="lounge-sheet-actions">
-          <button type="button" className="lounge-sheet-enter" onClick={onCreate}><Plus size={16} /> {koreanWith(character.name)} 대화방 만들기</button>
+          {loungeGroupRoomsEnabled && <button type="button" className="lounge-sheet-enter" onClick={onCreate}><Plus size={16} /> {koreanWith(character.name)} 대화방 만들기</button>}
           {loungeOneToOneStoriesOnly ? <Link className="lounge-sheet-solo" to={loungeStoriesPath(character.id)}><BookOpen size={15} /> 둘만의 이야기</Link>
             : home && <Link className="lounge-sheet-solo" to={`/lounge/spaces/${home.id}/solo?host=${character.id}`}><Swords size={15} /> 둘이서 대화</Link>}
         </div>
@@ -349,7 +353,18 @@ function LoungeCreateRoom({ spaces, initialSpace, initialHost, user, onGuestRequ
 }
 
 /** A place: its rooms with topic, character and people. Visitors choose a room or open one; when every room is full they can wait in line. */
-export function LoungeSpacePage({ spaceId, user, onGuestRequest }: { spaceId: string; user: AppUser | null; onGuestRequest: () => Promise<void> }) {
+export function LoungeSpacePage(props: { spaceId: string; user: AppUser | null; onGuestRequest: () => Promise<void> }) {
+  if (!loungeGroupRoomsEnabled) return <LoungeGroupRoomsClosed />;
+  return <LoungeOpenSpacePage {...props} />;
+}
+
+/** Where a link to a group room ends while they are closed (see `loungeGroupRoomsEnabled`). */
+function LoungeGroupRoomsClosed() {
+  return <main className="lounge-join-gate"><BookOpen size={40} /><h1>지금은 1:1 대화만 열려 있어요</h1><p>여러 사람이 함께하는 대화방은 잠시 쉬어요. 캐릭터를 골라 둘만의 이야기를 시작해 보세요.</p>
+    <Link className="lounge-primary" to="/lounge">캐릭터 고르러 가기 <ArrowRight size={17} /></Link></main>;
+}
+
+function LoungeOpenSpacePage({ spaceId, user, onGuestRequest }: { spaceId: string; user: AppUser | null; onGuestRequest: () => Promise<void> }) {
   const { spaces, failed, retry } = useLoungeSpaces();
   const [tables, setTables] = useState<LoungeSpaceTable[] | null>(null);
   const [creating, setCreating] = useState(false);
@@ -471,6 +486,7 @@ export function LoungeSpaceEntry({ spaceId, entry, user, onGuestRequest, onLogin
     }, err => { if (!cancelled) setError(errorText(err)); });
     return () => { cancelled = true; };
   }, [spaceId, entry, solo, valid, table, topic, host, agesKey, seatCount, nickname, navigate]);
+  if (!solo && !loungeGroupRoomsEnabled) return <LoungeGroupRoomsClosed />;
   if (storiesOnly) return <main className="lounge-join-gate"><BookOpen size={40} /><h1>1:1 대화는 이야기로 시작해요</h1><p>캐릭터의 이야기 하나를 고르면 짧은 프롤로그 뒤에 장면 속에서 대화가 시작돼요.</p>
     <Link className="lounge-primary" to={host ? loungeStoriesPath(host) : '/lounge'}>{host ? '이야기 고르러 가기' : '캐릭터 고르러 가기'} <ArrowRight size={17} /></Link></main>;
   if (!valid) return <main className="lounge-join-gate"><Coffee size={40} /><h1>{entry === 'open' ? '대화 주제와 캐릭터를 먼저 정해 주세요' : '어느 대화방에 앉을지 골라 주세요'}</h1><Link className="lounge-primary" to={`/lounge/spaces/${spaceId}`}>장소 둘러보기 <ArrowRight size={17} /></Link></main>;

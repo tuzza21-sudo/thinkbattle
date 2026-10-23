@@ -1381,22 +1381,22 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   const now = Date.now();
   const room = { status: 'active', capacity: 1, ai_turns: 2, last_ai_at: new Date(now - 6000).toISOString(), started_at: new Date(now - 10_000).toISOString() };
   const messages = [{ id: 1, kind: 'host', created_at: room.last_ai_at }, { id: 2, kind: 'human', created_at: new Date(now - 500).toISOString() }];
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1600, now - 6000, now - 1600, now - 350), 'followup', 'replies 1 s after the user stops and 0.3 s after the transcript');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 1600, now - 6000, now - 1600, now - 150), 'followup', 'replies 0.7 s after the user stops and 0.1 s after the transcript');
   assert.equal(lounge.nextLoungeHostReason({ ...room, capacity: 6 }, messages, now, now - 500, now - 4000), null);
   assert.equal(lounge.nextLoungeHostReason(room, [...messages, { id: 3, kind: 'host', created_at: new Date(now).toISOString() }], now, now - 500, now - 4000), null, 'do not answer the same human twice');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now, now - 4000), null, 'wait until the human finishes');
   assert.equal(lounge.nextLoungeHostReason({ ...room, ai_turns: 120 }, messages, now, now - 500, 0), null);
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 800, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 500, now - 6000, now - 3500, now - 1200), null, 'a short pause is not the end of the turn');
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 1000, now - 1200), null, 'wait after the AI finishes speaking');
-  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 200), null, 'settle after transcription is saved');
-  assert.equal(lounge.loungeSpeechPauseMs(1), 1000);
+  assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 50), null, 'settle after transcription is saved');
+  assert.equal(lounge.loungeSpeechPauseMs(1), 700);
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
   // A chat has no voice to wait out: a message is answered right after the last reply, guarded only against a loop.
   const chat = { ...room, space_id: null, voice_on: false };
   assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 1500, now - 100, now - 50), 'followup');
   assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 500, now - 100, now - 50), null, 'one second between two turns');
   assert.equal(lounge.nextLoungeHostReason({ ...chat, voice_on: true }, messages, now, now - 100, now - 1500, now - 100, now - 50), null, 'with the voice on it waits as before');
-  assert.equal(lounge.loungeHostCooldownMs(1, true), 1000); assert.equal(lounge.loungeHostCooldownMs(1), 5000);
+  assert.equal(lounge.loungeHostCooldownMs(1, true), 1000); assert.equal(lounge.loungeHostCooldownMs(1), 2000);
 });
 
 test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
@@ -2594,6 +2594,90 @@ test('윤지안 (id diplomat) speaks with Gemini through the same PCM stream, an
       });
     } finally { delete process.env.GEMINI_API_KEY; }
   }
+});
+
+test('the member picks the voice engine: ElevenLabs and Typecast speak through the same 24 kHz PCM stream, and OpenAI speaks without a key or a voice', async () => {
+  const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
+  // Typecast streams 32 kHz WAV: 3200 samples become 2400 at 24 kHz.
+  const typecastSamples = 3200, typecastWav = new Uint8Array(44 + typecastSamples * 2), view = new DataView(typecastWav.buffer);
+  'RIFF'.split('').forEach((c, i) => typecastWav[i] = c.charCodeAt(0)); 'WAVEfmt '.split('').forEach((c, i) => typecastWav[8 + i] = c.charCodeAt(0));
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 32000, true); 'data'.split('').forEach((c, i) => typecastWav[36 + i] = c.charCodeAt(0));
+  const scenarios = {
+    'eleven-flash': { env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length, model: 'eleven_flash_v2_5' },
+    'eleven-v3': { env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length, model: 'eleven_v3' },
+    'eleven-flash without a key': { speech: 'eleven-flash', env: {}, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    'typecast without a voice': { speech: 'typecast', env: { TYPECAST_API_KEY: 'tc-key' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    typecast: { env: { TYPECAST_API_KEY: 'tc-key', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 0, typecast: 1, openai: 0, bytes: 2400 * 2 },
+    'an unknown engine': { speech: 'nope', env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+  };
+  for (const [name, scenario] of Object.entries(scenarios)) {
+    const calls = { eleven: 0, typecast: 0, openai: 0 };
+    for (const [key, value] of Object.entries(scenario.env)) process.env[key] = value;
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그건 좀 다르게 찍고 싶네요.' }) }] }] });
+        if (url.startsWith('https://api.elevenlabs.io/')) {
+          calls.eleven++;
+          assert.ok(url.startsWith('https://api.elevenlabs.io/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb/stream?output_format=pcm_24000'), url);
+          assert.equal(init.headers['xi-api-key'], 'el-key');
+          const body = JSON.parse(init.body);
+          assert.equal(body.model_id, scenario.model); assert.equal(body.language_code, 'ko'); assert.equal(body.text, '그건 좀 다르게 찍고 싶네요.');
+          assert.equal('speed' in body.voice_settings, scenario.model === 'eleven_flash_v2_5', 'v3 takes no speed');
+          return new Response(pcm);
+        }
+        if (url.startsWith('https://api.typecast.ai/')) {
+          calls.typecast++;
+          assert.equal(url, 'https://api.typecast.ai/v1/text-to-speech/stream'); assert.equal(init.headers['X-API-KEY'], 'tc-key');
+          const body = JSON.parse(init.body);
+          assert.deepEqual([body.voice_id, body.model, body.language, body.text], ['tc_male_voice', 'ssfm-v30', 'kor', '그건 좀 다르게 찍고 싶네요.']);
+          return new Response(new ReadableStream({ start(controller) { controller.enqueue(typecastWav.subarray(0, 1001)); controller.enqueue(typecastWav.subarray(1001)); controller.close(); } }));
+        }
+        if (url.endsWith('/audio/speech')) { calls.openai++; return new Response(fallback); }
+        if (url.includes('finish_voice_lounge_reply') || url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true, speech: scenario.speech ?? name }));
+        assert.equal(response.status, 200, name);
+        const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.equal(heard.length, scenario.bytes, `${name}: what the listener hears`);
+        assert.deepEqual(calls, { eleven: scenario.eleven, typecast: scenario.typecast, openai: scenario.openai }, name);
+      });
+    } finally { for (const key of Object.keys(scenario.env)) delete process.env[key]; }
+  }
+});
+
+test('a voice reply starts speaking its first sentence while the rest is still being written, and never says it twice', async () => {
+  const reply = { text: '*잔을 내려놓는다* 아, 진짜요? 그럼 내일 같이 가요.' };
+  const json = JSON.stringify(reply), split = json.indexOf('그럼') + 3;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const spoken = [];
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+    // The first sentence arrives, then the reply waits until the first speech request has been made.
+    if (url.endsWith('/responses')) return sse([...deltas(json, split).slice(0, 1), 'gate', deltas(json, split)[1], { type: 'response.completed', response: { status: 'completed' } }], gate);
+    if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); release(); return new Response(new Uint8Array([1, 2, 3, 4])); }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge')) return result(true);
+    throw new Error('Unexpected call ' + url);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(spoken, ['아, 진짜요?', '그럼 내일 같이 가요.'], 'the first sentence, then only what follows it, without the action');
+    assert.equal(events.find(event => event.type === 'host').text, reply.text, 'the whole reply is still saved and shown');
+    assert.equal(events.filter(event => event.type === 'audio').length, 2);
+  });
+  assert.equal(lounge.loungeFirstSpokenSentence('*웃는다* 응. 나도'), '응.');
+  assert.equal(lounge.loungeFirstSpokenSentence('“음…'), undefined, 'not over until more text follows');
+  assert.equal(lounge.loungeFirstSpokenSentence('응. *고개를 끄덕'), undefined, 'an open action is not read');
 });
 
 test('a one-shot reply from 윤지안 comes back as a WAV the browser can decode, and falls back to the OpenAI mp3', async () => {

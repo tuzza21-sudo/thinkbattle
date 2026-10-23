@@ -366,11 +366,122 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  */
 export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = { diplomat: { voiceName: 'Despina' } };
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
-export function loungeGeminiSpeechRequest(hostId: string, input: string) {
+export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
   const host = getLoungeHost(hostId);
   return {
     contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
-    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore' } } } },
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } },
+  };
+}
+
+/**
+ * The speech engines a member can choose for a one-to-one voice conversation (the picker in the room). Every engine
+ * ends up as 24 kHz 16-bit mono PCM, so the browser plays them the same way, and OpenAI speaks whenever the chosen one
+ * cannot (no key, no voice for the character, a failed request).
+ */
+export const loungeSpeechEngines = [
+  { id: 'openai', label: 'OpenAI', description: '안정적인 기본 목소리' },
+  { id: 'gemini', label: 'Gemini', description: '자연스럽고 표현이 풍부한 목소리' },
+  { id: 'eleven-flash', label: 'ElevenLabs Flash', description: '가장 빠른 고품질 목소리' },
+  { id: 'eleven-v3', label: 'ElevenLabs v3', description: '감정 표현이 가장 풍부한 목소리 (조금 느림)' },
+  { id: 'typecast', label: 'Typecast', description: '한국어 감정 연기가 좋은 목소리' },
+] as const;
+export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
+export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
+export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines.find(engine => engine.id === id) ?? loungeSpeechEngines[0];
+/** The engine a character speaks with when the member has not chosen one (윤지안 has spoken with Gemini since before the picker). */
+export const loungeDefaultSpeechEngine = (hostId: string): LoungeSpeechEngine => loungeGeminiSpeech[hostId] ? 'gemini' : 'openai';
+/** Where the browser keeps the engine the member chose. */
+export const loungeSpeechStorageKey = 'lounge.speechEngine';
+/**
+ * Group rooms (the voice tables in places, the lounge's first form) are closed for now (2026-10-23): the lounge is one
+ * to one, a story in a chat or a voice call. Their entrances are hidden and their pages lead to the characters; the
+ * code stays so this one switch can open them again.
+ */
+export const loungeGroupRoomsEnabled = false;
+export const loungeElevenModels = { 'eleven-flash': 'eleven_flash_v2_5', 'eleven-v3': 'eleven_v3' } as const;
+export const loungeTypecastModel = 'ssfm-v30';
+
+// A voice for each character in each engine. A member's character (and anyone missing here) gets the engine's voice
+// for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
+// or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
+// to start with, and Typecast has none until its voices are chosen there.
+const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', lawyer: 'male' };
+const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
+export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
+  gemini: { jaeseok: 'Charon', ina: 'Vindemiatrix', auditor: 'Umbriel', closer: 'Orus', velvet: 'Gacrux', trickster: 'Puck', diplomat: 'Despina', lawyer: 'Algenib', female: 'Kore', male: 'Charon' },
+  eleven: {
+    jaeseok: 'JBFqnCBsd6RMkjVDRZzb', ina: 'XrExE9yKIg1WjnnlVkGX', auditor: 'TX3LPaxmHKxFdv7VOQHJ', closer: 'nPczCjzI2devNBz1zQrb', velvet: 'XB0fDUnXU5powFXDhCwa',
+    trickster: 'IKne3meq5aSn9XLyUdCD', diplomat: 'cgSgspJ2msm6clMCkdW9', lawyer: 'onwK4e9ZLuTAKqWW03F9', female: 'EXAVITQu4vr4xnSDxMaL', male: 'cjVigY5qzO86Huf0OWal',
+  },
+  typecast: {},
+};
+/** The voice of a character in an engine (undefined when the engine has none for it), with LOUNGE_VOICE_IDS overrides. */
+export function loungeEngineVoice(engine: 'gemini' | 'eleven' | 'typecast', hostId: string, overrides?: string) {
+  let extra: Partial<Record<string, Partial<Record<string, string>>>> = {};
+  try { extra = overrides ? JSON.parse(overrides) : {}; } catch { extra = {}; }
+  const voices = { ...loungeEngineVoices[engine], ...(extra[engine] ?? {}) };
+  const gender = houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
+  return voices[hostId] ?? voices[gender];
+}
+/** ElevenLabs: Flash speaks at the character's pace; v3 takes only its own stability steps and no speed. */
+export function loungeElevenSpeechRequest(hostId: string, input: string, engine: 'eleven-flash' | 'eleven-v3') {
+  const host = getLoungeHost(hostId);
+  return engine === 'eleven-v3'
+    ? { text: input, model_id: loungeElevenModels[engine], language_code: 'ko', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }
+    : { text: input, model_id: loungeElevenModels[engine], language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.3, use_speaker_boost: true, speed: Math.min(1.2, Math.max(0.7, host.speechSpeed)) } };
+}
+/** Typecast reads the feeling from the sentence itself ("smart" emotion) at the character's pace. */
+export function loungeTypecastSpeechRequest(hostId: string, voiceId: string, input: string) {
+  const host = getLoungeHost(hostId);
+  return { voice_id: voiceId, text: input, model: loungeTypecastModel, language: 'kor', prompt: { emotion_type: 'smart' }, output: { audio_format: 'wav', audio_tempo: Math.min(2, Math.max(0.5, host.speechSpeed)) } };
+}
+
+/**
+ * 16-bit mono PCM out of a WAV stream at any rate, as 24 kHz: the header (wherever its "data" chunk starts) is dropped,
+ * the rate is read from it, and samples are resampled by linear interpolation across chunk boundaries. A stream with no
+ * RIFF header is taken as raw PCM at `fallbackRate`. Typecast streams 32 kHz WAV; the browser plays 24 kHz.
+ */
+export function createLoungePcmConverter(fallbackRate: number, targetRate = 24_000) {
+  let header: Uint8Array | null = new Uint8Array(0), rate = fallbackRate, odd: number | null = null;
+  let position = 0, previous: number | null = null; // position: the next output sample's place in input samples
+  const resample = (bytes: Uint8Array) => {
+    let data = bytes;
+    if (odd !== null) { const joined = new Uint8Array(bytes.length + 1); joined[0] = odd; joined.set(bytes, 1); data = joined; odd = null; }
+    if (data.length % 2) { odd = data[data.length - 1]; data = data.subarray(0, data.length - 1); }
+    const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+    const input: number[] = previous === null ? [] : [previous];
+    for (let i = 0; i < data.length; i += 2) input.push(view.getInt16(i, true));
+    if (rate === targetRate) { previous = null; return data.slice(); }
+    const step = rate / targetRate, out: number[] = [];
+    // `position` counts from the first sample of `input` (the carried one when there is one).
+    while (position + 1 < input.length) {
+      const index = Math.floor(position), fraction = position - index;
+      out.push(Math.round(input[index] + (input[index + 1] - input[index]) * fraction));
+      position += step;
+    }
+    const consumed = Math.max(0, input.length - 1);
+    position -= consumed; previous = input.length ? input[input.length - 1] : previous;
+    const result = new Uint8Array(out.length * 2), writer = new DataView(result.buffer);
+    out.forEach((sample, i) => writer.setInt16(i * 2, Math.max(-32768, Math.min(32767, sample)), true));
+    return result;
+  };
+  return (chunk: Uint8Array): Uint8Array => {
+    if (header === null) return resample(chunk);
+    const joined = new Uint8Array(header.length + chunk.length); joined.set(header); joined.set(chunk, header.length);
+    if (joined.length < 12) { header = joined; return new Uint8Array(0); }
+    const text = (at: number) => String.fromCharCode(...joined.subarray(at, at + 4));
+    if (text(0) !== 'RIFF') { header = null; return resample(joined); }
+    // Walk the chunks after "WAVE" to the "data" one; "fmt " gives the rate.
+    let at = 12;
+    while (at + 8 <= joined.length) {
+      const id = text(at), size = new DataView(joined.buffer, joined.byteOffset + at + 4, 4).getUint32(0, true);
+      if (id === 'fmt ' && at + 16 <= joined.length) rate = new DataView(joined.buffer, joined.byteOffset + at + 12, 4).getUint32(0, true);
+      if (id === 'data') { header = null; return resample(joined.subarray(at + 8)); }
+      if (at + 8 + size > joined.length) break;
+      at += 8 + size;
+    }
+    header = joined; return new Uint8Array(0);
   };
 }
 
@@ -416,6 +527,18 @@ export function splitLoungeActions(text: string): Array<{ action: boolean; text:
 }
 
 /** What the voice reads aloud: the words only, without `*actions*`. */
+/**
+ * The first complete spoken sentence of a reply still being written, or undefined while there is none yet: the words
+ * outside *actions* (an action still open is left out) up to the first sentence end that more text has followed, so
+ * the sentence is known to be over. A voice reply starts speaking it before the rest is written.
+ */
+export function loungeFirstSpokenSentence(partial: string) {
+  const open = (partial.match(/\*/g) ?? []).length % 2 === 1;
+  const settled = open ? partial.slice(0, partial.lastIndexOf('*')) : partial;
+  const spoken = loungeSpokenText(settled);
+  const match = /^(.*?[.!?…~][.!?…~"”’'」)]*)\s+\S/.exec(spoken);
+  return match && match[1].replace(/[\s"“”'‘’]/g, '').length >= 2 ? match[1].trim() : undefined;
+}
 export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */
@@ -432,15 +555,17 @@ export const loungeMinimumParticipants = (capacity: number) => capacity === 1 ? 
 /**
  * The least time between two AI turns. A chat answers each message as it comes: its reply is saved before the next
  * turn starts, so it needs only a short guard against a loop; the 5 seconds made quick replies wait (2026-10-21).
+ * A one-to-one voice room keeps 2 seconds (the database keeps the same, 20261110000000), down from 5: a short reply
+ * held the next answer back after the member had already spoken (2026-10-23).
  */
-export const loungeHostCooldownMs = (capacity: number, chat = false) => chat ? 1000 : capacity === 1 ? 5000 : 10_000;
+export const loungeHostCooldownMs = (capacity: number, chat = false) => chat ? 1000 : capacity === 1 ? 2000 : 10_000;
 /**
- * One-to-one pacing. A 1-second pause ends the user's turn (people can talk over the AI to
- * take it back), the reply starts 0.3 seconds after the transcript is saved, and the AI may
- * answer again 1.5 seconds after it stopped speaking. The pause was 1.5 seconds; it was the largest
- * fixed part of the wait before the AI answered, and group rooms already use 0.95 seconds.
+ * One-to-one pacing. A 0.7-second pause ends the user's turn (people can talk over the AI to
+ * take it back), the reply starts 0.1 seconds after the transcript is saved, and the AI may
+ * answer again 1.5 seconds after it stopped speaking. The pause was 1.5 seconds, then 1; it is the largest
+ * fixed part of the wait before the AI answers, and about what a pause ends a turn on a phone call.
  */
-export const loungeSoloTiming = { endOfTurnMs: 1000, settleAfterTranscriptMs: 300, afterAiMs: 1500, pollMs: 150 } as const;
+export const loungeSoloTiming = { endOfTurnMs: 700, settleAfterTranscriptMs: 100, afterAiMs: 1500, pollMs: 150 } as const;
 /**
  * One recorded clip of a person speaking. A clip ends after `maxMs` or `maxBytes`, whichever comes first, and the
  * upload (base64 in a JSON body, 1.5 MB limit on the server) never sees a clip larger than 1.5 x `maxBytes`.
