@@ -875,6 +875,9 @@
 .lounge-model-menu strong { font-size:13px; font-weight:700; }
 .lounge-model-menu small { font-size:11px; line-height:1.45; color:#fff5e8b3; }
 .lounge-model-check { color:var(--lounge-accent); }
+.lounge-model-menu small.lounge-model-note { color:var(--lounge-accent); font-weight:600; }
+.has-room .lounge-room-controls .lounge-model-menu button:disabled { opacity:.5; cursor:not-allowed; }
+.has-room .lounge-room-controls .lounge-model-menu button:disabled:hover { background:transparent; }
 
 /* a one-to-one room, chat or voice, reads like a messenger: the conversation and the message box form one column in
    the middle, and every button under the box has the size of the microphone button */

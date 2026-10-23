@@ -235,6 +235,9 @@ export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean
 /** Puts text into the conversation as the member's own turn, like a spoken one. */
 export const postLoungeText = (roomId: string, text: string) => loungeRpc<void>('post_voice_lounge_message', { p_room: roomId, p_text: text.trim().slice(0, 1200) });
 export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'topics', roomId }) as Promise<{ topics?: string[]; skipped?: boolean }>;
+/** What a member has left in each premium voice engine this month (characters), from the server. */
+export type LoungeSpeechUsage = Record<string, { available: boolean; member: boolean; allowed: boolean; used: number; left: number; limit: number; unavailable?: boolean; reason?: 'member' | 'total' }>;
+export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage }>;
 export const loadLoungeRelationship = (roomId: string) => apiRequest({ action: 'relationship', roomId }) as Promise<{ enabled: boolean; relationship?: RelationshipView }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {
