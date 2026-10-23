@@ -9,7 +9,7 @@ import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, lo
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -687,10 +687,12 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId)), relationshipConfig, now);
       return { config: relationshipConfig, record, mood: moodFromRoom(relationshipConfig, room.ai_mood), now };
     })() : undefined;
-    // A story is fiction: the member's real long-term memories are not mixed into it, and what happens in it is not
-    // saved as facts about them (on 2026-10-22 a story's opening asked about a real jazz concert). The relationship and
-    // the room's summary (the plot) still carry on.
-    const memoryRows = relationship && !scenario ? await memoryRowsRead : null;
+    // A story is fiction, but the member is a real person playing a role: the character knows what they said about
+    // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
+    // happens in it. The real world is not brought into the story: no follow-up of a real plan as its opening, and no
+    // summary of a conversation outside it (on 2026-10-22 a story's opening asked about a real jazz concert). The plot
+    // is carried by the room's own summary.
+    const memoryRows = relationship ? await memoryRowsRead : null;
     // How close each of the user's memories of this character is to what was just said, from the same embedding as the
     // knowledge lookup. Without it (no embedding yet, or too slow) memories are chosen by importance as before.
     const relevanceStarted = performance.now();
@@ -704,11 +706,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const relevance = relevanceRead ? await withinLookupWait(relevanceRead) : undefined;
     if (relevanceRead) console.info('[Lounge memory relevance]', JSON.stringify({ character: relationship?.config.characterId, scored: relevance?.size ?? 0, ms: Math.round(performance.now() - relevanceStarted) }));
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance) : undefined;
-    const previousSession = relationship && longMemory ? previousSessionSummary((await previousRoomsRead) ?? [], relationship.config.characterId, room.ai_turns ?? 0, relationship.now) : undefined;
+    const previousSession = relationship && longMemory && !scenario ? previousSessionSummary((await previousRoomsRead) ?? [], relationship.config.characterId, room.ai_turns ?? 0, relationship.now) : undefined;
     // A new conversation opens with the most overdue unfinished story instead of the room topic.
     // Long-term memories are recorded only in solo play; at a space table (even alone) they are used, never written.
     const writesMemory = Boolean(longMemory) && !room.space_id;
-    const openingThread = longMemory && body.reason === 'opening' && (room.ai_turns ?? 0) <= 1 ? openingFollowUp(longMemory.forPrompt, longMemory.chosen) : undefined;
+    const openingThread = longMemory && !scenario && body.reason === 'opening' && (room.ai_turns ?? 0) <= 1 ? openingFollowUp(longMemory.forPrompt, longMemory.chosen) : undefined;
     const participantCount = Math.max(1, present.length);
     const mode = solo ? 'solo' : participantCount <= 2 ? 'pair' : 'group';
     const requestKind = body.reason !== 'requested' ? undefined
@@ -873,7 +875,7 @@ ${photoRule}`;
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
         timeAway ? loungeTimeAwayInstruction : '',
-        longMemory ? (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
+        longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         story ? storyInstruction : roleInstruction,
         // A story room with the voice on keeps to the story, in the voice rules.
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',
@@ -899,7 +901,7 @@ character는 캐릭터 이름이다. recent에서 kind=host는 캐릭터의 말,
 memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. ${memoryRules}`,
         scenario ? `scenario가 있으면 이 대화는 이야기이고 memory는 그 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '줄거리: 지금까지 일어난 일(중요한 것부터)', '남은 것: 아직 꺼내지 않은 마음이나 풀리지 않은 일', '다음: 곧 벌어질 일'을 600자 이내로 적는다.` : '',
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
-        relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}` : '',
+        relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}${scenario ? `\n${longMemoryStoryWriteInstructions}` : ''}` : '',
         chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
       ].filter(Boolean).join('\n'),
