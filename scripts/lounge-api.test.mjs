@@ -21,7 +21,8 @@ const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const repliesLib = compile('../src/lib/loungeReplies.ts');
 const modelsLib = compile('../src/lib/loungeModels.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const scenariosLib = compile('../src/lib/loungeScenarios.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -2009,6 +2010,71 @@ test('a chat reply can come with a photo: the scene goes to the browser after th
     assert.notEqual(turn.input.photos, true);
     assert.equal(turn.events.some(event => event.type === 'photo'), false);
   }
+});
+
+test('a chat started from a story is told as a story; with the voice on it stays in the story under the voice rules', async () => {
+  const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '선우령이 연출한 전시의 오프닝 파티. 당신은 이 전시를 혹평한 평론가다.', user_role: '전시를 혹평한 미술 평론가', relationship: '서로를 의식하는 앙숙', place: '갤러리 홀' };
+  for (const voiceOn of [false, true]) {
+    let reply, after;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '혹평의 밤', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 1, scenario }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 갤러리 홀, 대담 직전' }); }
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*샴페인 잔이 부딪친다* 오셨네요, 평론가님.' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'opening', stream: true }))).text(); });
+    assert.deepEqual(JSON.parse(reply.input).scenario, scenario, 'the story and the role of the member reach the model');
+    if (!voiceOn) {
+      assert.match(reply.instructions, /채팅으로 진행되는 롤플레이 소설이다/);
+      assert.match(reply.instructions, /reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다/);
+      assert.match(reply.instructions, /scenario.relationship에서 시작하고, relationship\(stage, outing\)은 그 위에서 마음을 얼마나 여는지만 정한다/);
+      // What the first try showed: the same paragraph order, the same prop, too little dialogue, every advance turned aside.
+      assert.match(reply.instructions, /답의 모양을 매번 바꾼다/);
+      assert.match(reply.instructions, /시그니처 동작\(예: 손목시계, 잔\)은 한 대화에서 많아야 두 번/);
+      assert.match(reply.instructions, /대사가 답의 절반 가까이 되게 하고/);
+      assert.match(reply.instructions, /매번 말로 비켜 가지 않는다/);
+      assert.match(reply.instructions, /질문으로 끝내지 않는다/);
+      assert.doesNotMatch(reply.instructions, /채팅의 대사는 지문을 빼고 최소 5문장/, 'the conversation rules are left out');
+      assert.doesNotMatch(reply.instructions, /이거냐 저거냐/);
+      assert.ok(reply.max_output_tokens >= 2200, 'a story reply has room for its length');
+      assert.match(after.instructions, /'줄거리: 지금까지 일어난 일/, 'the summary keeps the plot');
+      assert.deepEqual(JSON.parse(after.input).scenario, scenario);
+    } else {
+      assert.doesNotMatch(reply.instructions, /롤플레이 소설이다/);
+      assert.match(reply.instructions, /scenario가 있으면 이 대화는 그 이야기 속 장면이다/);
+    }
+  }
+});
+
+test('a story keeps the real memories of the member out and does not save what happens in it as facts about them', async () => {
+  const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다. 오늘 밤 둘이 같은 무대에 선다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
+  let reply, after;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_memories?')) return result(memoryRows);
+    if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+    if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null, scenario })]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '오늘 무대 꽤 멋있던데.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
+    if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 무대', events: [] }); }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*마이크를 내린다* 그래요?' }); }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship')) return result(true);
+    throw new Error('Unexpected fetch ' + url);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  const relationshipContext = JSON.parse(reply.input).relationship;
+  assert.ok(relationshipContext.stage, 'the relationship still shapes the story');
+  assert.equal(relationshipContext.user_memories, undefined);
+  assert.equal(relationshipContext.opening_follow_up, undefined);
+  assert.equal(after.text.format.schema.properties.memory_ops, undefined, 'nothing from the story is saved as a fact about the member');
+  assert.ok(after.text.format.schema.properties.events, 'relationship events are still classified');
+  assert.match(reply.instructions, /답의 마지막 문장은 물음표로 끝나지 않는다/);
 });
 
 test('a chat reply is text only and the model is told it is a chat', async () => {

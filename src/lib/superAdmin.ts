@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { LoungeScenarioRow } from './loungeScenarios';
 import type { LoungeAdminActivity, LoungeAdminConversation, LoungeAdminUser, SuperAdminDashboard, SuperAdminOrganization } from '../types';
 
 export const SUPER_ADMIN_EMAIL = 'piorne@naver.com';
@@ -134,4 +135,24 @@ export const addSuperAdminOrganizationOwner = async (
     p_owner_email: ownerEmail.trim().toLowerCase(),
   });
   if (error) throw new Error(organizationErrorMessage(error.message));
+};
+
+/** Every scenario (hidden ones too), and adding, changing or deleting one. */
+const scenarioError = (error: { message: string }, fallback: string) => new Error(error.message.includes('not authorized') ? '슈퍼 관리자 권한을 확인하지 못했습니다.' : error.message.includes('lounge_scenarios') || error.message.includes('function') ? '시나리오 기능이 아직 준비되지 않았습니다. 20261108000000 마이그레이션을 적용해 주세요.' : fallback);
+export const listLoungeScenariosForAdmin = async (): Promise<LoungeScenarioRow[]> => {
+  const { data, error } = await supabase.rpc('admin_list_lounge_scenarios');
+  if (error) throw scenarioError(error, '시나리오를 불러오지 못했습니다.');
+  return (data ?? []) as LoungeScenarioRow[];
+};
+export const saveLoungeScenario = async (scenario: Omit<LoungeScenarioRow, 'id'> & { id: string | null }) => {
+  const { data, error } = await supabase.rpc('admin_save_lounge_scenario', {
+    p_id: scenario.id, p_character: scenario.character_id, p_title: scenario.title, p_hook: scenario.hook, p_prologue: scenario.prologue,
+    p_user_role: scenario.user_role, p_relationship: scenario.relationship, p_place: scenario.place, p_theme: scenario.theme, p_sort: scenario.sort, p_active: scenario.active,
+  });
+  if (error) throw scenarioError(error, error.message.includes('check') ? '글자 수나 값을 확인해 주세요.' : '시나리오를 저장하지 못했습니다.');
+  return data as string;
+};
+export const deleteLoungeScenario = async (id: string) => {
+  const { error } = await supabase.rpc('admin_delete_lounge_scenario', { p_id: id });
+  if (error) throw scenarioError(error, '시나리오를 지우지 못했습니다.');
 };

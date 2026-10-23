@@ -23,6 +23,7 @@ import { LoungeAdminActivity } from './LoungeAdminActivity';
 import { LoungeBetaLimits } from './LoungeBetaLimits';
 import { LoungeImageLimits } from './LoungeImageLimits';
 import { LoungeCharacterReviews } from './LoungeCharacterReviews';
+import { LoungeScenarioAdmin } from './LoungeScenarioAdmin';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 const simulationCategoryLabel: Record<SuperAdminSimulationSession['categoryId'], string> = {
@@ -38,7 +39,7 @@ const simulationStatusLabel: Record<SuperAdminSimulationSession['status'], strin
   failed: '오류',
 };
 
-type SuperAdminSection = 'topics' | 'organizations' | 'records' | 'simulations' | 'lounge' | 'beta';
+type SuperAdminSection = 'topics' | 'organizations' | 'records' | 'simulations' | 'lounge' | 'beta' | 'scenarios';
 
 const superAdminSections: { id: SuperAdminSection; label: string; description: string }[] = [
   { id: 'topics', label: '토론 주제 관리 페이지', description: '메인 페이지의 최신 핵심 이슈와 섹터별 토론 주제를 관리합니다.' },
@@ -46,6 +47,7 @@ const superAdminSections: { id: SuperAdminSection; label: string; description: s
   { id: 'records', label: '토론 전체 활동 기록', description: '전체 회원의 토론 기록과 AI 평가 보고서를 확인합니다.' },
   { id: 'simulations', label: '페르소나 이용 현황', description: '페르소나 훈련 세션과 대화·평가 결과를 확인합니다.' },
   { id: 'beta', label: '사석 베타 이용 제한', description: '신규 회원의 하루 이용 시간과 제한을 받지 않는 베타테스터를 관리합니다.' },
+  { id: 'scenarios', label: '사석 캐릭터 시나리오', description: '캐릭터와 함께 시작하는 이야기(시나리오)를 추가·수정·숨김·삭제합니다.' },
   { id: 'lounge', label: '사석 회원 활동·대화', description: '사석 회원별 대화방 참여 기록과 대화 내용을 확인합니다. 열람 기록이 남습니다.' },
 ];
 
@@ -174,6 +176,8 @@ export const SuperAdminDashboard = () => {
           {activeSection === 'topics' && <HomepageTopicManager />}
 
           {activeSection === 'lounge' && <LoungeAdminActivity />}
+
+          {activeSection === 'scenarios' && <LoungeScenarioAdmin />}
 
           {activeSection === 'beta' && <><LoungeBetaLimits /><LoungeImageLimits /><LoungeCharacterReviews /></>}
 
