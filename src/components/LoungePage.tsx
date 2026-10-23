@@ -511,6 +511,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const inputReadyAt = useRef(0);
   const hostBlocked = useRef(false);
   const nextHostAttempt = useRef(0);
+  // The member's latest message when an AI turn last failed: a newer one asks again (see hostTurn).
+  const failedAtMessage = useRef(0);
   const lastModeratorRequest = useRef<string | null>(null);
   const audioBlocked = useRef(false);
   const nextAudioAttempt = useRef(0);
@@ -970,6 +972,10 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const requestAt = state.room.moderator_requested_at;
     const newRequest = reason === 'requested' && (!requestAt || requestAt !== lastModeratorRequest.current);
     if (newRequest) { hostBlocked.current = false; audioBlocked.current = false; nextHostAttempt.current = 0; lastModeratorRequest.current = requestAt ?? null; }
+    // One to one, something new from the member asks again at once, even after an error that stopped the AI or set a
+    // wait: on 2026-10-23 one failed reply left a chat unanswered, message after message, until the page was reloaded.
+    const latestHuman = state.messages.filter(message => message.kind === 'human').at(-1)?.id ?? 0;
+    if (state.room.capacity === 1 && (hostBlocked.current || nextHostAttempt.current) && latestHuman > failedAtMessage.current) { hostBlocked.current = false; nextHostAttempt.current = 0; }
     if (hostBlocked.current || Date.now() < nextHostAttempt.current) return;
     busy.current = true; lastAttempt.current = Date.now(); setPending(true);
     const controller = new AbortController(); hostRequest.current = controller;
@@ -1046,6 +1052,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (err instanceof LoungeApiError) {
         hostBlocked.current = !err.retryable;
         nextHostAttempt.current = Date.now() + Math.max(3, err.retryAfterSeconds) * 1000;
+        failedAtMessage.current = current.current.messages.filter(message => message.kind === 'human').at(-1)?.id ?? 0;
       }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.
       const yielded = err instanceof LoungeApiError && err.code === 'lounge_audio_deferred' && reason !== 'requested';
