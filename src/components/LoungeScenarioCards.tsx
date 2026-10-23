@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BookOpen, LoaderCircle, Play } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { listLoungeScenarios, startLoungeScenario } from '../lib/loungeApi';
 import type { LoungeScenarioRow } from '../lib/loungeScenarios';
@@ -14,6 +14,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
  */
 export function LoungeScenarioCards({ characterId, user }: { characterId: string; user: AppUser | null }) {
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const [scenarios, setScenarios] = useState<LoungeScenarioRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -22,6 +23,9 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
     void listLoungeScenarios(characterId).then(rows => { if (!cancelled) setScenarios(rows); });
     return () => { cancelled = true; };
   }, [characterId]);
+  // "둘만의 이야기" links here (#stories): the list appears once loaded, so it is scrolled to then.
+  const listed = scenarios.length > 0;
+  useEffect(() => { if (listed && hash === '#stories') document.getElementById('stories')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [listed, hash]);
   if (!scenarios.length) return null;
   const start = async (id: string) => {
     if (!user) return;
@@ -29,7 +33,7 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
     try { navigate(`/lounge/${await startLoungeScenario(id, user.nickname)}`); }
     catch (err) { setError(errorText(err)); setBusy(null); }
   };
-  return <section className="lounge-character-section lounge-scenarios">
+  return <section id="stories" className="lounge-character-section lounge-scenarios">
     <h2><BookOpen size={18} /> 함께할 이야기</h2>
     <p className="lounge-character-lead">이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
     <div className="lounge-scenario-list">

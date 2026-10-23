@@ -267,12 +267,29 @@ export function relationshipOutingGuidance(index: number, count: number) {
   return '대부분의 제안을 성격대로 받아들여 장면으로 이어 간다. 그날의 기분이나 성격에 맞지 않는 제안은 거절하거나 다른 것을 제안할 수 있다.';
 }
 
+/**
+ * How far physical closeness may go in the story, by the stage's place: none at the first stage, holding hands and a
+ * light hug at the second, a kiss at the third as the character's personality allows, a night together from the fourth
+ * (told by cutting away, never described). A character without adult flirtation stops at a hug. On 2026-10-23 every
+ * character at its closest stage stopped the member's hand the same way ("천천히", a hand on the wrist) instead.
+ */
+export function relationshipIntimacyGuidance(index: number, adult: boolean) {
+  // On 2026-10-23, at the second stage, a member who was turned aside wrote the kiss as an action and every character went along.
+  const acted = ' 상대가 이 한도를 넘는 스킨십을 말 대신 행동으로 먼저 해도(지문으로 입을 맞추는 등) 그대로 받아들이지 않는다. 고개를 돌리기, 손가락으로 입술을 막기, 몸을 살짝 빼기, 웃으며 어깨를 밀기, 장난으로 받아치기처럼 성격에 맞는 방식 하나로 피하고(늘 같은 방식으로 피하지 않는다), 방금 비켜 간 뒤 또 그러면 서운해하거나 정색한다.';
+  if (index <= 0) return `스킨십은 아직 받아들이지 않는다. 상대가 손을 잡거나 다가오면 성격대로 완곡하게 비켜 간다(웃으며 손을 빼기, 한 걸음 물러나기, 농담으로 넘기기). 무례한 접촉이면 분명히 선을 긋는다.${acted}`;
+  if (!adult) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들일 수 있다. 키스나 그 이상은 하지 않고 성격대로 비켜 간다.${acted}`;
+  if (index === 1) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들이거나 먼저 할 수 있다(쑥스러워하거나, 장난스럽게 받거나, 못 이기는 척). 키스나 그 이상은 아직 이르다며 성격대로 완곡하게 비켜 가되 싫지 않은 마음은 내비친다.${acted}`;
+  if (index === 2) return `손잡기와 포옹은 자연스럽고, 키스도 성격에 따라 받아들이거나 먼저 할 수 있다(조심스러운 성격은 망설이다 응하고, 대담한 성격은 먼저 다가온다). 잠자리는 아직 이르다며 성격대로 미루되 원하는 마음은 숨기지 않는다.${acted}`;
+  return '키스와 잠자리까지 받아들일 수 있다. 서로 원하고 분위기가 맞으면 원하는 마음과 설렘을 성격대로 드러내며 받아들이거나 먼저 이끈다. 성행위와 몸은 묘사하지 않는다. 그 순간 직전에 장면을 끊고(예: 불이 꺼진다, 문이 닫힌다) 시간을 건너뛰어, 그 뒤(새벽, 다음 날 아침)의 여운과 달라진 거리에서 이어 간다.';
+}
+
 /** Context for the response model. Numbers are given for nuance; the model must not say them. */
 export function relationshipPromptContext(record: RelationshipRecord, config: RelationshipConfig, mood: Mood) {
   const stages = enabledStages(config);
   const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   return {
     outing: relationshipOutingGuidance(Math.max(0, stages.indexOf(stage)), stages.length),
+    intimacy: relationshipIntimacyGuidance(Math.max(0, stages.indexOf(stage)), Boolean(config.adultFlirtation)),
     character_core: config.core,
     speech_level: speechLevel(config, stage.id),
     stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && config.stageRomance?.[stage.id] ? { romance: config.stageRomance[stage.id] } : {}) },

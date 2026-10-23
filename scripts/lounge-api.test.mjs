@@ -2043,7 +2043,7 @@ test('a chat started from a story is told as a story; with the voice on it stays
     if (!voiceOn) {
       assert.match(reply.instructions, /채팅으로 진행되는 롤플레이 소설이다/);
       assert.match(reply.instructions, /reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다/);
-      assert.match(reply.instructions, /scenario.relationship에서 시작하고, relationship\(stage, outing\)은 그 위에서 마음을 얼마나 여는지만 정한다/);
+      assert.match(reply.instructions, /scenario.relationship에서 시작하고, relationship\(stage, outing, intimacy\)은 그 위에서 마음을 얼마나 열고 스킨십을 어디까지 받아들일지 정한다/);
       // What the first try showed: the same paragraph order, the same prop, too little dialogue, every advance turned aside.
       assert.match(reply.instructions, /답의 모양을 매번 바꾼다/);
       assert.match(reply.instructions, /시그니처 동작\(예: 손목시계, 잔\)은 한 대화에서 많아야 두 번/);
