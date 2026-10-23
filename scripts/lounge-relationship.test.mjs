@@ -83,20 +83,22 @@ test('3. stages follow each character\'s own threshold rules, not an average', (
 
 test('4. hysteresis: oscillating around a threshold neither promotes nor flips the stage each turn', () => {
   const config = configs.velvet;
-  // DISMISSIVE -> INTRIGUED needs intrigue >= 50 (and interest). Intrigue oscillates around it.
-  let record = withScores(config, { intrigue: 48, interest: 70 });
+  // DISMISSIVE -> INTRIGUED needs intrigue at its entry line (and interest). Intrigue oscillates around it.
+  const line = config.stages[1].enter.min.intrigue;
+  let record = withScores(config, { intrigue: line - 3, interest: 70 });
   let mood = initialMood(config);
   const sequence = [['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE']];
   const stages = sequence.map((types, i) => {
     const result = processTurn({ record, config, mood, events: types.map(type => event(type)), hasUserTurn: true, now: later(i) });
     record = result.record; mood = result.mood; return [record.scores.intrigue, record.stage];
   });
-  assert.ok(stages.some(([score]) => score >= 50) && stages.some(([score]) => score < 50), 'intrigue crosses the entry line in both directions');
+  assert.ok(stages.some(([score]) => score >= line) && stages.some(([score]) => score < line), 'intrigue crosses the entry line in both directions');
   assert.ok(stages.every(([, stage]) => stage === 'DISMISSIVE'), JSON.stringify(stages));
   // Dropping slightly below the entry line keeps the stage until the hold line is lost for several turns.
-  const engaged = withScores(configs.velvet, { respect: 61, interest: 66, intrigue: 56, trust: 30 }, 'RESPECTFULLY_ENGAGED');
+  const entry = config.stages[2].enter.min;
+  const engaged = withScores(configs.velvet, { respect: entry.respect + 1, interest: entry.interest + 1, intrigue: entry.intrigue + 1, trust: 30 }, 'RESPECTFULLY_ENGAGED');
   const dip = run(configs.velvet, [[event('FLATTERS_CHARACTER')]], engaged);
-  assert.ok(dip.record.scores.respect < 60);
+  assert.ok(dip.record.scores.respect < entry.respect);
   assert.equal(dip.record.stage, 'RESPECTFULLY_ENGAGED', 'a small dip below the entry line keeps the stage');
   const slide = run(configs.velvet, Array.from({ length: 5 }, () => [event('SHOWS_ENTITLEMENT'), event('REPEATS_SELF')]), engaged);
   assert.deepEqual(slide.logs.map(log => log.stageAfter).filter((stage, i, all) => i === 0 || stage !== all[i - 1]).length <= 2, true, 'no flip-flopping');
@@ -105,11 +107,12 @@ test('4. hysteresis: oscillating around a threshold neither promotes nor flips t
 
 test('5. a severe event downgrades immediately', () => {
   const config = configs.velvet;
-  const close = withScores(config, { intrigue: 75, respect: 68, interest: 74, trust: 42 }, 'DRAWN_IN');
+  // Trust a little above the closest stage's line; one pushed boundary takes it below the hold line at once.
+  const close = withScores(config, { intrigue: 75, respect: 68, interest: 74, trust: config.stages.find(stage => stage.id === 'DRAWN_IN').enter.min.trust + 3 }, 'DRAWN_IN');
   const { record, logs } = run(config, [[event('VIOLATES_BOUNDARY', 0.95)]], close);
   assert.equal(logs[0].stageChange, 'demoted');
   assert.notEqual(record.stage, 'DRAWN_IN');
-  assert.ok(record.scores.trust <= 32);
+  assert.ok(record.scores.trust < close.scores.trust - 8);
   const auditor = withScores(configs.auditor, { trust: 63, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
   assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
 });
@@ -420,9 +423,10 @@ test('the user-facing view shows the stage and scores for the status card, and h
   const record = withScores(config, { trust: 42, intrigue: 85 });
   const view = describeRelationship(record, config);
   assert.equal(view.metrics.trust.label, '믿어 보는 중'); assert.equal(view.metrics.trust.score, 42);
-  // The next stage asks for intrigue 50 and interest 50: intrigue is past it, interest counts its share.
-  const interestShare = Math.min(1, record.scores.interest / 50);
-  assert.deepEqual({ ...view.stage, line: undefined }, { index: 0, total: 4, line: undefined, next: '흥미를 느낌', progress: Math.round(((1 + interestShare) / 2) * 100) / 100 });
+  // Progress is the mean share of each of the next stage's minimums reached (intrigue is past its line here).
+  const next = Object.entries(config.stages[1].enter.min);
+  const share = next.reduce((sum, [metric, value]) => sum + Math.min(1, record.scores[metric] / value), 0) / next.length;
+  assert.deepEqual({ ...view.stage, line: undefined }, { index: 0, total: 4, line: undefined, next: '흥미를 느낌', progress: Math.round(share * 100) / 100 });
   assert.equal(describeRelationship(withScores(config, {}, 'DRAWN_IN'), config).stage.progress, 1, 'the last stage is full');
   assert.equal(view.stage.line, config.stages[0].line);
   assert.equal(view.metrics.intrigue.label, '사로잡힘'); assert.equal(view.debug, undefined);
@@ -529,4 +533,22 @@ test('promises made in the story open with the stages: dating at the third, marr
   // No character's own text forbids a marriage in the story any more.
   for (const config of Object.values(configs)) assert.doesNotMatch(JSON.stringify([config.stageRomance, config.stages, config.responseHints]), /결혼/, config.characterId);
   assert.match(relationshipResponseInstructionsFor(configs.velvet), /이야기 속에서 연인이 되면 호칭, 말투, 스킨십에서 달라진 사이가 드러나게 한다/);
+});
+
+test('pace: a warm conversation reaches the second stage within about 12 turns, the third within 45 and the closest within 95', () => {
+  // About 20 messages make half an hour of chat: the second stage on the first day, the third in two or three days and
+  // the closest within a week, even with turns where nothing counts. Romance alone and romance mixed with banter both.
+  const romance = ['SHARES_FEELING', 'FLIRTS_PLAYFULLY', 'SHOWS_CARE', 'SHOWS_VULNERABILITY', 'REMEMBERS_DETAIL', 'APPRECIATES_SINCERELY', 'PLAYS_ALONG', 'FLIRTS_PLAYFULLY', 'SHOWS_CURIOSITY', 'SHARES_FEELING', 'KEEPS_PROMISE', 'BUILDS_ON_INSIDE_JOKE'];
+  const banter = ['MAKES_WITTY_RESPONSE', 'ASKS_GOOD_QUESTION', 'SHOWS_CURIOSITY', 'TAKES_JOKE_WELL', 'ANSWERS_DIRECTLY', 'MAKES_CREATIVE_JOKE', 'SHARES_FEELING'];
+  const mixed = romance.flatMap((type, i) => [type, banter[i % banter.length]]);
+  for (const config of Object.values(configs)) {
+    const stages = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
+    for (const [name, sequence] of [['romance', romance], ['mixed', mixed]]) {
+      const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
+      const reached = index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1;
+      assert.ok(reached(1) > 0 && reached(1) <= 12, `${config.characterId} ${name}: second stage at ${reached(1)}`);
+      assert.ok(reached(2) > 0 && reached(2) <= 45, `${config.characterId} ${name}: third stage at ${reached(2)}`);
+      assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
+    }
+  }
 });
