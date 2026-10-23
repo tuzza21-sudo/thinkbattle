@@ -814,3 +814,10 @@
 @media (prefers-reduced-motion:reduce) { .lounge-typing-dots i { animation:none; opacity:.7; } }
 /* 16px keeps phones from zooming into the box */
 @media (max-width:760px) { .lounge-chat-composer textarea { font-size:16px; } }
+
+/* a photo the character sent in a chat, the wait while it is made, and the button that asks for one */
+.has-room .lounge-participant-log .lounge-photo-message { gap:6px; }
+.lounge-photo { display:block; width:min(240px,70vw); aspect-ratio:2/3; border-radius:14px; overflow:hidden; border:1px solid #ffffff38; background:#ffffff14; box-shadow:0 10px 28px #0005; }
+.lounge-photo img { display:block; width:100%; height:100%; object-fit:cover; }
+.lounge-photo-pending { display:inline-flex; align-items:center; gap:7px; }
+.has-room .lounge-photo-button small { margin-left:4px; font-size:10px; opacity:.75; }

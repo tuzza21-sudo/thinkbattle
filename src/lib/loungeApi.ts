@@ -2,6 +2,8 @@ import { supabase } from './supabase';
 import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
+import type { LoungeCharacterPost } from './loungePhotos';
+import type { LoungeCustomCharacterRow, LoungeCustomSheet } from './loungeCustomCharacters';
 
 export class LoungeApiError extends Error {
   code: string | undefined;
@@ -184,6 +186,40 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
 export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
+/**
+ * A photo from the character in the member's one-to-one room: `request` when the member asked, `character` when the
+ * character sends one on their own. Takes 20 to 60 seconds. `skipped` means the character's own photos for today are used up.
+ */
+export async function requestLoungePhoto(roomId: string, source: 'request' | 'character', request?: string) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, ...(request ? { request: request.slice(0, 200) } : {}) }) }, '사진 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 10);
+  return payload as { post?: LoungeCharacterPost; left?: number; skipped?: boolean };
+}
+/** A refusal from the character maker, with the fields to fix. */
+export class LoungeCharacterError extends LoungeApiError {
+  problems: Array<{ field: string; message: string }>;
+  constructor(message: string, code: string | undefined, problems: Array<{ field: string; message: string }> = []) { super(message, code, false, 10); this.problems = problems; }
+}
+async function loungeCharacterRequest<T>(body: Record<string, unknown>): Promise<T> {
+  const response = await loungeAuthorizedFetch('/api/lounge-characters', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, '캐릭터 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeCharacterError(typeof payload?.error === 'string' ? payload.error : '요청을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_character_http_${response.status}`, Array.isArray(payload?.problems) ? payload.problems : []);
+  return payload as T;
+}
+/** The AI writes the rest of a character from the member's few lines. Nothing is stored yet. */
+export const draftLoungeCharacter = (basics: Pick<LoungeCustomSheet, 'name' | 'age' | 'gender' | 'job' | 'concept'>) =>
+  loungeCharacterRequest<{ sheet: LoungeCustomSheet }>({ action: 'draft', ...basics });
+export const saveLoungeCharacter = (character: { id?: string; sheet: LoungeCustomSheet; template: string; flirtation: boolean; voice: string; theme: string }) =>
+  loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'save', ...character });
+export const makeLoungeCharacterPortrait = (id: string) => loungeCharacterRequest<{ path: string; url: string }>({ action: 'portrait', id });
+export const chooseLoungeCharacterPortrait = (id: string, path: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'choose', id, path });
+export const uploadLoungeCharacterPortrait = (id: string, image: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'upload', id, image, consent: true });
+/** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
+export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc<string>('start_lounge_custom_chat', { p_character: id, p_nickname: nickname });
+export const setLoungeCustomStatus = (id: string, action: 'submit' | 'private' | 'delete') => loungeRpc<string>('set_lounge_custom_character_status', { p_character: id, p_action: action });
+export type LoungePhotoUsage = { enabled: boolean; daily: number; used: number };
+export const getMyLoungePhotoUsage = () => loungeRpc<LoungePhotoUsage | null>('get_my_lounge_photo_usage', {});
 /** Turns the character's voice on or off in the member's own one-to-one room; off, the talk is a chat. */
 export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean>('set_voice_lounge_voice', { p_room: roomId, p_on: on });
 /** Puts text into the conversation as the member's own turn, like a spoken one. */

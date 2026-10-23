@@ -6,6 +6,8 @@ import { getLoungeHost, getLoungeTheme, isLoungeAgeGroup, loungeHostThemes, loun
 import { enterLoungeTable, leaveLoungeWait, listLoungeOpenTables, listLoungeSpaces, listLoungeSpaceTables, openLoungeTable, startLoungeSolo, waitLoungeSpace } from '../lib/loungeApi';
 import { getLoungeCharacter, koreanSubject, koreanWith, loungeCharacters, type LoungeCharacter } from '../lib/loungeCharacters';
 import { useDialog } from '../lib/useDialog';
+import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrait } from '../lib/loungeCustomClient';
+import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { currentLoungeWait, setLoungeWaitAhead, startLoungeWait, stopLoungeWait, useLoungeWait } from '../lib/loungeWait';
 import './LoungeSpaces.css';
@@ -148,9 +150,12 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     </section>
 
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
-      <header className="lounge-home-subhead">
-        <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2>
-        <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>
+      <header className="lounge-home-subhead with-action">
+        <div>
+          <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2>
+          <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>
+        </div>
+        <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
       <LoungeRow label="캐릭터" className="lounge-cast-row">
         {loungeCharacters.map(character => {
@@ -165,6 +170,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         })}
       </LoungeRow>
     </section>
+    <LoungeMemberCast user={user} />
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
     {selected && <LoungeCharacterSheet key={selected.id} character={selected} spaces={spaces} tables={tables}
       onCreate={() => { closeSheet(); setCreating({ host: selected.id }); }} onClose={closeSheet} />}
@@ -172,6 +178,40 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   </main>;
 }
 
+
+const memberCastStatus: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화', pending: '공개 검수 중', public: '공개됨', rejected: '공개 반려' };
+/** Characters members made: the member's own (with where they stand) and public ones from everyone else. */
+function LoungeMemberCast({ user }: { user: AppUser | null }) {
+  const member = user && !user.isAnonymous ? user.id : null;
+  const [mine, setMine] = useState<LoungeCustomCharacterRow[]>([]);
+  const [shared, setShared] = useState<LoungeCustomCharacterRow[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    listPublicLoungeCharacters().then(rows => { if (!cancelled) setShared(rows); }).catch(() => { /* The section waits for the table. */ });
+    if (member) listMyLoungeCharacters(member).then(rows => { if (!cancelled) setMine(rows); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [member]);
+  const shown = [...(member ? mine : []), ...shared.filter(row => row.owner_id !== member)];
+  if (!shown.length) return null;
+  return <section className="lounge-home-section" aria-labelledby="lounge-member-cast-title">
+    <header className="lounge-home-subhead">
+      <h2 id="lounge-member-cast-title">회원이 만든 캐릭터</h2>
+      <p>내가 만든 캐릭터와, 검수를 거쳐 공개된 다른 회원의 캐릭터예요.</p>
+    </header>
+    <LoungeRow label="회원이 만든 캐릭터" className="lounge-cast-row">
+      {shown.map(row => {
+        const portrait = loungeCustomPortrait(row);
+        return <li key={row.id}>
+          <Link to={`/lounge/characters/${row.id}`} className="lounge-cast-card">
+            {portrait ? <img src={portrait} alt={`${row.name}의 대표 사진`} loading="lazy" /> : <span className="lounge-cast-card-empty" aria-hidden="true">✨</span>}
+            <span><strong>{row.name}</strong><small>{row.sheet.job}</small></span>
+          </Link>
+          <p className="lounge-cast-count">{row.owner_id === member ? `내 캐릭터 · ${memberCastStatus[row.status]}` : '회원이 만든 캐릭터'}</p>
+        </li>;
+      })}
+    </LoungeRow>
+  </section>;
+}
 
 /** A character's sheet over the home: who they are, the rooms they are helping now, and the ways to talk with them. */
 function LoungeCharacterSheet({ character, spaces, tables, onCreate, onClose }: {

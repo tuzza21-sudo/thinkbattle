@@ -21,6 +21,8 @@ import type { SuperAdminDashboard as DashboardData, SuperAdminRecord, SuperAdmin
 import { HomepageTopicManager } from './HomepageTopicManager';
 import { LoungeAdminActivity } from './LoungeAdminActivity';
 import { LoungeBetaLimits } from './LoungeBetaLimits';
+import { LoungeImageLimits } from './LoungeImageLimits';
+import { LoungeCharacterReviews } from './LoungeCharacterReviews';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
 const simulationCategoryLabel: Record<SuperAdminSimulationSession['categoryId'], string> = {
@@ -173,7 +175,7 @@ export const SuperAdminDashboard = () => {
 
           {activeSection === 'lounge' && <LoungeAdminActivity />}
 
-          {activeSection === 'beta' && <LoungeBetaLimits />}
+          {activeSection === 'beta' && <><LoungeBetaLimits /><LoungeImageLimits /><LoungeCharacterReviews /></>}
 
           {activeSection === 'organizations' && <section className="card admin-panel super-admin-organization-section">
             <div className="super-admin-section-heading">

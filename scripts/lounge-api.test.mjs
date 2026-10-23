@@ -10,7 +10,9 @@ const compile = (path, require = () => {}) => {
   new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require);
   return exports;
 };
-const lounge = compile('../src/lib/lounge.ts');
+// Loaded through loadTs so the lounge module is the same instance the character registry writes to.
+const lounge = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+const customLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCustomCharacters.ts', import.meta.url)));
 const study = compile('../src/lib/loungeStudy.ts');
 const filmStudy = compile('../src/lib/loungeFilmStudy.ts');
 const sessionLib = compile('../src/lib/loungeSession.ts');
@@ -18,7 +20,7 @@ const knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const repliesLib = compile('../src/lib/loungeReplies.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -1706,15 +1708,15 @@ test('a one-to-one room is a chat until its voice is turned on; *actions* are sh
   assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
 });
 
-const chatTurn = async ({ voiceOn, replyText }) => {
+const chatTurn = async ({ voiceOn, replyText, photo, anonymous = false }) => {
   const spoken = [];
-  let input, instructions, events;
+  let input, instructions, schema, events;
   await run(async (url, init) => {
-    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('/auth/')) return result({ id: 'host', is_anonymous: anonymous });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn }]);
     if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
-    if (url.endsWith('/responses')) { ({ instructions } = JSON.parse(init.body)); input = JSON.parse(JSON.parse(init.body).input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '' }) }] }] }); }
+    if (url.endsWith('/responses')) { const body = JSON.parse(init.body); ({ instructions } = body); schema = body.text.format.schema; input = JSON.parse(body.input); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: replyText, memory: '', ...(photo ?? {}) }) }] }] }); }
     if (url.includes('finish_voice_lounge_host')) return result(true);
     if (url.endsWith('/audio/speech')) { spoken.push(JSON.parse(init.body).input); return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
     throw new Error('Unexpected fetch');
@@ -1722,8 +1724,53 @@ const chatTurn = async ({ voiceOn, replyText }) => {
     const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
     events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
   });
-  return { spoken, input, instructions, events };
+  return { spoken, input, instructions, schema, events };
 };
+
+test('a member\'s character speaks as itself, with its own relationship type; an uploaded portrait sends no photos', async () => {
+  const id = `c_${'c'.repeat(32)}`;
+  const sheet = { name: '한지안', age: 31, gender: 'female', job: '새벽 라디오 PD', concept: '', role: '새벽 음악 방송을 만든다', tagline: '사연을 끝까지 듣는 새벽 라디오 PD',
+    story: ['대학 방송국에서 처음 마이크를 잡았다.', '첫 생방송에서 사연을 잘못 읽은 적이 있다.'], personality: [{ label: '강점', text: '끝까지 듣는다' }, { label: '약점', text: '자기 이야기를 안 한다' }, { label: '모순', text: '귀찮아하면서 사연을 기다린다' }],
+    habits: ['짧게 웃고 말한다.', '노래 제목을 붙여 준다.'], look: '검은 단발과 회색 니트', boundaries: ['빈말로 칭찬하지 않는다.', '모욕하지 않는다.'], greeting: '이 시간에 깨어 있네요.' };
+  for (const portraitSource of ['ai', 'upload']) {
+    let body;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('lounge_custom_characters?id=eq.')) return result([{ id, owner_id: 'user-1', name: '한지안', status: 'private', sheet, template: 'slow_burn', flirtation: true, voice: 'low_female', theme: 'river', portrait_path: `${id}/p.webp`, portrait_source: portraitSource, review_note: '' }]);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유', host_persona: id, memory: '', capacity: 1, space_id: null, voice_on: false }]);
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories?')) return result([]);
+      if (url.endsWith('/responses')) { body = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반가워요.', memory: '', events: [], memory_ops: [], ...(body.text.format.schema.properties.photo ? { photo: '', photo_asked: false } : {}) }) }] }] }); }
+      if (url.includes('finish_voice_lounge_host')) return result(true);
+      if (url.includes('save_voice_lounge_relationship')) return result(1);
+      return result([]);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'opening', stream: true }));
+      assert.equal(response.status, 200);
+      await response.text();
+    }));
+    assert.match(body.instructions, /너는 한지안이다/);
+    assert.match(body.instructions, /사연을 끝까지 듣는 새벽 라디오 PD/);
+    assert.equal(JSON.parse(body.input).relationship.stage.id, 'DISMISSIVE', 'the slow-burn type starts at a distance');
+    assert.equal(Boolean(body.text.format.schema.properties.photo), portraitSource === 'ai');
+  }
+});
+
+test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
+  const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
+  assert.deepEqual(asked.schema.required.slice(-2), ['photo', 'photo_asked']);
+  assert.equal(asked.schema.required[0], 'text', 'text stays first for the early reply');
+  assert.match(asked.instructions, /photo와 photo_asked는 채팅에서만 쓴다/);
+  assert.deepEqual(asked.events.map(event => event.type), ['host', 'photo', 'done']);
+  assert.deepEqual(asked.events[1], { type: 'photo', scene: '작업실 창가에서 야경을 등지고 찍은 셀카', asked: true });
+  const none = await chatTurn({ voiceOn: false, replyText: '그래서요?', photo: { photo: '', photo_asked: false } });
+  assert.deepEqual(none.events.map(event => event.type), ['host', 'done']);
+  // A guest's character does not offer photos, and a voice reply has no photo either.
+  for (const turn of [await chatTurn({ voiceOn: false, replyText: '그래서요?', anonymous: true }), await chatTurn({ voiceOn: true, replyText: '그래서요?' })]) {
+    assert.equal(turn.schema.properties.photo, undefined);
+    assert.equal(turn.events.some(event => event.type === 'photo'), false);
+  }
+});
 
 test('a chat reply is text only and the model is told it is a chat', async () => {
   const { spoken, input, instructions, events } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });

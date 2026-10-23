@@ -214,7 +214,8 @@ export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina'] },
   { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'] },
 ] as const;
-export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '');
+// Every character a member creates has a relationship too (from the type they picked).
+export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '') || isLoungeCustomCharacterId(id);
 /** What each character is like, shown on the lobby cards. */
 export const loungeCharacterProfiles: Record<string, { traits: readonly string[]; summary: string }> = {
   ina: { traits: ['말 속의 모순 발견', '내 경험도 나누는 대화', '끝에 생각 정리'], summary: '누군가와 깊이 이야기하고 싶을 때. 질문만 하지 않고, 말하지 않은 생각을 짚고 오늘 얻은 것을 정리해 줘요.' },
@@ -329,12 +330,25 @@ export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
  * the same room computes the same one, and different rooms spread across the list.
  */
 export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
-  const choices = loungeHostThemes[hostId]?.length ? loungeHostThemes[hostId] : [loungeThemes[0].id];
+  const custom = customHostThemes.get(hostId);
+  const choices = custom ? [custom] : loungeHostThemes[hostId]?.length ? loungeHostThemes[hostId] : [loungeThemes[0].id];
   let hash = 0;
   for (let index = 0; index < roomId.length; index++) hash = (hash * 31 + roomId.charCodeAt(index)) >>> 0;
   return choices[hash % choices.length];
 }
-export const getLoungeHost = (id: string) => loungeHosts.find(host => host.id === id) ?? loungeHosts[0];
+/** A host's fields, widened from the house list so a character a member creates can have the same shape. */
+export type LoungeHost = {
+  id: LoungeHostId; name: string; tag: string; emoji: string; color: string; portrait: string; voiceSample: string; voiceLabel: string;
+  description: string; greeting: string; instruction: string; companion: string; voice: string; speechSpeed: number; speechInstruction: string; sampleText: string;
+};
+// Characters that members create (ids "c_..."), registered once their data has been read (see loungeCustomCharacters.ts).
+const customLoungeHosts = new Map<string, LoungeHost>();
+const customHostThemes = new Map<string, LoungeThemeId>();
+export const isLoungeCustomCharacterId = (id?: string | null) => /^c_[0-9a-f]{32}$/.test(id ?? '');
+export function registerLoungeCustomHost(host: LoungeHost, theme: LoungeThemeId) {
+  customLoungeHosts.set(host.id, host); customHostThemes.set(host.id, theme);
+}
+export const getLoungeHost = (id: string): LoungeHost => loungeHosts.find(host => host.id === id) ?? customLoungeHosts.get(id) ?? loungeHosts[0];
 /** Added to every character's voice: the feeling in the words is played out in full, in that character's own voice. */
 export const loungeSpeechExpression = '문장에 담긴 감정과 리액션(감탄사, 웃음, 놀람, 한숨, 망설임, 장난기)을 이 캐릭터의 음색과 성격 안에서 최대한 실감 나고 크게 살린다. 억양의 높낮이, 강약, 쉼에 분명한 변화를 주고 밋밋하게 읽지 않는다.';
 export function loungeSpeechRequest(hostId: LoungeHostId, input: string, responseFormat: 'pcm' | 'mp3') {

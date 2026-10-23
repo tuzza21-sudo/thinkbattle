@@ -197,6 +197,8 @@ function App() {
         <Route path="/lounge" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/spaces/:spaceId/:entry" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/create" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/create/:editId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/characters/:characterId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />

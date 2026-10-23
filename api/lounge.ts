@@ -1,6 +1,7 @@
 import { getLoungeCharacter, loungeCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
-import { getLoungeHost, isLoungeChatRoom, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -170,7 +171,7 @@ export function modelUsageLog(result: ModelResult | undefined, label: Record<str
   const cached = usage.input_tokens_details?.cached_tokens ?? 0;
   return { ...label, inputTokens: usage.input_tokens, cachedTokens: cached, cachedPercent: usage.input_tokens ? Math.round(cached * 100 / usage.input_tokens) : 0, outputTokens: usage.output_tokens };
 }
-function parseHostAnswer(output: string | undefined, result?: ModelResult): { text: string; memory: string; events?: unknown } {
+function parseHostAnswer(output: string | undefined, result?: ModelResult): { text: string; memory: string; events?: unknown; photo?: unknown; photo_asked?: unknown } {
   if (!output) {
     console.error('[Lounge API] host reply was empty', JSON.stringify({ status: result?.status, incomplete: result?.incomplete_details?.reason, outputTokens: result?.usage?.output_tokens, messages: result?.output?.map(item => item.phase ?? 'none') }));
     throw new LoungeUpstreamError('사회자 답변이 비어 있었어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_empty_response', true, 5);
@@ -386,6 +387,16 @@ export default async function handler(req: Request): Promise<Response> {
       } catch { return null; }
     }
 
+    // A member's character is read and registered for this request, so everything after treats it like a house character.
+    const ensureCustomCharacter = async (id: string | undefined) => {
+      if (!isLoungeCustomCharacterId(id) || !serviceHeaders) return undefined;
+      const response = await fetchTimed(`${url}/rest/v1/lounge_custom_characters?id=eq.${id}&select=*`, { headers: serviceHeaders });
+      const [row] = response.ok ? await readJson<LoungeCustomCharacterRow[]>(response, 'lounge') : [];
+      if (!row) throw new LoungeUpstreamError('이 캐릭터를 찾을 수 없어요. 만든 사람이 지웠을 수 있어요.', 404, 'lounge_character_missing', false);
+      registerLoungeCustomCharacterRow(row, loungeCustomPortraitUrl(url, row.portrait_path));
+      return row;
+    };
+
     if (body.action === 'relationship') {
       const user = await readJson<{ id: string; email?: string }>(auth, 'lounge');
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,ai_mood,space_id`, { headers });
@@ -398,6 +409,7 @@ export default async function handler(req: Request): Promise<Response> {
         const present = response.ok ? loungePresentMembers(await readJson<Array<{ user_id: string; last_seen: string }>>(response, 'lounge'), Date.now()) : [];
         shown = present.some(member => member.user_id === user.id);
       }
+      if (shown) await ensureCustomCharacter(room.host_persona);
       const config = shown ? getRelationshipConfig(room.host_persona) : undefined;
       if (!config) return json({ enabled: false });
       const stored = await readRelationship(user.id, config.characterId);
@@ -445,6 +457,7 @@ export default async function handler(req: Request): Promise<Response> {
       const [member] = await readJson<Array<{ user_id: string }>>(responses[2], 'lounge');
       if (!room || !member) throw new LoungeUpstreamError('방 참가 상태를 확인해 주세요. 라운지에 다시 입장해 주세요.', 403, 'lounge_access_denied', false);
       if (room.status === 'ended' || (room.expires_at && Date.parse(room.expires_at) <= Date.now())) throw new LoungeUpstreamError('끝난 대화에서는 추천받을 수 없어요.', 410, 'lounge_replies_room_ended', false);
+      await ensureCustomCharacter(room.host_persona);
       const host = getLoungeHost(room.host_persona);
       const recent = (await readJson<Array<{ user_id: string | null; nickname: string; kind: string; text: string }>>(responses[1], 'lounge')).reverse()
         .map(message => ({ speaker: message.kind === 'host' ? host.name : message.user_id === user.id ? '나' : message.nickname, text: message.text.slice(0, 240) }));
@@ -465,7 +478,7 @@ export default async function handler(req: Request): Promise<Response> {
     const contextStarted = performance.now();
     const ticket = await rpc<string | null>('claim_voice_lounge_host', { p_room: roomId, p_reason: body.reason });
     if (!ticket) return json({ skipped: true });
-    const user = await readJson<{ id: string }>(auth, 'lounge');
+    const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
     // Read in parallel with the room so a relationship adds no round trip; a failure only disables it.
     const relationshipRows = serviceHeaders
       ? fetchTimed(`${url}/rest/v1/voice_lounge_relationships?user_id=eq.${encodeURIComponent(user.id)}&select=*`, { headers: serviceHeaders })
@@ -491,6 +504,7 @@ export default async function handler(req: Request): Promise<Response> {
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
     if (room.study_required && !room.topic_study) throw new LoungeUpstreamError('사회자가 주제 자료를 먼저 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.', 503, 'lounge_study_pending', true, 60);
+    const custom = await ensureCustomCharacter(room.host_persona);
     const host = getLoungeHost(room.host_persona);
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
@@ -624,6 +638,7 @@ reply_medium=chat이면 글로 주고받는 롤플레이 채팅이다. 소설의
 반응을 미지근하게 하지 않는다. 놀라면 확실히 놀라고, 웃기면 크게 웃고, 설레거나 언짢거나 감탄하면 그 감정이 지문과 대사에 분명하고 과감하게 드러나게 한다. 감정의 방향과 표현 방식은 캐릭터의 성격·페르소나와 relationship.stage를 따른다. 냉소적이거나 도도한 캐릭터는 차가운 쪽으로 극적으로(눈썹을 치켜올리고 코웃음 친다), 다정하거나 장난스러운 캐릭터는 따뜻하고 신나는 쪽으로 크게 드러낸다. 성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다. 같은 동작이나 표현을 되풀이하지 않고 장소의 소품과 분위기를 활용한다.
 대사는 별표 밖에 쓰고 따옴표로 감싸지 않는다. 채팅의 대사는 보통 3~5문장, 많으면 6문장까지 쓰고 지문을 빼고 400자 이내다. 한두 마디로 짧게 끊지 말고 네 생각과 감정, 떠오른 기억이나 이어지는 이야기를 한 겹 더 붙여 대화를 풍성하게 한다. 지문과 속마음은 글자 수 제한에 넣지 않는다. 이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다.
 reply_medium=voice이면 목소리로 들리는 대화이므로 지문과 속마음은 쓰지 않는다. 대신 리액션을 말로 크게 한다. 감탄사(와, 어머, 헐, 어?), 웃음(하하, 풉), 한숨(하아), 망설임(음…)과 말줄임표, 느낌표와 물음표를 캐릭터답게 살려 감정이 목소리에 그대로 실리게 한다. 리액션의 결도 캐릭터의 성격을 따른다.
+photo와 photo_asked는 채팅에서만 쓴다. photo는 대부분 빈 문자열이다. 상대가 사진이나 지금 모습을 보여 달라고 했을 때(photo_asked=true), 또는 네가 지금 있는 곳·옷차림·풍경을 이야기하다 사진 한 장을 보내는 게 자연스러운 드문 순간에만(photo_asked=false) 보낼 사진의 장면을 한국어 한 문장으로 쓴다. 먼저 보내는 사진은 한 대화에 많아야 한 번이고, relationship.stage가 첫 단계면 상대가 부탁하지 않는 한 먼저 보내지 않는다. 사진을 보낼 때는 대사와 지문에서도 사진을 보낸다는 것이 드러나게 한다(예: *휴대폰을 들어 한 장 찍는다*). 노출이나 성적인 사진은 보내지 않는다. 그런 부탁은 캐릭터답게 받아넘기고 photo를 비운다.
 상대의 글에서 대사와 행동·상황·속마음을 문맥으로 구분한다. 별표가 없어도 '커피를 한 모금 마신다', '창밖을 보며'처럼 지문으로 쓴 부분은 상대의 행동이나 상황이고, 괄호 속 말이나 '(속으로)', '라고 생각한다' 같은 부분은 상대의 속마음이다. 행동과 상황에는 눈앞에서 본 것처럼 반응한다. 속마음은 네가 들은 말이 아니므로 직접 들은 것처럼 받아 답하지 않고, 표정이나 행동에 드러난 만큼만 알아챈다. 지문인지 대사인지 애매하면 대사로 받는다. 상대가 하지 않은 행동이나 마음을 지어내지 않는다.` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
 participant_count는 지금 함께 있는 사람 수다. first_host_turn=true이면 이번 첫 인사에서만 패스해도 된다고 한 번 짧게 안내한다. first_host_turn=false이면 첫 인사는 이미 끝났다. 패스 가능, 발언 선택권, 말하기·마치기 버튼 사용 안내를 반복하지 않는다.
 여러 사람이 함께 있는 방에서는 어떤 참가자에게도 반말을 쓰지 않고 항상 존댓말로 말한다. 캐릭터 설명의 개입 방식은 네가 말하게 된 순간의 말투에만 쓴다. 말할 기회를 늘리는 근거가 아니며, 아래 규칙과 충돌하면 아래 규칙을 따른다.
@@ -669,6 +684,14 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const knowledge = await knowledgeRead;
     if (knowledgeAttempted) console.info('[Lounge knowledge wait]', JSON.stringify({ host: host.id, waitedMs: Math.round(performance.now() - knowledgeWaitStarted) }));
     const knowledgeText = loungeKnowledgePrompt(knowledge);
+    // In a chat the character may send a photo with the reply: photo is the scene (usually empty), photo_asked whether
+    // the member asked for one. The fields come after text, which must stay first for the early reply.
+    // Photos are kept per member, so a guest's character does not offer them; a member's character sends photos only
+    // when its portrait was made by the AI (an uploaded portrait is never used to make photos).
+    const chatPhotos = chat && !user.is_anonymous && (!custom || custom.portrait_source === 'ai');
+    const withChatPhoto = <T extends { properties: object; required: readonly string[] }>(schema: T) => chatPhotos
+      ? { ...schema, properties: { ...schema.properties, photo: { type: 'string' }, photo_asked: { type: 'boolean' } }, required: [...schema.required, 'photo', 'photo_asked'] }
+      : schema;
     const modelRequest = {
       // The reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
@@ -681,11 +704,11 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
         roleInstruction,
       ].filter(Boolean).join('\n'),
       // Relationship characters classify the user's latest behaviour in this same call (no extra request).
-      input: JSON.stringify(knowledgeText ? { ...context, character_knowledge: knowledgeText } : context), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: relationship
+      input: JSON.stringify(knowledgeText ? { ...context, character_knowledge: knowledgeText } : context), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: withChatPhoto(relationship
         ? writesMemory
           ? { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema, memory_ops: memoryOpsSchema }, required: ['text', 'memory', 'events', 'memory_ops'], additionalProperties: false }
           : { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema }, required: ['text', 'memory', 'events'], additionalProperties: false }
-        : { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' } }, required: ['text', 'memory'], additionalProperties: false } } },
+        : { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' } }, required: ['text', 'memory'], additionalProperties: false }) } },
     };
     // Deterministic score update from the classified events. It runs alongside speech
     // synthesis so the first audio is not delayed, and a failure never breaks the reply.
@@ -910,6 +933,9 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
             if (saved) await saveRelationship(answer);
             else console.warn('[Lounge API] spoken reply was not saved');
             await speech;
+            // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
+            const photo = chatPhotos && saved && typeof answer?.photo === 'string' ? answer.photo.trim().slice(0, 200) : '';
+            if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {
             console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined }));
