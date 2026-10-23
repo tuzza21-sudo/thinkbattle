@@ -12,6 +12,7 @@ import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { getLoungeChatModel } from '../lib/loungeModels';
 import { LoungeModelPicker } from './LoungeModelPicker';
 import { LoungeSpeechPicker } from './LoungeSpeechPicker';
+import { LoungeCall } from './LoungeCall';
 import type { LoungeRoomScenario } from '../lib/loungeScenarios';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
 import { isLoungeFreeStage, loungeSessionHostReason, newerLoungeSession, shouldAutoFinishLoungeTurn, type LoungeHostReason, type LoungeSession, type LoungeSessionAction } from '../lib/loungeSession';
@@ -264,8 +265,27 @@ function RoomView(props: RoomViewProps) {
         <p role="status">{props.helpRequested ? '요청했어요. 이야기가 잠깐 멈추면 짧게 도와드릴게요.' : 'AI는 사람들의 대화에 끼어들지 않아요. 필요할 때 불러 주세요.'}</p>
       </div>}
     </div>);
-  return <main className={`lounge-room-main ${solo && !space ? 'lounge-one-to-one' : ''}`} data-theme={theme.id} style={{ '--lounge-accent': theme.accent, '--lounge-surface': theme.surface, '--lounge-scene-image': `url('${theme.image}')` } as CSSProperties} ref={roomElement}>
-    {restricted ? <p className="lounge-safety-notice" role="status">대화 보호를 위해 잠시 발언이 제한됐어요. 약 {Math.max(1, Math.ceil((Date.parse(ownSafety!.restrictedUntil!) - (props.now ?? 0)) / 1000))}초 뒤 다시 말할 수 있어요. 다른 분의 이야기는 계속 들을 수 있어요. 오판이라고 생각되면 방장에게 해제를 요청해 주세요.</p> : Boolean(ownSafety?.warnings) && <p className="lounge-safety-notice" role="status">{ownSafety?.warnings === 1 ? '인신공격 1차 경고: 2차 인신공격부터 발언권이 제한됩니다.' : '추가 인신공격이 감지되면 발언권이 다시 제한됩니다.'} 수위가 심한 발언은 경고 없이 즉시 제한됩니다. 서로 존중하며 이야기해 주세요.</p>}
+  const safetyNotice = restricted ? <p className="lounge-safety-notice" role="status">대화 보호를 위해 잠시 발언이 제한됐어요. 약 {Math.max(1, Math.ceil((Date.parse(ownSafety!.restrictedUntil!) - (props.now ?? 0)) / 1000))}초 뒤 다시 말할 수 있어요. 다른 분의 이야기는 계속 들을 수 있어요. 오판이라고 생각되면 방장에게 해제를 요청해 주세요.</p> : Boolean(ownSafety?.warnings) && <p className="lounge-safety-notice" role="status">{ownSafety?.warnings === 1 ? '인신공격 1차 경고: 2차 인신공격부터 발언권이 제한됩니다.' : '추가 인신공격이 감지되면 발언권이 다시 제한됩니다.'} 수위가 심한 발언은 경고 없이 즉시 제한됩니다. 서로 존중하며 이야기해 주세요.</p>;
+  const roomStyle = { '--lounge-accent': theme.accent, '--lounge-surface': theme.surface, '--lounge-scene-image': `url('${theme.image}')` } as CSSProperties;
+  // One to one in voice is a phone call: the character, how the call is going and the call buttons. What is said is not
+  // written on the screen (it is kept, and shows in the chat).
+  if (solo && !space && !props.chat && !ended && !sessionProps) {
+    const options = <>
+      {props.onModelChange && <LoungeModelPicker value={props.chatModel ?? 'gpt'} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
+      {props.onSpeechEngineChange && <LoungeSpeechPicker value={props.speechEngine ?? 'openai'} usage={props.speechUsage} disabled={Boolean(props.pending || props.aiSpeaking)} onChange={props.onSpeechEngineChange} />}
+    </>;
+    return <main className="lounge-room-main lounge-one-to-one lounge-call" data-theme={theme.id} style={roomStyle} ref={roomElement}>
+      {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 AI 연결 없이 통화 화면을 둘러보는 미리보기예요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
+      <LoungeCall hostId={props.hostId} name={hostCharacter?.name ?? host.name} job={hostCharacter?.job} place={props.scenario?.title ?? props.place ?? theme.name} remaining={props.remaining}
+        preview={props.preview} lobby={props.status === 'lobby'} connecting={props.connecting} connected={props.connected} audioReady={props.audioReady} starting={props.starting} needsConnection={needsConnection}
+        micOn={props.micOn} micDisabled={restricted || Boolean(props.preview) || !props.connected || !props.audioReady} hostSpeaking={hostSpeaking} userSpeaking={liveSpeakers.some(member => member.id === props.currentUserId)}
+        pending={props.pending} replyDelayed={replyDelayed} topicDisabled={helpDisabled} chatDisabled={props.voiceBusy} chatBusy={props.voiceBusy}
+        options={props.onModelChange || props.onSpeechEngineChange ? options : undefined} notice={safetyNotice || undefined} error={props.error || sendError || undefined}
+        onConnect={props.onConnect} onMic={props.onMic} onTopic={() => props.onAsk('topic')} onChat={props.onVoiceToggle} onHangUp={props.onLeave} />
+    </main>;
+  }
+  return <main className={`lounge-room-main ${solo && !space ? 'lounge-one-to-one' : ''}`} data-theme={theme.id} style={roomStyle} ref={roomElement}>
+    {safetyNotice}
     {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 참가자·AI 연결 없이 분위기를 둘러보는 화면이에요. 손들기와 대화 순서도 미리 살펴보세요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
     <div className="lounge-conversation-layout"><section className="lounge-stage" aria-label="풍경 위에서 함께하는 대화">
       <div className={`lounge-scene scene-${props.capacity}`}>
