@@ -264,7 +264,7 @@ test('every character may flirt with an adult in a one-to-one room, and what the
   assert.ok(relationshipResponseInstructions.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
   const velvet = relationshipResponseInstructionsFor(configs.velvet);
   assert.ok(!velvet.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
-  for (const rule of ['가벼운 플러팅', '약한 수준의 성적 뉘앙스', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '강요·협박', '불편해하거나 그만하자고 하면 바로 멈추고', '질투, 독점, 현실에서 만나자는 약속, 의존·죄책감·결제', '가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다']) assert.ok(velvet.includes(rule), rule);
+  for (const rule of ['가벼운 플러팅', '성적인 뉘앙스도 괜찮다', 'relationship.intimacy를 따른다', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '강요·협박', '불편해하거나 그만하자고 하면 바로 멈추고', '질투, 독점, 현실에서 만나자는 약속, 의존·죄책감·결제', '가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다']) assert.ok(velvet.includes(rule), rule);
   // The shared ban still counts a sexual demand that goes on after the character drew a line, but not flirting she accepts.
   assert.ok(relationship.relationshipEventCatalog.VIOLATES_BOUNDARY.description.includes('선을 그은 뒤에 이어 가면 해당'));
   // The rest of the shared rules are untouched, including the safety answer for someone in danger.
@@ -423,6 +423,28 @@ test('invitations to go somewhere together open up with the relationship: not at
     assert.match(outing(stages.at(-1)), /기꺼이 받아들여/, `${config.characterId} closest stage`);
   }
   assert.match(relationship.relationshipOutingGuidance(2, 4), /대부분의 제안/);
+});
+
+test('touch opens up with the relationship: none at first, hands and a hug next, a kiss at the third, a night together from the fourth', () => {
+  for (const config of Object.values(configs)) {
+    const stages = config.stages.filter(stage => stage.enabled !== false);
+    const intimacy = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).intimacy;
+    assert.match(intimacy(stages[0]), /스킨십은 아직 받아들이지 않는다/, `${config.characterId} first stage`);
+    assert.match(intimacy(stages[1]), /손을 잡거나 가볍게 안는/, `${config.characterId} second stage`);
+    assert.doesNotMatch(intimacy(stages[1]), /키스도/, `${config.characterId} no kiss at the second stage`);
+    if (!config.adultFlirtation || stages.length < 4) continue;
+    assert.match(intimacy(stages[2]), /키스도 성격에 따라/, `${config.characterId} third stage`);
+    assert.match(intimacy(stages[2]), /잠자리는 아직 이르다/, `${config.characterId} not yet a night together`);
+    assert.match(intimacy(stages[3]), /잠자리까지 받아들일 수 있다/, `${config.characterId} fourth stage`);
+    assert.match(intimacy(stages[3]), /성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.*장면을 끊고.*시간을 건너뛰어/, `${config.characterId} told by cutting away`);
+    assert.match(intimacy(stages[3]), /이야기부터 하자며 미루지 않고/, `${config.characterId} does not put it off`);
+    assert.match(intimacy(stages[3]), /한 문장으로 끊지 않고 충분히 그린다/, `${config.characterId} the scene up to the cut is told fully`);
+    assert.match(intimacy(stages[3]), /여운 장면도 다정하고 적극적으로/, `${config.characterId} and the morning after`);
+  }
+  assert.match(relationship.relationshipIntimacyGuidance(3, false), /키스나 그 이상은 하지 않고/, 'without adult flirtation a hug is the most');
+  assert.match(relationship.attractionReactionRule, /relationship.intimacy를 따르고/);
+  assert.match(relationship.attractionReactionRule, /매번 같은 동작이나 말\(손목을 잡아 멈추기/);
+  assert.match(relationship.attractionReactionRule, /이야기 밖의 말/);
 });
 
 test('every one-to-one character shows what it feels when flirted with, as far as the stage allows, never explicitly', () => {

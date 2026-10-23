@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Coffee, Crown, DoorOpen, Hourglass, LoaderCircle, Plus, RefreshCw, Swords, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Coffee, Crown, DoorOpen, Hourglass, LoaderCircle, Plus, RefreshCw, Swords, Users, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, getLoungeTheme, isLoungeAgeGroup, loungeHostThemes, loungeAgeGroups, loungeAgeLimitLabel, loungeCharacterProfiles, loungeTopics, type LoungeAgeGroup, type LoungeHostId, type LoungeOpenTable, type LoungeSpace, type LoungeSpaceTable } from '../lib/lounge';
@@ -9,6 +9,7 @@ import { useDialog } from '../lib/useDialog';
 import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrait } from '../lib/loungeCustomClient';
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
+import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
 import { currentLoungeWait, setLoungeWaitAhead, startLoungeWait, stopLoungeWait, useLoungeWait } from '../lib/loungeWait';
 import './LoungeSpaces.css';
 
@@ -241,7 +242,8 @@ function LoungeCharacterSheet({ character, spaces, tables, onCreate, onClose }: 
         </div>
         <div className="lounge-sheet-actions">
           <button type="button" className="lounge-sheet-enter" onClick={onCreate}><Plus size={16} /> {koreanWith(character.name)} 대화방 만들기</button>
-          {home && <Link className="lounge-sheet-solo" to={`/lounge/spaces/${home.id}/solo?host=${character.id}`}><Swords size={15} /> 둘이서 대화</Link>}
+          {loungeOneToOneStoriesOnly ? <Link className="lounge-sheet-solo" to={loungeStoriesPath(character.id)}><BookOpen size={15} /> 둘만의 이야기</Link>
+            : home && <Link className="lounge-sheet-solo" to={`/lounge/spaces/${home.id}/solo?host=${character.id}`}><Swords size={15} /> 둘이서 대화</Link>}
         </div>
         <Link className="lounge-sheet-more" to={`/lounge/characters/${character.id}`}>인물 소개 전체 보기 <ArrowRight size={14} /></Link>
       </div>
@@ -429,8 +431,13 @@ export function LoungeSpacePage({ spaceId, user, onGuestRequest }: { spaceId: st
 
     <article className="lounge-space-option solo">
       <Swords size={22} /><h2>{koreanWith(soloName)} 둘이서 <span>솔로 플레이</span></h2>
-      <p>다른 손님 없이 1:1로 이야기해요. 대화할수록 {koreanSubject(soloName)} 당신을 다르게 대해요.</p>
-      <Link className="lounge-space-enter" to={`/lounge/spaces/${space.id}/solo`}><Swords size={15} /> 둘이서 시작하기</Link>
+      {loungeOneToOneStoriesOnly && soloCharacter ? <>
+        <p>이야기 하나를 골라 1:1로 시작해요. 함께할수록 {koreanSubject(soloName)} 당신을 다르게 대해요.</p>
+        <Link className="lounge-space-enter" to={loungeStoriesPath(soloCharacter.id)}><BookOpen size={15} /> 이야기 고르기</Link>
+      </> : <>
+        <p>다른 손님 없이 1:1로 이야기해요. 대화할수록 {koreanSubject(soloName)} 당신을 다르게 대해요.</p>
+        <Link className="lounge-space-enter" to={`/lounge/spaces/${space.id}/solo`}><Swords size={15} /> 둘이서 시작하기</Link>
+      </>}
     </article>
     {creating && <LoungeCreateRoom spaces={spaces} initialSpace={space.id} user={user} onGuestRequest={onGuestRequest} onClose={() => setCreating(false)} />}
   </main>;
@@ -448,7 +455,9 @@ export function LoungeSpaceEntry({ spaceId, entry, user, onGuestRequest, onLogin
   const agesKey = (params.get('ages') ?? '').split(',').filter(isLoungeAgeGroup).join(',');
   const seatParam = Math.trunc(Number(params.get('capacity')));
   const seatCount = seatParam >= 2 && seatParam <= 6 ? seatParam : undefined;
-  const valid = solo || (entry === 'open' && Boolean(topic && host)) || (entry === 'join' && Boolean(table));
+  // A one-to-one starts from a story now (see `loungeOneToOneStoriesOnly`), so an old link to the free one is turned away.
+  const storiesOnly = solo && loungeOneToOneStoriesOnly;
+  const valid = (solo && !storiesOnly) || (entry === 'open' && Boolean(topic && host)) || (entry === 'join' && Boolean(table));
   const [error, setError] = useState('');
   const nickname = user?.nickname;
   useEffect(() => {
@@ -462,6 +471,8 @@ export function LoungeSpaceEntry({ spaceId, entry, user, onGuestRequest, onLogin
     }, err => { if (!cancelled) setError(errorText(err)); });
     return () => { cancelled = true; };
   }, [spaceId, entry, solo, valid, table, topic, host, agesKey, seatCount, nickname, navigate]);
+  if (storiesOnly) return <main className="lounge-join-gate"><BookOpen size={40} /><h1>1:1 대화는 이야기로 시작해요</h1><p>캐릭터의 이야기 하나를 고르면 짧은 프롤로그 뒤에 장면 속에서 대화가 시작돼요.</p>
+    <Link className="lounge-primary" to={host ? loungeStoriesPath(host) : '/lounge'}>{host ? '이야기 고르러 가기' : '캐릭터 고르러 가기'} <ArrowRight size={17} /></Link></main>;
   if (!valid) return <main className="lounge-join-gate"><Coffee size={40} /><h1>{entry === 'open' ? '대화 주제와 캐릭터를 먼저 정해 주세요' : '어느 대화방에 앉을지 골라 주세요'}</h1><Link className="lounge-primary" to={`/lounge/spaces/${spaceId}`}>장소 둘러보기 <ArrowRight size={17} /></Link></main>;
   if (!user) return <main className="lounge-join-gate"><DoorOpen size={40} /><h1>{solo ? '둘이서 이야기하기 전에' : '들어가기 전에'} 불릴 이름이 필요해요.</h1><p>게스트로 바로 들어가거나, 로그인하면 캐릭터와의 관계가 계정에 이어져요.</p>
     <button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 들어가기 <ArrowRight size={17} /></button>

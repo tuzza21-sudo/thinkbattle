@@ -15,6 +15,14 @@ export type LoungeScenarioRow = {
   prologue: string;
   user_role: string; relationship: string; place: string; theme: LoungeThemeId; sort: number; active: boolean;
 };
+/**
+ * A house character's one-to-one conversation starts only from one of its stories (2026-10-23): the free chat and voice
+ * entries ("둘이서 대화", "둘이서 시작하기") lead to the character's stories instead. Members' own characters, which
+ * have no stories, keep their chat. Set to false to open the free one-to-one again.
+ */
+export const loungeOneToOneStoriesOnly = true;
+/** The character page section that lists a character's stories. */
+export const loungeStoriesPath = (characterId: string) => `/lounge/characters/${characterId}#stories`;
 /** The copy of a scenario a room keeps (rooms.scenario), so editing the scenario does not change a story under way. */
 export type LoungeRoomScenario = Pick<LoungeScenarioRow, 'id' | 'title' | 'prologue' | 'user_role' | 'relationship' | 'place'>;
 
