@@ -6,7 +6,7 @@ import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
 import { getLoungeHost, getLoungeHostLoudness, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
 import { LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, postLoungeText, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { readLoungeStream } from '../lib/loungeStream';
-import { LoungeChatComposer, LoungeMessageText } from './LoungeChatComposer';
+import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { getLoungeChatModel, loungeChatModels } from '../lib/loungeModels';
@@ -160,6 +160,14 @@ function RoomView(props: RoomViewProps) {
     spotlightAnchor.current = newest ? Math.max(0, newest.offsetTop - element.clientHeight * 0.18) : 0;
     element.scrollTo({ top: spotlightAnchor.current, behavior: 'auto' });
   }, [latestParticipantMessageId, latestHost?.id, props.liveHostText, props.chatHostText, chatTyping, photoCount, props.photoPending, spotlightLatest]);
+  // While a reply types out the log keeps up with it; on phones the newest line stays at the bottom.
+  useEffect(() => {
+    const element = participantLog.current;
+    if (!element || spotlightLatest) return;
+    const observer = new MutationObserver(() => { if (followParticipantLog.current) element.scrollTop = element.scrollHeight; });
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [spotlightLatest]);
   useEffect(() => {
     const strip = participantSeats.current;
     const seat = strip?.querySelector<HTMLElement>('.has-floor');
@@ -287,9 +295,9 @@ function RoomView(props: RoomViewProps) {
                 {(props.status === 'lobby' || !conversationMessages.length) && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? props.chat ? '오늘은 둘이 편하게 이야기해요. 곧 먼저 인사할게요.' : '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : host.greeting}</div></div>}
                 <div className="lounge-guidance">{props.topicBrief && <LoungeTopicDescription brief={props.topicBrief} />}{props.study && <LoungeStudyNotes study={props.study} />}
             {sessionProps && <LoungeSessionPanel {...sessionProps} mode="context" />}</div>
-                {timeline.map(({ message, photo }) => photo ? <div key={`photo-${photo.id}`} className="lounge-host-message lounge-photo-message"><strong>{hostTitle} <span>{hostRole}</span></strong><a className="lounge-photo" href={photo.url} target="_blank" rel="noopener noreferrer"><img src={photo.url} alt={`${koreanSubject(hostTitle)} 보낸 사진${photo.caption ? `: ${photo.caption}` : ''}`} loading="lazy" /></a>{photo.caption && <div className="lounge-host-bubble">{photo.caption}</div>}</div> : !message ? null : message.kind === 'host' ? <div key={message.id} className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeMessageText text={message.text} /></div></div> : <article key={message.id} className={message.user_id === props.currentUserId ? 'self' : ''}><strong>{message.user_id === props.currentUserId ? '나' : message.nickname}</strong><p><LoungeMessageText text={message.text} /></p></article>)}
+                {timeline.map(({ message, photo }) => photo ? <div key={`photo-${photo.id}`} className="lounge-host-message lounge-photo-message"><strong>{hostTitle} <span>{hostRole}</span></strong><a className="lounge-photo" href={photo.url} target="_blank" rel="noopener noreferrer"><img src={photo.url} alt={`${koreanSubject(hostTitle)} 보낸 사진${photo.caption ? `: ${photo.caption}` : ''}`} loading="lazy" /></a>{photo.caption && <div className="lounge-host-bubble">{photo.caption}</div>}</div> : !message ? null : message.kind === 'host' ? <div key={message.id} className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble">{props.chat && message.id === latestHost?.id ? <LoungeTypewriterText text={message.text} /> : <LoungeMessageText text={message.text} />}</div></div> : <article key={message.id} className={message.user_id === props.currentUserId ? 'self' : ''}><strong>{message.user_id === props.currentUserId ? '나' : message.nickname}</strong><p><LoungeMessageText text={message.text} /></p></article>)}
                 {props.aiSpeaking && props.liveHostText && props.liveHostText !== latestHost?.text && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeMessageText text={props.liveHostText} /></div></div>}
-                {props.chat && props.chatHostText && props.chatHostText !== latestHost?.text && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeMessageText text={props.chatHostText} /></div></div>}
+                {props.chat && props.chatHostText && props.chatHostText !== latestHost?.text && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeTypewriterText text={props.chatHostText} fromStart /></div></div>}
                 {props.photoPending && !ended && <div className="lounge-host-message" role="status"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble lounge-photo-pending"><Camera size={15} /> 사진을 고르는 중…</div></div>}
                 {props.chat && props.pending && !props.chatHostText && !ended && <div className="lounge-host-message" role="status"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><span className="lounge-typing-dots" aria-label="답장을 쓰는 중"><i /><i /><i /></span></div></div>}
                 {ended && <p className="lounge-participant-empty">함께 이야기해 줘서 고마워요. 오늘 남은 시간도 편안하길 바라요.</p>}
@@ -895,6 +903,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         for await (const event of readLoungeStream(response.stream, controller.signal)) {
           // The photo is made separately (it takes longer than the reply) and appears in the conversation when ready.
           if (event.type === 'photo') { void photoRequest.current(event.asked ? 'request' : 'character', event.scene); continue; }
+          // The sentence as it is being written: it starts typing out right away.
+          if (event.type === 'text') { if (mounted.current) { setChatHostText(event.text.slice(0, 1200)); setPending(false); } continue; }
           if (event.type !== 'host' || !mounted.current) continue;
           spoke = true; setChatHostText(event.text.slice(0, 1200)); setPending(false);
           console.info('[Lounge latency]', { ...event.timings, firstTextMs: Math.round(performance.now() - started) });

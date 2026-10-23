@@ -1659,6 +1659,18 @@ test('the reply sentence is read from a partial JSON stream only once its string
   assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), undefined, 'another key first waits for the full reply');
 });
 
+test('a chat shows the reply sentence while it is written, decoding escapes and waiting for half-arrived ones', () => {
+  const { replyTextPartial } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
+  assert.equal(replyTextPartial('{"tex'), undefined);
+  assert.equal(replyTextPartial('{"text":"'), '');
+  assert.equal(replyTextPartial('{"text":"*잔을 내려놓으며* 그건 \\"근거\\"'), '*잔을 내려놓으며* 그건 "근거"');
+  assert.equal(replyTextPartial('{"text":"줄바꿈\\'), '줄바꿈', 'a backslash whose letter has not arrived waits');
+  assert.equal(replyTextPartial('{"text":"하트 \\u2764'), '하트 ❤');
+  assert.equal(replyTextPartial('{"text":"하트 \\u27'), '하트 ', 'a half-arrived \\u escape waits');
+  assert.equal(replyTextPartial('{"text":"다 썼어.","memory":"'), '다 썼어.', 'stops at the end of the sentence');
+  assert.equal(replyTextPartial('{"memory":"먼저","text":"나중"'), undefined);
+});
+
 test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
   // A request's deadline is the last timer set before its fetch.
   const originalSetTimeout = globalThis.setTimeout;
@@ -1792,8 +1804,10 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
       assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
       if (geminiWorks) {
         assert.equal(openaiCalled, false);
-        assert.deepEqual(events.map(event => event.type), ['host', 'done'], '"없음" is not a photo');
-        assert.equal(events[0].text, '*컵을 내려놓으며* 그 장면, 저도 오래 남았어요.');
+        // The sentence goes out while it is written, then whole.
+        assert.deepEqual(events.filter(event => event.type === 'text').map(event => event.text), ['*컵을 내려놓으며* 그 장면, ']);
+        assert.deepEqual(events.filter(event => event.type !== 'text').map(event => event.type), ['host', 'done'], '"없음" is not a photo');
+        assert.equal(events.find(event => event.type === 'host').text, '*컵을 내려놓으며* 그 장면, 저도 오래 남았어요.');
       } else {
         assert.equal(openaiCalled, true, 'GPT answers when Gemini fails');
         assert.equal(events[0].text, 'GPT가 대신 답해요.');
