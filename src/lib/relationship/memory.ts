@@ -163,6 +163,15 @@ export const longMemoryWriteInstructions = `memory_ops: 사용자의 가장 최�
 - close: follow_up의 결과를 사용자가 알려 줘서 끝난 이야기일 때 그 ref를 적는다. 결과가 남길 만하면 add event를 같이 쓴다.
 summary는 사용자에 대한 3인칭 한 문장, 80자 이내로 쓴다. importance는 0~1이고 일회성 잡담은 0.5 미만이다. 쓰지 않는 칸은 빈 문자열로 둔다.
 건강·질병·정신건강, 자해·자살 관련 발언, 성적 지향·성생활, 종교, 정치 성향, 범죄 이력, 주소·연락처·계좌·주민번호 같은 식별 정보, 다른 사람의 사적인 정보는 memory_ops에 쓰지 않는다.`;
+/**
+ * In a story (a scenario) the member plays a role. What they said about themselves as a person stays true of them and
+ * the character may know it in the scene; the real world is not brought into the story. Stories kept memories out
+ * entirely from 2026-10-22 (an opening asked about a real jazz concert); since every conversation became a story the
+ * characters remembered nothing, so memories come back on these terms (2026-10-24).
+ */
+export const longMemoryStoryUseInstructions = `user_memories는 이 사용자가 지난 대화들에서 실제 자기 자신에 대해 말한 것이다(이야기 속 역할이 아니다). ref는 내부 표시라 말하지 않는다. 지금은 이야기 속 장면이므로, 기억은 그 장면 안에서 캐릭터가 이 사람을 알아보는 방식으로만 녹인다: 좋아하는 것과 싫어하는 것, 불리고 싶은 호칭, 원하는 대화나 관계의 방식 같은 것(예: 좋아한다던 술을 건넨다). 이야기에서 빠져나와 현실의 일(일정, 시험, 회사, 약속의 결과)을 묻거나, 현실의 일을 이야기 속 사건으로 바꾸지 않는다. 날짜를 대거나 기억하고 있다고 과시하지 않고, user_memories에 없는 과거는 지어내지 않는다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.`;
+/** What a story may record about the member: only what they say about themselves outside the role. */
+export const longMemoryStoryWriteInstructions = `이야기 속 장면에서 memory_ops는 사용자가 역할이 아닌 실제 자기 자신에 대해 분명히 말한 것만 기록한다: 실제 취향, 불리고 싶은 호칭, 원하는 이야기나 관계의 방식(예: 천천히 가까워지는 로맨스를 좋아함), 이야기 밖에서 말한 실제 일정이나 계획. 사용자가 맡은 역할의 설정, 이야기 속 행동·사건·대사, 장면에 대한 반응은 기록하지 않는다(그것은 memory에 이야기 기록으로 남는다). 역할인지 실제인지 애매하면 기록하지 않는다. 그래서 이야기 속 대부분의 턴은 빈 배열이다.`;
 export const longMemoryInstructions = `${longMemoryUseInstructions}
 ${longMemoryWriteInstructions}`;
 
