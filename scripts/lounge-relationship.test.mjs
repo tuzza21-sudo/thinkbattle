@@ -418,6 +418,7 @@ test('invitations to go somewhere together open up with the relationship: not at
     const stages = config.stages.filter(stage => stage.enabled !== false);
     const outing = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).outing;
     assert.match(outing(stages[0]), /아직 받아들이지 않는다/, `${config.characterId} first stage`);
+    assert.match(outing(stages[0]), /현실의 약속이나 만남처럼 말하지 않는다/, `${config.characterId} a refusal is about the story, not a real appointment`);
     assert.match(outing(stages[1]), stages.length > 2 ? /가볍고 짧은 제안/ : /기꺼이/, `${config.characterId} second stage`);
     assert.match(outing(stages.at(-1)), /기꺼이 받아들여/, `${config.characterId} closest stage`);
   }
