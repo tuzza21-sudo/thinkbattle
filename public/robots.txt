@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /super-admin
+Disallow: /admin
+Disallow: /history
+Disallow: /battle
+Disallow: /simulation
+Disallow: /report
+Disallow: /institution
+Disallow: /argument-library
+Disallow: /lounge/spaces
+Disallow: /lounge/lounge-
+
+Sitemap: https://saseok.kr/sitemap.xml

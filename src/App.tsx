@@ -9,6 +9,7 @@ import { captureMetaClickId, initMetaPixel, trackMetaOnce, trackMetaPageView } f
 import { captureFirstTouch, saveFirstTouch } from './lib/attribution';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { isSuperAdminUser } from './lib/superAdmin';
+import { applySeo, seoFor } from './lib/seo';
 import {
   clearOAuthCallbackError,
   getCurrentUser,
@@ -84,9 +85,12 @@ function App() {
         : normalizedPath.startsWith('/battle/live/') ? '실시간 토론'
           : normalizedPath.startsWith('/simulation/') ? '페르소나 대화'
             : normalizedPath.startsWith('/report/') ? '토론 리포트' : null);
-    document.title = normalizedPath === '/' || normalizedPath.startsWith('/lounge')
-      ? '사석 — 진짜 대화는 사석에서'
-      : pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
+    const seo = seoFor(normalizedPath);
+    if (seo) applySeo(seo);
+    else {
+      document.head.querySelector('meta[name="robots"]')?.remove();
+      document.title = pageTitle ? `${pageTitle} · 생각근육` : '생각근육 ThinkFit — 토론과 대화 훈련';
+    }
   }, [normalizedPath]);
 
   // Ad measurement: the pixel starts once, every screen counts as a page view, and a new member counts once.
