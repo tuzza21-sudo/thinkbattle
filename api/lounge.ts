@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, normalizeLoungeTopicBrief, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -950,10 +950,17 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // One speech request up to its first audio. A request that sends nothing for firstAudioMs is given up.
     // Some hosts speak with Gemini (loungeGeminiSpeech); it sends the same 24 kHz PCM, and OpenAI speaks for it when Gemini fails.
     const geminiKey = process.env.GEMINI_API_KEY, geminiHost = Boolean(geminiKey && loungeGeminiSpeech[host.id]);
+    // The speech engine the member chose in a one-to-one voice room (or the character's own). It speaks only with its
+    // key and a voice for this character; otherwise, and whenever it fails, OpenAI speaks.
+    const chosenSpeech: LoungeSpeechEngine = isLoungeSpeechEngine(body.speech) ? body.speech : loungeDefaultSpeechEngine(host.id);
+    const speechFamily = chosenSpeech === 'gemini' ? 'gemini' : chosenSpeech === 'typecast' ? 'typecast' : chosenSpeech === 'openai' ? undefined : 'eleven';
+    const speechVoice = speechFamily ? loungeEngineVoice(speechFamily, host.id, process.env.LOUNGE_VOICE_IDS) : undefined;
+    const speechKey = speechFamily === 'gemini' ? geminiKey : speechFamily === 'eleven' ? process.env.ELEVENLABS_API_KEY : speechFamily === 'typecast' ? process.env.TYPECAST_API_KEY : undefined;
+    const speechEngine: LoungeSpeechEngine = speechFamily && speechKey && speechVoice ? chosenSpeech : 'openai';
     let speechProvider = 'openai';
     const geminiFailure = () => new LoungeUpstreamError('사회자 음성 서버에서 음성을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_audio_failed', true, 30);
     const geminiSpeechStream = async (text: string, signal: AbortSignal, timeout: number) => {
-      const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${loungeGeminiSpeechModel}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeGeminiSpeechRequest(host.id, text)), signal }, timeout);
+      const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${loungeGeminiSpeechModel}:streamGenerateContent?alt=sse`, { method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeGeminiSpeechRequest(host.id, text, speechFamily === 'gemini' ? speechVoice : undefined)), signal }, timeout);
       if (!response.ok || !response.body) throw geminiFailure();
       const upstream = response.body.getReader(), decoder = new TextDecoder();
       let buffer = '';
@@ -984,6 +991,19 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         cancel() { return upstream.cancel(); },
       });
     };
+    // ElevenLabs streams 24 kHz PCM as it is; Typecast streams 32 kHz WAV, turned into 24 kHz PCM on the way.
+    const engineSpeechStream = async (text: string, signal: AbortSignal, timeout: number): Promise<ReadableStream<Uint8Array>> => {
+      if (speechEngine === 'gemini') return geminiSpeechStream(text, signal, timeout);
+      if (speechEngine === 'typecast') {
+        const response = await fetchTimed('https://api.typecast.ai/v1/text-to-speech/stream', { method: 'POST', headers: { 'X-API-KEY': speechKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeTypecastSpeechRequest(host.id, speechVoice!, text)), signal }, timeout);
+        if (!response.ok || !response.body) throw new Error(`typecast ${response.status}`);
+        const convert = createLoungePcmConverter(32_000);
+        return response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(chunk, controller) { const pcm = convert(chunk); if (pcm.length) controller.enqueue(pcm); } }));
+      }
+      const response = await fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(speechVoice!)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': speechKey!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(host.id, text, speechEngine as 'eleven-flash' | 'eleven-v3')), signal }, timeout);
+      if (!response.ok || !response.body) throw new Error(`elevenlabs ${response.status}`);
+      return response.body;
+    };
     const firstAudio = async (stream: ReadableStream<Uint8Array>) => {
       const reader = stream.getReader();
       try {
@@ -999,11 +1019,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       try {
         const signals = AbortSignal.any([req.signal, signal, hedge, stall.signal]), timeout = loungeSpeechLimits(text).timeoutMs;
         let opened: Awaited<ReturnType<typeof firstAudio>> | undefined;
-        if (geminiHost) {
-          try { opened = await firstAudio(await geminiSpeechStream(text, signals, timeout)); speechProvider = 'gemini'; }
+        if (speechEngine !== 'openai') {
+          try { opened = await firstAudio(await engineSpeechStream(text, signals, timeout)); speechProvider = speechEngine; }
           catch (error) {
             if (signals.aborted) throw error;
-            console.warn('[Lounge speech] gemini failed, speaking with openai', error instanceof Error ? error.message.slice(0, 80) : 'error');
+            console.warn(`[Lounge speech] ${speechEngine} failed, speaking with openai`, error instanceof Error ? error.message.slice(0, 80) : 'error');
           }
         }
         if (!opened) {
@@ -1060,7 +1080,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           } finally { clearTimeout(timer); }
         }
       } catch (error) { stats.failed = true; throw error; }
-      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed, ...(geminiHost ? { provider: speechProvider } : {}) })); }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed, ...(speechEngine !== 'openai' ? { provider: speechProvider } : {}) })); }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'
@@ -1086,8 +1106,20 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           // In a chat the sentence goes out as it is written (about every 50 ms) and starts appearing within a second,
           // instead of all at once when it is complete. Each attempt starts over, so a retry replaces what was shown.
           let partialLength = 0, partialAt = 0, firstPartialAt = 0;
+          // A voice reply starts speaking its first sentence as soon as that sentence is written, and speaks the rest
+          // once the reply is complete: the first audio no longer waits for the whole reply to be written.
+          let earlySpoken = '', earlySpeech: Promise<void> | undefined, earlySpeechError: unknown;
           const sendPartial = (written: string) => {
-            if (!chat || found) return;
+            if (found) return;
+            if (!chat) {
+              // A reply that arrives whole is spoken in one request, as before.
+              if (earlySpeech || replyTextSoFar(written) !== undefined) return;
+              const first = loungeFirstSpokenSentence(replyTextPartial(written) ?? '');
+              if (!first) return;
+              earlySpoken = first;
+              earlySpeech = streamSpeech(first, send, cancelled.signal, value => { reader = value; }).catch(error => { earlySpeechError = error; });
+              return;
+            }
             const partial = replyTextPartial(written);
             if (!partial || partial.length <= partialLength) return;
             const now = performance.now();
@@ -1177,7 +1209,8 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             try {
               try { return await attemptReply(provider); }
               catch (error) {
-                if (found || req.signal.aborted || cancelled.signal.aborted) throw error;
+                // Once the first sentence is being spoken a new attempt would say something else after it.
+                if (found || earlySpeech || req.signal.aborted || cancelled.signal.aborted) throw error;
                 // A chosen Gemini model that fails before any text: GPT answers this turn, so the conversation goes on.
                 if (provider === 'gemini') {
                   console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
@@ -1209,7 +1242,14 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
             // A chat gets the text alone; the voice reads the words without the *actions*.
-            const speech = chat ? Promise.resolve() : streamSpeech(loungeSpokenText(firstText) || firstText, send, cancelled.signal, value => { reader = value; }).catch(error => { speechError = error; });
+            // When the first sentence is already being spoken, only what follows it is spoken now.
+            const spoken = loungeSpokenText(firstText) || firstText;
+            const rest = !earlySpoken ? spoken : spoken.startsWith(earlySpoken) ? spoken.slice(earlySpoken.length).trim()
+              : spoken.includes(earlySpoken) ? spoken.slice(spoken.indexOf(earlySpoken) + earlySpoken.length).trim() : spoken;
+            const speech = chat ? Promise.resolve() : (async () => {
+              if (earlySpeech) { await earlySpeech; if (earlySpeechError) throw earlySpeechError; }
+              if (rest) await streamSpeech(rest, send, cancelled.signal, value => { reader = value; });
+            })().catch(error => { speechError = error; });
             // Save what is shown or spoken right away, so the next turn can start; the summary is written after it. A
             // database without this migration (no finish_voice_lounge_reply) saves the reply the old way, keeping the summary.
             const saving = performance.now();
