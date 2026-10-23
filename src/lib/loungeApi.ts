@@ -148,6 +148,15 @@ export async function loadLounge(id: string) {
   }
   return { room, session, members: results[1].data as LoungeMember[], messages: (results[2].data as LoungeMessage[]).reverse() };
 }
+/**
+ * Whether a room has a message newer than `afterId`: one id at most, the cheap check a one-to-one room makes every
+ * second instead of reading the room, its members and sixty messages (about 15 KB a second per open room before).
+ */
+export async function hasNewLoungeMessage(id: string, afterId: number) {
+  const result = await supabase.from('voice_lounge_messages').select('id').eq('room_id', id).gt('id', afterId).limit(1);
+  if (result.error) throw loungeConnectionError(new Error(result.error.message), '대화방 상태 서버');
+  return (result.data?.length ?? 0) > 0;
+}
 export async function reviewLoungeInteraction(roomId: string, messageId?: number) {
   return interactionRequest({ roomId, action: 'review', ...(messageId ? { messageId } : {}) });
 }

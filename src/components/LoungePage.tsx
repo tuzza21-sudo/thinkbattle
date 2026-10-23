@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
 import { getLoungeHost, getLoungeHostLoudness, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeSpeechStorageKey, type LoungeSpeechEngine, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
-import { type LoungeSpeechUsage, LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, loadLoungeSpeechUsage, postLoungeText, resumeLoungeChat, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
+import { type LoungeSpeechUsage, LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, loadLoungeSpeechUsage, postLoungeText, resumeLoungeChat, hasNewLoungeMessage, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
@@ -715,22 +715,27 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   useEffect(() => {
     if (!isHost || room?.status !== 'active') return;
     let cancelled = false, running = false;
+    // A one-to-one room has nobody else to protect in its voice room: it asks the server only to review a new message,
+    // and to apply a restriction to the call while one is still waiting (a group room checks every time).
+    let syncPending = false;
     const check = async () => {
       if (running || cancelled || interactionBlockedRoom.current === roomId) return;
+      const latest = current.current.room, oneToOne = Boolean(latest && latest.capacity === 1 && !latest.space_id);
+      const message = current.current.messages.find(item => item.kind === 'human' && item.reviewed_at === null
+        && (item.review_attempts ?? 0) < 3 && Date.parse(item.created_at) > Date.now() - 120_000);
+      if (oneToOne && !message && !syncPending) return;
       running = true;
       let safetyError = '';
       try {
-        try { await syncLoungeSafety(roomId); }
+        if (!oneToOne || syncPending) try { await syncLoungeSafety(roomId); syncPending = false; }
         catch (err) {
           safetyError = errorText(err);
           if (!cancelled) reportInteractionError(err);
         }
         if (cancelled || interactionBlockedRoom.current === roomId) return;
-        const message = current.current.messages.find(item => item.kind === 'human' && item.reviewed_at === null
-          && (item.review_attempts ?? 0) < 3 && Date.parse(item.created_at) > Date.now() - 120_000);
         if (message) {
           const result = await reviewLoungeInteraction(roomId, message.id);
-          if (result.voiceSyncPending) safetyError = '발언 제한의 음성 연결 반영을 다시 시도하고 있어요.';
+          if (result.voiceSyncPending) { safetyError = '발언 제한의 음성 연결 반영을 다시 시도하고 있어요.'; syncPending = true; }
         }
         if (!cancelled && interactionBlockedRoom.current !== roomId) { setInteractionError(safetyError); await refreshAfterMessage(); }
       } catch (err) { if (!cancelled) reportInteractionError(err); }
@@ -749,10 +754,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const userId = user?.id, userNickname = user?.nickname;
   useEffect(() => {
     if (!userId || !userNickname) return;
-    let cancelled = false, refreshing = false, joined = false;
+    let cancelled = false, refreshing = false, joined = false, lastMessageId = 0, ticks = 0;
     const refresh = async () => {
       if (refreshing) return; refreshing = true;
-      try { const state = await loadLounge(roomId); if (!cancelled) { clearRoomNetworkError(); setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages); } }
+      try {
+        const state = await loadLounge(roomId);
+        if (!cancelled) { clearRoomNetworkError(); setRoom(state.room); applySession(state.session ?? null); setMembers(state.members); setMessages(state.messages); lastMessageId = Math.max(0, ...state.messages.map(message => message.id)); }
+      }
       catch (err) {
         if (!cancelled) {
           if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') joined = false;
@@ -768,7 +776,17 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (opened && opened !== roomId) { navigate(`/lounge/${opened}`, { replace: true }); return; }
       return joinLounge(roomId, userNickname).then(() => { if (!cancelled) { joined = true; void refresh(); } });
     }).catch(err => { if (!cancelled) setError(errorText(err)); });
-    const interval = setInterval(() => { if (joined) void refresh(); }, 1000);
+    // A group room changes every second (people, turns); a one-to-one room changes when a message arrives. There the
+    // page reads the whole room every ten seconds and in between only asks for a newer message id, reading the room
+    // again at once when there is one: about one small request a second instead of three large ones.
+    const poll = async () => {
+      if (!joined || refreshing) return;
+      const latest = current.current.room;
+      if (!(latest && latest.capacity === 1 && !latest.space_id && lastMessageId) || ++ticks % 10 === 0) { await refresh(); return; }
+      try { if (await hasNewLoungeMessage(roomId, lastMessageId) && !cancelled) await refresh(); }
+      catch (err) { if (!cancelled) reportRoomError(err); }
+    };
+    const interval = setInterval(() => void poll(), 1000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [roomId, userId, userNickname, retry, applySession, reportRoomError, clearRoomNetworkError, navigate]);
   useEffect(() => {
