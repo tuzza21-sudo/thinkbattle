@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { ArrowLeft, ArrowRight, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Play, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
@@ -227,7 +227,7 @@ function RoomView(props: RoomViewProps) {
   const hostCharacter = getLoungeCharacter(props.hostId), hostTitle = hostCharacter ? `${hostCharacter.job} ${hostCharacter.name}` : host.name;
   const microphoneControl = <button type="button" className={`lounge-mic-button ${props.micOn ? 'on' : ''}`} onClick={props.onMic} aria-pressed={props.micOn} title={restricted ? '발언 제한이 해제되면 마이크를 켤 수 있어요' : props.preview ? '마이크는 실제 방에서 사용할 수 있어요' : undefined} disabled={restricted || props.preview || ended || !props.connected || !props.audioReady}>{props.micOn ? <Mic size={16} /> : <MicOff size={16} />}{props.micOn ? '마이크 끄기' : '마이크 켜기'}</button>;
   // A one-to-one chat needs no voice connection; the voice is turned on from the bottom bar.
-  const voiceToggle = solo && !ended && props.onVoiceToggle && <button type="button" className={`lounge-mic-button lounge-voice-toggle ${props.chat ? '' : 'on'}`} aria-pressed={!props.chat} onClick={props.onVoiceToggle} disabled={props.voiceBusy || (props.chat && props.voiceLocked)} title={props.chat && props.voiceLocked ? '오늘 음성 대화 시간을 다 썼어요' : undefined}>{props.voiceBusy ? <LoaderCircle size={16} className="lounge-spin" /> : props.chat ? <Headphones size={16} /> : <MessageCircle size={16} />}{props.chat ? '음성으로 대화' : '채팅으로 대화'}</button>;
+  const voiceToggle = solo && !ended && props.onVoiceToggle && <button type="button" className={`lounge-mic-button lounge-voice-toggle ${props.chat ? 'lounge-call-start' : 'on'}`} aria-pressed={!props.chat} onClick={props.onVoiceToggle} disabled={props.voiceBusy || (props.chat && props.voiceLocked)} title={props.chat && props.voiceLocked ? '오늘 통화 시간을 다 썼어요' : props.chat ? '캐릭터에게 전화를 걸어 목소리로 대화해요' : undefined}>{props.voiceBusy ? <LoaderCircle size={16} className="lounge-spin" /> : props.chat ? <Phone size={16} /> : <MessageCircle size={16} />}{props.chat ? '전화 연결' : '채팅으로 대화'}</button>;
   const needsConnection = !props.preview && !ended && !props.chat && (!props.connected || !props.audioReady || (solo && props.status === 'lobby'));
   const liveSpeakers = ended || props.status === 'lobby' ? [] : props.members.filter(member => props.speakers.includes(member.id));
   const hostSpeaking = props.aiSpeaking && !ended;
