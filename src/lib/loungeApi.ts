@@ -224,6 +224,11 @@ export async function listLoungeScenarios(characterId: string): Promise<LoungeSc
 /** Opens (or continues) a one-to-one chat in a scenario; returns the room id. */
 export const startLoungeScenario = (id: string, nickname: string) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname });
 /** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
+/** A member's one-to-one conversation in their chat list: the latest with each character they have talked with. */
+export type LoungeChatSummary = { room_id: string; character_id: string; story: string | null; last_text: string; last_kind: string; last_at: string; open: boolean; character_name: string | null; character_portrait: string | null };
+export const listLoungeChats = () => loungeRpc<LoungeChatSummary[]>('list_my_lounge_chats', {});
+/** Opens a member's own one-to-one conversation again and returns the room to open (a long one goes on in a new room). */
+export const resumeLoungeChat = (roomId: string) => loungeRpc<string>('resume_lounge_chat', { p_room: roomId });
 export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc<string>('start_lounge_custom_chat', { p_character: id, p_nickname: nickname });
 export const setLoungeCustomStatus = (id: string, action: 'submit' | 'private' | 'delete') => loungeRpc<string>('set_lounge_custom_character_status', { p_character: id, p_action: action });
 export type LoungePhotoUsage = { enabled: boolean; daily: number; used: number };

@@ -573,6 +573,20 @@ export function loungeFirstSpokenSentence(partial: string) {
   const match = /^(.*?[.!?…~][.!?…~"”’'」)]*)\s+\S/.exec(spoken);
   return match && match[1].replace(/[\s"“”'‘’]/g, '').length >= 2 ? match[1].trim() : undefined;
 }
+/**
+ * How long a member was away before their latest message, in words, when it is long enough to notice (3 hours or
+ * more): a conversation picked up again from the chat list. Messages are oldest first, with their times.
+ */
+export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
+  let latest = -1;
+  for (let index = messages.length - 1; index >= 0; index--) if (messages[index].kind === 'human') { latest = index; break; }
+  if (latest < 1) return undefined;
+  const gap = messages[latest].at - messages[latest - 1].at;
+  if (!Number.isFinite(gap) || gap < 3 * 3_600_000) return undefined;
+  const hours = Math.round(gap / 3_600_000), days = Math.round(gap / 86_400_000);
+  return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
+}
+export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다.';
 export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */

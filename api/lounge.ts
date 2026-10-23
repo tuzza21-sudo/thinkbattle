@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -555,8 +555,8 @@ export default async function handler(req: Request): Promise<Response> {
     // character's knowledge and the user's memories) starts at once instead of after the rest of the context. On
     // 2026-10-21 the knowledge lookup started only after it and added 0.25-1.28 s (0.68 s on average) to every reply.
     const lookupGiveUp = new AbortController();
-    const messagesRead = fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text`, { headers })
-      .then(response => response.ok ? readJson<Array<{ nickname: string; kind: string; text: string }>>(response, 'lounge') : null);
+    const messagesRead = fetchTimed(`${url}/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(roomId)}&order=id.desc&limit=24&select=id,user_id,nickname,kind,text,created_at`, { headers })
+      .then(response => response.ok ? readJson<Array<{ nickname: string; kind: string; text: string; created_at?: string }>>(response, 'lounge') : null);
     messagesRead.catch(() => {});
     const lookupQuery = messagesRead.then(rows => rows ? loungeKnowledgeQuery([...rows].reverse().filter(message => message.kind === 'human').map(message => message.text)) : '', () => '');
     let embedMs: number | undefined, embedHedged = false;
@@ -720,6 +720,9 @@ export default async function handler(req: Request): Promise<Response> {
       memories: askerRows ? selectMemoriesForPrompt(askerRows, groupConfig.characterId, new Date()).forPrompt : [],
     } : undefined;
     const recent = messages.reverse();
+    // A conversation picked up again after a while (the chat list opens it where it was left): how long the member was
+    // away before their latest message, so the character notices that time has passed.
+    const timeAway = loungeTimeAway(recent.map(message => ({ kind: message.kind, at: Date.parse(message.created_at ?? '') })));
     const fullHumanMessages = new Set(recent.filter(message => message.kind === 'human').slice(-2));
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
@@ -728,9 +731,9 @@ export default async function handler(req: Request): Promise<Response> {
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(scenario ? { scenario } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
-      first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind,
+      first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
       ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
-      recent: recent.map(message => ({ ...message, text: fullHumanMessages.has(message) ? message.text.slice(0, 1200)
+      recent: recent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(recent[index]) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
     const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character) : '';
@@ -854,6 +857,7 @@ ${photoRule}`;
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
+        timeAway ? loungeTimeAwayInstruction : '',
         longMemory ? (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         story ? storyInstruction : roleInstruction,
         // A story room with the voice on keeps to the story, in the voice rules.

@@ -2817,3 +2817,35 @@ test('reply suggestions need a seat in the room, are spaced out and return spoke
     assert.equal(response.status, 403); assert.equal(paid, 0, 'a non-member never reaches the model');
   });
 });
+
+test('a conversation picked up after a while tells the character how long the member was away', async () => {
+  const hour = 3_600_000, at = Date.parse('2026-10-20T12:00:00Z');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 2 * hour }]), undefined, 'two hours is the same sitting');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 5 * hour }]), '5시간');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'human', at }, { kind: 'host', at: at + 60_000 }, { kind: 'human', at: at + 3 * 24 * hour }]), '3일');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'host', at }, { kind: 'human', at: at + 65 * 24 * hour }]), '2달');
+  assert.equal(lounge.loungeTimeAway([{ kind: 'human', at }]), undefined, 'nothing before it');
+  let context;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 9 }]);
+    if (url.includes('voice_lounge_messages?')) {
+      assert.ok(url.includes('created_at'), 'the times are read');
+      return result([{ id: 2, kind: 'human', nickname: '나', text: '나 왔어', created_at: new Date(Date.now() - 60_000).toISOString() }, { id: 1, kind: 'host', nickname: 'AI', text: '내일 봐요.', created_at: new Date(Date.now() - 2 * 24 * hour).toISOString() }]);
+    }
+    if (url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      if (!context) { context = JSON.parse(body.input); assert.ok(body.instructions.includes('time_away'), 'the instruction says what it means'); }
+      return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '오랜만이네요.', memory: '' }) }] }] });
+    }
+    if (url.includes('finish_voice_lounge')) return result(true);
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
+    return result(null);
+  }, async () => {
+    await handler(request({ action: 'host', roomId, reason: 'followup', stream: true })).then(response => response.text());
+  });
+  assert.equal(context.time_away, '2일');
+  assert.ok(context.recent.every(message => !('created_at' in message)), 'the times themselves are not sent to the model');
+});
