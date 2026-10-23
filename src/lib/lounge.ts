@@ -427,7 +427,11 @@ export const loungeHelpOptions: ReadonlyArray<{ kind: Exclude<LoungeHelpKind, 'd
 ];
 export const isLoungeHelpKind = (value: unknown): value is LoungeHelpKind => ['spark', 'question', 'opinion', 'topic', 'summary', 'direct'].includes(String(value));
 export const loungeMinimumParticipants = (capacity: number) => capacity === 1 ? 1 : 2;
-export const loungeHostCooldownMs = (capacity: number) => capacity === 1 ? 5000 : 10_000;
+/**
+ * The least time between two AI turns. A chat answers each message as it comes: its reply is saved before the next
+ * turn starts, so it needs only a short guard against a loop; the 5 seconds made quick replies wait (2026-10-21).
+ */
+export const loungeHostCooldownMs = (capacity: number, chat = false) => chat ? 1000 : capacity === 1 ? 5000 : 10_000;
 /**
  * One-to-one pacing. A 1-second pause ends the user's turn (people can talk over the AI to
  * take it back), the reply starts 0.3 seconds after the transcript is saved, and the AI may
@@ -448,11 +452,13 @@ export const loungeGroupSilenceGapMs = 120_000;
 // Groups are people talking to each other: the AI speaks when asked, and at most
 // once into a real silence after people have spoken since its last words.
 export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0): 'opening' | 'followup' | 'silence' | 'requested' | null {
-  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity)) return null;
+  const chat = isLoungeChatRoom(room);
+  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity, chat)) return null;
   const human = messages.filter(message => message.kind === 'human').at(-1);
   const host = messages.filter(message => message.kind === 'host').at(-1);
   if (room.capacity === 1) {
-    if (now - lastHostEnded < loungeSoloTiming.afterAiMs || now - inputReadyAt < loungeSoloTiming.settleAfterTranscriptMs || now - lastActivity < loungeSoloTiming.endOfTurnMs) return null;
+    // These pauses wait out speech (the person finishing, the AI's voice ending); a chat has none to wait for.
+    if (!chat && (now - lastHostEnded < loungeSoloTiming.afterAiMs || now - inputReadyAt < loungeSoloTiming.settleAfterTranscriptMs || now - lastActivity < loungeSoloTiming.endOfTurnMs)) return null;
     if (human && (!host || human.id > host.id)) return 'followup';
     if (!host && now - Date.parse(room.started_at || room.created_at) >= 1500) return 'opening';
     return null;

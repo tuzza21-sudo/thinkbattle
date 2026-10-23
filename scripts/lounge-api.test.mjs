@@ -1386,6 +1386,12 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   assert.equal(lounge.nextLoungeHostReason(room, messages, now, now - 2500, now - 6000, now - 3500, now - 200), null, 'settle after transcription is saved');
   assert.equal(lounge.loungeSpeechPauseMs(1), 1000);
   assert.equal(lounge.loungeSpeechPauseMs(6), 950);
+  // A chat has no voice to wait out: a message is answered right after the last reply, guarded only against a loop.
+  const chat = { ...room, space_id: null, voice_on: false };
+  assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 1500, now - 100, now - 50), 'followup');
+  assert.equal(lounge.nextLoungeHostReason(chat, messages, now, now - 100, now - 500, now - 100, now - 50), null, 'one second between two turns');
+  assert.equal(lounge.nextLoungeHostReason({ ...chat, voice_on: true }, messages, now, now - 100, now - 1500, now - 100, now - 50), null, 'with the voice on it waits as before');
+  assert.equal(lounge.loungeHostCooldownMs(1, true), 1000); assert.equal(lounge.loungeHostCooldownMs(1), 5000);
 });
 
 test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
@@ -1888,6 +1894,8 @@ test('the deep model reasons in a chat; a voice reply and the fast model do not'
     assert.equal(body.max_output_tokens >= 3000, effort !== 'none', 'reasoning gets room in the output limit');
     // Nobody waits for the call after the reply, so it reasons a little whichever model answers.
     assert.equal(after.reasoning.effort, 'low');
+    // Each kind of request keeps to one cache.
+    assert.equal(body.prompt_cache_key, 'lounge-ina'); assert.equal(after.prompt_cache_key, 'lounge-after-reply');
   }
 });
 
@@ -1963,8 +1971,12 @@ test('a chat reply can come with a photo: the scene goes to the browser after th
 test('a chat reply is text only and the model is told it is a chat', async () => {
   const { spoken, input, instructions, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
-  // A chat reply comes with the character's actions, and the member's actions and thoughts are read from context.
-  assert.match(instructions, /거의 모든 답변에 네 행동·표정·시선·몸짓·주변 분위기를 별표로 감싼 지문 1~3개/);
+  // A chat reply has the character's actions only where they mean something, never the same prop or gesture again;
+  // the member's actions and thoughts are read from context.
+  assert.match(instructions, /지문\(별표로 감싼 네 행동·표정·몸짓\)은 의미가 있을 때만 0~2개 넣는다/);
+  assert.match(instructions, /그런 순간이 아니면 지문 없이 대사만 쓴다/);
+  assert.match(instructions, /recent에서 네가 최근에 쓴 동작·소품·표정은 다시 쓰지 않는다/);
+  assert.doesNotMatch(instructions, /거의 모든 답변에/);
   // Reactions are big but stay in character; voice replies react in words instead of stage directions.
   assert.match(instructions, /반응을 미지근하게 하지 않는다/);
   assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
