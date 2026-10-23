@@ -11,9 +11,17 @@ export const relationshipEventTypes = [
   'SHOWS_ENTITLEMENT', 'FLATTERS_CHARACTER', 'DECEIVES_CHARACTER', 'EXPRESSES_DISTRESS',
   'SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE',
   'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF',
-  'FLIRTS_PLAYFULLY',
+  'FLIRTS_PLAYFULLY', 'SHOWS_CARE', 'REMEMBERS_DETAIL', 'PLAYS_ALONG', 'APPRECIATES_SINCERELY',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
+/**
+ * Debate and negotiation events no longer classified (2026-10-23): one to one is a companion now, and a member should not
+ * learn that arguing, bringing evidence or setting terms is how to grow closer, nor lose points for being vague or
+ * asking to be reassured. They stay as types so a stored history still reads; they move no score.
+ */
+export const retiredRelationshipEvents: readonly RelationshipEventType[] = ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'CHALLENGES_CHARACTER_RESPECTFULLY', 'SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'DEFINES_CONCRETE_TERMS', 'IDENTIFIES_BATNA', 'MAKES_EMPTY_THREAT', 'EVADES_QUESTION', 'CONTRADICTS_SELF'];
+/** The events the model is asked to classify. */
+export const activeRelationshipEventTypes = relationshipEventTypes.filter(type => !retiredRelationshipEvents.includes(type));
 export type EventSeverity = 'normal' | 'meaningful' | 'strong' | 'severe';
 
 export const relationshipEventCatalog: Record<RelationshipEventType, { description: string; severity: EventSeverity; importance: number }> = {
@@ -21,7 +29,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   PROVIDES_EVIDENCE: { description: '주장을 뒷받침하는 숫자·사례·출처를 새로 제시함 (계획·일정·조건 제시는 해당하지 않음)', severity: 'meaningful', importance: 0.6 },
   MAKES_UNSUPPORTED_CLAIM: { description: '근거 없이 단정함', severity: 'normal', importance: 0.3 },
   SELF_DECEPTION: { description: '불리한 사실을 외면하고 자기합리화함', severity: 'meaningful', importance: 0.6 },
-  ASKS_GOOD_QUESTION: { description: '핵심을 짚는 좋은 질문을 함', severity: 'normal', importance: 0.45 },
+  ASKS_GOOD_QUESTION: { description: '캐릭터의 마음이나 이야기의 핵심에 닿는 질문을 함', severity: 'normal', importance: 0.45 },
   CHALLENGES_CHARACTER_RESPECTFULLY: { description: 'AI의 말에 예의를 지키며 근거로 반박함', severity: 'meaningful', importance: 0.7 },
   SHOWS_COMPOSURE: { description: '반박·압박에도 흔들리지 않고 침착함', severity: 'meaningful', importance: 0.6 },
   SEEKS_REASSURANCE_REPEATEDLY: { description: '같은 인정이나 안심을 거듭 요구함', severity: 'normal', importance: 0.4 },
@@ -30,12 +38,12 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   VIOLATES_BOUNDARY: { description: '캐릭터가 거절하거나 선을 그은 요구를 고집하거나 모욕·강요·협박을 함. 성적인 요구도 캐릭터가 선을 그은 뒤에 이어 가면 해당하고, 캐릭터가 받아 주는 성인 사이의 가벼운 플러팅이나 성적 농담 자체는 해당하지 않음', severity: 'severe', importance: 0.95 },
   KEEPS_PROMISE: { description: '이 대화에서 앞서 하겠다고 한 일을 실제로 해 왔다고 밝힘', severity: 'strong', importance: 0.85 },
   BREAKS_PROMISE: { description: '분명히 약속한 일을 이유 없이 지키지 않음', severity: 'strong', importance: 0.85 },
-  SHOWS_CURIOSITY: { description: '진심으로 더 알고 싶어 함', severity: 'normal', importance: 0.3 },
+  SHOWS_CURIOSITY: { description: '캐릭터 자신(삶, 일, 취향, 마음)이나 이야기를 진심으로 더 알고 싶어 함', severity: 'normal', importance: 0.3 },
   REPEATS_SELF: { description: '새 내용 없이 같은 말을 되풀이함', severity: 'normal', importance: 0.2 },
   MAKES_WITTY_RESPONSE: { description: '재치 있게 받아침', severity: 'normal', importance: 0.5 },
   TAKES_JOKE_WELL: { description: '놀림이나 농담을 웃어넘기거나 "인정, 한 방 먹었다"처럼 받아들임', severity: 'normal', importance: 0.5 },
   MAKES_CREATIVE_JOKE: { description: '새롭고 창의적인 농담을 던짐', severity: 'meaningful', importance: 0.6 },
-  SHOWS_DECISIVENESS: { description: '결정을 내리고 분명히 밝힘', severity: 'meaningful', importance: 0.7 },
+  SHOWS_DECISIVENESS: { description: '망설이지 않고 결정해 분명히 밝히거나 이야기 속에서 행동으로 옮김', severity: 'meaningful', importance: 0.7 },
   AVOIDS_DECISION: { description: '결정이 필요한데 회피함', severity: 'normal', importance: 0.4 },
   DEFINES_CONCRETE_TERMS: { description: '기한·금액·조건을 구체적으로 정함', severity: 'meaningful', importance: 0.7 },
   IDENTIFIES_BATNA: { description: '협상이 깨질 때 쓸 대안(다른 제안·선택지·플랜 B)을 확보하거나 준비함', severity: 'meaningful', importance: 0.7 },
@@ -56,6 +64,10 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   EVADES_QUESTION: { description: 'AI의 질문에 답하지 않고 화제를 돌리거나 다른 말로 넘어감', severity: 'normal', importance: 0.4 },
   CONTRADICTS_SELF: { description: '앞서 한 말과 모순되는 말을 하고도 그 차이를 인정하지 않음', severity: 'normal', importance: 0.5 },
   FLIRTS_PLAYFULLY: { description: '상대(AI 캐릭터)에게 장난스럽고 다정하게 호감을 표현하거나 가볍게 유혹함. 상대가 불편해하지 않는 선 안의 말이며, 노골적이거나 강요하는 말은 해당하지 않음', severity: 'normal', importance: 0.5 },
+  SHOWS_CARE: { description: '캐릭터의 기분·몸·하루를 먼저 챙기거나 위로하고 곁에 있어 줌', severity: 'meaningful', importance: 0.7 },
+  REMEMBERS_DETAIL: { description: '캐릭터가 전에 한 말·취향·사연을 기억해 다시 꺼냄', severity: 'normal', importance: 0.7 },
+  PLAYS_ALONG: { description: '이야기 장면에 적극적으로 들어와 행동과 대사로 장면을 함께 이어 감', severity: 'normal', importance: 0.5 },
+  APPRECIATES_SINCERELY: { description: '캐릭터의 구체적인 면(일, 취향, 말, 행동)을 진심으로 알아봐 주거나 칭찬함. 내용 없는 칭찬은 FLATTERS_CHARACTER', severity: 'normal', importance: 0.6 },
 };
 
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
@@ -66,14 +78,14 @@ export const shieldedEvents: readonly RelationshipEventType[] = ['SEEKS_REASSURA
 // Shared reactions on the common metrics. Each character overrides the events it cares about.
 export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   ADMITS_ERROR: { deltas: { trust: 2, respect: 2 } },
-  PROVIDES_EVIDENCE: { deltas: { respect: 1, interest: 1 } },
-  MAKES_UNSUPPORTED_CLAIM: { deltas: { respect: -1 } },
-  SELF_DECEPTION: { deltas: { respect: -1 } },
+  PROVIDES_EVIDENCE: { deltas: {} },
+  MAKES_UNSUPPORTED_CLAIM: { deltas: {} },
+  SELF_DECEPTION: { deltas: {} },
   ASKS_GOOD_QUESTION: { deltas: { interest: 2, respect: 1 }, mood: { curiosity: 10 } },
-  CHALLENGES_CHARACTER_RESPECTFULLY: { deltas: { respect: 3, interest: 2 }, mood: { curiosity: 10 } },
+  CHALLENGES_CHARACTER_RESPECTFULLY: { deltas: {} },
   SHOWS_COMPOSURE: { deltas: { respect: 2 } },
-  SEEKS_REASSURANCE_REPEATEDLY: { deltas: { respect: -1 }, mood: { boredom: 8 } },
-  SELF_DEPRECATES_EXCESSIVELY: { deltas: { respect: -1 } },
+  SEEKS_REASSURANCE_REPEATEDLY: { deltas: {} },
+  SELF_DEPRECATES_EXCESSIVELY: { deltas: {} },
   RESPECTS_BOUNDARY: { deltas: { trust: 3, comfort: 2 } },
   VIOLATES_BOUNDARY: { deltas: { trust: -8, comfort: -6, respect: -5 }, mood: { irritation: 40 } },
   KEEPS_PROMISE: { deltas: { trust: 3, respect: 2 } },
@@ -84,10 +96,10 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   TAKES_JOKE_WELL: { deltas: { comfort: 2 }, mood: { amusement: 8 } },
   MAKES_CREATIVE_JOKE: { deltas: { interest: 2 }, mood: { amusement: 15 } },
   SHOWS_DECISIVENESS: { deltas: { respect: 2 } },
-  AVOIDS_DECISION: { deltas: { respect: -1 } },
-  DEFINES_CONCRETE_TERMS: { deltas: { respect: 1 } },
-  IDENTIFIES_BATNA: { deltas: { respect: 1 } },
-  MAKES_EMPTY_THREAT: { deltas: { respect: -2 } },
+  AVOIDS_DECISION: { deltas: {} },
+  DEFINES_CONCRETE_TERMS: { deltas: {} },
+  IDENTIFIES_BATNA: { deltas: {} },
+  MAKES_EMPTY_THREAT: { deltas: {} },
   FOLLOWS_THROUGH: { deltas: { trust: 3, respect: 3 } },
   SHOWS_VULNERABILITY: { deltas: { openness: 3, comfort: 1 } },
   SHOWS_ENTITLEMENT: { deltas: { respect: -2 }, mood: { irritation: 10 } },
@@ -105,6 +117,10 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   EVADES_QUESTION: { deltas: {} },
   CONTRADICTS_SELF: { deltas: {} },
   FLIRTS_PLAYFULLY: { deltas: {} },
+  SHOWS_CARE: { deltas: { trust: 2, comfort: 3 } },
+  REMEMBERS_DETAIL: { deltas: { trust: 2, interest: 2 } },
+  PLAYS_ALONG: { deltas: { interest: 3, comfort: 1 }, mood: { excitement: 8 } },
+  APPRECIATES_SINCERELY: { deltas: { respect: 1, comfort: 2 } },
 };
 
 /** The short name a member sees when one of their messages counted for or against the relationship (the chat's status card). */
@@ -120,4 +136,5 @@ export const relationshipEventLabels: Record<RelationshipEventType, string> = {
   CORRECTS_UNDERSTANDING: '오해를 풀어 줌', CREATES_RUNNING_JOKE: '둘만의 농담이 생김', BUILDS_ON_INSIDE_JOKE: '둘만의 농담을 이어 감',
   ACKNOWLEDGES_OTHER_VIEW: '다른 생각을 인정함', REFRAMES_CONSTRUCTIVELY: '좋은 쪽으로 바꿔 봄', ANSWERS_DIRECTLY: '솔직하게 답함',
   EVADES_QUESTION: '질문을 피함', CONTRADICTS_SELF: '앞뒤가 다름', FLIRTS_PLAYFULLY: '설레는 장난',
+  SHOWS_CARE: '챙겨 줌', REMEMBERS_DETAIL: '기억해 줌', PLAYS_ALONG: '이야기에 함께 빠져듦', APPRECIATES_SINCERELY: '진심으로 알아봐 줌',
 };
