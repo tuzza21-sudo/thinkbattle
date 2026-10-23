@@ -20,7 +20,8 @@ const knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const repliesLib = compile('../src/lib/loungeReplies.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const modelsLib = compile('../src/lib/loungeModels.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -1754,6 +1755,51 @@ test('a member\'s character speaks as itself, with its own relationship type; an
     assert.equal(JSON.parse(body.input).relationship.stage.id, 'DISMISSIVE', 'the slow-burn type starts at a distance');
     assert.equal(Boolean(body.text.format.schema.properties.photo), portraitSource === 'ai');
   }
+});
+
+test('a room set to Gemini sends the same instructions and JSON shape there; if Gemini fails, GPT answers', async () => {
+  const savedKey = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = 'gemini-key';
+  const sse = events => new Response(events.map(event => `data: ${JSON.stringify(event)}\r\n\r\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
+  try {
+    for (const geminiWorks of [true, false]) {
+      let geminiBody, openaiCalled = false;
+      const events = [];
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: false, ai_model: 'gemini-flash' }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+        if (url.includes(':streamGenerateContent')) {
+          assert.match(url, /models\/gemini-3\.8-flash:streamGenerateContent\?alt=sse/); assert.equal(init.headers['x-goog-api-key'], 'gemini-key');
+          geminiBody = JSON.parse(init.body);
+          if (!geminiWorks) return result({ error: { code: 503 } }, 503);
+          return sse([
+            { candidates: [{ content: { parts: [{ text: '{"text": "*컵을 내려놓으며* 그 장면, ' }] } }] },
+            { candidates: [{ content: { parts: [{ text: '저도 오래 남았어요.", "memory": "", "photo": "없음", "photo_asked": false}' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 9000, candidatesTokenCount: 60, cachedContentTokenCount: 8800 } },
+          ]);
+        }
+        if (url.endsWith('/responses')) { openaiCalled = true; return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: 'GPT가 대신 답해요.', memory: '', photo: '', photo_asked: false }) }] }] }); }
+        if (url.includes('finish_voice_lounge_host')) return result(true);
+        throw new Error(`Unexpected ${url}`);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+        events.push(...(await response.text()).trim().split('\n').map(line => JSON.parse(line)));
+      });
+      assert.equal(geminiBody.generationConfig.responseMimeType, 'application/json');
+      assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'text', 'the same JSON shape, text first');
+      assert.match(geminiBody.systemInstruction.parts[0].text, /reply_medium=chat이면/, 'the same instructions');
+      assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
+      if (geminiWorks) {
+        assert.equal(openaiCalled, false);
+        assert.deepEqual(events.map(event => event.type), ['host', 'done'], '"없음" is not a photo');
+        assert.equal(events[0].text, '*컵을 내려놓으며* 그 장면, 저도 오래 남았어요.');
+      } else {
+        assert.equal(openaiCalled, true, 'GPT answers when Gemini fails');
+        assert.equal(events[0].text, 'GPT가 대신 답해요.');
+      }
+    }
+  } finally { if (savedKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = savedKey; }
 });
 
 test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {

@@ -220,6 +220,8 @@ export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc
 export const setLoungeCustomStatus = (id: string, action: 'submit' | 'private' | 'delete') => loungeRpc<string>('set_lounge_custom_character_status', { p_character: id, p_action: action });
 export type LoungePhotoUsage = { enabled: boolean; daily: number; used: number };
 export const getMyLoungePhotoUsage = () => loungeRpc<LoungePhotoUsage | null>('get_my_lounge_photo_usage', {});
+/** The conversation model of the member's own one-to-one room (src/lib/loungeModels.ts). */
+export const setLoungeModel = (roomId: string, model: string) => loungeRpc<string>('set_voice_lounge_model', { p_room: roomId, p_model: model });
 /** Turns the character's voice on or off in the member's own one-to-one room; off, the talk is a chat. */
 export const setLoungeVoice = (roomId: string, on: boolean) => loungeRpc<boolean>('set_voice_lounge_voice', { p_room: roomId, p_on: on });
 /** Puts text into the conversation as the member's own turn, like a spoken one. */
