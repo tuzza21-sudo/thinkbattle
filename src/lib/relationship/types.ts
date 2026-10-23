@@ -83,11 +83,22 @@ export type TurnLog = {
 };
 
 export type MetricView = { label: string; score?: number };
+/** What one turn changed, sent to the page as soon as it is saved: what the member did, the scores it moved, a stage change. */
+export type RelationshipChange = {
+  events: Array<{ type: string; label: string; up: boolean }>;
+  delta: Record<string, number>;
+  stage: 'promoted' | 'demoted' | null;
+};
 export type RelationshipView = {
   characterId: string;
   /** What the character remembers about the user, shown to the user. */
   remembered?: Array<{ kind: string; label: string; summary: string; followUp?: string }>;
   macroState: { id: string; label: string };
+  /**
+   * The stage for the chat's status card: its place among the enabled stages (from 0), how many there are, its line,
+   * the next stage's name and how close the scores are to it (0-1; 1 at the last stage).
+   */
+  stage: { index: number; total: number; line: string; next?: string; progress: number };
   metrics: Record<string, MetricView & { name: string }>;
   debug?: {
     scores: Scores;

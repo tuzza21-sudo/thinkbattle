@@ -1,5 +1,5 @@
-import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventTypes, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
-import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
+import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventLabels, relationshipEventTypes, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
+import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipChange, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
 
 export const relationshipSettings = {
   minConfidence: 0.6,
@@ -229,21 +229,45 @@ export function metricName(config: RelationshipConfig, metric: string) {
   return config.uniqueMetrics.find(item => item.id === metric)?.name ?? commonNames[metric] ?? metric;
 }
 
-/** Labels for everyone; raw scores and history only when `debug` is requested by a developer. */
+/** How close the scores are to a stage's entry: the mean share of each minimum reached (0-1). */
+function stageProgress(scores: Scores, condition: StageCondition) {
+  const minimums = Object.entries(condition.min ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0);
+  if (!minimums.length) return 1;
+  const share = minimums.reduce((sum, [metric, value]) => sum + Math.min(1, (scores[metric] ?? 0) / value), 0) / minimums.length;
+  return Math.round(share * 100) / 100;
+}
+
+/**
+ * The stage, labels and scores for everyone (the chat shows them as a status card with bars, so a member sees the
+ * relationship grow); mood and history only when `debug` is requested by a developer.
+ */
 export function describeRelationship(record: RelationshipRecord, config: RelationshipConfig, options: { mood?: Mood; debug?: boolean } = {}): RelationshipView {
-  const stage = enabledStages(config).find(item => item.id === record.stage) ?? config.stages[0];
+  const stages = enabledStages(config);
+  const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
+  const index = Math.max(0, stages.indexOf(stage)), next = stages[index + 1];
   return {
     characterId: config.characterId,
     macroState: { id: stage.id, label: stage.label },
+    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter) : 1 },
     metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, {
-      name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]),
-      ...(options.debug ? { score: record.scores[metric] } : {}),
+      name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]), score: record.scores[metric],
     }])),
     ...(options.debug ? { debug: {
       scores: record.scores, mood: options.mood ?? initialMood(config), pending: record.pending,
       recentEvents: record.recentEvents.slice(-10), memories: record.memories, meaningfulTurns: record.meaningfulTurns,
       turnCount: record.turnCount, version: record.version,
     } } : {}),
+  };
+}
+
+/** What a saved turn changed, for the chat to show: each accepted event (rising when it raised scores overall), the scores it moved, a stage change. */
+export function describeTurnChange(log: TurnLog, config: RelationshipConfig): RelationshipChange {
+  const metrics = relationshipMetrics(config);
+  return {
+    events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
+      up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
+    delta: Object.fromEntries(metrics.map(metric => [metric, Math.round(log.delta[metric] ?? 0)] as const).filter(([, value]) => value !== 0)),
+    stage: log.stageChange,
   };
 }
 

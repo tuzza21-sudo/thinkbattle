@@ -1171,7 +1171,7 @@ test('rooms with other people never receive relationship context or events, whic
   }, async () => assert.equal((await handler(request({ action: 'host', roomId, reason: 'followup' }))).status, 200)));
 });
 
-test('the relationship endpoint returns labels to players and raw scores only to listed developers, without paid calls', async () => {
+test('the relationship endpoint returns the stage, labels and scores to players, and mood and history only to listed developers, without paid calls', async () => {
   for (const [developer, owner, persona, capacity] of [[false, true, 'velvet', 1], [true, true, 'velvet', 1], [false, false, 'velvet', 1], [false, true, 'velvet', 4]]) {
     let body;
     await withServiceKey(() => run(async (url, init) => {
@@ -1184,7 +1184,9 @@ test('the relationship endpoint returns labels to players and raw scores only to
     assert.equal(body.relationship.macroState.id, 'INTRIGUED');
     assert.equal(body.relationship.macroState.label, '흥미를 느낌');
     assert.equal(body.relationship.metrics.trust.label, '조심스러움');
-    assert.equal(body.relationship.metrics.trust.score, developer ? 30 : undefined);
+    assert.equal(body.relationship.metrics.trust.score, 30, 'the status card draws every score as a bar');
+    assert.equal(body.relationship.stage.index, 1); assert.equal(body.relationship.stage.total, 4); assert.equal(body.relationship.stage.next, '인정하는 상대');
+    assert.ok(body.relationship.stage.progress > 0 && body.relationship.stage.progress < 1);
     assert.equal(Boolean(body.relationship.debug), developer);
     if (developer) { assert.equal(body.relationship.debug.mood.amusement, 40); assert.equal(body.relationship.debug.version, 4); }
   }
@@ -1626,7 +1628,7 @@ test('one-to-one speech starts once the reply sentence is complete; the reply is
     const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
     assert.equal(response.status, 200);
     const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
-    assert.deepEqual(typesOf(events).sort(), ['audio', 'done', 'host', 'saved']);
+    assert.deepEqual(typesOf(events).sort(), ['audio', 'done', 'host', 'relationship', 'saved']);
     assert.equal(events[0].type, 'host'); assert.equal(events.at(-1).type, 'done');
     assert.equal(events[0].text, reply.text, 'escaped quotes in the reply survive early extraction');
     assert.ok(speechStartedBeforeRelease, 'speech started before the reply call had finished');
@@ -1637,6 +1639,12 @@ test('one-to-one speech starts once the reply sentence is complete; the reply is
     assert.match(afterBody.instructions, /events: 사용자의 가장 최근 발언/);
     assert.deepEqual(summary, { p_room: roomId, p_memory: later.memory, p_turn: 3 }, 'the summary is saved with its turn, so an older one never replaces a newer');
     assert.equal(saved.p_state.recentEvents.at(-1).type, 'MAKES_UNSUPPORTED_CLAIM', 'events from the call after the reply update the relationship');
+    // The chat's status card gets the saved state and what the message changed, before the stream ends.
+    const changed = events.find(event => event.type === 'relationship');
+    assert.ok(events.indexOf(changed) < events.length - 1);
+    assert.equal(changed.relationship.macroState.id, saved.p_state.stage);
+    assert.deepEqual(changed.change.events, [{ type: 'MAKES_UNSUPPORTED_CLAIM', label: '섣불리 단정함', up: false }]);
+    assert.ok(Object.values(changed.change.delta).every(value => Number.isInteger(value) && value !== 0) && Object.values(changed.change.delta).some(value => value < 0));
   }));
 });
 
