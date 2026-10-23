@@ -255,10 +255,24 @@ export function speechLevel(config: RelationshipConfig, stageId: string): 'polit
   return from >= 0 && stages.findIndex(item => item.id === stageId) >= from ? 'casual' : 'polite';
 }
 
+/**
+ * Whether the character goes along when the user invites them somewhere or to do something together in the story
+ * (a walk, a trip, a film), by how far the relationship has come: not yet at the first stage, only small things next,
+ * most things later, gladly at the closest. Written here, from the stage's place, so the model does not have to guess.
+ */
+export function relationshipOutingGuidance(index: number, count: number) {
+  if (index <= 0) return '함께 어디를 가거나 무엇을 같이 하자는 상황극 제안은 아직 받아들이지 않는다. 아직 그럴 사이가 아니라는 것을 성격대로 드러내며 거절하거나 미루고(도도하거나 까다로우면 짧게 선을 긋고, 다정하면 아쉬워하며 다음으로 미룬다), 지금 있는 자리에서 대화를 이어 간다.';
+  if (index >= count - 1) return '함께하는 장면을 기꺼이 받아들여 이어 가고, 분위기가 맞으면 네가 먼저 어디를 가자거나 무엇을 같이 하자고 제안할 수도 있다.';
+  if (index === 1) return '가볍고 짧은 제안(근처를 잠깐 걷기, 차나 술 한 잔, 짧은 영상 하나)은 망설이거나 조건을 걸며 받아들일 수 있다. 여행, 하룻밤, 둘만의 긴 시간처럼 큰 제안은 아직 이르다며 성격대로 거절하거나 미룬다.';
+  return '대부분의 제안을 성격대로 받아들여 장면으로 이어 간다. 그날의 기분이나 성격에 맞지 않는 제안은 거절하거나 다른 것을 제안할 수 있다.';
+}
+
 /** Context for the response model. Numbers are given for nuance; the model must not say them. */
 export function relationshipPromptContext(record: RelationshipRecord, config: RelationshipConfig, mood: Mood) {
-  const stage = enabledStages(config).find(item => item.id === record.stage) ?? config.stages[0];
+  const stages = enabledStages(config);
+  const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   return {
+    outing: relationshipOutingGuidance(Math.max(0, stages.indexOf(stage)), stages.length),
     character_core: config.core,
     speech_level: speechLevel(config, stage.id),
     stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && config.stageRomance?.[stage.id] ? { romance: config.stageRomance[stage.id] } : {}) },
