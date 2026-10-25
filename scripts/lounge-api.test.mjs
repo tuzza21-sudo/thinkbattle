@@ -2073,7 +2073,7 @@ test('a chat started from a story is told as a story; with the voice on it stays
   }
 });
 
-test('a story keeps the real memories of the member out and does not save what happens in it as facts about them', async () => {
+test('a story knows what the member said about themselves, records only that, and keeps the real world out of the scene', async () => {
   const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다. 오늘 밤 둘이 같은 무대에 선다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
   let reply, after;
   await withServiceKey(() => run(async (url, init) => {
@@ -2081,7 +2081,8 @@ test('a story keeps the real memories of the member out and does not save what h
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_memories?')) return result(memoryRows);
     if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
-    if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+    if (url.includes('voice_lounge_rooms?host_id=')) return result([{ host_persona: 'velvet', memory: '사용자는 사업 아이디어를 이야기했다.', created_at: '2026-10-07T00:00:00Z' }]);
+    if (url.includes('score_voice_lounge_memories')) return result([]);
     if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null, scenario })]);
     if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '오늘 무대 꽤 멋있던데.' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
@@ -2093,9 +2094,14 @@ test('a story keeps the real memories of the member out and does not save what h
   }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
   const relationshipContext = JSON.parse(reply.input).relationship;
   assert.ok(relationshipContext.stage, 'the relationship still shapes the story');
-  assert.equal(relationshipContext.user_memories, undefined);
-  assert.equal(relationshipContext.opening_follow_up, undefined);
-  assert.equal(after.text.format.schema.properties.memory_ops, undefined, 'nothing from the story is saved as a fact about the member');
+  assert.ok(relationshipContext.user_memories?.length, 'what the member said about themselves comes into the story');
+  assert.equal(relationshipContext.opening_follow_up, undefined, 'a story does not open with a real-life follow-up');
+  assert.equal(relationshipContext.previous_session, undefined, 'nor with a conversation outside it');
+  assert.match(reply.instructions, /이야기에서 빠져나와 현실의 일\(일정, 시험, 회사, 약속의 결과\)을 묻거나/);
+  assert.doesNotMatch(reply.instructions, /opening_follow_up이 있으면/, 'the free-talk memory rules are not used in a story');
+  assert.ok(after.text.format.schema.properties.memory_ops, 'a story may record something about the member');
+  assert.match(after.instructions, /역할이 아닌 실제 자기 자신에 대해 분명히 말한 것만 기록한다/);
+  assert.match(after.instructions, /이야기 속 행동·사건·대사, 장면에 대한 반응은 기록하지 않는다/);
   assert.ok(after.text.format.schema.properties.events, 'relationship events are still classified');
   assert.match(reply.instructions, /답의 마지막 문장은 물음표로 끝나지 않는다/);
 });
