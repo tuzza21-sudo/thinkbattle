@@ -57,7 +57,7 @@ export const LoungeScenarioAdmin = () => {
       {input('title', '제목')}
       {input('hook', '한 줄 소개 (카드에 보임)')}
       <label style={field}>프롤로그 (시작할 때 들려주는 이야기, 2인칭) <small>({draft.prologue.length}/{loungeScenarioLimits.prologue}자)</small>
-        <textarea rows={5} value={draft.prologue} maxLength={loungeScenarioLimits.prologue} onChange={event => set('prologue', event.target.value)} /></label>
+        <textarea rows={12} value={draft.prologue} maxLength={loungeScenarioLimits.prologue} onChange={event => set('prologue', event.target.value)} /></label>
       {input('user_role', '회원의 역할 (캐릭터의 삶에서 어떤 의미인 사람인지. 전문 지식이 필요 없게)')}
       {input('relationship', '둘의 관계 (지난 인연, 또는 캐릭터의 어떤 모습을 받아 주는 사람인지)')}
       {input('place', '첫 장면의 장소')}

@@ -31,9 +31,9 @@ const text = (value: unknown, max: number) => typeof value === 'string' ? value.
 export function normalizeLoungeRoomScenario(raw: unknown): LoungeRoomScenario | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const value = raw as Record<string, unknown>;
-  const scenario = { id: text(value.id, 60), title: text(value.title, 40), prologue: text(value.prologue, 700), user_role: text(value.user_role, 120), relationship: text(value.relationship, 200), place: text(value.place, 200) };
+  const scenario = { id: text(value.id, 60), title: text(value.title, 40), prologue: text(value.prologue, loungeScenarioLimits.prologue), user_role: text(value.user_role, 120), relationship: text(value.relationship, 200), place: text(value.place, 200) };
   return scenario.id && scenario.prologue ? scenario : undefined;
 }
 
-/** The limits the database checks, for the admin form. */
-export const loungeScenarioLimits = { title: 40, hook: 120, prologue: 700, user_role: 120, relationship: 200, place: 200 } as const;
+/** The limits the database checks, for the admin form (a prologue opens full screen and may run to 3,000 characters since 2026-10-25). */
+export const loungeScenarioLimits = { title: 40, hook: 120, prologue: 3000, user_role: 120, relationship: 200, place: 200 } as const;
