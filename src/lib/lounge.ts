@@ -210,7 +210,14 @@ export const loungeRelationshipHostIds: readonly string[] = ['ina', 'jaeseok', '
 // The private detective (onyx: median pitch about 95 Hz against 113 Hz for the earlier echo voice) measured 1.8 dB below echo
 // (-20.1 vs -18.3 dBFS), so 1.2x.
 export const loungeHostLoudness: Record<string, number> = { lawyer: 1.2, velvet: 2.5 };
-export const getLoungeHostLoudness = (id?: string | null) => loungeHostLoudness[id ?? ''] ?? 1;
+/**
+ * The gain above is for the OpenAI voices. Other engines are measured on their own (2026-10-25, the sample sentences,
+ * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 and 한이나 about 4 dB lower, so 1.5x), Gemini Sulafat -18.6 needs none, and the
+ * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
+ */
+const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: { lawyer: 2 }, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 1.5, lawyer: 1.3, auditor: 1.2 }, typecast: {} };
+/** The playback gain of a host's voice in an engine (the OpenAI voices when none is given, as the lobby samples are). */
+export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina'] },
@@ -364,7 +371,8 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = { diplomat: { voiceName: 'Despina' } };
+const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Vindemiatrix', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Puck', diplomat: 'Despina', lawyer: 'Algenib' };
+export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = Object.fromEntries(Object.entries(loungeGeminiVoices).map(([id, voiceName]) => [id, { voiceName }]));
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
   const host = getLoungeHost(hostId);
@@ -388,8 +396,10 @@ export const loungeSpeechEngines = [
 export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
 export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
 export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines.find(engine => engine.id === id) ?? loungeSpeechEngines[0];
-/** The engine a character speaks with when the member has not chosen one (윤지안 has spoken with Gemini since before the picker). */
-export const loungeDefaultSpeechEngine = (hostId: string): LoungeSpeechEngine => loungeGeminiSpeech[hostId] ? 'gemini' : 'openai';
+/** The engine every character speaks with when the member has not chosen one: ElevenLabs, then Gemini, then OpenAI as each one fails or is not open (since 2026-10-25). */
+export const loungeDefaultSpeechEngine = (_hostId: string): LoungeSpeechEngine => 'eleven-v4-turbo';
+/** The engine that speaks where the default is not open to the member (a guest, or the month's allowance used): Gemini; OpenAI speaks when that fails too. */
+export const loungeOrdinarySpeechEngine = (): LoungeSpeechEngine => 'gemini';
 /** Where the browser keeps the engine the member chose. */
 export const loungeSpeechStorageKey = 'lounge.speechEngine';
 /**
@@ -437,19 +447,35 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', lawyer: 'male' };
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
-  gemini: { jaeseok: 'Charon', ina: 'Vindemiatrix', auditor: 'Umbriel', closer: 'Orus', velvet: 'Gacrux', trickster: 'Puck', diplomat: 'Despina', lawyer: 'Algenib', female: 'Kore', male: 'Charon' },
+  gemini: { ...loungeGeminiVoices, female: 'Kore', male: 'Charon' },
   eleven: {
-    // Korean voices from the ElevenLabs voice library. They need a paid plan through the API (a free account is refused
-    // with 402 "paid_plan_required"), and then loungeElevenPremadeVoices speak.
-    jaeseok: 'ZJCNdZEjYwkOElxugmW2', ina: 'JQaWvPoEUkcuOTfxFYpJ', auditor: 'nbrxrAz3eYm9NgojrmFK', closer: 'jB1Cifc2UQbq1gR3wnb0', velvet: 'gnWujHp24oqX3I03lRbU',
-    trickster: '1W00IGEmNmwmsDeYy7ag', diplomat: '8jHHF8rMqMlg8if2mOUe', lawyer: 'Ir7oQcBXWiq4oFGROCfj', female: 'uyVNoMrnUku1dZyVEXwD', male: 'PDoCXqBQFGsvfO0hNkEs',
+    // Korean voices from the ElevenLabs voice library (their names are beside them). They need a paid plan through the
+    // API (a free account is refused with 402 "paid_plan_required"), and then loungeElevenPremadeVoices speak.
+    jaeseok: 'GFsKFsadyjMQ7MPv89Tw', // Hwan - Warm Mature Korean
+    ina: 'JQaWvPoEUkcuOTfxFYpJ', // Kyung - Warm, Calm & Clear
+    auditor: 'PthLbtxfrHtPA1psYOnG', // VIV - Trendy Tech & Business Creator
+    closer: 'GLuWz93jOAhbFz7XKEDq', // DD - Low-to-mid-range Korean tone
+    velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky
+    trickster: '1W00IGEmNmwmsDeYy7ag', // KKC - Korean Bright Voice
+    diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
+    lawyer: 'Ir7oQcBXWiq4oFGROCfj', // taemin
+    female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
+    male: 'PDoCXqBQFGsvfO0hNkEs', // KKC HQ
   },
   typecast: {},
 };
 /** ElevenLabs premade voices (every account has them, a free one too), in the same places; they speak when a library voice is refused. */
 export const loungeElevenPremadeVoices: Partial<Record<string, string>> = {
-  jaeseok: 'JBFqnCBsd6RMkjVDRZzb', ina: 'XrExE9yKIg1WjnnlVkGX', auditor: 'TX3LPaxmHKxFdv7VOQHJ', closer: 'nPczCjzI2devNBz1zQrb', velvet: 'pFZP5JQG7iQjIQuC4Bku',
-  trickster: 'IKne3meq5aSn9XLyUdCD', diplomat: 'cgSgspJ2msm6clMCkdW9', lawyer: 'onwK4e9ZLuTAKqWW03F9', female: 'EXAVITQu4vr4xnSDxMaL', male: 'cjVigY5qzO86Huf0OWal',
+  jaeseok: 'JBFqnCBsd6RMkjVDRZzb', // George - Warm, Captivating Storyteller
+  ina: 'XrExE9yKIg1WjnnlVkGX', // Matilda - Knowledgable, Professional
+  auditor: 'TX3LPaxmHKxFdv7VOQHJ', // Liam - Energetic, Social Media Creator
+  closer: 'nPczCjzI2devNBz1zQrb', // Brian - Deep, Resonant and Comforting
+  velvet: 'pFZP5JQG7iQjIQuC4Bku', // Lily - Velvety Actress
+  trickster: 'IKne3meq5aSn9XLyUdCD', // Charlie - Deep, Confident, Energetic
+  diplomat: 'cgSgspJ2msm6clMCkdW9', // Jessica - Playful, Bright, Warm
+  lawyer: 'onwK4e9ZLuTAKqWW03F9', // Daniel - Steady Broadcaster
+  female: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Mature, Reassuring, Confident
+  male: 'cjVigY5qzO86Huf0OWal', // Eric - Smooth, Trustworthy
 };
 /** The voice of a character in an engine (undefined when the engine has none for it), with LOUNGE_VOICE_IDS overrides. */
 export function loungeEngineVoice(engine: 'gemini' | 'eleven' | 'typecast', hostId: string, overrides?: string) {
