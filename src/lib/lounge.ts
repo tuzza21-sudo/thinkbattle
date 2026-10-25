@@ -613,6 +613,17 @@ export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
   return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
 }
 export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다.';
+/**
+ * A one-to-one voice conversation is a phone call (the call screen, 2026-10-24): the member called the character from
+ * the chat, and the two are apart. It carries on the story and the relationship, as a call: no acting out of the scene
+ * the chat was in, and talk that suits a call. Before, the voice simply went on with the chat's scene, face to face.
+ */
+export const loungePhoneCallRules = `phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다. 사용자가 너에게 전화를 걸었다. 지금까지의 이야기와 관계, 감정은 그대로 이어지지만 통화는 각자 있는 곳에서 이루어진다. memory나 recent에서 둘이 같은 자리에 있었다면, 그 뒤 헤어진 다음에 걸려 온 전화로 받아들인다.
+같은 자리에 있는 것처럼 굴지 않는다. 손을 잡거나 무엇을 건네거나 보여 주는 일은 할 수 없고, 목소리와 전화 너머로 들리는 것(네가 있는 곳의 소리, 하던 일)으로만 전한다.
+phone_call.just_connected=true이면 방금 전화를 받은 순간이다. 너는 전화를 받는 쪽이다. 전화를 받는 사람처럼 한두 마디로 짧게 받는다(예: 여보세요?, 어, 웬일이야?, 마침 네 생각 하고 있었는데). '나야'처럼 전화를 건 사람이 하는 말은 하지 않는다. 관계와 지금까지의 일에 맞게 반가움, 놀람, 짐짓 무심한 척 같은 마음을 캐릭터답게 싣고, 하던 장면의 대사를 그대로 이어 말하지 않는다.
+통화에서는 통화다운 이야기를 한다: 지금 어디서 뭐 하고 있는지, 그 뒤에 있었던 일, 목소리를 들으니 드는 마음, 다음에 만날 약속. 이야기 속 사건도 전화로 전할 수 있는 만큼 이어 간다. 사용자가 끊으려 하면 통화답게 인사하고 끝낸다.`;
+/** The chat after a call: the call is over, and the chat carries on from what was said in it. */
+export const loungeAfterCallRule = `memory 첫 줄이 '지금 장면: 통화'로 시작하면 방금까지 전화 통화를 하다 끊은 것이다. 이제는 채팅이므로 통화에서 나눈 이야기에 이어서 장면을 자연스럽게 정해 이어 간다(통화에서 만나기로 했으면 만나는 장면, 아니면 통화를 끊은 뒤의 장면).`;
 export const loungeSpokenText = (text: string) => splitLoungeActions(text).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */

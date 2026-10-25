@@ -2880,6 +2880,37 @@ test('a chat reply is still written and saved when the connection drops while it
   assert.equal(modelSignal.aborted, false, 'the model request is not cancelled with the reader');
 });
 
+test('a one-to-one voice conversation is a phone call: the character answers first, and the chat after it carries on from the call', async () => {
+  const turn = async ({ voiceOn, reason = 'followup', callStart = false, memory = '' }) => {
+    let reply, after;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory, capacity: 1, ai_turns: 6, voice_on: voiceOn }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, kind: 'human', nickname: '나', text: '응' }, { id: 1, kind: 'host', nickname: 'AI', text: '그래.' }]);
+      if (url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '', events: [], memory_ops: [] }); }
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '여보세요?' }) }] }] }); }
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
+      if (url.includes('finish_voice_lounge') || url.includes('save_voice_lounge')) return result(true);
+      throw new Error('Unexpected call ' + url);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason, stream: true, ...(callStart ? { callStart: true } : {}) }))).text(); });
+    return { input: JSON.parse(reply.input), instructions: reply.instructions, after };
+  };
+  const answered = await turn({ voiceOn: true, reason: 'opening', callStart: true });
+  assert.deepEqual(answered.input.phone_call, { just_connected: true });
+  assert.match(answered.instructions, /너는 전화를 받는 쪽이다/);
+  assert.match(answered.instructions, /같은 자리에 있는 것처럼 굴지 않는다/);
+  assert.match(answered.after.instructions, /memory 첫 줄은 '지금 장면: 통화 중/);
+  const onCall = await turn({ voiceOn: true });
+  assert.deepEqual(onCall.input.phone_call, { just_connected: false }, 'later turns of the call');
+  const chat = await turn({ voiceOn: false, memory: '지금 장면: 통화 중 — 각자 집' });
+  assert.equal(chat.input.phone_call, undefined);
+  assert.match(chat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
+  const plainChat = await turn({ voiceOn: false, memory: '지금 장면: 카페' });
+  assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
+});
+
 
 test('ElevenLabs speaks every character by default (선우령: her own library voice, no speech instruction); when it fails or is not open, Gemini speaks (Sulafat, with her instruction), and OpenAI speaks last', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);

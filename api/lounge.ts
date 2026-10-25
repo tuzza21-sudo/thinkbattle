@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy } from '../src/lib/lounge';
+import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -744,7 +744,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const topicBrief = room.topic_brief ? normalizeLoungeTopicBrief(room.topic_brief) : null;
     const stages = loungeSessionStagesForTopic(topicBrief);
     // In a space the topic exists once someone has chosen one; before that the conversation is free.
-    const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
+    // One to one, the voice is a phone call (the call screen): the two are apart and the member called the character.
+    const phoneCall = solo && !chat && !room.space_id;
+    const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(scenario ? { scenario } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
@@ -877,6 +879,8 @@ ${photoRule}`;
         timeAway ? loungeTimeAwayInstruction : '',
         longMemory ? (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         story ? storyInstruction : roleInstruction,
+        phoneCall ? loungePhoneCallRules : '',
+        chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
         // A story room with the voice on keeps to the story, in the voice rules.
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',
       ].filter(Boolean).join('\n'),
@@ -900,12 +904,13 @@ ${photoRule}`;
 character는 캐릭터 이름이다. recent에서 kind=host는 캐릭터의 말, kind=human은 사용자의 말이다. recent의 마지막 host 발언은 캐릭터가 방금 한 답이고, 그 앞의 마지막 human 발언이 사용자의 가장 최근 발언이다. memory는 직전 턴까지의 요약이고, relationship은 지금까지 쌓인 관계다.
 memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. ${memoryRules}`,
         scenario ? `scenario가 있으면 이 대화는 이야기이고 memory는 그 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '줄거리: 지금까지 일어난 일(중요한 것부터)', '남은 것: 아직 꺼내지 않은 마음이나 풀리지 않은 일', '다음: 곧 벌어질 일'을 600자 이내로 적는다.` : '',
+        phoneCall ? `이번 대화는 전화 통화다(phone_call). memory 첫 줄은 '지금 장면: 통화 중 — 각자 있는 곳과 하고 있는 일'로 쓰고, 통화에서 나눈 이야기와 약속을 기록한다. 이 규칙은 위의 '지금 장면' 규칙보다 우선한다.` : '',
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
         relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}` : '',
         chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
       ].filter(Boolean).join('\n'),
-      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(scenario ? { scenario } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
+      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
