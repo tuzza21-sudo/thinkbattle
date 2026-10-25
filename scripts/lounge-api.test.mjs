@@ -3001,3 +3001,23 @@ test('a refused Gemini request (429, quota used up) is spoken by OpenAI, and Gem
   assert.equal(openai, 2);
   assert.ok(warnings.some(line => line.includes('HTTP 429') && line.includes('generate_requests_per_model_per_day')), 'the reason is logged: ' + warnings.join(' | '));
 });
+
+test('a host turn that fails after it was claimed is released at once, so the AI can answer again without waiting out the ticket', async () => {
+  const released = [], errors = [], originalError = console.error;
+  console.error = (...args) => { errors.push(args.join(' ')); };
+  try {
+    await run(async url => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket-1');
+      if (url.includes('release_voice_lounge_host')) { released.push(url); return new Response(null, { status: 204 }); }
+      if (url.includes('voice_lounge_rooms?')) return new Response('nope', { status: 500 });
+      if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+      throw new Error('Unexpected call ' + url);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      assert.equal(response.status, 502);
+    });
+  } finally { console.error = originalError; }
+  assert.equal(released.length, 1, 'the claimed turn is released');
+  assert.ok(errors.some(line => line.includes('"action":"host"') && line.includes('"released":true')), 'the log names the action: ' + errors.join(' | '));
+});
