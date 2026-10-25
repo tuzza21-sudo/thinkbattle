@@ -400,8 +400,11 @@ export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines
 export const loungeDefaultSpeechEngine = (_hostId: string): LoungeSpeechEngine => 'eleven-v4-turbo';
 /** The engine that speaks where the default is not open to the member (a guest, or the month's allowance used): Gemini; OpenAI speaks when that fails too. */
 export const loungeOrdinarySpeechEngine = (): LoungeSpeechEngine => 'gemini';
-/** Where the browser keeps the engine the member chose. */
-export const loungeSpeechStorageKey = 'lounge.speechEngine';
+/**
+ * Where the browser keeps the engine the member chose. The key is versioned: a choice stored under the old one (made while
+ * the default was OpenAI or Gemini) was kept for every character and hid the new default, ElevenLabs (2026-10-25).
+ */
+export const loungeSpeechStorageKey = 'lounge.speechEngine.v2';
 /**
  * Group rooms (the voice tables in places, the lounge's first form) are closed for now (2026-10-23): the lounge is one
  * to one, a story in a chat or a voice call. Their entrances are hidden and their pages lead to the characters; the
