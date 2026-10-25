@@ -337,7 +337,9 @@ test('the listening and reframing events still leave out the characters not buil
   // The reporter (id diplomat) ignores the lawyer's habits.
   for (const type of ['ANSWERS_DIRECTLY', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.diplomat, [[event(type)]]).logs[0].delta, {}, `reporter ${type}`);
   // Playful flirting counts for the characters whose closeness grows through it, not for the listeners.
-  for (const id of ['ina', 'auditor']) assert.deepEqual(run(configs[id], [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, {}, `${id} FLIRTS_PLAYFULLY`);
+  assert.deepEqual(run(configs.ina, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, {}, 'ina FLIRTS_PLAYFULLY');
+  // 서도현 became the groom who plays push and pull (2026-10-25): playful flirting now counts with him.
+  assert.deepEqual(run(configs.auditor, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, { interest: 2, comfort: 1 }, 'auditor FLIRTS_PLAYFULLY');
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
 });
 

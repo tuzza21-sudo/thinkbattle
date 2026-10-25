@@ -897,7 +897,36 @@
 /* a story room: the prologue told before the first scene, at the top of the conversation */
 .lounge-prologue { margin:0 0 18px; padding:16px 18px; border:1px solid #ffffff30; border-radius:16px; background:#00000059; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff5e8; text-shadow:none; }
 .lounge-prologue>span { display:block; margin-bottom:8px; font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--lounge-accent); }
-.lounge-prologue>p { margin:0; font-size:14.5px; line-height:1.75; }
+.lounge-prologue>p { margin:0; font-size:14.5px; line-height:1.75; white-space:pre-line; }
+
+/* a story's prologue, full screen before the first scene (LoungeStoryIntro): the whole screen on a phone, a column over the scenery on a computer */
+.lounge-story-intro { position:fixed; inset:0; z-index:1000; display:flex; flex-direction:column; height:100vh; height:100dvh; color:#fff5e8; background:#0b0a0d; isolation:isolate; animation:lounge-story-intro-in .5s ease-out; }
+.lounge-story-intro::before { content:''; position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,#0b0a0db3 0%,#0b0a0deb 45%,#0b0a0d 100%),var(--story-intro-image) center/cover no-repeat; filter:saturate(.9); }
+.lounge-story-intro-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:calc(28px + env(safe-area-inset-top)) 20px 24px; }
+.lounge-story-intro-page { max-width:640px; margin:0 auto; }
+.lounge-story-intro-page header { display:flex; align-items:center; gap:14px; margin-bottom:26px; padding-bottom:18px; border-bottom:1px solid #ffffff24; }
+.lounge-story-intro-page header img { width:56px; height:56px; flex:none; border-radius:50%; object-fit:cover; border:2px solid var(--story-intro-accent); }
+.lounge-story-intro-page header span { display:block; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--story-intro-accent); }
+.lounge-story-intro-page h1 { margin:4px 0 0; font-size:23px; line-height:1.3; letter-spacing:-.01em; color:#fff; }
+.lounge-story-intro-page p { margin:0 0 18px; font-size:16.5px; line-height:1.9; word-break:keep-all; overflow-wrap:break-word; animation:lounge-story-intro-line .9s ease-out both; }
+.lounge-story-intro-page p.lounge-story-intro-line { padding-left:14px; border-left:2px solid var(--story-intro-accent); color:#fff; font-style:italic; }
+.lounge-story-intro-more { display:block; margin-top:6px; font-size:12px; color:#fff5e880; animation:lounge-story-intro-blink 1.8s ease-in-out infinite; }
+.lounge-story-intro-footer { flex:none; display:flex; flex-direction:column; align-items:stretch; gap:10px; padding:14px 20px calc(16px + env(safe-area-inset-bottom)); background:#0b0a0df2; border-top:1px solid #ffffff1f; }
+.lounge-story-intro-footer small { max-width:640px; width:100%; margin:0 auto; font-size:12.5px; line-height:1.5; color:#fff5e8b3; }
+.lounge-story-intro-start { max-width:640px; width:100%; margin:0 auto; display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; border:0; border-radius:14px; background:var(--story-intro-accent); color:#1a1310; font-size:16px; font-weight:800; cursor:pointer; }
+.lounge-story-intro-start:hover { filter:brightness(1.08); }
+.lounge-story-intro-start:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+@keyframes lounge-story-intro-in { from { opacity:0; } to { opacity:1; } }
+@keyframes lounge-story-intro-line { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes lounge-story-intro-blink { 50% { opacity:.4; } }
+@media (min-width:900px) {
+  .lounge-story-intro-scroll { padding-top:64px; }
+  .lounge-story-intro-page { padding:36px 44px 20px; border-radius:22px; background:#0b0a0d99; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid #ffffff1a; }
+  .lounge-story-intro-page h1 { font-size:28px; }
+  .lounge-story-intro-page p { font-size:17.5px; }
+  .lounge-story-intro-footer { background:transparent; border-top:0; padding-bottom:32px; }
+}
+@media (prefers-reduced-motion:reduce) { .lounge-story-intro,.lounge-story-intro-page p,.lounge-story-intro-more { animation:none; } }
 .lounge-prologue>small { display:block; margin-top:10px; font-size:12px; color:#fff5e8b3; }
 
 /* The button that starts a call from a chat: the one thing in the bar that is not like the others. */
