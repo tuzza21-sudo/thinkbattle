@@ -1013,7 +1013,10 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       const family = choice === 'gemini' ? 'gemini' : choice === 'typecast' ? 'typecast' : choice === 'openai' ? undefined : 'eleven';
       const voice = family ? loungeEngineVoice(family, host.id, process.env.LOUNGE_VOICE_IDS) : undefined;
       const key = family === 'gemini' ? geminiKey : family === 'eleven' ? process.env.ELEVENLABS_API_KEY : family === 'typecast' ? process.env.TYPECAST_API_KEY : undefined;
-      return family && key && voice ? { engine: choice, family, voice, key } : choice !== 'gemini' && choice !== 'openai' ? planSpeech('gemini') : { engine: 'openai' };
+      if (family && key && voice) return { engine: choice, family, voice, key };
+      // A missing key is a deployment setting, not a failure: it is said in the log, or the voice silently falls to the next one.
+      if (family) console.warn(`[Lounge speech] ${choice} is not used: ${!key ? `${family === 'gemini' ? 'GEMINI_API_KEY' : family === 'eleven' ? 'ELEVENLABS_API_KEY' : 'TYPECAST_API_KEY'} is not set on this deployment` : `no voice for ${host.id}`}`);
+      return choice !== 'gemini' && choice !== 'openai' ? planSpeech('gemini') : { engine: 'openai' };
     };
     let speech = planSpeech(chosenSpeech);
     // A premium engine speaks only while the member's monthly allowance lasts; past it (or for a guest, or when the
