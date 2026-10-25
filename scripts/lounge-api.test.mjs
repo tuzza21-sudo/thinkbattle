@@ -2605,10 +2605,10 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
   const scenarios = {
     'eleven-v4-turbo': { env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
     'eleven-v4-turbo without a key': { speech: 'eleven-v4-turbo', env: { SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
-    'a retired engine (eleven-flash)': { speech: 'eleven-flash', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    'a retired engine (eleven-flash) gets the default, ElevenLabs': { speech: 'eleven-flash', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
     'typecast without a voice': { speech: 'typecast', env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
     typecast: { env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 0, typecast: 1, openai: 0, bytes: 2400 * 2 },
-    'an unknown engine': { speech: 'nope', env: { ELEVENLABS_API_KEY: 'el-key' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
+    'an unknown engine gets the default, ElevenLabs': { speech: 'nope', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
     const calls = { eleven: 0, typecast: 0, openai: 0 };
@@ -2625,7 +2625,7 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
         if (url.includes('add_lounge_speech_usage')) return result(16);
         if (url.startsWith('https://api.elevenlabs.io/')) {
           calls.eleven++;
-          assert.ok(url.startsWith('https://api.elevenlabs.io/v1/text-to-speech/ZJCNdZEjYwkOElxugmW2/stream?output_format=pcm_24000'), 'the Korean library voice of this character: ' + url);
+          assert.ok(url.startsWith('https://api.elevenlabs.io/v1/text-to-speech/GFsKFsadyjMQ7MPv89Tw/stream?output_format=pcm_24000'), 'the Korean library voice of this character: ' + url);
           assert.equal(init.headers['xi-api-key'], 'el-key');
           const body = JSON.parse(init.body);
           assert.equal(body.model_id, 'eleven_v4_turbo'); assert.equal(body.language_code, 'ko'); assert.equal(body.text, '그건 좀 다르게 찍고 싶네요.');
@@ -2656,7 +2656,7 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
 
 test('a premium voice speaks only within the member\'s monthly allowance, and its characters are counted', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
-  const library = 'ZJCNdZEjYwkOElxugmW2', premade = 'JBFqnCBsd6RMkjVDRZzb';
+  const library = 'GFsKFsadyjMQ7MPv89Tw', premade = 'JBFqnCBsd6RMkjVDRZzb';
   const scenarios = {
     'within the allowance': { status: { member: 1200, total: 9000 }, eleven: [library], openai: 0, recorded: [16] },
     'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], openai: 1, recorded: [] },
@@ -2909,4 +2909,89 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.match(chat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
   const plainChat = await turn({ voiceOn: false, memory: '지금 장면: 카페' });
   assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
+});
+
+
+test('ElevenLabs speaks every character by default (선우령: her own library voice, no speech instruction); when it fails or is not open, Gemini speaks (Sulafat, with her instruction), and OpenAI speaks last', async () => {
+  const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
+  const piece = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(pcm).toString('base64') } }] } }] };
+  const scenarios = {
+    'default': { eleven: 1, gemini: 0, openai: 0, expect: pcm },
+    'ElevenLabs down': { elevenDown: true, eleven: 1, gemini: 1, openai: 0, expect: pcm },
+    'ElevenLabs and Gemini down': { elevenDown: true, geminiDown: true, eleven: 1, gemini: 1, openai: 1, expect: fallback },
+    'a guest': { user: { id: 'user-1', is_anonymous: true }, eleven: 0, gemini: 1, openai: 0, expect: pcm },
+    'Gemini chosen': { speech: 'gemini', eleven: 0, gemini: 1, openai: 0, expect: pcm },
+    'no ElevenLabs key': { noElevenKey: true, eleven: 0, gemini: 1, openai: 0, expect: pcm },
+  };
+  for (const [name, scenario] of Object.entries(scenarios)) {
+    const calls = { gemini: 0, eleven: 0, openai: 0 };
+    Object.assign(process.env, { GEMINI_API_KEY: 'gem-key', SUPABASE_SERVICE_ROLE_KEY: 'service' });
+    if (!scenario.noElevenKey) process.env.ELEVENLABS_API_KEY = 'el-key';
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result(scenario.user ?? { id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'velvet', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어서 와요.' }) }] }] });
+        if (url.includes('lounge_speech_usage_status')) return result({ member: 0, total: 0 });
+        if (url.includes('add_lounge_speech_usage')) return result(5);
+        if (url.includes('generativelanguage.googleapis.com')) {
+          calls.gemini++;
+          const body = JSON.parse(init.body);
+          assert.equal(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Sulafat', 'her own Gemini voice, not the ElevenLabs id');
+          assert.ok(body.contents[0].parts[0].text.includes('허스키'), 'her speech instruction goes to Gemini');
+          return scenario.geminiDown ? new Response('nope', { status: 500 }) : new Response(`data: ${JSON.stringify(piece)}\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        if (url.startsWith('https://api.elevenlabs.io/')) {
+          calls.eleven++;
+          // An earlier test of a refused library voice makes the server use the premade voice for ten minutes (module state).
+          assert.ok(url.includes('/text-to-speech/gnWujHp24oqX3I03lRbU/stream') || url.includes('/text-to-speech/pFZP5JQG7iQjIQuC4Bku/stream'), url);
+          assert.deepEqual(Object.keys(JSON.parse(init.body)).sort(), ['language_code', 'model_id', 'text', 'voice_settings'], 'ElevenLabs gets no speech instruction');
+          return scenario.elevenDown ? new Response('nope', { status: 500 }) : new Response(pcm);
+        }
+        if (url.endsWith('/audio/speech')) { calls.openai++; assert.equal(JSON.parse(init.body).voice, 'sage'); return new Response(fallback); }
+        if (url.includes('finish_voice_lounge') || url.includes('save_voice_lounge')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true, ...(scenario.speech ? { speech: scenario.speech } : {}) }))).text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.deepEqual([...heard], [...scenario.expect], name);
+        assert.deepEqual(calls, { gemini: scenario.gemini, eleven: scenario.eleven, openai: scenario.openai }, name);
+      });
+    } finally { for (const key of ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key]; }
+  }
+});
+
+test('a refused Gemini request (429, quota used up) is spoken by OpenAI, and Gemini is not asked again until the time it named', async () => {
+  const fallback = new Uint8Array([9, 8, 7, 6]);
+  const quota = { error: { code: 429, message: 'You exceeded your current quota. * Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 100', details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '29569s' }] } };
+  const warnings = [], originalWarn = console.warn;
+  console.warn = (...args) => { warnings.push(args.join(' ')); };
+  let gemini = 0, openai = 0;
+  Object.assign(process.env, { GEMINI_API_KEY: 'gem-key', SUPABASE_SERVICE_ROLE_KEY: 'service' });
+  try {
+    for (const reply of [1, 2]) {
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '어서 와요.' }) }] }] });
+        if (url.includes('generativelanguage.googleapis.com')) { gemini++; return new Response(JSON.stringify(quota), { status: 429 }); }
+        if (url.endsWith('/audio/speech')) { openai++; return new Response(fallback); }
+        if (url.includes('finish_voice_lounge') || url.includes('save_voice_lounge')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.deepEqual([...heard], [...fallback], 'reply ' + reply + ': OpenAI speaks');
+      });
+    }
+  } finally { console.warn = originalWarn; for (const key of ['GEMINI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key]; }
+  assert.equal(gemini, 1, 'Gemini is asked once, then left alone while it is refusing');
+  assert.equal(openai, 2);
+  assert.ok(warnings.some(line => line.includes('HTTP 429') && line.includes('generate_requests_per_model_per_day')), 'the reason is logged: ' + warnings.join(' | '));
 });

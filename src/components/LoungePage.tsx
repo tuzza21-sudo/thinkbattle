@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Camera, Coffee, Copy, Hand, Headphones, Heart, L
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { getLoungeHost, getLoungeHostLoudness, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeSpeechStorageKey, type LoungeSpeechEngine, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
+import { getLoungeHost, getLoungeHostLoudness, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, isLoungePremiumSpeech, loungeSpeechStorageKey, type LoungeSpeechEngine, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeRoomTheme, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
 import { type LoungeSpeechUsage, LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, loadLoungeSpeechUsage, postLoungeText, resumeLoungeChat, hasNewLoungeMessage, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
@@ -654,7 +654,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     },
   }), [roomId, reviewAfterInput, user]);
   const restrictedIds = restrictedLoungeMembers(members, clock);
-  const audio = useLoungeAudio(roomId, (room?.space_id ? broadcaster : room?.host_id) ?? '', transcript, viewRoom?.capacity, room?.guided_session && !isLoungeFreeStage(session) ? { allowed: session?.speaker_id === user?.id && session?.state === 'speaking', speakerId: session?.state === 'speaking' ? session.speaker_id : null, turnId: session?.turn_id } : undefined, restrictedIds, getLoungeHostLoudness(room?.host_persona));
+  // The voice engine the member chose, kept for every room on this device.
+  const [speechChoice, setSpeechChoice] = useState<LoungeSpeechEngine | null>(() => { try { const stored = localStorage.getItem(loungeSpeechStorageKey); return isLoungeSpeechEngine(stored) ? stored : null; } catch { return null; } });
+  const speechEngine = useRef(speechChoice); speechEngine.current = speechChoice;
+  const [speechUsage, setSpeechUsage] = useState<LoungeSpeechUsage | undefined>();
+  // The engine that speaks, for the host's playback gain: a premium one only while it is open to this member.
+  const spokenEngine = (() => { const engine = speechChoice ?? loungeDefaultSpeechEngine(room?.host_persona ?? ''); return isLoungePremiumSpeech(engine) && speechUsage && !speechUsage[engine]?.allowed ? loungeOrdinarySpeechEngine() : engine; })();
+  const audio = useLoungeAudio(roomId, (room?.space_id ? broadcaster : room?.host_id) ?? '', transcript, viewRoom?.capacity, room?.guided_session && !isLoungeFreeStage(session) ? { allowed: session?.speaker_id === user?.id && session?.state === 'speaking', speakerId: session?.state === 'speaking' ? session.speaker_id : null, turnId: session?.turn_id } : undefined, restrictedIds, getLoungeHostLoudness(room?.host_persona, spokenEngine));
   const voiceProfiles = useRef(new Map<string, (typeof audio.participants)[number]>());
   useEffect(() => { for (const participant of audio.participants) voiceProfiles.current.set(participant.id, participant); }, [audio.participants]);
   const current = useRef({ room: viewRoom, session, messages, audio, isHost, restrictedIds });
@@ -861,10 +867,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   useEffect(() => { if (ended || chat) disconnectAudio(); }, [ended, chat, disconnectAudio]);
   useEffect(() => { if (ended || (!chat && !audio.connected)) hostRequest.current?.abort(); }, [ended, chat, audio.connected]);
   const [modelBusy, setModelBusy] = useState(false);
-  // The voice engine the member chose, kept for every room on this device.
-  const [speechChoice, setSpeechChoice] = useState<LoungeSpeechEngine | null>(() => { try { const stored = localStorage.getItem(loungeSpeechStorageKey); return isLoungeSpeechEngine(stored) ? stored : null; } catch { return null; } });
-  const speechEngine = useRef(speechChoice); speechEngine.current = speechChoice;
-  const [speechUsage, setSpeechUsage] = useState<LoungeSpeechUsage | undefined>();
   const changeSpeech = (engine: LoungeSpeechEngine) => { setSpeechChoice(engine); try { localStorage.setItem(loungeSpeechStorageKey, engine); } catch { /* The choice lasts for this visit. */ } };
   const changeModel = async (model: string) => {
     setModelBusy(true); setError('');
