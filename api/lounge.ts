@@ -328,11 +328,14 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     }
     return response;
   };
+  // The AI's turn this request claimed and has not handed on to the reply stream: a failure before that releases it, or the room waits out the ticket's 60 seconds before the AI may speak again.
+  let claimedTicket: string | null = null, requestAction = '', requestRoom = '';
   try {
     const raw = await req.text();
     if (new TextEncoder().encode(raw).length > MAX_BYTES) return json({ error: '음성이 너무 길어요.' }, 413);
     let body: Record<string, unknown>;
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
+    requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
     if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
@@ -591,6 +594,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     queryEmbedding.catch(() => {});
     const ticket = await rpc<string | null>('claim_voice_lounge_host', { p_room: roomId, p_reason: body.reason }).catch(error => { lookupGiveUp.abort(); throw error; });
     if (!ticket) { lookupGiveUp.abort(); return json({ skipped: true }); }
+    claimedTicket = ticket;
     const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
     // Read in parallel with the room so a relationship adds no round trip; a failure only disables it.
     const relationshipRows = serviceHeaders
@@ -1439,9 +1443,10 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     } catch { await relationshipSaved; return json({ text, audioError: true }); }
   } catch (error) {
     // Server-side diagnostics: a 502 should always leave a cause in the logs. No request bodies or keys.
+    if (claimedTicket) await rpc<void>('release_voice_lounge_host', { p_room: requestRoom, p_ticket: claimedTicket }, true).catch(() => {});
     console.error('[Lounge API] request failed', JSON.stringify(error instanceof LoungeUpstreamError
-      ? { code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
-      : { name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code }));
+      ? { action: requestAction, released: Boolean(claimedTicket), code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
+      : { action: requestAction, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code }));
     if (error instanceof LoungeUpstreamError) return json({ error: error.message, code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds, databaseCode: error.databaseCode, rpc: error.rpc, upstreamStatus: error.upstreamStatus }, error.status);
     // A timed-out request used to reach the screen as "The operation was aborted due to timeout".
     if (error instanceof Error && error.name === 'TimeoutError') return json({ error: 'AI 서버 응답이 늦어지고 있어요. 잠시 뒤 다시 말씀해 주세요.', code: 'lounge_upstream_timeout', retryable: true, retryAfterSeconds: 3 }, 504);
