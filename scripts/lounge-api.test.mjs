@@ -2249,8 +2249,8 @@ test('TTS recovery is bounded, never repeats transmitted audio, and does not ret
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
       assert.equal(events.at(-1).type, 'error'); assert.equal(events.some(event => event.type === 'done'), false);
-      // An empty answer is also raced by a second request, so each try costs two requests.
-      assert.equal(speech, failure === 'rate_limit' ? 1 : failure === 'empty' ? lounge.loungeSpeechStall.attempts * 2 : lounge.loungeSpeechStall.attempts);
+      // No second request races a try any more, so each try is one request.
+      assert.equal(speech, failure === 'rate_limit' ? 1 : lounge.loungeSpeechStall.attempts);
       // A retry after a partial sentence skips the bytes already sent, so the same audio is never sent twice.
       assert.equal(events.filter(event => event.type === 'audio').length, failure === 'partial' ? 1 : 0);
     });
@@ -2291,9 +2291,9 @@ test('a speech request that stalls before or during the reply is requested again
   } finally { Object.assign(lounge.loungeSpeechStall, saved); }
 });
 
-test('slow speech and slow transcription are raced by a second request, and the slow one is cancelled', async () => {
+test('slow transcription is raced by a second request and the slow one is cancelled; slow speech is not raced, it is asked again once it stalls', async () => {
   const saved = { ...lounge.loungeSpeechStall };
-  Object.assign(lounge.loungeSpeechStall, { hedgeAfterMs: 30, firstAudioMs: 5000 });
+  Object.assign(lounge.loungeSpeechStall, { firstAudioMs: 200 });
   const hanging = signal => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
   try {
     const signals = []; const started = performance.now();
@@ -2310,8 +2310,8 @@ test('slow speech and slow transcription are raced by a second request, and the 
       const events = (await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).trim().split('\n').map(line => JSON.parse(line));
       assert.deepEqual(events.map(event => event.type), ['host', 'audio', 'done']);
     });
-    assert.equal(signals.length, 2); assert.equal(signals[0].aborted, true, 'the slow speech request is cancelled');
-    assert.ok(performance.now() - started < 3000, 'the reply did not wait for the slow request');
+    assert.equal(signals.length, 2); assert.equal(signals[0].aborted, true, 'the stalled speech request is cancelled');
+    assert.ok(performance.now() - started >= 200, 'the second speech request waited for the first to stall: no race for a place');
 
     const transcriptions = []; let posted;
     await run(async (url, init) => {
@@ -2602,19 +2602,15 @@ test('윤지안 (id diplomat) speaks with Gemini through the same PCM stream, an
   }
 });
 
-test('the member picks the voice engine: ElevenLabs and Typecast speak through the same 24 kHz PCM stream, and OpenAI speaks without a key or a voice', async () => {
+test('every character speaks with ElevenLabs whatever engine the page sends; a deployment without its key speaks every reply with OpenAI', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
-  // Typecast streams 32 kHz WAV: 3200 samples become 2400 at 24 kHz.
-  const typecastSamples = 3200, typecastWav = new Uint8Array(44 + typecastSamples * 2), view = new DataView(typecastWav.buffer);
-  'RIFF'.split('').forEach((c, i) => typecastWav[i] = c.charCodeAt(0)); 'WAVEfmt '.split('').forEach((c, i) => typecastWav[8 + i] = c.charCodeAt(0));
-  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 32000, true); 'data'.split('').forEach((c, i) => typecastWav[36 + i] = c.charCodeAt(0));
+  const withKey = { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' };
   const scenarios = {
-    'eleven-v4-turbo': { env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
-    'eleven-v4-turbo without a key': { speech: 'eleven-v4-turbo', env: { SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
-    'a retired engine (eleven-flash) gets the default, ElevenLabs': { speech: 'eleven-flash', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
-    'typecast without a voice': { speech: 'typecast', env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, typecast: 0, openai: 1, bytes: fallback.length },
-    typecast: { env: { TYPECAST_API_KEY: 'tc-key', SUPABASE_SERVICE_ROLE_KEY: 'service', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 0, typecast: 1, openai: 0, bytes: 2400 * 2 },
-    'an unknown engine gets the default, ElevenLabs': { speech: 'nope', env: { ELEVENLABS_API_KEY: 'el-key', SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 1, typecast: 0, openai: 0, bytes: pcm.length },
+    'eleven-v4-turbo': { env: withKey, eleven: 1, openai: 0, bytes: pcm.length },
+    'Typecast chosen on an older page': { speech: 'typecast', env: { ...withKey, TYPECAST_API_KEY: 'tc-key', LOUNGE_VOICE_IDS: JSON.stringify({ typecast: { male: 'tc_male_voice' } }) }, eleven: 1, openai: 0, bytes: pcm.length },
+    'OpenAI chosen on an older page': { speech: 'openai', env: withKey, eleven: 1, openai: 0, bytes: pcm.length },
+    'an unknown engine': { speech: 'nope', env: withKey, eleven: 1, openai: 0, bytes: pcm.length },
+    'no ElevenLabs key on this deployment': { speech: 'eleven-v4-turbo', env: { SUPABASE_SERVICE_ROLE_KEY: 'service' }, eleven: 0, openai: 1, bytes: fallback.length },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
     const calls = { eleven: 0, typecast: 0, openai: 0 };
@@ -2638,13 +2634,7 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
           assert.equal('speed' in body.voice_settings, false, 'v4 Turbo takes no speed');
           return new Response(pcm);
         }
-        if (url.startsWith('https://api.typecast.ai/')) {
-          calls.typecast++;
-          assert.equal(url, 'https://api.typecast.ai/v1/text-to-speech/stream'); assert.equal(init.headers['X-API-KEY'], 'tc-key');
-          const body = JSON.parse(init.body);
-          assert.deepEqual([body.voice_id, body.model, body.language, body.text], ['tc_male_voice', 'ssfm-v30', 'kor', '그건 좀 다르게 찍고 싶네요.']);
-          return new Response(new ReadableStream({ start(controller) { controller.enqueue(typecastWav.subarray(0, 1001)); controller.enqueue(typecastWav.subarray(1001)); controller.close(); } }));
-        }
+        if (url.startsWith('https://api.typecast.ai/')) { calls.typecast++; return new Response(new Uint8Array()); }
         if (url.endsWith('/audio/speech')) { calls.openai++; return new Response(fallback); }
         if (url.includes('finish_voice_lounge_reply') || url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge')) return result(true);
         throw new Error('Unexpected call ' + url);
@@ -2654,23 +2644,23 @@ test('the member picks the voice engine: ElevenLabs and Typecast speak through t
         const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
         const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
         assert.equal(heard.length, scenario.bytes, `${name}: what the listener hears`);
-        assert.deepEqual(calls, { eleven: scenario.eleven, typecast: scenario.typecast, openai: scenario.openai }, name);
+        assert.deepEqual(calls, { eleven: scenario.eleven, typecast: 0, openai: scenario.openai }, name);
       });
     } finally { for (const key of Object.keys(scenario.env)) delete process.env[key]; }
   }
 });
 
-test('a premium voice speaks only within the member\'s monthly allowance, and its characters are counted', async () => {
+test('ElevenLabs speaks only within the member\'s monthly allowance and its characters are counted; past it, or for a guest, the reply stays text with a notice', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
   const library = 'GFsKFsadyjMQ7MPv89Tw', premade = 'JBFqnCBsd6RMkjVDRZzb';
   const scenarios = {
-    'within the allowance': { status: { member: 1200, total: 9000 }, eleven: [library], openai: 0, recorded: [16] },
-    'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], openai: 1, recorded: [] },
-    'everyone together used the month': { env: { LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' }, status: { member: 0, total: 100 }, eleven: [], openai: 1, recorded: [] },
-    'a larger allowance from the environment': { env: { LOUNGE_ELEVEN_MONTHLY_CHARS: '20000' }, status: { member: 5000, total: 5000 }, eleven: [library], openai: 0, recorded: [16] },
-    'a guest': { user: { id: 'user-1', is_anonymous: true }, status: { member: 0, total: 0 }, eleven: [], openai: 1, recorded: [], statusCalls: 0 },
-    'an allowance that cannot be read': { statusFailure: true, eleven: [], openai: 1, recorded: [] },
-    'a free ElevenLabs plan (library voice refused)': { status: { member: 0, total: 0 }, refuseLibrary: true, eleven: [library, premade], openai: 0, recorded: [16] },
+    'within the allowance': { status: { member: 1200, total: 9000 }, eleven: [library], heard: pcm.length, recorded: [16] },
+    'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
+    'everyone together used the month': { env: { LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' }, status: { member: 0, total: 100 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
+    'a larger allowance from the environment': { env: { LOUNGE_ELEVEN_MONTHLY_CHARS: '20000' }, status: { member: 5000, total: 5000 }, eleven: [library], heard: pcm.length, recorded: [16] },
+    'a guest': { user: { id: 'user-1', is_anonymous: true }, status: { member: 0, total: 0 }, eleven: [], heard: 0, recorded: [], statusCalls: 0, notice: '회원만' },
+    'an allowance that cannot be read': { statusFailure: true, eleven: [library], heard: pcm.length, recorded: [16] },
+    'a free ElevenLabs plan (library voice refused)': { status: { member: 0, total: 0 }, refuseLibrary: true, eleven: [library, premade], heard: pcm.length, recorded: [16] },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
     const calls = { eleven: [], openai: 0, recorded: [], status: 0 };
@@ -2703,9 +2693,14 @@ test('a premium voice speaks only within the member\'s monthly allowance, and it
         assert.equal(response.status, 200, name);
         const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
         const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
-        assert.equal(heard.length, scenario.openai ? fallback.length : pcm.length, `${name}: who speaks`);
-        assert.equal(events.at(-1).type, 'done', name);
-        assert.deepEqual({ eleven: calls.eleven, openai: calls.openai, recorded: calls.recorded }, { eleven: scenario.eleven, openai: scenario.openai, recorded: scenario.recorded }, name);
+        assert.equal(heard.length, scenario.heard, `${name}: what the listener hears`);
+        assert.ok(events.some(event => event.type === 'host'), `${name}: the reply itself is there, as text`);
+        if (scenario.notice) {
+          const last = events.at(-1);
+          assert.equal(last.type, 'error', name); assert.equal(last.code, 'lounge_speech_allowance', name); assert.equal(last.retryable, false, name);
+          assert.ok(last.error.includes(scenario.notice) && last.error.includes('글로'), `${name}: ${last.error}`);
+        } else assert.equal(events.at(-1).type, 'done', name);
+        assert.deepEqual({ eleven: calls.eleven, openai: calls.openai, recorded: calls.recorded }, { eleven: scenario.eleven, openai: 0, recorded: scenario.recorded }, name);
         if (scenario.statusCalls !== undefined) assert.equal(calls.status, scenario.statusCalls, `${name}: the allowance is not looked up`);
       });
     } finally { for (const key of ['ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', ...Object.keys(scenario.env ?? {})]) delete process.env[key]; }
@@ -2918,16 +2913,15 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
 });
 
 
-test('ElevenLabs speaks every character by default (선우령: her own library voice, no speech instruction); when it fails or is not open, Gemini speaks (Sulafat, with her instruction), and OpenAI speaks last', async () => {
+test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy refusal is asked again, and when it fails no other voice speaks', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
   const piece = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(pcm).toString('base64') } }] } }] };
   const scenarios = {
     'default': { eleven: 1, gemini: 0, openai: 0, expect: pcm },
-    'ElevenLabs down': { elevenDown: true, eleven: 1, gemini: 1, openai: 0, expect: pcm },
-    'ElevenLabs and Gemini down': { elevenDown: true, geminiDown: true, eleven: 1, gemini: 1, openai: 1, expect: fallback },
-    'a guest': { user: { id: 'user-1', is_anonymous: true }, eleven: 0, gemini: 1, openai: 0, expect: pcm },
-    'Gemini chosen': { speech: 'gemini', eleven: 0, gemini: 1, openai: 0, expect: pcm },
-    'no ElevenLabs key': { noElevenKey: true, eleven: 0, gemini: 1, openai: 0, expect: pcm },
+    'ElevenLabs busy once (429 at the concurrent limit)': { busyOnce: true, eleven: 2, gemini: 0, openai: 0, expect: pcm },
+    'ElevenLabs down: tried again, then the reply stays text': { elevenDown: true, eleven: lounge.loungeSpeechStall.attempts, gemini: 0, openai: 0, expect: new Uint8Array() },
+    'Gemini chosen on an older page': { speech: 'gemini', eleven: 1, gemini: 0, openai: 0, expect: pcm },
+    'no ElevenLabs key on this deployment: every reply with Gemini': { noElevenKey: true, eleven: 0, gemini: 1, openai: 0, expect: pcm },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
     const calls = { gemini: 0, eleven: 0, openai: 0 };
@@ -2948,13 +2942,14 @@ test('ElevenLabs speaks every character by default (선우령: her own library v
           const body = JSON.parse(init.body);
           assert.equal(body.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Sulafat', 'her own Gemini voice, not the ElevenLabs id');
           assert.ok(body.contents[0].parts[0].text.includes('허스키'), 'her speech instruction goes to Gemini');
-          return scenario.geminiDown ? new Response('nope', { status: 500 }) : new Response(`data: ${JSON.stringify(piece)}\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+          return new Response(`data: ${JSON.stringify(piece)}\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
         }
         if (url.startsWith('https://api.elevenlabs.io/')) {
           calls.eleven++;
           // An earlier test of a refused library voice makes the server use the premade voice for ten minutes (module state).
           assert.ok(url.includes('/text-to-speech/gnWujHp24oqX3I03lRbU/stream') || url.includes('/text-to-speech/pFZP5JQG7iQjIQuC4Bku/stream'), url);
           assert.deepEqual(Object.keys(JSON.parse(init.body)).sort(), ['language_code', 'model_id', 'text', 'voice_settings'], 'ElevenLabs gets no speech instruction');
+          if (scenario.busyOnce && calls.eleven === 1) return new Response(JSON.stringify({ detail: { code: 'concurrent_limit_exceeded' } }), { status: 429 });
           return scenario.elevenDown ? new Response('nope', { status: 500 }) : new Response(pcm);
         }
         if (url.endsWith('/audio/speech')) { calls.openai++; assert.equal(JSON.parse(init.body).voice, 'sage'); return new Response(fallback); }
