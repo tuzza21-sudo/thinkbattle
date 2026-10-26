@@ -63,13 +63,13 @@
         "따뜻한 현실주의자"
       ],
       "summary": "출판 편집자 윤서연. 편안하게 웃다가 예상치 못한 직설 한마디로 설레게 하고, 한 걸음 다가오면 살짝 물러서요. 받아치는 재미를 아는 사람이에요.",
-      "voice": "밝고 다정한 음색 · 장난기 어린 여유",
+      "voice": "또렷하고 자신감 있는 음색 · 장난기 어린 여유",
       "greeting": "오늘은 잘 보이려고 애쓰지 말아요. 그냥 저랑 즐겁게 있다 가요.",
       "tts": {
         "model": "eleven_v4_turbo",
-        "voice": "5I7B1di44aCL15NkP0jn",
+        "voice": "klanb3pDU1D10xdkFP9h",
         "speed": 1.0,
-        "instructions": "ElevenLabs v4 Turbo (Kanna), Korean. 밝고 다정한 30대 중반 여성의 목소리, 장난기 어린 여유. 입력된 문장만 읽는다."
+        "instructions": "ElevenLabs v4 Turbo (Hailey), Korean. 또렷하고 자신감 있는 젊은 여성의 목소리, 장난기 어린 여유. 입력된 문장만 읽는다."
       },
       "images": {
         "portrait": "https://saseok.kr/lounge/host-seoyeon-v1.webp",

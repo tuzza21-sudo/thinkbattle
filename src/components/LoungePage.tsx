@@ -1102,6 +1102,14 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     } catch (err) {
       // After the reply was saved, a broken stream only loses the photo; the conversation has moved on.
       if (controller.signal.aborted || released) return;
+      // The voice was refused (a guest's trial or the month's allowance used, no voice set up) after the reply was saved: the
+      // conversation goes on as a chat, with the reason shown, instead of the AI being held back as after a failure.
+      if (err instanceof LoungeApiError && ['lounge_speech_allowance', 'lounge_speech_not_configured'].includes(err.code ?? '')) {
+        hostBlocked.current = false; nextHostAttempt.current = 0;
+        if (current.current.room && !isLoungeChatRoom(current.current.room)) await setLoungeVoice(roomId, false).catch(() => {});
+        if (mounted.current) { setError(errorText(err)); await refreshAfterMessage().catch(() => {}); }
+        return;
+      }
       console.warn('[Lounge host] turn failed', { reason, code: err instanceof LoungeApiError ? err.code : undefined, message: err instanceof Error ? err.message.slice(0, 120) : String(err) });
       if (err instanceof LoungeApiError) {
         hostBlocked.current = !err.retryable;

@@ -448,14 +448,18 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // (the table is missing, the server role is not set) counts as used, so a premium voice is never spent unchecked.
     const readSpeechAllowance = async (engine: LoungePremiumSpeechEngine, user: { id: string; is_anonymous?: boolean }) => {
       const limits = loungePremiumSpeechLimits(engine, process.env), available = Boolean(engine === 'typecast' ? process.env.TYPECAST_API_KEY : process.env.ELEVENLABS_API_KEY);
-      const none = (extra: Record<string, unknown> = {}) => ({ available, member: !user.is_anonymous, allowed: false, used: 0, left: 0, limit: limits.member, ...extra });
-      if (user.is_anonymous) return none();
+      // A guest hears the same voice for a short trial (LOUNGE_ELEVEN_GUEST_CHARS, 1500 characters, about 4 minutes; 0 for
+      // members only), counted under the guest's own id, so the voice does not change or fall silent for someone who has not signed up.
+      const guest = Boolean(user.is_anonymous), guestChars = Number(process.env.LOUNGE_ELEVEN_GUEST_CHARS?.trim() ? process.env.LOUNGE_ELEVEN_GUEST_CHARS : 1500);
+      const yours = guest ? Math.max(0, Number.isFinite(guestChars) ? Math.floor(guestChars) : 1500) : limits.member;
+      const none = (extra: Record<string, unknown> = {}) => ({ available, member: !guest, allowed: false, used: 0, left: 0, limit: yours, ...extra });
+      if (guest && yours <= 0) return none();
       if (!serviceHeaders) return none({ unavailable: true });
       const response = await fetchTimed(`${url}/rest/v1/rpc/lounge_speech_usage_status`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_engine: engine }) }, 4_000);
       if (!response.ok) { console.warn('[Lounge speech] allowance not read', engine, response.status); return none({ unavailable: true }); }
       const used = await readJson<{ member: number; total: number }>(response, 'lounge');
-      const allowance = loungeSpeechAllowance(limits, used);
-      return { available, member: true, allowed: allowance.allowed, used: used.member, left: allowance.left, limit: limits.member, ...(allowance.reason ? { reason: allowance.reason } : {}) };
+      const allowance = loungeSpeechAllowance({ ...limits, member: yours }, used);
+      return { available, member: !guest, allowed: allowance.allowed, used: used.member, left: allowance.left, limit: yours, ...(allowance.reason ? { reason: allowance.reason } : {}) };
     };
     const readRelationship = async (userId: string, characterId: string) => {
       if (!serviceHeaders) return { ok: false as const };
@@ -1036,7 +1040,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         .then(status => {
           if (status.allowed || ('unavailable' in status && status.unavailable)) return;
           console.info('[Lounge speech] premium voice not used', JSON.stringify({ engine: premiumSpeech, guest: !status.member, used: status.used, limit: status.limit }));
-          speechRefused = new LoungeUpstreamError(status.member ? '이번 달 목소리 통화 사용량을 다 썼어요. 대화는 글로 이어 갈게요.' : '목소리 통화는 회원만 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
+          speechRefused = new LoungeUpstreamError(status.member ? '이번 달 목소리 통화 사용량을 다 썼어요. 대화는 글로 이어 갈게요.' : status.used > 0 ? '체험 목소리를 다 썼어요. 로그인하면 더 들을 수 있어요. 대화는 글로 이어 갈게요.' : '목소리 통화는 회원만 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
         })
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
@@ -1047,7 +1051,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // The characters a premium voice spoke are added to the member's month (after the reply, so the next one sees them).
     const recordSpeech = async () => {
       const chars = spentChars; spentChars = 0;
-      if (!chars || !premiumSpeech || !serviceHeaders || user.is_anonymous) return;
+      if (!chars || !premiumSpeech || !serviceHeaders) return;
       try {
         const response = await fetchTimed(`${url}/rest/v1/rpc/add_lounge_speech_usage`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_engine: premiumSpeech, p_chars: chars }) }, 4_000);
         if (!response.ok) console.warn('[Lounge speech] usage not saved', response.status);
