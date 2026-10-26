@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowRight } from 'lucide-react';
-import type { LoungeRoomScenario } from '../lib/loungeScenarios';
+import { personalizeLoungeStory, type LoungeRoomScenario } from '../lib/loungeScenarios';
 
 type Props = {
   scenario: LoungeRoomScenario;
@@ -9,6 +9,8 @@ type Props = {
   /** The room's scenery behind the text, and its accent colour. */
   image: string;
   accent: string;
+  /** The member's nickname, told in place of "당신". */
+  memberName?: string;
   onStart: () => void;
 };
 
@@ -18,8 +20,8 @@ type Props = {
  * character speaks only once the member starts the story. On a phone it fills the screen and scrolls; on a computer it
  * is a column over the scenery.
  */
-export function LoungeStoryIntro({ scenario, characterName, portrait, image, accent, onStart }: Props) {
-  const paragraphs = scenario.prologue.split(/\n+/).map(paragraph => paragraph.trim()).filter(Boolean);
+export function LoungeStoryIntro({ scenario, characterName, portrait, image, accent, memberName, onStart }: Props) {
+  const paragraphs = personalizeLoungeStory(scenario.prologue, memberName).split(/\n+/).map(paragraph => paragraph.trim()).filter(Boolean);
   const [shown, setShown] = useState(1);
   const startButton = useRef<HTMLButtonElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export function LoungeStoryIntro({ scenario, characterName, portrait, image, acc
       </article>
     </div>
     <footer className="lounge-story-intro-footer" onClick={event => event.stopPropagation()}>
-      <small>당신의 역할 · {scenario.user_role}</small>
+      <small>{personalizeLoungeStory('당신의 역할', memberName)} · {personalizeLoungeStory(scenario.user_role, memberName)}</small>
       <button ref={startButton} type="button" className="lounge-story-intro-start" onClick={done ? onStart : showAll}>
         {done ? <>이야기 시작하기 <ArrowRight size={17} /></> : '끝까지 보기'}
       </button>

@@ -3021,3 +3021,13 @@ test('a host turn that fails after it was claimed is released at once, so the AI
   assert.equal(released.length, 1, 'the claimed turn is released');
   assert.ok(errors.some(line => line.includes('"action":"host"') && line.includes('"released":true')), 'the log names the action: ' + errors.join(' | '));
 });
+
+test('a story is told with the member\'s name: "당신" in the narration takes their nickname and the particle that fits it, and quotes stay', () => {
+  const story = '그룹의 오너 2세인 당신.\n당신은 서류를 넘겼다. 그는 당신이 마음에 들었고 당신을 지켜봤다. 당신의 서명, 당신과 그, 당신에게서 온 전화.\n“당신은 믿을 만한 의뢰인이니까요.” 그날의 주인공은 당신이었다.';
+  assert.equal(scenariosLib.personalizeLoungeStory(story, '지수'),
+    '그룹의 오너 2세인 지수.\n지수는 서류를 넘겼다. 그는 지수가 마음에 들었고 지수를 지켜봤다. 지수의 서명, 지수와 그, 지수에게서 온 전화.\n“당신은 믿을 만한 의뢰인이니까요.” 그날의 주인공은 지수였다.');
+  assert.equal(scenariosLib.personalizeLoungeStory('당신은 당신을 당신과 당신으로', '민준'), '민준은 민준을 민준과 민준으로');
+  assert.equal(scenariosLib.personalizeLoungeStory('당신으로', '하늘'), '하늘로', 'ㄹ takes 로');
+  assert.equal(scenariosLib.personalizeLoungeStory('당신은 "당신 꿈이 먼저야"라고 했다.', 'Sam'), 'Sam은 "당신 꿈이 먼저야"라고 했다.');
+  assert.equal(scenariosLib.personalizeLoungeStory('당신은', ''), '당신은', 'no name, no change');
+});

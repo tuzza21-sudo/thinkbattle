@@ -3,7 +3,7 @@ import { BookOpen, LoaderCircle, Play } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { listLoungeScenarios, startLoungeScenario } from '../lib/loungeApi';
-import type { LoungeScenarioRow } from '../lib/loungeScenarios';
+import { personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 
@@ -39,8 +39,8 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
     <div className="lounge-scenario-list">
       {scenarios.map(scenario => <article key={scenario.id} className="lounge-scenario-card">
         <h3>{scenario.title}</h3>
-        <p>{scenario.hook}</p>
-        <small>당신의 역할 · {scenario.user_role}</small>
+        <p>{personalizeLoungeStory(scenario.hook, user?.nickname)}</p>
+        <small>{personalizeLoungeStory('당신의 역할', user?.nickname)} · {personalizeLoungeStory(scenario.user_role, user?.nickname)}</small>
         {user ? <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{busy === scenario.id ? <LoaderCircle size={15} className="lounge-spin" /> : <Play size={15} />}이 이야기로 시작</button>
           : <Link to="/lounge" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>}
       </article>)}
