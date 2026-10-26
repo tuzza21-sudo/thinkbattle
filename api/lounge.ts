@@ -684,6 +684,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const solo = loungeIsSolo(room, members, now);
     // A one-to-one chat started from a story (scenario, see loungeScenarios.ts): the story and the member's role go to the model.
     const scenario = solo && !room.space_id ? normalizeLoungeRoomScenario(room.scenario) : undefined;
+    const memberName = members.find(member => member.user_id === user.id)?.nickname?.replace(/\s+/g, ' ').trim().slice(0, 20);
     // The place the member chose for the scene (the background button of a one-to-one conversation).
     const chosenBackground = solo && !room.space_id ? readLoungeRoomBackground(room.background) : null;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
@@ -850,6 +851,7 @@ reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연�
 - 긴장은 실제로 나아가야 한다: 사용자가 다가오거나 결정적인 말이나 행동을 하면 그 장면에서 한 번은 분명히 흔들리거나 받아들이는 순간을 보여 준다. 매번 말로 비켜 가지 않는다. 다만 한 번에 다 풀지 않고 한 걸음씩 나아간다.
 - 이야기의 온도는 무겁기보다 설레고 즐겁게 간다. 사과, 후회, 고마움 같은 무거운 마음은 한 번 진하게 말하면 되풀이하지 않고, 그 뒤에는 지금 이 순간(장난, 웃음, 설렘, 함께 하는 작은 일)으로 옮겨 간다. 같은 다짐이나 자책("비겁했다", "변명하지 않겠다", "꾸미지 않겠다")을 다시 쓰지 않는다.
 - 끝맺음: 질문으로 끝내지 않는다. 답의 마지막 문장은 물음표로 끝나지 않는다. 도발, 행동, 곧 벌어질 일의 예고로 끝낸다. 질문은 장면에 꼭 필요할 때만 답의 중간에 한다. '~예요, 아니면 ~예요?'처럼 둘 중 하나를 고르게 하는 질문은 하지 않는다.
+- member_name은 사용자의 이름이다. 지문에서 사용자를 가리킬 때는 '당신' 대신 이 이름을 쓴다('나는 지수를 바라본다'). 대사에서는 관계와 말투에 맞게 부르고, 처음 만난 사이면 이름을 아직 모를 수도 있다. scenario의 '당신'도 이 사람이다.
 - 사용자가 맡은 인물의 행동, 대사, 마음은 대신 정하지 않는다. 주변 인물이 사용자에게 말을 걸게 할 수는 있다.
 - 캐릭터 설명의 소품과 시그니처 동작(예: 손목시계, 잔)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다.
 ${photoRule}`;
@@ -920,7 +922,7 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
       ].filter(Boolean).join('\n'),
-      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
+      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
