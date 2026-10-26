@@ -46,14 +46,13 @@ test('every strong driver of a character (a change of 4 or more) is explained on
   }
 });
 
-test('“gentle” only promises what the configuration forgives', () => {
-  const ina = loungeCharacters.find(c => c.id === 'ina');
-  const config = relationshipConfigs.ina;
-  for (const event of ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'REPEATS_SELF']) {
-    assert.ok(values(effect(config, event)).every(v => v >= 0), `ina: ${event} is said to be forgiven but lowers a score`);
+test('“gentle” only promises what the configuration forgives, for whichever character has it', () => {
+  for (const character of loungeCharacters.filter(c => c.gentle)) {
+    const config = relationshipConfigs[character.id];
+    for (const event of ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'REPEATS_SELF']) {
+      assert.ok(values(effect(config, event)).every(v => v >= 0), `${character.id}: ${event} is said to be forgiven but lowers a score`);
+    }
   }
-  assert.ok(ina.gentle);
-  for (const character of loungeCharacters.filter(c => c.gentle && c.id !== 'ina')) assert.fail(`${character.id}: add a check for its gentle promise`);
 });
 
 test('a page shows a final note only where the closest stage is switched off', () => {

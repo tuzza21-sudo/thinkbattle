@@ -29,7 +29,7 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
   const directory = mkdtempSync(resolve(tempRoot, 'lounge-images-runtime-'));
   try {
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
-    const relationship = ['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates', 'configs/auditor', 'configs/closer', 'configs/diplomat', 'configs/empath', 'configs/lawyer', 'configs/trickster', 'configs/velvetKnife', 'configs/wit'].map(name => `src/lib/relationship/${name}.ts`);
+    const relationship = ['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates', 'configs/auditor', 'configs/closer', 'configs/diplomat', 'configs/seoyeon', 'configs/lawyer', 'configs/trickster', 'configs/velvetKnife', 'configs/wit'].map(name => `src/lib/relationship/${name}.ts`);
     for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });

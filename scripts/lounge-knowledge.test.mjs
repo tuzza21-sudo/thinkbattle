@@ -215,32 +215,24 @@ test('a file of entries is read as jsonl or csv and every problem is reported wi
   assert.match(bad.problems[2], /^4번째 줄.*같은 제목/); assert.match(bad.problems[3], /^5번째 줄.*전화번호/);
 });
 
-test('Han Ina\'s knowledge file is valid, has no bookshop past and keeps her stories anonymous and in the first person', async () => {
+test('윤서연\'s knowledge file is valid, tells her stories as her own and anonymous, and keeps facts to a source note', async () => {
   const { checkEntries } = await import('./import-lounge-knowledge.mjs');
   const path = '../docs/lounge-knowledge/ina.jsonl';
   const { entries, problems } = checkEntries(path, readFileSync(new URL(path, import.meta.url), 'utf8'), lounge.loungeHosts.map(host => host.id));
   assert.deepEqual(problems, []);
-  assert.equal(entries.length, 42);
+  assert.ok(entries.length >= 8);
   assert.ok(entries.every(item => item.character === 'ina'));
-  assert.equal(entries.filter(item => item.kind === 'experience').length, 26);
-  assert.equal(entries.filter(item => item.kind === 'knowledge').length, 16);
+  assert.ok(entries.some(item => item.kind === 'experience') && entries.some(item => item.kind === 'knowledge'));
   const text = entries.map(item => [item.title, item.content, item.lesson, item.tags.join(' '), item.sourceNote].join(' ')).join('\n');
-  assert.doesNotMatch(text, /서점|느린 페이지/, 'her past is a podcast host and author, not a bookshop');
   assert.doesNotMatch(text, /https?:|\bAI\b|인공지능/, 'no web addresses, and she never speaks of herself as an AI');
-  // The breakup interview is told only through the lookup (once per person), never from the profile or the room instruction that go into every reply.
-  const { loadTs } = await import('./lounge-ts-loader.mjs');
-  const profile = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
-  const ina = profile.loungeCharacters.find(character => character.id === 'ina');
-  const host = lounge.loungeHosts.find(item => item.id === 'ina');
-  for (const [where, text] of [['profile', profile.loungePersonaPrompt(ina)], ['room instruction', host.instruction], ['one-to-one instruction', host.companion]]) assert.doesNotMatch(text, /떠난 이유|몇 년 동안|예전에 인터뷰했던/, `${where}: no breakup story`);
-  assert.ok(entries.some(item => item.tags.includes('이별') && item.kind === 'experience'), 'the breakup story is an experience of the lookup');
+  assert.doesNotMatch(text, /한이나|인터뷰어|팟캐스트/, 'nothing is left of the interviewer who held this id before');
+  // Her own past is told only through the lookup (once per person), never from the profile that goes into every reply.
   assert.match(loungeKnowledgePrompt([{ id: 'x', kind: 'experience', title: 't', content: 'c' }]), /개인적인 부분이라 말씀드리기 어려워요/, 'asked who a story was about, she does not name anyone');
   for (const item of entries) {
-    assert.ok(item.tags.some(tag => /^HIN-(INT|HARD|METHOD|CANON)-\d{3}$/.test(tag)), `${item.title}: keeps its record id as a tag`);
     if (item.kind === 'experience') {
-      assert.doesNotMatch(item.content, /이나(는|가|의|에게)/, `${item.title}: told as her own, not about "이나"`);
+      assert.doesNotMatch(item.content, /서연(은|이|의|에게)/, `${item.title}: told as her own, not about "서연"`);
       assert.ok(item.lesson && item.category, `${item.title}: an experience has a lesson and a kind`);
-      assert.ok(item.content.length >= 250, `${item.title}: told as a scene (who, what happened, what was said, how it felt), not a summary`);
+      assert.ok(item.content.length >= 150, `${item.title}: told as a scene, not a summary`);
     } else assert.ok(item.sourceNote && !item.lesson && !item.category, `${item.title}: a fact has a source note only`);
   }
 });

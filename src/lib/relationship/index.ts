@@ -2,7 +2,7 @@ import { auditorRelationship } from './configs/auditor.js';
 import { closerRelationship } from './configs/closer.js';
 import { diplomatRelationship } from './configs/diplomat.js';
 import { lawyerRelationship } from './configs/lawyer.js';
-import { empathRelationship } from './configs/empath.js';
+import { seoyeonRelationship } from './configs/seoyeon.js';
 import { tricksterRelationship } from './configs/trickster.js';
 import { velvetKnifeRelationship } from './configs/velvetKnife.js';
 import { witRelationship } from './configs/wit.js';
@@ -18,7 +18,7 @@ export * from './templates.js';
 
 // Adding a character means adding a configuration here; the engine is unchanged.
 export const relationshipConfigs: Record<string, RelationshipConfig> = Object.fromEntries(
-  [empathRelationship, witRelationship, auditorRelationship, closerRelationship, velvetKnifeRelationship, tricksterRelationship, diplomatRelationship, lawyerRelationship].map(config => [config.characterId, config]),
+  [seoyeonRelationship, witRelationship, auditorRelationship, closerRelationship, velvetKnifeRelationship, tricksterRelationship, diplomatRelationship, lawyerRelationship].map(config => [config.characterId, config]),
 );
 // Characters that members create get a configuration from their relationship type, registered when their data is read.
 const customConfigs = new Map<string, RelationshipConfig>();
