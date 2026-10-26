@@ -60,7 +60,7 @@ export const loungeVoicePresetSample = (id: string) => getLoungeHost(getLoungeVo
 export const loungeCustomRules = {
   name: [1, 20], job: [2, 30], concept: [0, 600], intro: [50, 1200], personality: [30, 600], tastes: [20, 600],
   tagline: [10, 100], look: [15, 240], greeting: [5, 140],
-  prologue: [100, 3000], userRole: [2, 120], storyRelationship: [5, 200], portraitPrompt: [5, 600],
+  prologue: [100, 12000], userRole: [2, 120], storyRelationship: [5, 200], portraitPrompt: [5, 600],
 } as const;
 export function validateLoungeCustomSheet(sheet: LoungeCustomSheet) {
   const problems: Array<{ field: string; message: string }> = [];
@@ -111,7 +111,7 @@ export function normalizeLoungeCustomSheet(raw: unknown): LoungeCustomSheet {
     personality: typeof value.personality === 'string' ? multiline(value.personality, 600) : [oldPersonality, oldHabits].filter(Boolean).join(' ').slice(0, 600),
     tastes: multiline(value.tastes, 600),
     tagline: text(value.tagline, 100), look: text(value.look, 240), greeting: text(value.greeting, 140),
-    prologue: multiline(value.prologue, 3000), userRole: text(value.userRole, 120), storyRelationship: text(value.storyRelationship, 200),
+    prologue: multiline(value.prologue, 12000), userRole: text(value.userRole, 120), storyRelationship: text(value.storyRelationship, 200),
     portraitPrompt: multiline(value.portraitPrompt, 600),
   };
 }
