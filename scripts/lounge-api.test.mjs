@@ -1192,8 +1192,9 @@ test('the relationship endpoint returns the stage, labels and scores to players,
   }
 });
 
-test('there are exactly eight hosts, each with a relationship configuration and instructions for both one-to-one and group rooms', () => {
-  assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']);
+test('every host has a relationship configuration and instructions for both one-to-one and group rooms', () => {
+  for (const id of ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']) assert.ok(lounge.loungeHosts.some(host => host.id === id), `the original ${id} is still a host`);
+  assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), Object.keys(relationshipLib.relationshipConfigs).sort(), 'a host and its relationship configuration come together');
   for (const id of lounge.loungeRelationshipHostIds) {
     assert.ok(lounge.loungeHosts.some(host => host.id === id));
     assert.ok(relationshipLib.getRelationshipConfig(id), id);

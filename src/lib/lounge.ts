@@ -225,7 +225,7 @@ export const loungeHosts = [
  * changes how the character speaks; in a room with other people it never changes and the character
  * only helps as a light moderator.
  */
-export const loungeRelationshipHostIds: readonly string[] = ['ina', 'jaeseok', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'];
+export const loungeRelationshipHostIds: readonly string[] = loungeHosts.map(host => host.id);
 /**
  * Playback gain on top of the shared boost, for voices the speech model renders quietly.
  * Measured on the sample sentences: Velvet Knife's earlier OpenAI voice (sage) averaged about 9 dB below the other five

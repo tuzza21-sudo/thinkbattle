@@ -50,6 +50,13 @@ const characters = {
     prompt: `${common} He wears the same mustard-yellow overshirt open over a plain white tee, relaxed dark jeans and white sneakers, holding a paper takeaway coffee cup. He leans casually against a rain-streaked cafe window with warm string lights and a cozy blurred cafe interior, one eyebrow raised and a lopsided mischievous grin, as if he just thought of a joke.` },
 };
 
+// Characters added with scripts/new-lounge-character.mjs keep their prompts in scripts/lounge-character-prompts.json
+// ({{common}} stands for the shared text above), so no script has to be edited to draw a new character.
+const extra = existsSync('scripts/lounge-character-prompts.json') ? JSON.parse(readFileSync('scripts/lounge-character-prompts.json', 'utf8')) : {};
+for (const [id, spec] of Object.entries(extra)) {
+  if (spec.full && !characters[id]) characters[id] = { portrait: spec.full.portrait, file: spec.full.file, prompt: spec.full.prompt.replaceAll('{{common}}', common) };
+  if (spec.work && !workScenes[id]) workScenes[id] = { portrait: spec.work.portrait, file: spec.work.file, prompt: spec.work.prompt.replaceAll('{{common}}', workCommon) };
+}
 const scenes = options.set === 'work' ? workScenes : characters;
 const targets = options.only ? options.only.split(',') : Object.keys(scenes);
 const folder = join(tmpdir(), 'lounge-character-full-body'); mkdirSync(folder, { recursive: true });

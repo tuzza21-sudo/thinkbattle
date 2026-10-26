@@ -21,7 +21,7 @@ function run(config, turns, start = createRelationship(config)) {
 const withScores = (config, scores, stage) => ({ ...createRelationship(config), scores: { ...createRelationship(config).scores, ...scores }, ...(stage ? { stage } : {}) });
 
 test('every shipped character configuration is valid and starts from its configured values', () => {
-  assert.deepEqual(Object.keys(configs).sort(), ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']);
+  for (const id of ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']) assert.ok(configs[id], `${id} has a configuration`);
   for (const config of Object.values(configs)) {
     assert.deepEqual(validateRelationshipConfig(config), [], config.characterId);
     const record = createRelationship(config);
@@ -39,7 +39,9 @@ test('one-to-one speech starts polite for everyone; six characters turn casual f
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
     stageIds.forEach((id, index) => {
-      const expected = casualStage[config.characterId] && index >= stageIds.indexOf(casualStage[config.characterId]) ? 'casual' : 'polite';
+      // The characters named above are pinned; a character added later turns casual where its own configuration says.
+      const from = casualStage[config.characterId] ?? config.casualFromStage;
+      const expected = from && index >= stageIds.indexOf(from) ? 'casual' : 'polite';
       assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: id }, config, initialMood(config)).speech_level, expected, `${config.characterId} ${id}`);
     });
   }

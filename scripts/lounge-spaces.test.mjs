@@ -31,7 +31,7 @@ test('a recorded clip always fits the 1.5 MB upload limit once encoded as base64
 });
 
 test('every home card has a name and a short job title', () => {
-  assert.deepEqual(loungeCharacters.map(character => character.id), ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'], 'four on top, four below, in this order');
+  assert.deepEqual(loungeCharacters.slice(0, 8).map(character => character.id), ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'], 'the first eight keep their order; a new character goes after them');
   for (const character of loungeCharacters) assert.ok(character.job && character.job.length <= 12, `${character.id}: job "${character.job}"`);
 });
 const { readLoungeTopicSuggestions, loungeTopicSuggestionInstructions, loungeTopicLimit } = loadTs(fileURLToPath(new URL('../src/lib/loungeTopics.ts', import.meta.url)));
