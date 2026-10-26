@@ -2913,13 +2913,15 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
 });
 
 
-test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy line goes at once to the same voice in Flash v2.5, only both busy waits, and when it fails no other voice speaks', async () => {
+test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy line waits and asks v4 Turbo again (Flash v2.5 only when switched on), and when it fails no other voice speaks', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
   const piece = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(pcm).toString('base64') } }] } }] };
   const scenarios = {
     'default': { eleven: 1, gemini: 0, openai: 0, expect: pcm },
-    'v4 Turbo busy (429 at its concurrent limit): Flash v2.5 at once': { busy: 1, eleven: 2, models: ['eleven_v4_turbo', 'eleven_flash_v2_5'], gemini: 0, openai: 0, expect: pcm },
-    'both busy: a short wait, then v4 Turbo again': { busy: 2, eleven: 3, models: ['eleven_v4_turbo', 'eleven_flash_v2_5', 'eleven_v4_turbo'], gemini: 0, openai: 0, expect: pcm },
+    'v4 Turbo busy (429 at its concurrent limit): a short wait, then v4 Turbo again': { busy: 1, eleven: 2, models: ['eleven_v4_turbo', 'eleven_v4_turbo'], gemini: 0, openai: 0, expect: pcm },
+    'v4 Turbo busy three times: still v4 Turbo, never another model': { busy: 3, eleven: 4, models: ['eleven_v4_turbo', 'eleven_v4_turbo', 'eleven_v4_turbo', 'eleven_v4_turbo'], gemini: 0, openai: 0, expect: pcm },
+    'backup switched on, v4 Turbo busy: Flash v2.5 at once': { backup: true, busy: 1, eleven: 2, models: ['eleven_v4_turbo', 'eleven_flash_v2_5'], gemini: 0, openai: 0, expect: pcm },
+    'backup switched on, both busy: a short wait, then v4 Turbo again': { backup: true, busy: 2, eleven: 3, models: ['eleven_v4_turbo', 'eleven_flash_v2_5', 'eleven_v4_turbo'], gemini: 0, openai: 0, expect: pcm },
     'ElevenLabs down: tried again, then the reply stays text': { elevenDown: true, eleven: lounge.loungeSpeechStall.attempts, gemini: 0, openai: 0, expect: new Uint8Array() },
     'Gemini chosen on an older page': { speech: 'gemini', eleven: 1, gemini: 0, openai: 0, expect: pcm },
     'no ElevenLabs key on this deployment: every reply with Gemini': { noElevenKey: true, eleven: 0, gemini: 1, openai: 0, expect: pcm },
@@ -2928,6 +2930,7 @@ test('ElevenLabs speaks every character (선우령: her own library voice, no sp
     const calls = { gemini: 0, eleven: 0, openai: 0 }, models = [];
     Object.assign(process.env, { GEMINI_API_KEY: 'gem-key', SUPABASE_SERVICE_ROLE_KEY: 'service' });
     if (!scenario.noElevenKey) process.env.ELEVENLABS_API_KEY = 'el-key';
+    if (scenario.backup) process.env.LOUNGE_ELEVEN_BACKUP = 'on';
     try {
       await run(async (url, init) => {
         if (url.includes('/auth/')) return result(scenario.user ?? { id: 'user-1' });
@@ -2965,7 +2968,7 @@ test('ElevenLabs speaks every character (선우령: her own library voice, no sp
         if (scenario.models) assert.deepEqual(models, scenario.models, `${name}: the models asked, in order`);
         else assert.ok(models.every(model => model === 'eleven_v4_turbo'), `${name}: v4 Turbo while it has a place`);
       });
-    } finally { for (const key of ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key]; }
+    } finally { for (const key of ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'LOUNGE_ELEVEN_BACKUP']) delete process.env[key]; }
   }
 });
 
