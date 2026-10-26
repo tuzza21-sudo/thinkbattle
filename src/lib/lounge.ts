@@ -440,7 +440,7 @@ export const loungeSpeechEngines = [
 export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
 export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
 export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines.find(engine => engine.id === id) ?? loungeSpeechEngines[0];
-/** The engine every character speaks with when the member has not chosen one: ElevenLabs, then Gemini, then OpenAI as each one fails or is not open (since 2026-10-25). */
+/** The engine every character speaks with: ElevenLabs alone since 2026-10-26 (a reply it cannot speak stays text, so the voice never changes in a call). */
 export const loungeDefaultSpeechEngine = (_hostId: string): LoungeSpeechEngine => 'eleven-v4-turbo';
 /** The engine that speaks where the default is not open to the member (a guest, or the month's allowance used): Gemini; OpenAI speaks when that fails too. */
 export const loungeOrdinarySpeechEngine = (): LoungeSpeechEngine => 'gemini';
@@ -593,12 +593,18 @@ export function createLoungePcmConverter(fallbackRate: number, targetRate = 24_0
 }
 
 /**
- * OpenAI speech sometimes stops sending for tens of seconds (3 of 16 requests on 2026-10-07; normally the
- * first audio arrives within 1.3 s and packets are at most 0.8 s apart). A second request is started when the
- * first audio is `hedgeAfterMs` late, a request with no audio after `firstAudioMs` or a `gapMs` pause is given up,
- * and a reply gets at most `attempts` tries.
+ * Speech sometimes stops sending for tens of seconds (OpenAI, 3 of 16 requests on 2026-10-07; normally the first audio
+ * arrives within 1.3 s and packets are at most 0.8 s apart). A request with no audio after `firstAudioMs` or a `gapMs`
+ * pause is given up, and a reply gets at most `attempts` tries. No second request races a slow one any more
+ * (2026-10-26): with ElevenLabs it took a second of the plan's few places at once.
  */
-export const loungeSpeechStall = { hedgeAfterMs: 2500, firstAudioMs: 8000, gapMs: 4000, attempts: 3 };
+export const loungeSpeechStall = { firstAudioMs: 8000, gapMs: 4000, attempts: 3 };
+/**
+ * ElevenLabs refuses a request past the plan's concurrent limit with 429 at once, without a queue (5 places on the
+ * Creator plan for eleven_v4_turbo, measured 2026-10-26: 30 callers x 3 lines, 9 of 90 refused). A refused request is
+ * asked again after each of these waits (plus up to 0.2 s) before the reply is left as text.
+ */
+export const loungeElevenBusyWaitsMs = [300, 500, 700, 900, 1100, 1300] as const;
 
 /**
  * When to start a second transcription request. On 2026-10-07 transcription of a 4-second recording took about

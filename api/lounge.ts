@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -1011,9 +1011,9 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     // One speech request up to its first audio. A request that sends nothing for firstAudioMs is given up.
     // Some hosts speak with Gemini (loungeGeminiSpeech); it sends the same 24 kHz PCM, and OpenAI speaks for it when Gemini fails.
     const geminiKey = process.env.GEMINI_API_KEY, geminiHost = Boolean(geminiKey && loungeGeminiSpeech[host.id]);
-    // The speech engine the member chose in a one-to-one voice room (or the character's own). It speaks only with its
-    // key and a voice for this character; otherwise, and whenever it fails, OpenAI speaks.
-    const chosenSpeech: LoungeSpeechEngine = isLoungeSpeechEngine(body.speech) ? body.speech : loungeDefaultSpeechEngine(host.id);
+    // Every character speaks with ElevenLabs (2026-10-26): a voice that changes in the middle of a call breaks it, so a
+    // choice sent by an older page is not followed and nothing else speaks when ElevenLabs fails (the reply stays text).
+    const chosenSpeech: LoungeSpeechEngine = loungeDefaultSpeechEngine(host.id);
     type SpeechPlan = { engine: LoungeSpeechEngine; family?: 'gemini' | 'eleven' | 'typecast'; voice?: string; key?: string };
     const planSpeech = (choice: LoungeSpeechEngine): SpeechPlan => {
       const family = choice === 'gemini' ? 'gemini' : choice === 'typecast' ? 'typecast' : choice === 'openai' ? undefined : 'eleven';
@@ -1022,18 +1022,25 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       if (family && key && voice) return { engine: choice, family, voice, key };
       // A missing key is a deployment setting, not a failure: it is said in the log, or the voice silently falls to the next one.
       if (family) console.warn(`[Lounge speech] ${choice} is not used: ${!key ? `${family === 'gemini' ? 'GEMINI_API_KEY' : family === 'eleven' ? 'ELEVENLABS_API_KEY' : 'TYPECAST_API_KEY'} is not set on this deployment` : `no voice for ${host.id}`}`);
+      // A deployment without the key speaks with the next voice for every reply alike, so it never changes in a call.
       return choice !== 'gemini' && choice !== 'openai' ? planSpeech('gemini') : { engine: 'openai' };
     };
     let speech = planSpeech(chosenSpeech);
-    // A premium engine speaks only while the member's monthly allowance lasts; past it (or for a guest, or when the
-    // allowance cannot be read) the character's ordinary voice speaks. The allowance is read while the reply is written.
+    // A premium engine speaks only while the member's monthly allowance lasts. Past it (or for a guest) the reply stays
+    // text with a notice, instead of another voice; an allowance that cannot be read does not stop the voice. It is read
+    // while the reply is written.
     const premiumSpeech = isLoungePremiumSpeech(speech.engine) ? speech.engine : undefined;
+    let speechRefused: LoungeUpstreamError | undefined;
     const speechGate: Promise<void> = premiumSpeech
       ? readSpeechAllowance(premiumSpeech, user)
-        .then(status => { if (!status.allowed) { console.info('[Lounge speech] premium voice not used', JSON.stringify({ engine: premiumSpeech, guest: !status.member, used: status.used, limit: status.limit })); speech = planSpeech(loungeOrdinarySpeechEngine()); } })
-        .catch(() => { console.warn('[Lounge speech] allowance not read, ordinary voice'); speech = planSpeech(loungeOrdinarySpeechEngine()); })
+        .then(status => {
+          if (status.allowed || ('unavailable' in status && status.unavailable)) return;
+          console.info('[Lounge speech] premium voice not used', JSON.stringify({ engine: premiumSpeech, guest: !status.member, used: status.used, limit: status.limit }));
+          speechRefused = new LoungeUpstreamError(status.member ? '이번 달 목소리 통화 사용량을 다 썼어요. 대화는 글로 이어 갈게요.' : '목소리 통화는 회원만 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
+        })
+        .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
-    let speechProvider = 'openai', spentChars = 0;
+    let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0;
     // The characters a premium voice spoke are added to the member's month (after the reply, so the next one sees them).
     const recordSpeech = async () => {
       const chars = spentChars; spentChars = 0;
@@ -1089,8 +1096,20 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         const convert = createLoungePcmConverter(32_000);
         return response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({ transform(chunk, controller) { const pcm = convert(chunk); if (pcm.length) controller.enqueue(pcm); } }));
       }
+      if (!plan.key || !plan.voice) throw new LoungeUpstreamError('목소리 설정을 확인해 주세요. 대화는 글로 이어 갈게요.', 503, 'lounge_speech_not_configured', false, 60);
       const premade = loungeElevenPremadeVoice(host.id);
-      const speak = (voice: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text)), signal }, timeout);
+      const once = (voice: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text)), signal }, timeout);
+      // The plan allows a few requests at once (5 on 2026-10-26) and refuses the next with 429 at once, without a queue.
+      // A refused request is asked again after a short wait: a line takes about half a second, so a place opens soon.
+      const speak = async (voice: string) => {
+        for (let attempt = 0; ; attempt++) {
+          const response = await once(voice);
+          if (response.status !== 429 || attempt >= loungeElevenBusyWaitsMs.length || signal.aborted) return response;
+          await response.body?.cancel().catch(() => {});
+          await new Promise(resolve => setTimeout(resolve, loungeElevenBusyWaitsMs[attempt] + Math.random() * 200));
+          elevenBusyRetries++;
+        }
+      };
       let response = await speak(premade && Date.now() < elevenLibraryRefusedUntil ? premade : plan.voice!);
       // A free account may not use library voices through the API: the premade voice speaks, and the library voice is not asked again for a while.
       if (response.status === 402 && premade && premade !== plan.voice) { elevenLibraryRefusedUntil = Date.now() + 10 * 60_000; console.warn('[Lounge speech] elevenlabs library voice refused (paid plan needed), using the premade voice'); response = await speak(premade); }
@@ -1106,15 +1125,18 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         return { reader, first: first.value };
       } catch (error) { await reader.cancel().catch(() => {}); reader.releaseLock(); throw error; }
     };
-    const openSpeech = async (text: string, signal: AbortSignal, hedge: AbortSignal) => {
+    const openSpeech = async (text: string, signal: AbortSignal) => {
       if (premiumSpeech) await speechGate;
+      if (speechRefused) throw speechRefused;
       const stall = new AbortController();
       const timer = setTimeout(() => stall.abort(new DOMException('speech stalled', 'TimeoutError')), loungeSpeechStall.firstAudioMs);
       try {
-        const signals = AbortSignal.any([req.signal, signal, hedge, stall.signal]), timeout = loungeSpeechLimits(text).timeoutMs;
+        const signals = AbortSignal.any([req.signal, signal, stall.signal]), timeout = loungeSpeechLimits(text).timeoutMs;
         let opened: Awaited<ReturnType<typeof firstAudio>> | undefined;
-        // The chosen engine speaks; if it fails (or is not open), Gemini; if that fails (or is refusing), OpenAI.
-        const plans = [speech, ...(speech.engine !== 'gemini' && speech.engine !== 'openai' ? [planSpeech('gemini')] : [])]
+        // ElevenLabs speaks alone: when it fails the error goes up and the reply stays text, never another voice.
+        if (speech.family === 'eleven') { opened = await firstAudio(await engineSpeechStream(text, signals, timeout, speech)); speechProvider = speech.engine; }
+        // Any other engine: if it fails (or is not open), Gemini; if that fails (or is refusing), OpenAI.
+        const plans = opened ? [] : [speech, ...(speech.engine !== 'gemini' && speech.engine !== 'openai' ? [planSpeech('gemini')] : [])]
           .filter((plan, index, all) => plan.engine !== 'openai' && !(plan.engine === 'gemini' && Date.now() < geminiBlockedUntil) && all.findIndex(other => other.engine === plan.engine) === index);
         for (const plan of plans) {
           try { opened = await firstAudio(await engineSpeechStream(text, signals, timeout, plan)); speechProvider = plan.engine; break; }
@@ -1137,14 +1159,15 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       // (first audio +0.2 s, last audio +2.7 s on 2026-10-07) for no gain once retries skip what was sent.
       const limits = loungeSpeechLimits(text);
       const started = performance.now();
-      const stats = { firstMs: -1, maxGapMs: 0, retries: 0, hedges: 0, failed: false };
+      const stats = { firstMs: -1, maxGapMs: 0, retries: 0, failed: false };
+      elevenBusyRetries = 0;
       let bytesSent = 0;
       try {
         for (let attempt = 1; ; attempt++) {
           let reader: ReadableStreamDefaultReader<Uint8Array> | undefined, stall: AbortController | undefined, timer: ReturnType<typeof setTimeout> | undefined;
           try {
-            // The first audio is raced against a second request if it is slow.
-            const opened = await hedged(hedge => openSpeech(text, signal, hedge), loungeSpeechStall.hedgeAfterMs, transientUpstream, () => { stats.hedges++; });
+            // No second request races a slow first audio any more: it took a second of the plan's few places at once.
+            const opened = await openSpeech(text, signal);
             reader = opened.reader; stall = opened.stall; track(reader);
             const stalled = () => stall?.abort(new DOMException('speech stalled', 'TimeoutError'));
             let received = 0, last = 0, next: { done: boolean; value?: Uint8Array } = { done: false, value: opened.first };
@@ -1177,7 +1200,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           } finally { clearTimeout(timer); }
         }
       } catch (error) { stats.failed = true; throw error; }
-      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, hedges: stats.hedges, failed: stats.failed, ...(speech.engine !== 'openai' ? { provider: speechProvider } : {}) })); if (isLoungePremiumSpeech(speechProvider)) spentChars += text.length; }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, busyRetries: elevenBusyRetries, failed: stats.failed, ...(speech.engine !== 'openai' ? { provider: speechProvider } : {}) })); if (isLoungePremiumSpeech(speechProvider)) spentChars += text.length; }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'
