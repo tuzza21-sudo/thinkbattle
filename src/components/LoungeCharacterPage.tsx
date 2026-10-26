@@ -1,9 +1,10 @@
 import { useState, type CSSProperties } from 'react';
-import { ArrowLeft, LoaderCircle, MessageCircle, Pencil, Send, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Heart, LoaderCircle, MessageCircle, Pencil, Send, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeHosts } from '../lib/lounge';
-import { getLoungeCharacter, koreanWith, loungeCharacters } from '../lib/loungeCharacters';
+import { getLoungeCharacter, koreanSubject, koreanWith, loungeCharacters } from '../lib/loungeCharacters';
+import { defaultEventEffects, metricName, relationshipConfigs, type RelationshipConfig, type RelationshipEventType } from '../lib/relationship';
 import { setLoungeCustomStatus, startLoungeCustomChat } from '../lib/loungeApi';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
@@ -11,6 +12,14 @@ import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { LoungeCharacterGallery } from './LoungeCharacterGallery';
 import { LoungeScenarioCards } from './LoungeScenarioCards';
 import './LoungeCharacter.css';
+
+/** The metrics an event moves in this character's configuration, largest first. */
+function effectChips(config: RelationshipConfig, event: RelationshipEventType, direction: 1 | -1) {
+  const deltas = (config.events[event] ?? defaultEventEffects[event]).deltas;
+  return Object.entries(deltas).filter(([, value]) => (value ?? 0) * direction > 0)
+    .sort((a, b) => Math.abs(b[1] ?? 0) - Math.abs(a[1] ?? 0)).slice(0, 3)
+    .map(([metric, value]) => ({ name: metricName(config, metric), strong: Math.abs(value ?? 0) >= 4 }));
+}
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const statusLabels: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화할 수 있어요', pending: '공개 검수 중이에요', public: '모두가 대화할 수 있어요', rejected: '공개가 반려됐어요' };
@@ -50,6 +59,8 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
   const host = getLoungeHost(character.id);
   const night = character.id === 'velvet';
   const made = isLoungeCustomCharacterId(character.id);
+  const config = relationshipConfigs[character.id];
+  const chips = (event: RelationshipEventType, direction: 1 | -1) => <span className={`lounge-character-effects ${direction > 0 ? 'up' : 'down'}`}>{effectChips(config, event, direction).map(chip => <i key={chip.name} className={chip.strong ? 'strong' : ''}>{chip.name} {direction > 0 ? chip.strong ? '▲▲' : '▲' : chip.strong ? '▼▼' : '▼'}</i>)}</span>;
   const nameOf = (hostId: string) => loungeCharacters.find(item => item.id === hostId)?.name ?? getLoungeHost(hostId).name;
 
   return <main className={`lounge-character ${night ? 'night' : ''}`} style={{ '--character-accent': host.color } as CSSProperties}>
@@ -82,6 +93,25 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
       <h2>성격</h2>
       <div className="lounge-character-traits">{character.personality.map(item => <article key={item.label}><h3>{item.label}</h3><p>{item.text}</p></article>)}</div>
     </section>
+
+    {config && character.wins?.length > 0 && <section className="lounge-character-section">
+      <h2><Heart size={19} /> 이렇게 대화하면 마음이 열려요</h2>
+      <p className="lounge-character-lead">대화 속에서 이런 모습이 보이면 {koreanSubject(character.name)} 당신을 다르게 보기 시작해요.</p>
+      <div className="lounge-character-moves">{character.wins.map(move => <article key={move.event}>
+        <header><h3>{move.title}</h3>{chips(move.event, 1)}</header>
+        {move.example && <p className="lounge-character-example">{move.example}</p>}
+        <p className="lounge-character-why"><b>왜 좋아할까</b>{move.why}</p>
+      </article>)}</div>
+      {character.gentle && <p className="lounge-character-gentle"><ShieldCheck size={16} />{character.gentle}</p>}
+    </section>}
+
+    {config && character.losses?.length > 0 && <section className="lounge-character-section">
+      <h2><X size={19} /> 이런 대화는 통하지 않아요</h2>
+      <div className="lounge-character-moves losses">{character.losses.map(move => <article key={move.event}>
+        <header><h3>{move.title}</h3>{chips(move.event, -1)}</header>
+        <p className="lounge-character-why"><b>왜 싫어할까</b>{move.why}</p>
+      </article>)}</div>
+    </section>}
 
     {character.tastes && <section className="lounge-character-section">
       <h2>취향</h2>
