@@ -1,6 +1,6 @@
 import { isLoungeCustomCharacterId } from '../src/lib/lounge.js';
 import {
-  loungeCustomBucket, loungeCustomDraftInstructions, loungeCustomDraftSchema, loungeCustomExtrasInstructions, loungeCustomExtrasSchema, loungeCustomPortraitPrompt, loungeCustomPortraitUrl, loungeCustomReviewInstructions,
+  loungeCustomBucket, loungeCustomDraftInstructions, loungeCustomDraftSchema, loungeCustomExtrasInstructions, loungeCustomExtrasSchema, loungeCustomPortraitPrompt, loungeCustomPortraitUrl, loungeCustomPrologueInstructions, loungeCustomPrologueSchema, loungeCustomReviewInstructions,
   loungeCustomReviewSchema, loungeCustomThemes, loungeCustomUploadReviewInstructions, loungeCustomUploadReviewSchema, loungeVoicePresets,
   normalizeLoungeCustomSheet, validateLoungeCustomBasics, validateLoungeCustomSheet, type LoungeCustomCharacterRow, type LoungeCustomSheet,
 } from '../src/lib/loungeCustomCharacters.js';
@@ -13,7 +13,10 @@ import { relationshipTemplateIds } from '../src/lib/relationship/index.js';
  *           look and greeting); nothing is stored.
  *   save    {id?, sheet, template, flirtation, voice, theme}: the rules (the AI writes a missing tagline, look or
  *           greeting), an AI review, then the character is stored.
- *   portrait {id}: a portrait draft from the sheet's look (10 a day); choose {id, path} makes it the portrait.
+ *   prologue {sheet}: the AI writes the opening of the first conversation (prologue, the member's role, where the two
+ *           start) from the sheet; nothing is stored.
+ *   portrait {id, prompt?}: a portrait draft from the sheet's look and the member's description of how to draw them
+ *           (kept on the sheet) (10 a day); choose {id, path} makes it the portrait.
  *   upload  {id, image (data URL), consent}: an image the member made, checked, used as the portrait only.
  */
 type NodeRequest = { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
@@ -71,6 +74,16 @@ async function draft(context: Context, body: Record<string, unknown>) {
   return json({ sheet: normalizeLoungeCustomSheet({ ...written, name: basics.name, age: basics.age, gender: basics.gender, job: basics.job, concept: basics.concept }) });
 }
 
+async function prologue(context: Context, body: Record<string, unknown>) {
+  const sheet = normalizeLoungeCustomSheet(body.sheet);
+  const problems = validateLoungeCustomBasics(sheet);
+  if (sheet.intro.length < 20 || sheet.personality.length < 10) problems.push({ field: 'intro', message: '소개와 성격을 먼저 적어 주세요. 그걸 바탕으로 프롤로그를 써요.' });
+  if (problems.length) throw new LoungeCharacterError('캐릭터 정보를 먼저 채워 주세요.', 400, 'lounge_character_prologue_basics', problems);
+  const written = await modelJson<Record<string, unknown>>(context, 'lounge_character_prologue', loungeCustomPrologueInstructions,
+    { name: sheet.name, age: sheet.age, gender: sheet.gender, job: sheet.job, intro: sheet.intro, personality: sheet.personality, tastes: sheet.tastes, look: sheet.look, greeting: sheet.greeting, draft: sheet.prologue }, loungeCustomPrologueSchema, 3500);
+  const story = normalizeLoungeCustomSheet(written);
+  return json({ prologue: story.prologue, userRole: story.userRole, storyRelationship: story.storyRelationship });
+}
 async function save(context: Context, body: Record<string, unknown>) {
   const sheet: LoungeCustomSheet = normalizeLoungeCustomSheet(body.sheet);
   const template = relationshipTemplateIds.find(id => id === body.template);
@@ -106,7 +119,10 @@ async function save(context: Context, body: Record<string, unknown>) {
 }
 
 async function portrait(context: Context, body: Record<string, unknown>) {
-  const row = await ownCharacter(context, body.id);
+  let row = await ownCharacter(context, body.id);
+  // The member's description of how to draw them is kept on the sheet for the next try.
+  const description = normalizeLoungeCustomSheet({ portraitPrompt: body.prompt }).portraitPrompt;
+  if (typeof body.prompt === 'string' && description !== normalizeLoungeCustomSheet(row.sheet).portraitPrompt) row = await patchCharacter(context, row.id, { sheet: { ...normalizeLoungeCustomSheet(row.sheet), portraitPrompt: description } });
   const claim = await timed(`${context.base}/rest/v1/rpc/claim_lounge_custom_portrait`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_owner: context.userId }) });
   if (!claim.ok) throw new LoungeCharacterError('사진 요청을 처리하지 못했어요.', 502, 'lounge_character_portrait_claim');
   if (await claim.json() !== true) throw new LoungeCharacterError('오늘은 대표 사진을 10장까지 만들 수 있어요. 내일 다시 시도해 주세요.', 429, 'lounge_character_portrait_limit');
@@ -175,6 +191,7 @@ async function handle(req: Request) {
     const context: Context = { base, service, key, userId: user.id };
     switch (body.action) {
       case 'draft': return await draft(context, body);
+      case 'prologue': return await prologue(context, body);
       case 'save': return await save(context, body);
       case 'portrait': return await portrait(context, body);
       case 'choose': return await choose(context, body);

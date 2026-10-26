@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, Camera, Check, LoaderCircle, MessageCircle, Play, Send, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Camera, Check, LoaderCircle, MessageCircle, Play, Send, Sparkles, Upload, Wand2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import {
   LoungeCharacterError, chooseLoungeCharacterPortrait, draftLoungeCharacter, makeLoungeCharacterPortrait, saveLoungeCharacter,
-  setLoungeCustomStatus, startLoungeCustomChat, uploadLoungeCharacterPortrait,
+  setLoungeCustomStatus, startLoungeCustomChat, uploadLoungeCharacterPortrait, writeLoungeCharacterPrologue,
 } from '../lib/loungeApi';
 import {
   loungeCustomLimit, loungeCustomRules, loungeCustomThemes, loungeVoicePresets, loungeVoicePresetSample, normalizeLoungeCustomSheet,
@@ -16,7 +16,7 @@ import { relationshipTemplateIds, relationshipTemplates, type RelationshipTempla
 import './LoungeCharacter.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
-const emptySheet: LoungeCustomSheet = { name: '', age: 28, gender: 'female', job: '', concept: '', intro: '', personality: '', tastes: '', tagline: '', look: '', greeting: '' };
+const emptySheet: LoungeCustomSheet = { name: '', age: 28, gender: 'female', job: '', concept: '', intro: '', personality: '', tastes: '', tagline: '', look: '', greeting: '', prologue: '', userRole: '', storyRelationship: '', portraitPrompt: '' };
 // The voices to choose from follow the character's gender; "other" can choose any.
 const voiceGender: Record<string, 'female' | 'male'> = { calm_female: 'female', low_female: 'female', deep_male: 'male', soft_male: 'male', firm_male: 'male', playful_male: 'male' };
 const statusLabels: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화', pending: '공개 검수 중', public: '공개됨', rejected: '공개 반려' };
@@ -52,7 +52,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
   const [row, setRow] = useState<LoungeCustomCharacterRow | null>(null);
   const [candidate, setCandidate] = useState<{ path: string; url: string } | null>(null);
   const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState<'draft' | 'save' | 'portrait' | 'choose' | 'upload' | 'chat' | 'submit' | null>(null);
+  const [busy, setBusy] = useState<'draft' | 'prologue' | 'save' | 'portrait' | 'choose' | 'upload' | 'chat' | 'submit' | null>(null);
   const [problems, setProblems] = useState<Array<{ field: string; message: string }>>([]);
   const [notice, setNotice] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   const [loading, setLoading] = useState(Boolean(editId));
@@ -84,6 +84,11 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     setSheet(result.sheet); setDrafted(true);
     setNotice({ kind: 'done', text: 'AI가 소개, 성격, 취향을 썼어요. 내 캐릭터답게 고친 뒤 저장해 주세요.' });
   });
+  const writePrologue = () => run('prologue', async () => {
+    const story = await writeLoungeCharacterPrologue(sheet);
+    setSheet(previous => ({ ...previous, ...story }));
+    setNotice({ kind: 'done', text: 'AI가 시작 프롤로그를 썼어요. 마음에 들게 고친 뒤 저장해 주세요.' });
+  });
   const changeGender = (gender: LoungeCustomGender) => {
     set('gender', gender);
     if (gender !== 'other' && voiceGender[voice] !== gender) setVoice(loungeVoicePresets.find(preset => voiceGender[preset.id] === gender)!.id);
@@ -93,7 +98,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     setRow(result.character); registerLoungeCustomRow(result.character);
     setNotice({ kind: 'done', text: result.character.status === 'pending' ? '저장했어요. 공개 중이던 캐릭터라 바뀐 내용은 다시 검수를 거쳐요.' : '저장했어요. 이제 대표 사진을 정해 주세요.' });
   });
-  const makePortrait = () => run('portrait', async () => { if (row) setCandidate(await makeLoungeCharacterPortrait(row.id)); });
+  const makePortrait = () => run('portrait', async () => { if (row) setCandidate(await makeLoungeCharacterPortrait(row.id, sheet.portraitPrompt)); });
   const choose = () => run('choose', async () => {
     if (!row || !candidate) return;
     const result = await chooseLoungeCharacterPortrait(row.id, candidate.path);
@@ -159,6 +164,19 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
       </Field>
     </section>
 
+    <section className="lounge-creator-step">
+      <h2><span>5</span> 시작 프롤로그 <small>선택</small></h2>
+      <p className="lounge-character-lead">첫 대화가 시작되기 전의 이야기예요. 적어 두면 첫 대화가 이 장면에서 이야기처럼 시작해요. 비워 두면 편한 대화로 시작해요.</p>
+      <Field label="프롤로그" hint="'당신'이 겪는 장면으로, 그가 말을 거는 순간까지" problem={problemFor('prologue')}>
+        <textarea rows={8} value={sheet.prologue} maxLength={rules.prologue[1]} onChange={event => set('prologue', event.target.value)} placeholder={'예: 비가 그친 새벽 두 시, 방송국 로비는 텅 비어 있다. 막차를 놓친 당신이 자판기 앞에 서 있을 때, 엘리베이터 문이 열리고 낯익은 목소리가 들린다.\n\n"이 시간에 여기서 뭐 해요?"'} />
+      </Field>
+      <div className="lounge-creator-grid">
+        <Field label="나의 역할" hint="이 이야기에서 나는 누구인가요" problem={problemFor('userRole')}><input value={sheet.userRole} maxLength={rules.userRole[1]} onChange={event => set('userRole', event.target.value)} placeholder="예: 새벽 라디오에 사연을 보내던 청취자" /></Field>
+        <Field label="둘의 관계" hint="어디서 시작하나요" problem={problemFor('storyRelationship')}><input value={sheet.storyRelationship} maxLength={rules.storyRelationship[1]} onChange={event => set('storyRelationship', event.target.value)} placeholder="예: 오늘 처음 얼굴을 보는 사이. 목소리만은 오래 알았다." /></Field>
+      </div>
+      <button type="button" className="lounge-character-secondary" onClick={() => void writePrologue()} disabled={Boolean(busy)}>{busy === 'prologue' ? <LoaderCircle size={16} className="lounge-spin" /> : <BookOpen size={16} />}{sheet.prologue ? 'AI로 프롤로그 다듬기' : 'AI로 프롤로그 쓰기'}</button>
+    </section>
+
     <section className="lounge-creator-step lounge-creator-more">
       <details>
         <summary>더 다듬기 <small>선택 · 비워 두면 AI가 채워요</small></summary>
@@ -182,11 +200,14 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     </section>
 
     {row && <section className="lounge-creator-step">
-      <h2><span>3</span> 대표 사진</h2>
+      <h2><span>6</span> 대표 사진</h2>
       <div className="lounge-creator-portrait">
         <figure>{candidate ? <img src={candidate.url} alt="새로 만든 대표 사진 후보" /> : portraitUrl ? <img src={portraitUrl} alt={`${row.name}의 대표 사진`} /> : <span><Camera size={28} />아직 사진이 없어요</span>}{candidate && <figcaption>후보</figcaption>}</figure>
         <div>
-          <p className="lounge-character-lead">외모 설명으로 AI가 사진을 만들어요(하루 10장). 이 얼굴로 대화 중에 사진도 보낼 수 있어요.</p>
+          <p className="lounge-character-lead">아래 묘사와 외모 설명으로 AI가 사진을 만들어요(하루 10장). 이 얼굴로 대화 중에 사진도 보낼 수 있어요.</p>
+          <Field label="어떤 모습으로 그릴까요?" hint="얼굴, 머리, 옷, 표정, 분위기, 배경 (선택)" problem={problemFor('portraitPrompt')}>
+            <textarea rows={3} value={sheet.portraitPrompt} maxLength={rules.portraitPrompt[1]} onChange={event => set('portraitPrompt', event.target.value)} placeholder="예: 날렵한 턱선에 웨이브 진 검은 머리, 오버핏 베이지 니트, 살짝 웃는 눈매. 창가의 따뜻한 오후 햇살." />
+          </Field>
           <div className="lounge-character-actions">
             <button type="button" className="lounge-character-secondary" onClick={() => void makePortrait()} disabled={Boolean(busy)}>{busy === 'portrait' ? <LoaderCircle size={15} className="lounge-spin" /> : <Wand2 size={15} />}{candidate || portraitUrl ? '다시 만들기' : 'AI로 만들기'}</button>
             {candidate && <button type="button" className="lounge-character-cta" onClick={() => void choose()} disabled={Boolean(busy)}>{busy === 'choose' ? <LoaderCircle size={15} className="lounge-spin" /> : <Check size={15} />}이 사진으로 정하기</button>}
@@ -201,7 +222,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     </section>}
 
     {row?.portrait_path && <section className="lounge-creator-step">
-      <h2><span>4</span> 대화하기</h2>
+      <h2><span>7</span> 대화하기</h2>
       <div className="lounge-character-actions">
         <button type="button" className="lounge-character-cta" onClick={() => void startChat()} disabled={Boolean(busy)}>{busy === 'chat' ? <LoaderCircle size={16} className="lounge-spin" /> : <MessageCircle size={16} />}{koreanWith(row.name)} 대화 시작</button>
         {(row.status === 'private' || row.status === 'rejected') && <button type="button" className="lounge-character-secondary" onClick={() => void submit()} disabled={Boolean(busy)}><Send size={15} />공개 신청</button>}

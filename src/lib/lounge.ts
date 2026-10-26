@@ -300,7 +300,7 @@ export type LoungeFilmCard = {
 export type LoungeFilmResearch = { version: 2; coverage: 'scene_grounded' | 'limited'; materials: Array<{ title: string; url: string; provider: string; retrieved_at: string }>; cards: LoungeFilmCard[] };
 export type LoungeTopicStudy = { title: string; confidence: 'verified' | 'uncertain'; overview: string; facts: string[]; angles: string[]; questions: string[]; clarification: string; sources: Array<{ title: string; url: string }>; film_research?: LoungeFilmResearch };
 export const loungeNeedsStudy = (topic: string) => !loungeTopics.some(item => item.question === topic.trim());
-export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null; voice_on?: boolean; ai_model?: string | null ; /** A one-to-one chat started from a story (see loungeScenarios.ts). */ scenario?: LoungeRoomScenario | null };
+export type LoungeRoom = { space?: { name: string } | null; space_id?: string | null; table_no?: number | null; broadcaster_id?: string | null; topic_source?: 'ai' | 'member' | null; topic_set_by?: string | null; topic_set_at?: string | null; topic_suggestions?: string[] | null; moderator_requested_at?: string | null; moderator_requested_by?: string | null; moderator_request_kind?: LoungeHelpKind | null; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; theme?: LoungeThemeId; study_required?: boolean; topic_study?: LoungeTopicStudy | null; id: string; host_id: string; host_persona: LoungeHostId; topic: string; capacity: number; status: 'lobby' | 'active' | 'ended'; created_at: string; started_at: string | null; expires_at: string | null; memory: string; ai_turns: number; last_ai_at: string | null; voice_on?: boolean; ai_model?: string | null ; /** A one-to-one chat started from a story (see loungeScenarios.ts). */ scenario?: LoungeRoomScenario | null; background?: unknown };
 /** A space in 상상의 집: always open, hosted by one character. Tables (rooms) open inside it as people arrive. */
 export type LoungeSpace = { id: string; name: string; host_persona: LoungeHostId; theme: LoungeThemeId; capacity: number; present_count: number; table_count: number; topic: string | null; participants: string[]; seat_free: boolean; waiting: number };
 /**
@@ -334,6 +334,7 @@ export const loungeThemes = [
   { id: 'rooftop', name: '루프탑 라운지', subtitle: '도심 위에서 즐기는 시티 뷰', tag: 'UNDER THE CITY SKY', caption: '도시의 불빛 아래, 우리의 이야기가 가까워져요.', image: '/lounge/rooftop-city-v2.webp', accent: '#ead0a3', surface: '#242421' },
   { id: 'river', name: '한강 야경', subtitle: '물 위에 반짝이는 밤의 여유', tag: 'BY THE HAN RIVER', caption: '강 위로 번지는 불빛, 천천히 나누는 이야기.', image: '/lounge/river-v1.webp', accent: '#bdd4e3', surface: '#1d2931' },
   { id: 'forest', name: '오래된 LP 재즈 바', subtitle: '낡은 LP 선반과 따뜻한 조명, 천천히 도는 턴테이블', tag: 'A SLOW RECORD AFTER MIDNIGHT', caption: '한 곡이 끝날 때까지, 천천히 이야기를 나눠요.', image: '/lounge/jazz-lp-bar-v1.webp', accent: '#e0b878', surface: '#2b2118' },
+  { id: 'hotellobby', name: '호텔 로비 카페', subtitle: '아치형 창과 낮은 조명, 따뜻한 차 두 잔', tag: 'A QUIET TABLE IN THE LOBBY', caption: '서두르지 않아도 괜찮아요. 차가 식을 때까지 천천히 이야기해요.', image: '/lounge/hotel-lounge-v1.webp', accent: '#e6c48f', surface: '#2a2016' },
   { id: 'hotel', name: '새벽 후반작업실', subtitle: '모니터 불빛만 남은 편집실, 식은 커피 한 잔', tag: 'THE EDIT ROOM BEFORE DAWN', caption: '타임라인을 멈추고, 장면 하나를 천천히 들여다봐요.', image: '/lounge/postproduction-suite-v1.webp', accent: '#9dc3e6', surface: '#1a2230' },
   { id: 'cafe', name: '비 오는 창가 카페', subtitle: '빗방울 너머, 따뜻한 커피 한 잔', tag: 'A RAINY DAY BY THE WINDOW', caption: '창밖에는 비가, 이곳에는 편안한 이야기가 흘러요.', image: '/lounge/rainy-cafe-v1.webp', accent: '#e0c6aa', surface: '#302923' },
   { id: 'seaside', name: '바다 테라스', subtitle: '푸른 수평선과 햇살이 머무는 자리', tag: 'A SLOW MORNING BY THE SEA', caption: '넓은 바다를 바라보며, 마음에도 여유를 더해요.', image: '/lounge/seaside-terrace-v1.webp', accent: '#c4dfdd', surface: '#253536' },
@@ -347,7 +348,7 @@ export type LoungeThemeId = typeof loungeThemes[number]['id'];
 export const getLoungeTheme = (id?: string | null) => loungeThemes.find(theme => theme.id === id) ?? loungeThemes[0];
 /** The backgrounds each character's conversations can use. A room picks one of its character's list. */
 export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
-  jaeseok: ['hotel'], ina: ['seaside'], auditor: ['forest'], closer: ['boardroom'],
+  jaeseok: ['hotel'], ina: ['seaside'], auditor: ['hotellobby'], closer: ['boardroom'],
   velvet: ['cocktailbar'], trickster: ['theater'], diplomat: ['embassy'], lawyer: ['lawlibrary'],
 };
 /**
@@ -360,6 +361,29 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
   let hash = 0;
   for (let index = 0; index < roomId.length; index++) hash = (hash * 31 + roomId.charCodeAt(index)) >>> 0;
   return choices[hash % choices.length];
+}
+/**
+ * What a member chose for a room's background (rooms.background): one of the backgrounds above, or an image made from
+ * their own description, kept privately under their folder (lounge-character-private).
+ */
+export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string };
+export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  const theme = loungeThemes.find(item => item.id === value.theme)?.id;
+  const image = typeof value.image === 'string' && /^[0-9a-f-]{36}\/backgrounds\/[\w.-]{1,120}\.webp$/.test(value.image) ? value.image : undefined;
+  const prompt = typeof value.prompt === 'string' ? value.prompt.replace(/\s+/g, ' ').trim().slice(0, 300) : undefined;
+  return image ? { image, ...(prompt ? { prompt } : {}) } : theme ? { theme } : null;
+}
+/**
+ * The scene a room shows: the background the member chose, else the story's own (a story room keeps the theme its
+ * scenario names), else one of the character's.
+ */
+export function loungeRoomSceneTheme(room: { id: string; host_persona: string; theme?: LoungeThemeId | null; space_id?: string | null; scenario?: unknown; background?: unknown }): LoungeThemeId {
+  const chosen = readLoungeRoomBackground(room.background)?.theme;
+  if (chosen) return chosen;
+  if ((room.space_id || room.scenario) && room.theme && loungeThemes.some(item => item.id === room.theme)) return room.theme;
+  return loungeRoomTheme(room.host_persona, room.id);
 }
 /** A host's fields, widened from the house list so a character a member creates can have the same shape. */
 export type LoungeHost = {

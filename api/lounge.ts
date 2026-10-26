@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, isLoungeSpeechEngine, loungeDefaultSpeechEngine, loungeOrdinarySpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -615,7 +615,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     ]);
     const messages = await messagesRead;
     if (responses.some(response => !response.ok) || !messages) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; voice_on?: boolean; ai_model?: string | null; scenario?: unknown }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; scenario?: unknown }>>(responses[0], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[1], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
@@ -684,6 +684,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const solo = loungeIsSolo(room, members, now);
     // A one-to-one chat started from a story (scenario, see loungeScenarios.ts): the story and the member's role go to the model.
     const scenario = solo && !room.space_id ? normalizeLoungeRoomScenario(room.scenario) : undefined;
+    // The place the member chose for the scene (the background button of a one-to-one conversation).
+    const chosenBackground = solo && !room.space_id ? readLoungeRoomBackground(room.background) : null;
+    const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
     const relationshipConfig = solo ? getRelationshipConfig(room.host_persona) : undefined;
@@ -887,6 +890,7 @@ ${photoRule}`;
         story ? storyInstruction : roleInstruction,
         phoneCall ? loungePhoneCallRules : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
+        sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
         // A story room with the voice on keeps to the story, in the voice rules.
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',
       ].filter(Boolean).join('\n'),
@@ -916,7 +920,7 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
       ].filter(Boolean).join('\n'),
-      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
+      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,

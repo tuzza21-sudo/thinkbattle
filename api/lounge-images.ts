@@ -1,7 +1,7 @@
 import { isLoungeCustomCharacterId } from '../src/lib/lounge.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
-import { loungePhotoBuckets, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
+import { loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
 
 /**
@@ -137,6 +137,41 @@ async function memberPhoto(context: Context, authorization: string, anon: string
   }
 }
 
+/**
+ * A background for the member's own one-to-one conversation, made from their description. A few a day; each is kept
+ * under the member's folder and saved on the room (rooms.background), which the conversation then shows.
+ */
+async function memberBackground(context: Context, userId: string, roomId: string, request: string) {
+  if (request.length < 4) return json({ error: '어떤 곳인지 조금만 더 적어 주세요.', code: 'lounge_background_short', retryable: false }, 400);
+  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=id`, { headers: serviceHeaders(context) });
+  if (!rooms.ok || !(await rooms.json() as unknown[]).length) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
+  const folder = `${userId}/backgrounds`;
+  const listed = await timed(`${context.base}/storage/v1/object/list/${loungePhotoBuckets.private}`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ prefix: folder, limit: 100, sortBy: { column: 'created_at', order: 'desc' } }) });
+  const kst = new Date(Date.now() + 9 * 3_600_000);
+  const todayStart = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3_600_000).toISOString();
+  const used = listed.ok ? (await listed.json() as Array<{ created_at?: string }>).filter(item => (item.created_at ?? '') >= todayStart).length : 0;
+  if (used >= loungeBackgroundDaily) return json({ error: `오늘 만들 수 있는 배경 ${loungeBackgroundDaily}장을 모두 만들었어요. 기존 배경에서 골라 주세요.`, code: 'lounge_background_limit', retryable: false }, 429);
+  const response = await timed('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { Authorization: `Bearer ${context.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
+    model: loungePhotoModel, prompt: loungeBackgroundImagePrompt(request), size: loungeBackgroundSize, quality: process.env.LOUNGE_IMAGE_QUALITY || 'medium', output_format: 'webp', output_compression: 82, n: 1,
+  }) }, 150_000);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+    console.warn('[Lounge background] image failed', JSON.stringify({ status: response.status, code: payload?.error?.code }));
+    if (payload?.error?.code === 'moderation_blocked' || /safety|moderation/i.test(payload?.error?.message ?? '')) throw new LoungePhotoError('이 장소는 배경으로 만들 수 없어요. 다른 장소로 적어 주세요.', 422, 'lounge_background_blocked');
+    if (response.status === 429) throw new LoungePhotoError('요청이 잠시 몰렸어요. 조금 뒤 다시 시도해 주세요.', 429, 'lounge_background_rate_limit');
+    throw new LoungePhotoError('배경을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_background_failed');
+  }
+  const b64 = ((await response.json()) as { data?: Array<{ b64_json?: string }> }).data?.[0]?.b64_json;
+  if (!b64) throw new LoungePhotoError('배경을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_background_empty');
+  const path = `${folder}/${roomId.replace(/^lounge-/, '')}-${crypto.randomUUID().slice(0, 8)}.webp`;
+  await upload(context, loungePhotoBuckets.private, path, Uint8Array.from(atob(b64), character => character.charCodeAt(0)));
+  // Saved on the room so it stays on every device; the member's browser keeps it too if this does not go through.
+  const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ background: { image: path, prompt: request } }) }).catch(() => null);
+  if (!saved?.ok) console.warn('[Lounge background] not saved on the room', saved?.status);
+  console.info('[Lounge background]', JSON.stringify({ left: loungeBackgroundDaily - used - 1 }));
+  return json({ image: path, prompt: request, left: loungeBackgroundDaily - used - 1 });
+}
+
 /** Once a day, one post from each character's own day to their public gallery. */
 async function dailyPosts(context: Context) {
   const settings = await timed(`${context.base}/rest/v1/lounge_image_settings?id=eq.1&select=enabled`, { headers: serviceHeaders(context) });
@@ -183,13 +218,15 @@ async function handle(req: Request) {
     let body: { action?: string; roomId?: string; source?: string; request?: unknown };
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = body.roomId;
-    if (body.action !== 'photo' || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['request', 'character'].includes(body.source ?? '')) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
+    const background = body.action === 'background';
+    if ((body.action !== 'photo' && !background) || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || (!background && !['request', 'character'].includes(body.source ?? ''))) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
     const auth = await timed(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization } });
     if (!auth.ok) return json({ error: '로그인 세션이 만료됐어요.' }, 401);
     const user = await auth.json() as { id: string; is_anonymous?: boolean };
     // Photos are kept per member, so a guest without an account cannot receive them.
-    if (user.is_anonymous) return json({ error: '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
-    const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
+    if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
+    const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
+    if (background) return await memberBackground(context, user.id, roomId, request);
     return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request);
   } catch (error) {
     if (error instanceof LoungePhotoError) return json({ error: error.message, code: error.code, retryable: error.status >= 500 || error.status === 429 }, error.status);
