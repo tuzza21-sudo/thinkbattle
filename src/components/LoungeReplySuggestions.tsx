@@ -31,7 +31,7 @@ export type LoungeReplies = ReturnType<typeof useLoungeReplies>;
 /** Same look as the other buttons of the bottom bar. */
 export function LoungeReplyButton({ state }: { state: LoungeReplies }) {
   return <button type="button" className="lounge-ask-button lounge-reply-trigger" disabled={state.disabled || Boolean(state.busy)} aria-expanded={Boolean(state.replies)} onClick={() => void (state.replies ? state.close() : state.load())}>
-    {state.busy === 'suggest' && !state.replies ? <LoaderCircle size={17} className="lounge-spin" /> : <MessageSquareQuote size={17} />}내 답변 추천받기
+    {state.busy === 'suggest' && !state.replies ? <LoaderCircle size={17} className="lounge-spin" /> : <MessageSquareQuote size={17} />}<span className="lounge-label-full">내 답변 추천받기</span><span className="lounge-label-short">답변 추천</span>
   </button>;
 }
 

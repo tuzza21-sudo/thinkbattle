@@ -200,3 +200,4 @@
 .lounge-scenario-card p { margin:0; font-size:14px; line-height:1.6; }
 .lounge-scenario-card small { font-size:12px; opacity:.75; }
 .lounge-scenario-card .lounge-character-cta { margin-top:auto; align-self:flex-start; padding:10px 14px; font-size:13px; }
+.lounge-creator-step>h2 small { font-size:12px; font-weight:500; letter-spacing:0; color:var(--c-muted,#8a8f84); }

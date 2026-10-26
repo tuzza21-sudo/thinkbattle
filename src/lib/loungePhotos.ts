@@ -59,6 +59,18 @@ export function loungePhotoImagePrompt(characterId: string, scene: string) {
   ].filter(Boolean).join('\n');
 }
 
+/** A conversation background from the member's description: a place, wide, with no one in it. */
+export const loungeBackgroundSize = '1536x1024';
+export const loungeBackgroundDaily = 6;
+export function loungeBackgroundImagePrompt(description: string) {
+  return [
+    'A wide, cinematic, photorealistic photograph of a place, used as the background behind a chat conversation.',
+    `The place (Korean description): ${description.slice(0, 300)}`,
+    'No people, no faces, no hands. No text, signs, captions, watermarks or logos.',
+    'Atmospheric light that fits the description; the lower half calm and not too busy, so white text reads over it.',
+  ].join('\n');
+}
+
 /** Characters' time of day, in Korean time, for the scene. */
 export function loungePhotoNow(date = new Date()) {
   const parts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'long', hour: 'numeric', hour12: false }).format(date);

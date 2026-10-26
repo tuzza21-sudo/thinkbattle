@@ -23,6 +23,12 @@ export async function withPhotoUrls(posts: readonly LoungeCharacterPost[]): Prom
   });
 }
 
+/** The address of a background the member made for their conversation (kept privately under their folder). */
+export async function signLoungeBackground(path: string) {
+  const { data } = await supabase.storage.from(loungePhotoBuckets.private).createSignedUrl(path, 7200);
+  return data?.signedUrl ?? null;
+}
+
 /** The photos the character sent in this conversation, oldest first. Only the member's own are readable. */
 export async function loadLoungeRoomPhotos(roomId: string) {
   const { data, error } = await supabase.from('lounge_character_posts').select(columns).eq('room_id', roomId).eq('status', 'ready').order('created_at').limit(60);

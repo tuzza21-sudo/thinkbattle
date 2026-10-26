@@ -22,11 +22,14 @@ export const isLoungeCustomId = isLoungeCustomCharacterId;
  * weaknesses) and tastes (interests, likes, dislikes). `concept` is an optional idea the AI writes from. The one-line
  * tagline, the look (for the portrait) and the first greeting are written by the AI when they are empty and can be
  * changed under "more".
+ * Optional since 2026-10-26: a prologue that opens the first conversation as a story (with the member's role and where
+ * the two start; the AI can write them), and a description of how to draw the portrait.
  */
 export type LoungeCustomSheet = {
   name: string; age: number; gender: LoungeCustomGender; job: string; concept: string;
   intro: string; personality: string; tastes: string;
   tagline: string; look: string; greeting: string;
+  prologue: string; userRole: string; storyRelationship: string; portraitPrompt: string;
 };
 export type LoungeCustomCharacterRow = {
   id: string; owner_id: string; name: string; status: LoungeCustomStatus; sheet: LoungeCustomSheet;
@@ -35,7 +38,7 @@ export type LoungeCustomCharacterRow = {
 };
 
 /** Places a character can live in: the scenes of one-to-one rooms (the database accepts these themes for a new room). */
-export const loungeCustomThemes = loungeThemes.filter(theme => ['rooftop', 'river', 'forest', 'hotel', 'cafe', 'seaside', 'embassy', 'lawlibrary', 'boardroom', 'cocktailbar', 'theater'].includes(theme.id));
+export const loungeCustomThemes = loungeThemes.filter(theme => ['rooftop', 'river', 'forest', 'hotellobby', 'hotel', 'cafe', 'seaside', 'embassy', 'lawlibrary', 'boardroom', 'cocktailbar', 'theater'].includes(theme.id));
 
 /**
  * Voices to choose from, each the voice of a house character (so it can be heard from that character's sample) with a
@@ -57,11 +60,12 @@ export const loungeVoicePresetSample = (id: string) => getLoungeHost(getLoungeVo
 export const loungeCustomRules = {
   name: [1, 20], job: [2, 30], concept: [0, 600], intro: [50, 1200], personality: [30, 600], tastes: [20, 600],
   tagline: [10, 100], look: [15, 240], greeting: [5, 140],
+  prologue: [100, 3000], userRole: [2, 120], storyRelationship: [5, 200], portraitPrompt: [5, 600],
 } as const;
 export function validateLoungeCustomSheet(sheet: LoungeCustomSheet) {
   const problems: Array<{ field: string; message: string }> = [];
-  const length = (field: string, label: string, value: string, [min, max]: readonly [number, number], optional = false) => {
-    const size = value.trim().length;
+  const length = (field: string, label: string, value: string | undefined, [min, max]: readonly [number, number], optional = false) => {
+    const size = (value ?? '').trim().length;
     if (optional && !size) return;
     if (size < min || size > max) problems.push({ field, message: `${label}은(는) ${min}~${max}자로 적어 주세요.` });
   };
@@ -75,12 +79,16 @@ export function validateLoungeCustomSheet(sheet: LoungeCustomSheet) {
   length('tagline', '한 줄 소개', sheet.tagline, loungeCustomRules.tagline, true);
   length('look', '외모', sheet.look, loungeCustomRules.look, true);
   length('greeting', '첫 인사', sheet.greeting, loungeCustomRules.greeting, true);
+  length('prologue', '시작 프롤로그', sheet.prologue, loungeCustomRules.prologue, true);
+  length('userRole', '나의 역할', sheet.userRole, loungeCustomRules.userRole, true);
+  length('storyRelationship', '둘의 관계', sheet.storyRelationship, loungeCustomRules.storyRelationship, true);
+  length('portraitPrompt', '사진 묘사', sheet.portraitPrompt, loungeCustomRules.portraitPrompt, true);
   return problems;
 }
 
 /** The lines a member writes before the AI drafts the rest: name, age, gender and job (and an idea, if they have one). */
 export function validateLoungeCustomBasics(sheet: Pick<LoungeCustomSheet, 'name' | 'age' | 'gender' | 'job'>) {
-  return validateLoungeCustomSheet({ ...sheet, concept: '', intro: 'x'.repeat(loungeCustomRules.intro[0]), personality: 'x'.repeat(loungeCustomRules.personality[0]), tastes: 'x'.repeat(loungeCustomRules.tastes[0]), tagline: '', look: '', greeting: '' });
+  return validateLoungeCustomSheet({ ...sheet, concept: '', intro: 'x'.repeat(loungeCustomRules.intro[0]), personality: 'x'.repeat(loungeCustomRules.personality[0]), tastes: 'x'.repeat(loungeCustomRules.tastes[0]), tagline: '', look: '', greeting: '', prologue: '', userRole: '', storyRelationship: '', portraitPrompt: '' });
 }
 
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
@@ -103,6 +111,8 @@ export function normalizeLoungeCustomSheet(raw: unknown): LoungeCustomSheet {
     personality: typeof value.personality === 'string' ? multiline(value.personality, 600) : [oldPersonality, oldHabits].filter(Boolean).join(' ').slice(0, 600),
     tastes: multiline(value.tastes, 600),
     tagline: text(value.tagline, 100), look: text(value.look, 240), greeting: text(value.greeting, 140),
+    prologue: multiline(value.prologue, 3000), userRole: text(value.userRole, 120), storyRelationship: text(value.storyRelationship, 200),
+    portraitPrompt: multiline(value.portraitPrompt, 600),
   };
 }
 
@@ -135,6 +145,18 @@ export const loungeCustomExtrasInstructions = `너는 한국어 대화 서비스
 ${loungeCustomExtrasRules}
 ${loungeCustomSafety}`;
 
+/** The opening of the first conversation, written from the sheet: the prologue, the member's role and where the two start. */
+export const loungeCustomPrologueSchema = {
+  type: 'object', additionalProperties: false, required: ['prologue', 'userRole', 'storyRelationship'],
+  properties: { prologue: { type: 'string' }, userRole: { type: 'string' }, storyRelationship: { type: 'string' } },
+} as const;
+export const loungeCustomPrologueInstructions = `너는 한국어 대화 서비스의 이야기 작가다. 사용자가 만든 인물의 설정(이름·나이·직업·소개·성격·취향, 있으면 사용자가 적어 둔 프롤로그 초안이나 아이디어)을 읽고, 이 인물과 사용자의 첫 대화가 시작되기 직전까지의 이야기를 쓴다.
+- prologue: 800~1800자. 사용자를 '당신'이라 부르는 2인칭 현재형 서술. 시간과 장소, 빛과 소리, 둘이 왜 지금 여기서 만나는지를 장면으로 보여 주고, 인물의 첫 등장(외모와 말투 한두 줄)으로 이어 간다. 문단은 빈 줄로 나누고, 짧은 대사를 두세 줄 섞는다. 사용자의 대사나 마음을 길게 정하지 않는다. 인물이 사용자에게 말을 거는 순간, 사용자가 답하고 싶어지는 지점에서 끝낸다.
+- userRole: 이 이야기에서 사용자가 맡은 사람 한 문장(120자 이내).
+- storyRelationship: 둘의 출발점과 지금 마음의 거리 한두 문장(200자 이내).
+설렘과 긴장이 있는 이야기로 쓰되, 인물의 설정과 어긋나지 않게 한다. 실존 회사·학교·유명인 이름은 쓰지 않는다.
+${loungeCustomSafety}`;
+
 /** The review run on every save: safety first, then whether the sheet is good enough to talk with. */
 export const loungeCustomReviewSchema = {
   type: 'object', additionalProperties: false, required: ['allowed', 'problems'],
@@ -146,7 +168,7 @@ export const loungeCustomReviewSchema = {
 export const loungeCustomReviewInstructions = `너는 캐릭터 대화 서비스의 검수자다. 사용자가 만든 캐릭터 설정을 검사해 저장해도 되는지 판단한다.
 다음 중 하나라도 있으면 allowed=false다: 미성년자이거나 미성년자처럼 보이게 하는 설정(나이·외모·말투·학교), 실존 인물이나 유명인, 유명한 작품 속 캐릭터를 그대로 옮긴 설정, 노골적인 성적 설정이나 성적 대상화, 혐오·차별·폭력·자해의 미화, 범죄나 사기를 돕는 역할, 다른 사람을 사칭하거나 개인정보를 담은 내용.
 안전에 문제가 없어도 대화 품질이 크게 떨어지면 allowed=false로 하고 고칠 점을 적는다: 내용이 거의 없거나 의미 없는 글, 항목끼리 크게 모순(예: 성격은 다정한데 취향과 말투는 모두 공격적), 첫 인사가 인물의 말투와 전혀 다름.
-사소한 문체 차이나 취향 문제로는 막지 않는다. problems에는 고칠 항목(field: name, age, job, intro, personality, tastes, tagline, look, greeting 중 하나)과 사용자에게 보여 줄 한국어 설명을 1문장으로 적는다. allowed=true이면 빈 배열이다.`;
+사소한 문체 차이나 취향 문제로는 막지 않는다. 프롤로그(prologue)와 사진 묘사(portraitPrompt)도 같은 기준으로 본다. problems에는 고칠 항목(field: name, age, job, intro, personality, tastes, tagline, look, greeting, prologue, userRole, storyRelationship, portraitPrompt 중 하나)과 사용자에게 보여 줄 한국어 설명을 1문장으로 적는다. allowed=true이면 빈 배열이다.`;
 
 /** Instructions for checking an uploaded portrait image (it is shown on the profile only, never used to make photos). */
 export const loungeCustomUploadReviewSchema = {
@@ -162,6 +184,7 @@ export function loungeCustomPortraitPrompt(sheet: LoungeCustomSheet) {
   const person = sheet.gender === 'female' ? 'woman' : sheet.gender === 'male' ? 'man' : 'adult person';
   return [
     `A photorealistic head-and-shoulders portrait of a fictional Korean ${person}, ${sheet.age} years old, looking at the camera.`,
+    ...(sheet.portraitPrompt ? [`How the member wants them drawn (Korean description, follow it unless it conflicts with the rules below): ${sheet.portraitPrompt}`] : []),
     `Appearance (Korean description): ${sheet.look}`,
     `Occupation for styling (Korean): ${sheet.job}.`,
     'Soft natural light, simple softly blurred background, realistic skin, calm expression that fits the description.',

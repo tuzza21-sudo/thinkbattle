@@ -72,9 +72,20 @@ export function LoungeChatComposer({ onSend, disabled, placeholder }: { onSend: 
     catch (err) { setError(errorText(err)); }
     finally { setSending(false); area.current?.focus({ preventScroll: true }); }
   };
+  // An action goes between two asterisks: the button puts them in (around the selection, if any) with the caret inside.
+  const insertAction = () => {
+    const element = area.current;
+    const start = element?.selectionStart ?? text.length, end = element?.selectionEnd ?? text.length;
+    const before = text.slice(0, start), chosen = text.slice(start, end), after = text.slice(end);
+    const gap = before && !/\s$/.test(before) ? ' ' : '';
+    setText(`${before}${gap}*${chosen}*${after}`);
+    const caret = before.length + gap.length + 1 + chosen.length;
+    requestAnimationFrame(() => { element?.focus({ preventScroll: true }); element?.setSelectionRange(caret, caret); });
+  };
   return <>
     {error && <p className="lounge-chat-composer-error" role="alert">{error}</p>}
     <form className="lounge-chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}>
+      <button type="button" className="lounge-chat-action" onClick={insertAction} disabled={disabled} title="*행동*을 넣어요" aria-label="행동 넣기">*행동*</button>
       <textarea ref={area} rows={1} value={text} maxLength={1200} placeholder={placeholder} aria-label="메시지 입력"
         onChange={event => setText(event.target.value)}
         onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && enterSends()) { event.preventDefault(); void send(); } }} />

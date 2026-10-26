@@ -206,6 +206,15 @@ export async function requestLoungePhoto(roomId: string, source: 'request' | 'ch
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { post?: LoungeCharacterPost; left?: number; skipped?: boolean };
 }
+/** The background of the member's own one-to-one conversation: one of the places, or null for the conversation's own. */
+export const setLoungeRoomBackground = (roomId: string, theme: LoungeThemeId | null) => loungeRpc<void>('set_lounge_room_background', { p_room: roomId, p_theme: theme });
+/** A background made from the member's description (20 to 60 seconds). Returns the stored image and its signed address. */
+export async function makeLoungeRoomBackground(roomId: string, prompt: string) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, request: prompt.slice(0, 300) }) }, '배경 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '배경을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_background_http_${response.status}`, payload?.retryable !== false, 10);
+  return payload as { image: string; prompt: string; left: number };
+}
 /** A refusal from the character maker, with the fields to fix. */
 export class LoungeCharacterError extends LoungeApiError {
   problems: Array<{ field: string; message: string }>;
@@ -222,7 +231,10 @@ export const draftLoungeCharacter = (basics: Pick<LoungeCustomSheet, 'name' | 'a
   loungeCharacterRequest<{ sheet: LoungeCustomSheet }>({ action: 'draft', ...basics });
 export const saveLoungeCharacter = (character: { id?: string; sheet: LoungeCustomSheet; template: string; flirtation: boolean; voice: string; theme: string }) =>
   loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'save', ...character });
-export const makeLoungeCharacterPortrait = (id: string) => loungeCharacterRequest<{ path: string; url: string }>({ action: 'portrait', id });
+export const makeLoungeCharacterPortrait = (id: string, prompt?: string) => loungeCharacterRequest<{ path: string; url: string }>({ action: 'portrait', id, ...(prompt !== undefined ? { prompt } : {}) });
+/** The AI writes the opening of the first conversation from the sheet. Nothing is stored. */
+export const writeLoungeCharacterPrologue = (sheet: LoungeCustomSheet) =>
+  loungeCharacterRequest<Pick<LoungeCustomSheet, 'prologue' | 'userRole' | 'storyRelationship'>>({ action: 'prologue', sheet });
 export const chooseLoungeCharacterPortrait = (id: string, path: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'choose', id, path });
 export const uploadLoungeCharacterPortrait = (id: string, image: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'upload', id, image, consent: true });
 /** The active stories (scenarios) a member can start with a character, in their order. Empty if none can be read. */
