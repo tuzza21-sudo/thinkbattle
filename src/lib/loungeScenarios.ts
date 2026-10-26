@@ -59,5 +59,5 @@ export function normalizeLoungeRoomScenario(raw: unknown): LoungeRoomScenario | 
   return scenario.id && scenario.prologue ? scenario : undefined;
 }
 
-/** The limits the database checks, for the admin form (a prologue opens full screen and may run to 6,000 characters since 2026-10-26). */
-export const loungeScenarioLimits = { title: 40, hook: 120, prologue: 6000, user_role: 120, relationship: 200, place: 200 } as const;
+/** The limits the database checks, for the admin form (a prologue opens full screen and may run to 12,000 characters since 2026-10-27). */
+export const loungeScenarioLimits = { title: 40, hook: 120, prologue: 12000, user_role: 120, relationship: 200, place: 200 } as const;
