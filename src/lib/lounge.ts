@@ -456,6 +456,11 @@ export const loungeSpeechStorageKey = 'lounge.speechEngine.v2';
  */
 export const loungeGroupRoomsEnabled = false;
 export const loungeElevenModel = 'eleven_v4_turbo';
+/**
+ * The model that speaks a line when every place of the main one is taken: the same voice in Flash v2.5, which has its
+ * own places (measured 2026-10-26 on the Creator plan: v4 Turbo 5, Flash v2.5 10, and 5 + 7 at once were all spoken).
+ */
+export const loungeElevenBackupModel = 'eleven_flash_v2_5';
 export const loungeTypecastModel = 'ssfm-v30';
 
 /**
@@ -534,9 +539,9 @@ export function loungeEngineVoice(engine: 'gemini' | 'eleven' | 'typecast', host
 const loungeHostGender = (hostId: string) => houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
 /** The ElevenLabs premade voice of a character, for when its library voice is refused (an account without a paid plan). */
 export const loungeElevenPremadeVoice = (hostId: string) => loungeElevenPremadeVoices[hostId] ?? loungeElevenPremadeVoices[loungeHostGender(hostId)];
-/** ElevenLabs v4 Turbo in Korean. It takes the stability settings; a "speed" setting is accepted but changes nothing (measured 2026-10-23), so none is sent. */
-export function loungeElevenSpeechRequest(input: string) {
-  return { text: input, model_id: loungeElevenModel, language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8 } };
+/** ElevenLabs in Korean (v4 Turbo, or Flash v2.5 as its backup). It takes the stability settings; a "speed" setting is accepted but changes nothing (measured 2026-10-23), so none is sent. */
+export function loungeElevenSpeechRequest(input: string, model: string = loungeElevenModel) {
+  return { text: input, model_id: model, language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8 } };
 }
 /** Typecast reads the feeling from the sentence itself ("smart" emotion) at the character's pace. */
 export function loungeTypecastSpeechRequest(hostId: string, voiceId: string, input: string) {
@@ -601,8 +606,9 @@ export function createLoungePcmConverter(fallbackRate: number, targetRate = 24_0
 export const loungeSpeechStall = { firstAudioMs: 8000, gapMs: 4000, attempts: 3 };
 /**
  * ElevenLabs refuses a request past the plan's concurrent limit with 429 at once, without a queue (5 places on the
- * Creator plan for eleven_v4_turbo, measured 2026-10-26: 30 callers x 3 lines, 9 of 90 refused). A refused request is
- * asked again after each of these waits (plus up to 0.2 s) before the reply is left as text.
+ * Creator plan for eleven_v4_turbo, measured 2026-10-26: 30 callers x 3 lines, 9 of 90 refused). A refused line goes at
+ * once to the backup model (loungeElevenBackupModel); only when both are full is it asked again after each of these
+ * waits (plus up to 0.2 s), and past them the reply is left as text.
  */
 export const loungeElevenBusyWaitsMs = [300, 500, 700, 900, 1100, 1300] as const;
 

@@ -3,7 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -1040,7 +1040,8 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         })
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
-    let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0;
+    let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0, elevenBackupLines = 0;
+    let elevenModels: string[] = [loungeElevenModel, loungeElevenBackupModel];
     // The characters a premium voice spoke are added to the member's month (after the reply, so the next one sees them).
     const recordSpeech = async () => {
       const chars = spentChars; spentChars = 0;
@@ -1098,14 +1099,23 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       }
       if (!plan.key || !plan.voice) throw new LoungeUpstreamError('목소리 설정을 확인해 주세요. 대화는 글로 이어 갈게요.', 503, 'lounge_speech_not_configured', false, 60);
       const premade = loungeElevenPremadeVoice(host.id);
-      const once = (voice: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text)), signal }, timeout);
-      // The plan allows a few requests at once (5 on 2026-10-26) and refuses the next with 429 at once, without a queue.
-      // A refused request is asked again after a short wait: a line takes about half a second, so a place opens soon.
+      const once = (voice: string, model: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text, model)), signal }, timeout);
+      // The plan allows a few requests at once and refuses the next with 429 at once, without a queue (2026-10-26).
+      // A refused line goes at once to the same voice in the backup model, which has its own places; only when both are
+      // full does it wait a moment and ask again (a line takes about half a second, so a place opens soon). A reply
+      // that went to the backup keeps it for its next lines, so one reply does not switch back and forth.
       const speak = async (voice: string) => {
         for (let attempt = 0; ; attempt++) {
-          const response = await once(voice);
-          if (response.status !== 429 || attempt >= loungeElevenBusyWaitsMs.length || signal.aborted) return response;
-          await response.body?.cancel().catch(() => {});
+          let response: Response | undefined;
+          for (const model of elevenModels) {
+            response = await once(voice, model);
+            if (response.status !== 429) {
+              if (model === loungeElevenBackupModel && response.ok) { elevenBackupLines++; elevenModels = [loungeElevenBackupModel, loungeElevenModel]; }
+              return response;
+            }
+            await response.body?.cancel().catch(() => {});
+          }
+          if (attempt >= loungeElevenBusyWaitsMs.length || signal.aborted) return response!;
           await new Promise(resolve => setTimeout(resolve, loungeElevenBusyWaitsMs[attempt] + Math.random() * 200));
           elevenBusyRetries++;
         }
@@ -1160,7 +1170,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       const limits = loungeSpeechLimits(text);
       const started = performance.now();
       const stats = { firstMs: -1, maxGapMs: 0, retries: 0, failed: false };
-      elevenBusyRetries = 0;
+      elevenBusyRetries = 0; elevenBackupLines = 0;
       let bytesSent = 0;
       try {
         for (let attempt = 1; ; attempt++) {
@@ -1200,7 +1210,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           } finally { clearTimeout(timer); }
         }
       } catch (error) { stats.failed = true; throw error; }
-      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, busyRetries: elevenBusyRetries, failed: stats.failed, ...(speech.engine !== 'openai' ? { provider: speechProvider } : {}) })); if (isLoungePremiumSpeech(speechProvider)) spentChars += text.length; }
+      finally { console.info('[Lounge speech]', JSON.stringify({ host: host.id, firstMs: stats.firstMs, totalMs: Math.round(performance.now() - started), maxGapMs: stats.maxGapMs, retries: stats.retries, busyRetries: elevenBusyRetries, backupLines: elevenBackupLines, failed: stats.failed, ...(speech.engine !== 'openai' ? { provider: speechProvider } : {}) })); if (isLoungePremiumSpeech(speechProvider)) spentChars += text.length; }
     };
     const streamFailure = (error: unknown, fallback: string) => {
       const failure = error instanceof Error && error.name === 'TimeoutError'
