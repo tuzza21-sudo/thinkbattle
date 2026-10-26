@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
 const { loungeCharacters, loungePersonaPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const { relationshipConfigs, defaultEventEffects, protectiveEvents, relationshipEventTypes } = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
-const { loungeHosts, loungeThemes } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+const { loungeHosts, loungeThemes, loungeHostGroups, loungeCharacterProfiles, loungeHostThemes, loungeEngineVoice } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
 const effect = (config, event) => (config.events[event] ?? defaultEventEffects[event]).deltas;
 const values = deltas => Object.values(deltas);
 
@@ -81,4 +81,26 @@ test('her flirtation and dominance are written down with their limits, and nobod
   assert.ok(page.personality.some(item => item.label === '유혹') && page.personality.some(item => item.label === '주도권'));
   assert.ok(page.boundaries.some(item => item.includes('그만하자고 하면 바로 멈춘다')));
   for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('성인 사이의 상호적인 플러팅'), host.id);
+});
+
+// Adding a character touches several places (docs/add-a-lounge-character.md). These two tests name what is missing.
+test('every host is fully set up: lobby group and card, background, voice and its files', () => {
+  for (const host of loungeHosts) {
+    const missing = what => `${host.id}: missing ${what} (see docs/add-a-lounge-character.md)`;
+    assert.equal(loungeHostGroups.filter(group => group.hostIds.includes(host.id)).length, 1, missing('a place in exactly one lobby group (loungeHostGroups)'));
+    const card = loungeCharacterProfiles[host.id];
+    assert.ok(card?.traits.length && card.summary, missing('a lobby card (loungeCharacterProfiles)'));
+    const backgrounds = loungeHostThemes[host.id];
+    assert.ok(backgrounds?.length && backgrounds.every(id => loungeThemes.some(theme => theme.id === id)), missing('a background (loungeHostThemes)'));
+    assert.equal(typeof loungeEngineVoice('eleven', host.id, undefined), 'string', missing('an ElevenLabs voice (loungeEngineVoices.eleven or the gender in houseVoiceGender)'));
+    for (const file of [host.portrait, host.voiceSample]) assert.ok(existsSync(fileURLToPath(new URL(`../public${file.split('?')[0]}`, import.meta.url))), missing(`the file ${file} (scripts/generate-lounge-character-portraits.mjs, generate-lounge-voice-sample.mjs)`));
+  }
+});
+
+test('no character is shipped with the placeholders scripts/new-lounge-character.mjs leaves', () => {
+  for (const file of ['src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/relationship/index.ts', 'scripts/lounge-character-prompts.json']) {
+    const path = fileURLToPath(new URL(`../${file}`, import.meta.url));
+    if (!existsSync(path)) continue;
+    assert.doesNotMatch(readFileSync(path, 'utf8'), /TODO\(새 캐릭터\)/, `${file}: a new character still has TODO(새 캐릭터) to write`);
+  }
 });

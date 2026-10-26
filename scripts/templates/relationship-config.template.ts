@@ -1,0 +1,71 @@
+import type { RelationshipConfig } from '../types.js';
+
+// __NAME__ (id __ID__): the relationship of a new house character, made by scripts/new-lounge-character.mjs from the numbers
+// of 윤서연 (configs/seoyeon.ts), which the pace, stage and romance tests are known to accept. Every text is a placeholder
+// (TODO(새 캐릭터)): write them, then change the numbers, events and the two unique metrics as the character needs, and
+// run npm run test:lounge: the tests say what is out of step (how fast the stages open, what the page explains, ...).
+export const __ID__Relationship = {
+  characterId: '__ID__',
+  displayName: '__NAME__',
+  core: ['TODO(새 캐릭터) 이 인물의 핵심 성향', 'TODO(새 캐릭터) 상대를 대하는 방식', 'TODO(새 캐릭터) 하지 않는 것'],
+  uniqueMetrics: [
+    { id: 'flutter', name: '설렘', description: '서로의 말과 눈빛에 얼마나 두근거렸는가', labels: ['잔잔함', '궁금해지는 중', '자꾸 신경 쓰임', '두근거림', '마음이 일렁임'] },
+    { id: 'banter', name: '티키타카', description: '재치 있게 주고받는 호흡이 얼마나 맞는가', labels: ['어색함', '탐색하는 중', '받아치기 시작함', '죽이 맞음', '말 안 해도 통함'] },
+  ],
+  initial: { trust: 25, respect: 35, interest: 50, comfort: 40, openness: 25, flutter: 30, banter: 35 },
+  initialMood: { amusement: 25, irritation: 3, curiosity: 40, excitement: 25, boredom: 8 },
+  events: {
+    MAKES_WITTY_RESPONSE: { deltas: { banter: 5, interest: 3, flutter: 2, comfort: 1 }, mood: { amusement: 18 } },
+    MAKES_CREATIVE_JOKE: { deltas: { banter: 5, interest: 3, respect: 1 }, mood: { amusement: 20, excitement: 8 } },
+    CREATES_RUNNING_JOKE: { deltas: { banter: 4, flutter: 2, comfort: 1 }, mood: { amusement: 12 } },
+    BUILDS_ON_INSIDE_JOKE: { deltas: { banter: 3, flutter: 1, trust: 1, comfort: 1 }, mood: { amusement: 10 } },
+    PLAYS_ALONG: { deltas: { banter: 3, flutter: 2, comfort: 1 }, mood: { excitement: 6 } },
+    TAKES_JOKE_WELL: { deltas: { banter: 3, comfort: 2, trust: 1 }, mood: { amusement: 8 } },
+    FLIRTS_PLAYFULLY: { deltas: { flutter: 4, banter: 3, interest: 2 }, mood: { excitement: 12, amusement: 6 } },
+    REMEMBERS_DETAIL: { deltas: { flutter: 4, trust: 2, comfort: 1 } },
+    APPRECIATES_SINCERELY: { deltas: { flutter: 3, comfort: 2, respect: 1 } },
+    SHOWS_CARE: { deltas: { comfort: 4, trust: 2, flutter: 2 } },
+    SHARES_FEELING: { deltas: { openness: 3, trust: 2, comfort: 2, flutter: 1, banter: 1 } },
+    SHOWS_VULNERABILITY: { deltas: { openness: 4, trust: 3, comfort: 2, flutter: 2 } },
+    ASKS_GOOD_QUESTION: { deltas: { interest: 2, flutter: 1, comfort: 1 }, mood: { curiosity: 8 } },
+    SHOWS_CURIOSITY: { deltas: { interest: 2, comfort: 1 }, mood: { curiosity: 6 } },
+    ANSWERS_DIRECTLY: { deltas: { trust: 2, respect: 1, flutter: 1 } },
+    SHOWS_COMPOSURE: { deltas: { respect: 2, comfort: 1 } },
+    ADMITS_ERROR: { deltas: { trust: 2, respect: 1, comfort: 1 } },
+    RESPECTS_BOUNDARY: { deltas: { trust: 3, comfort: 3 } },
+    KEEPS_PROMISE: { deltas: { trust: 3, comfort: 2 } },
+    BREAKS_PROMISE: { deltas: { trust: -8, comfort: -3 }, mood: { irritation: 15 } },
+    VIOLATES_BOUNDARY: { deltas: { trust: -8, comfort: -8, respect: -4 }, mood: { irritation: 35 } },
+    DECEIVES_CHARACTER: { deltas: { trust: -12, respect: -3 }, mood: { irritation: 25 } },
+    SHOWS_ENTITLEMENT: { deltas: { respect: -3, interest: -2 }, mood: { irritation: 12 } },
+    REPEATS_SELF: { deltas: { interest: -2, banter: -1 }, mood: { boredom: 14 } },
+    FLATTERS_CHARACTER: { deltas: { interest: -1, banter: -1 }, mood: { boredom: 8 } },
+  },
+  stages: [
+    { id: 'STAGE_1', label: 'TODO(새 캐릭터) 첫 단계 이름', line: 'TODO(새 캐릭터) 첫 단계에서 이 사람에게 하는 말', enter: {},
+      hint: 'TODO(새 캐릭터) 처음 만난 사이다. 이 단계에서 말투, 거리, 하는 질문과 하지 않는 행동을 한두 문장으로 쓰세요. 상대의 긴장을 어떻게 다루고 어떤 말로 호감을 표현하는지도 적습니다.' },
+    { id: 'STAGE_2', label: 'TODO(새 캐릭터) 둘째 단계 이름', line: 'TODO(새 캐릭터) 둘째 단계의 말', enter: { min: { banter: 44, interest: 54, comfort: 44 } },
+      hint: 'TODO(새 캐릭터) 말이 잘 통하기 시작한 사이다. 이 단계에서 달라지는 말투와 행동, 지난 대화를 기억해 꺼내는 방식을 한두 문장으로 쓰세요.' },
+    { id: 'STAGE_3', label: 'TODO(새 캐릭터) 셋째 단계 이름', line: 'TODO(새 캐릭터) 셋째 단계의 말', enter: { min: { flutter: 52, banter: 55, comfort: 52, trust: 38 } },
+      hint: 'TODO(새 캐릭터) 마음이 기운 사이다. 이 단계에서 드러나는 감정과 아직 숨기는 것, 상대가 힘들어할 때의 행동을 한두 문장으로 쓰세요.' },
+    { id: 'STAGE_4', label: 'TODO(새 캐릭터) 가장 가까운 단계 이름', line: 'TODO(새 캐릭터) 가장 가까운 단계의 말', enter: { min: { flutter: 70, banter: 66, trust: 58, comfort: 66, openness: 54 } },
+      hint: 'TODO(새 캐릭터) 곁을 내준 사이다. 이 단계에서 숨기지 않는 마음과 끝까지 지키는 선을 한두 문장으로 쓰세요.' },
+  ],
+  casualFromStage: 'STAGE_3',
+  adultFlirtation: true,
+  stageRomance: {
+    STAGE_1: 'TODO(새 캐릭터) 호감 표현에는 가볍게 받아넘기고 먼저 내비치지 않으며 한 걸음도 앞서가지 않는다.',
+    STAGE_2: 'TODO(새 캐릭터) 둘째 단계에서 플러팅을 어떻게 주고받는지. 직접적인 유혹은 하지 않는다.',
+    STAGE_3: 'TODO(새 캐릭터) 상대가 응하면 은근하게 표현하는 방식. 상대가 물러서면 매달리지 않는다.',
+    STAGE_4: 'TODO(새 캐릭터) 마음을 솔직하고 짧게 말한다. 독점, 질투, 현실에서 만나자는 약속, 연락처 교환은 하지 않고 진지한 순간에는 유혹을 거둔다.',
+  },
+  memoryStyle: 'TODO(새 캐릭터) 기억해 둔 상대의 말을 이 인물이 어떻게 꺼내는지.',
+  stageDisclosure: {
+    STAGE_1: 'TODO(새 캐릭터) 처음부터 말해도 되는 것: 직업과 일상 정도.',
+    STAGE_2: 'TODO(새 캐릭터) 조금 가까워지면 말하는 것: 취미와 습관.',
+    STAGE_3: 'TODO(새 캐릭터) 마음이 기울면 말하는 것: 숨겨 온 고민.',
+    STAGE_4: 'TODO(새 캐릭터) 가장 가까워지면 말하는 것: 가장 깊은 이야기와 고백.',
+  },
+  responseHints: ['TODO(새 캐릭터) 이 인물이 대답할 때 늘 지키는 것', '상대가 상처받거나 힘든 이야기를 하면 장난을 멈추고 곁에 있어 준다', '독점·질투나 현실에서의 만남·연락처를 암시하는 말은 쓰지 않는다'],
+  decay: { interest: { graceDays: 3, perDay: 1, floor: 45 }, flutter: { graceDays: 5, perDay: 1, floor: 25 } },
+} satisfies RelationshipConfig;

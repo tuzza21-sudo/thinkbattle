@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
@@ -29,7 +29,8 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
   const directory = mkdtempSync(resolve(tempRoot, 'lounge-images-runtime-'));
   try {
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
-    const relationship = ['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates', 'configs/auditor', 'configs/closer', 'configs/diplomat', 'configs/seoyeon', 'configs/lawyer', 'configs/trickster', 'configs/velvetKnife', 'configs/wit'].map(name => `src/lib/relationship/${name}.ts`);
+    // Every file of the relationship folder, so a character added later is part of the graph without editing this list.
+    const relationship = [...['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates'].map(name => `src/lib/relationship/${name}.ts`), ...readdirSync(resolve(workspace, 'src/lib/relationship/configs')).filter(name => name.endsWith('.ts')).map(name => `src/lib/relationship/configs/${name}`)];
     for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });

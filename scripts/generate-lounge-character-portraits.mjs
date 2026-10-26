@@ -2,7 +2,7 @@
 //   node scripts/generate-lounge-character-portraits.mjs [--only=velvet] [--overwrite] [--model=gpt-image-2] [--quality=medium]
 // Needs OPENAI_API_KEY in .env.local and Python with Pillow (PNG -> 512x512 WebP).
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import dotenv from 'dotenv';
@@ -60,6 +60,10 @@ const portraits = {
   },
 };
 
+// Characters added with scripts/new-lounge-character.mjs keep their prompts in scripts/lounge-character-prompts.json
+// ({{common}} stands for the shared text above), so no script has to be edited to draw a new character.
+const extra = existsSync('scripts/lounge-character-prompts.json') ? JSON.parse(readFileSync('scripts/lounge-character-prompts.json', 'utf8')) : {};
+for (const [id, spec] of Object.entries(extra)) if (spec.portrait && !portraits[id]) portraits[id] = { file: spec.portrait.file, prompt: spec.portrait.prompt.replaceAll('{{common}}', common) };
 const targets = options.only ? [options.only] : Object.keys(portraits);
 const folder = join(tmpdir(), 'lounge-character-portraits'); mkdirSync(folder, { recursive: true });
 for (const id of targets) {
