@@ -527,16 +527,18 @@ test('a character tells more about itself as the stages open, and keeps the deep
     assert.deepEqual(stages.map(stage => disclosure(stage).open.length), stages.map((_, index) => index + 1), `${config.characterId} opens one layer per stage`);
     assert.deepEqual(stages.map(stage => disclosure(stage).kept.length), stages.map((_, index) => stages.length - index - 1), `${config.characterId} names what each later stage still keeps`);
   }
-  // The velvet's past stays closed to a stranger: the regret opens at the third stage, the stopped watch at the fourth.
+  // 선우령's past stays closed to a stranger: the black rose opens at the third stage, 강태준 and the old message at the fourth.
   const velvet = stage => relationshipPromptContext({ ...createRelationship(configs.velvet), stage }, configs.velvet, initialMood(configs.velvet)).self_disclosure.open.join(' ');
-  assert.doesNotMatch(velvet('DISMISSIVE'), /전시의 마지막 날/);
-  assert.match(velvet('RESPECTFULLY_ENGAGED'), /전시의 마지막 날/);
-  assert.match(velvet('DRAWN_IN'), /멈춘 시계/);
+  assert.doesNotMatch(velvet('DISMISSIVE'), /검은 장미|강태준/);
+  assert.doesNotMatch(velvet('INTRIGUED'), /검은 장미|강태준/);
+  assert.match(velvet('RESPECTFULLY_ENGAGED'), /검은 장미/);
+  assert.doesNotMatch(velvet('RESPECTFULLY_ENGAGED'), /강태준/);
+  assert.match(velvet('DRAWN_IN'), /강태준/);
   assert.equal(relationshipPromptContext(createRelationship(configs.velvet), { ...configs.velvet, stageDisclosure: undefined }, initialMood(configs.velvet)).self_disclosure, undefined, 'a character without layers gets none');
   assert.match(relationshipResponseInstructions, /self_disclosure\.open은 네가 이 사람에게 지금까지 털어놓을 수 있는 네 이야기다/);
   // What is kept is named, so the model knows exactly what not to tell yet.
   assert.match(relationshipResponseInstructions, /self_disclosure\.kept는 아직 이 사람에게 털어놓지 않는 이야기다/);
-  assert.match(relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).self_disclosure.kept.join(' '), /전시의 마지막 날/);
+  assert.match(relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).self_disclosure.kept.join(' '), /검은 장미/);
 });
 
 test('promises made in the story open with the stages: dating at the third, marriage and living together at the fourth, never a real meeting', () => {

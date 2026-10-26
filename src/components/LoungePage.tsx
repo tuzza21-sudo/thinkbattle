@@ -228,7 +228,7 @@ function RoomView(props: RoomViewProps) {
   // A table in a space: no turn order, no owner. Everyone has the microphone and AI help.
   const space = Boolean(props.topicPicker);
   const hostRole = solo ? 'AI 대화 상대' : 'AI 도우미';
-  // In the room the host is called by job and name, like "아트 디렉터 선우령".
+  // In the room the host is called by job and name, like "프라이빗 아트 디렉터 선우령".
   const hostCharacter = getLoungeCharacter(props.hostId), hostTitle = hostCharacter ? `${hostCharacter.job} ${hostCharacter.name}` : host.name;
   const microphoneControl = <button type="button" className={`lounge-mic-button ${props.micOn ? 'on' : ''}`} onClick={props.onMic} aria-pressed={props.micOn} title={restricted ? '발언 제한이 해제되면 마이크를 켤 수 있어요' : props.preview ? '마이크는 실제 방에서 사용할 수 있어요' : undefined} disabled={restricted || props.preview || ended || !props.connected || !props.audioReady}>{props.micOn ? <Mic size={16} /> : <MicOff size={16} />}{props.micOn ? '마이크 끄기' : '마이크 켜기'}</button>;
   // A one-to-one chat needs no voice connection; the voice is turned on from the bottom bar.
