@@ -1041,7 +1041,9 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
     let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0, elevenBackupLines = 0;
-    let elevenModels: string[] = [loungeElevenModel, loungeElevenBackupModel];
+    // v4 Turbo alone, which was measured to speak every line (30 of 30 and 90 of 90) with the short waits below; Flash v2.5
+    // is the backup only when LOUNGE_ELEVEN_BACKUP=on, for the day too many callers make those waits long.
+    let elevenModels: string[] = process.env.LOUNGE_ELEVEN_BACKUP === 'on' ? [loungeElevenModel, loungeElevenBackupModel] : [loungeElevenModel];
     // The characters a premium voice spoke are added to the member's month (after the reply, so the next one sees them).
     const recordSpeech = async () => {
       const chars = spentChars; spentChars = 0;
