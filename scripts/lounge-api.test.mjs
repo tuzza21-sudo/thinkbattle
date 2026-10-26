@@ -2659,7 +2659,9 @@ test('ElevenLabs speaks only within the member\'s monthly allowance and its char
     'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
     'everyone together used the month': { env: { LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' }, status: { member: 0, total: 100 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
     'a larger allowance from the environment': { env: { LOUNGE_ELEVEN_MONTHLY_CHARS: '20000' }, status: { member: 5000, total: 5000 }, eleven: [library], heard: pcm.length, recorded: [16] },
-    'a guest': { user: { id: 'user-1', is_anonymous: true }, status: { member: 0, total: 0 }, eleven: [], heard: 0, recorded: [], statusCalls: 0, notice: '회원만' },
+    'a guest within the trial': { user: { id: 'user-1', is_anonymous: true }, status: { member: 600, total: 600 }, eleven: [library], heard: pcm.length, recorded: [16] },
+    'a guest who used the trial': { user: { id: 'user-1', is_anonymous: true }, status: { member: 1500, total: 1500 }, eleven: [], heard: 0, recorded: [], notice: '체험 목소리를 다 썼어요' },
+    'guests switched off': { user: { id: 'user-1', is_anonymous: true }, env: { LOUNGE_ELEVEN_GUEST_CHARS: '0' }, status: { member: 0, total: 0 }, eleven: [], heard: 0, recorded: [], statusCalls: 0, notice: '회원만' },
     'an allowance that cannot be read': { statusFailure: true, eleven: [library], heard: pcm.length, recorded: [16] },
     'a free ElevenLabs plan (library voice refused)': { status: { member: 0, total: 0 }, refuseLibrary: true, eleven: [library, premade], heard: pcm.length, recorded: [16] },
   };
@@ -2724,7 +2726,7 @@ test('the speech action tells the picker what each premium voice has left this m
         assert.deepEqual(Object.keys(engines).sort(), ['eleven-v4-turbo', 'typecast']);
         const eleven = engines['eleven-v4-turbo'];
         if (name === 'a member') assert.deepEqual(eleven, { available: true, member: true, allowed: true, used: 3300, left: 1700, limit: 5000 });
-        if (name === 'a guest') assert.deepEqual([eleven.member, eleven.allowed], [false, false]);
+        if (name === 'a guest') assert.deepEqual([eleven.member, eleven.allowed, eleven.limit], [false, true, 1500], 'a guest has a short trial of the same voice');
         if (name === 'no key') assert.deepEqual([eleven.available, eleven.allowed], [false, true], 'the allowance is real; the engine is not set up');
         assert.equal(engines.typecast.available, false);
       });

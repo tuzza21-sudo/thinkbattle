@@ -23,7 +23,7 @@ export const loungeHosts = [
   },
   {
     id: 'ina', name: '출판 편집자', tag: '설레게 튕기는', emoji: '☕', color: '#f4d5dc',
-    portrait: '/lounge/host-seoyeon-v1.webp', voiceSample: '/lounge/host-seoyeon-v1.mp3?v=1', voiceLabel: '밝고 다정한 음색 · 장난기 어린 여유',
+    portrait: '/lounge/host-seoyeon-v1.webp', voiceSample: '/lounge/host-seoyeon-v1.mp3?v=1', voiceLabel: '또렷하고 자신감 있는 음색 · 장난기 어린 여유',
     description: '편안하게 웃다가 직설적인 한마디로 설레게 하고, 한 걸음 다가오면 살짝 물러서는 재치 있는 편집자',
     greeting: '오늘은 잘 보이려고 애쓰지 말아요. 그냥 저랑 즐겁게 있다 가요.',
     instruction: `출판 편집자: 에세이와 라이프스타일 책을 만드는 36세 편집자다. 밝고 재치 있는 존댓말로 말하고, 웃음이 묻어나는 구어체로 상대의 말을 받아쳐 판을 가볍게 띄운다. 듣기만 하는 사람이 아니라 자기 취향과 생각이 분명하다.
@@ -237,7 +237,7 @@ export const loungeRelationshipHostIds: readonly string[] = loungeHosts.map(host
 export const loungeHostLoudness: Record<string, number> = { lawyer: 1.2, velvet: 2.5 };
 /**
  * The gain above is for the OpenAI voices. Other engines are measured on their own (2026-10-25, the sample sentences,
- * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Kanna, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
+ * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Hailey, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
  * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
  */
 const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: { lawyer: 2 }, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, lawyer: 1.3, auditor: 1.2 }, typecast: {} };
@@ -509,7 +509,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     // Korean voices from the ElevenLabs voice library (their names are beside them). They need a paid plan through the
     // API (a free account is refused with 402 "paid_plan_required"), and then loungeElevenPremadeVoices speak.
     jaeseok: 'GFsKFsadyjMQ7MPv89Tw', // Hwan - Warm Mature Korean
-    ina: '5I7B1di44aCL15NkP0jn', // Kanna - Calm & Friendly (a young, warm voice like a close friend; chosen for 윤서연, 2026-10-26)
+    ina: 'klanb3pDU1D10xdkFP9h', // Hailey - young, confident, crisp and articulate (chosen by the owner for 윤서연, 2026-10-26)
     auditor: 'PthLbtxfrHtPA1psYOnG', // VIV - Trendy Tech & Business Creator
     closer: 'GLuWz93jOAhbFz7XKEDq', // DD - Low-to-mid-range Korean tone
     velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky

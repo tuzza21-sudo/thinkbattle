@@ -1014,3 +1014,8 @@
   .has-room .lounge-one-to-one .lounge-participant-speech>h2 { display:none; }
   .has-room .lounge-room-main.lounge-one-to-one .lounge-stage .lounge-moderator-avatar { width:46px; }
 }
+
+/* Phone: the choice between a quick and a deep conversation is not shown (2026-10-26). The room keeps the model it has. */
+@media (max-width:760px) {
+  .lounge-model-picker { display:none !important; }
+}
