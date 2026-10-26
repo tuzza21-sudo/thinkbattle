@@ -2913,18 +2913,19 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
 });
 
 
-test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy refusal is asked again, and when it fails no other voice speaks', async () => {
+test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy line goes at once to the same voice in Flash v2.5, only both busy waits, and when it fails no other voice speaks', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
   const piece = { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(pcm).toString('base64') } }] } }] };
   const scenarios = {
     'default': { eleven: 1, gemini: 0, openai: 0, expect: pcm },
-    'ElevenLabs busy once (429 at the concurrent limit)': { busyOnce: true, eleven: 2, gemini: 0, openai: 0, expect: pcm },
+    'v4 Turbo busy (429 at its concurrent limit): Flash v2.5 at once': { busy: 1, eleven: 2, models: ['eleven_v4_turbo', 'eleven_flash_v2_5'], gemini: 0, openai: 0, expect: pcm },
+    'both busy: a short wait, then v4 Turbo again': { busy: 2, eleven: 3, models: ['eleven_v4_turbo', 'eleven_flash_v2_5', 'eleven_v4_turbo'], gemini: 0, openai: 0, expect: pcm },
     'ElevenLabs down: tried again, then the reply stays text': { elevenDown: true, eleven: lounge.loungeSpeechStall.attempts, gemini: 0, openai: 0, expect: new Uint8Array() },
     'Gemini chosen on an older page': { speech: 'gemini', eleven: 1, gemini: 0, openai: 0, expect: pcm },
     'no ElevenLabs key on this deployment: every reply with Gemini': { noElevenKey: true, eleven: 0, gemini: 1, openai: 0, expect: pcm },
   };
   for (const [name, scenario] of Object.entries(scenarios)) {
-    const calls = { gemini: 0, eleven: 0, openai: 0 };
+    const calls = { gemini: 0, eleven: 0, openai: 0 }, models = [];
     Object.assign(process.env, { GEMINI_API_KEY: 'gem-key', SUPABASE_SERVICE_ROLE_KEY: 'service' });
     if (!scenario.noElevenKey) process.env.ELEVENLABS_API_KEY = 'el-key';
     try {
@@ -2949,7 +2950,8 @@ test('ElevenLabs speaks every character (선우령: her own library voice, no sp
           // An earlier test of a refused library voice makes the server use the premade voice for ten minutes (module state).
           assert.ok(url.includes('/text-to-speech/gnWujHp24oqX3I03lRbU/stream') || url.includes('/text-to-speech/pFZP5JQG7iQjIQuC4Bku/stream'), url);
           assert.deepEqual(Object.keys(JSON.parse(init.body)).sort(), ['language_code', 'model_id', 'text', 'voice_settings'], 'ElevenLabs gets no speech instruction');
-          if (scenario.busyOnce && calls.eleven === 1) return new Response(JSON.stringify({ detail: { code: 'concurrent_limit_exceeded' } }), { status: 429 });
+          models.push(JSON.parse(init.body).model_id);
+          if (calls.eleven <= (scenario.busy ?? 0)) return new Response(JSON.stringify({ detail: { code: 'concurrent_limit_exceeded' } }), { status: 429 });
           return scenario.elevenDown ? new Response('nope', { status: 500 }) : new Response(pcm);
         }
         if (url.endsWith('/audio/speech')) { calls.openai++; assert.equal(JSON.parse(init.body).voice, 'sage'); return new Response(fallback); }
@@ -2960,6 +2962,8 @@ test('ElevenLabs speaks every character (선우령: her own library voice, no sp
         const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
         assert.deepEqual([...heard], [...scenario.expect], name);
         assert.deepEqual(calls, { gemini: scenario.gemini, eleven: scenario.eleven, openai: scenario.openai }, name);
+        if (scenario.models) assert.deepEqual(models, scenario.models, `${name}: the models asked, in order`);
+        else assert.ok(models.every(model => model === 'eleven_v4_turbo'), `${name}: v4 Turbo while it has a place`);
       });
     } finally { for (const key of ['GEMINI_API_KEY', 'ELEVENLABS_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key]; }
   }
