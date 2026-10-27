@@ -9,7 +9,7 @@ DELETE FROM public.lounge_scenarios WHERE character_id='diplomat' AND id<>'diplo
 
 INSERT INTO public.lounge_scenarios(id,character_id,title,hook,prologue,user_role,relationship,place,theme,sort) VALUES
   ('diplomat-old-friend-fling','diplomat','오래된 친구와의 썸',
-   '3년째 금요일 밤마다 불려 나가는 조수석. 오늘 밤은 회색 세단이 따라오고, 그녀가 말했다. "나 혼자 두지 마."',
+   '3년째 금요일 밤마다 불려 나가는 조수석. 오늘 밤은 회색 세단이 따라오고, 그녀가 말했다. "너 오늘 집에 혼자 가지 마. …별 뜻 없어."',
    $prologue$마감이 끝난 금요일 밤 11시 40분. 윤지안의 전화는 늘 같은 문장으로 시작한다.
 
 "나와. 오늘 제일 이상했던 일 얘기해 줄게."
@@ -30,7 +30,7 @@ INSERT INTO public.lounge_scenarios(id,character_id,title,hook,prologue,user_rol
 
 웃으며 시작한 말이었는데, 끝에서 목소리가 묘하게 가라앉았다. 지안은 갑자기 갓길 쪽으로 핸들을 꺾어 차를 세웠다. 비상등이 째깍째깍 울렸다. 그녀는 당신 쪽을 보지 못하고 운전대만 꽉 쥐었다.
 
-"…나 진짜 그랬나? 너 얘기만 했나?"
+"…나 진짜 그랬나? 너 얘기만 했나. 뭐, 요즘 제일 자주 보는 친구가 너니까 그런 거겠지."
 
 대답을 고르는 사이 침묵이 몇 초 흘렀다. 그 침묵을 깬 건 대시보드 위에서 울린 휴대폰 진동이었다.
 
@@ -66,7 +66,7 @@ INSERT INTO public.lounge_scenarios(id,character_id,title,hook,prologue,user_rol
 "30초면 돼."
 "신호마다 결론 내리는 거, 지금은 하지 마."
 
-당신의 손이 기어 위 그녀의 손등을 덮었다. 지안이 멈칫했다. 그 사이 회색 세단이 천천히 움직이기 시작했다. 전조등을 켜지 않은 채로 둘의 차 옆을 지나가며 아주 잠깐 속도를 늦췄다. 선팅이 짙은 조수석 창문이 손가락 한 마디만큼 내려갔다가 다시 올라갔다. 그리고 차는 어둠 속으로 사라졌다.
+당신은 기어를 잡으려는 그녀 앞에 손바닥을 펼쳐 보였다. 지안이 멈칫했다. 그 사이 회색 세단이 천천히 움직이기 시작했다. 전조등을 켜지 않은 채로 둘의 차 옆을 지나가며 아주 잠깐 속도를 늦췄다. 선팅이 짙은 조수석 창문이 손가락 한 마디만큼 내려갔다가 다시 올라갔다. 그리고 차는 어둠 속으로 사라졌다.
 
 차 안에는 비상등 소리만 남았다. 지안이 숨을 내쉬려는 순간, 마지막 메시지가 도착했다.
 
@@ -90,15 +90,15 @@ INSERT INTO public.lounge_scenarios(id,character_id,title,hook,prologue,user_rol
 
 그리고 사진을 쥔 손에 힘을 주며, 이번엔 당신을 똑바로 보고 말했다.
 
-"너 오늘 집에 혼자 가지 마. 아니…"
+"너 오늘 집에 혼자 가지 마. 아니, 그러니까……"
 
-잠깐 말이 끊겼다.
+잠깐 말이 끊겼다. 지안은 사진을 봉투에 도로 넣고는 아무 일 없다는 얼굴로 안전벨트를 당겼다.
 
-"나 혼자 두지 마."
+"내일 아침에 커피나 사 와. 별 뜻 없어. 기사 때문이야."
 
-비상등이 한 번 더 째깍였다. 그녀의 손이 사진을 쥔 채, 당신의 소매 끝을 잡고 있었다.$prologue$,
+귀 끝이 조금 붉어져 있었다. 비상등이 한 번 더 째깍였다.$prologue$,
    '3년째 금요일 밤마다 그녀의 차 조수석에 앉아 온 오랜 남사친. 오래전부터 그녀를 좋아해 왔고, 이제 그녀의 사건 취재를 돕는 조력자가 된다',
-   '오래된 친구이자 썸. 그녀는 사건의 단서를 계속 건네며 당신의 생각을 구하고, 가끔 마음인지 장난인지 헷갈리는 말을 툭 던진다. 당신은 오래 좋아해 온 마음을 아직 말하지 못했다.',
+   '오래된 친구이자 썸. 그녀는 사건의 단서를 계속 건네며 당신의 생각을 구하고, 가끔 마음인지 장난인지 헷갈리는 말을 툭 던지고는 금방 장난으로 덮는다. 당신은 오래 좋아해 온 마음을 아직 말하지 못했다.',
    '10월 끝자락 밤 11시 40분, 강변북로 갓길에 비상등을 켜고 선 지안의 낡은 흰색 SUV. 50미터 뒤에는 전조등을 끈 회색 세단','river',0)
 ON CONFLICT (id) DO UPDATE SET title=EXCLUDED.title, hook=EXCLUDED.hook, prologue=EXCLUDED.prologue, user_role=EXCLUDED.user_role,
   relationship=EXCLUDED.relationship, place=EXCLUDED.place, theme=EXCLUDED.theme, sort=EXCLUDED.sort, active=true, updated_at=now();

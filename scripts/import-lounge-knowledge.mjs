@@ -26,7 +26,10 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   const path = process.argv[2];
   if (!path || path.startsWith('--')) throw new Error('Usage: node scripts/import-lounge-knowledge.mjs <file.jsonl|file.csv> [--apply] [--update]');
   const apply = process.argv.includes('--apply'), update = process.argv.includes('--update');
-  const { entries, problems } = checkEntries(path, await readFile(path, 'utf8'));
+  const text = await readFile(path, 'utf8');
+  // A member's character (c_ and 32 hex characters) can have knowledge too, once its id is in the file.
+  const memberCharacters = [...new Set(text.match(/"character":"(c_[0-9a-f]{32})"/g)?.map(match => match.slice(13, -1)) ?? [])];
+  const { entries, problems } = checkEntries(path, text, [...lounge.loungeHosts.map(host => host.id), ...memberCharacters]);
   if (problems.length) { console.error(`${problems.length} problem(s), nothing was sent:\n${problems.map(problem => `  ${problem}`).join('\n')}`); process.exit(1); }
   const count = (key, value) => entries.filter(entry => entry[key] === value).length;
   console.log(`${entries.length} entries are valid: ${count('kind', 'knowledge')} knowledge, ${count('kind', 'experience')} experience; characters: ${[...new Set(entries.map(entry => entry.character))].join(', ')}.`);

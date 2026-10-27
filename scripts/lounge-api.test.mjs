@@ -2059,6 +2059,9 @@ test('a chat started from a story is told as a story; with the voice on it stays
       assert.match(reply.instructions, /대사가 답의 절반 가까이 되게 하고/);
       assert.match(reply.instructions, /매번 말로 비켜 가지 않는다/);
       assert.match(reply.instructions, /질문으로 끝내지 않는다/);
+      // The member's own side is never written for them, even when the prologue ends waiting for their choice (2026-10-27).
+      assert.match(reply.instructions, /지문의 '나'는 언제나 너 자신/);
+      assert.match(reply.instructions, /프롤로그가 사용자의 대답이나 선택을 기다리며 끝났다면/);
       // Narration in plain style, dialogue spoken the way a person would in that moment.
       assert.match(reply.instructions, /'나는 ~한다'처럼 평서체로 쓰고 존댓말로 쓰지 않는다/);
       assert.match(reply.instructions, /안내문이나 상담하는 말투/);

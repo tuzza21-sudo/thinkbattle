@@ -25,7 +25,7 @@ export function LoungeModelPicker({ value, disabled, onChange }: { value: string
     setOpen(false); trigger.current?.focus();
     if (model !== current.id) onChange(model);
   };
-  return <div className="lounge-model-picker" ref={root} onKeyDown={event => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); trigger.current?.focus(); } }}>
+  return <div className="lounge-model-picker lounge-chat-model-picker" ref={root} onKeyDown={event => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false); trigger.current?.focus(); } }}>
     <button type="button" ref={trigger} className="lounge-model-trigger" aria-haspopup="menu" aria-expanded={open} aria-controls={menuId} disabled={disabled} onClick={() => setOpen(value => !value)} title="대화 상대가 답할 때 쓰는 AI 모델이에요">
       <Icon size={15} /><span>{current.label}</span><ChevronDown size={14} className="lounge-model-chevron" />
     </button>

@@ -302,6 +302,8 @@ export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; 
   { id: 'ina', headline: '이혼 후 3년, 첫 소개팅에서 만난 출판 편집자', story: true },
   { id: 'guide', headline: '피렌체·베네치아·돌로미티, 짓궂은 이탈리아 가이드', story: true },
 ];
+/** The order of the regular cast row on the lobby (2026-10-27); the new characters are not in it. The data order of loungeCharacters is unchanged. */
+export const loungeLobbyCastOrder: readonly string[] = ['closer', 'diplomat', 'auditor', 'jaeseok', 'velvet', 'trickster', 'lawyer'];
 export const loungeCharacterProfiles: Record<string, { traits: readonly string[]; summary: string }> = {
   ina: { traits: ['설레게 튕기는 밀당', '재치 있는 티키타카', '따뜻한 현실주의자'], summary: '출판 편집자 윤서연. 편안하게 웃다가 예상치 못한 직설 한마디로 설레게 하고, 한 걸음 다가오면 살짝 물러서요. 받아치는 재미를 아는 사람이에요.' },
   jaeseok: { traits: ['함께 웃는 유머', '재치 있는 관찰', '둘만의 농담'], summary: '재밌게 떠들고 싶을 때. 대화가 쌓일수록 둘만 아는 농담이 생겨요.' },
@@ -570,6 +572,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
     lawyer: 'Ir7oQcBXWiq4oFGROCfj', // taemin
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
+    c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
     male: 'PDoCXqBQFGsvfO0hNkEs', // KKC HQ
   },

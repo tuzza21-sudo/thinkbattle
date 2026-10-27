@@ -10,7 +10,7 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
-import { loungeGroupRoomsEnabled, loungeNewCharacters } from '../lib/lounge';
+import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
 /** With group rooms closed there are no open tables to fetch. */
 const noTables = async (): Promise<LoungeOpenTable[]> => [];
@@ -130,6 +130,10 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const tables = rooms.value;
   const [creating, setCreating] = useState<{ space?: string; host?: LoungeHostId } | null>(null);
   const selected = loungeCharacters.find(character => character.id === params.get('character'));
+  // The regular cast row: in the lobby's order, without the characters shown above as new.
+  const newIds = new Set(loungeNewCharacters.map(item => item.id));
+  const lobbyCast = [...loungeLobbyCastOrder.map(id => loungeCharacters.find(character => character.id === id)), ...loungeCharacters.filter(character => !loungeLobbyCastOrder.includes(character.id))]
+    .filter((character): character is LoungeCharacter => Boolean(character) && !newIds.has(character!.id));
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
   const openSheet = (id: string) => setParams({ character: id }, { state: { sheet: true } });
   const closeSheet = () => { if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1); else setParams({}, { replace: true }); };
@@ -165,7 +169,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
       <LoungeRow label="캐릭터" className="lounge-cast-row">
-        {loungeCharacters.map(character => {
+        {lobbyCast.map(character => {
           const host = getLoungeHost(character.id), count = tables?.filter(table => table.host_persona === character.id).length ?? 0;
           return <li key={character.id}>
             <button type="button" className="lounge-cast-card" aria-haspopup="dialog" onClick={() => openSheet(character.id)}>
