@@ -3,13 +3,14 @@ import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Coffee, Cro
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, getLoungeTheme, isLoungeAgeGroup, loungeHostThemes, loungeAgeGroups, loungeAgeLimitLabel, loungeCharacterProfiles, loungeTopics, type LoungeAgeGroup, type LoungeHostId, type LoungeOpenTable, type LoungeSpace, type LoungeSpaceTable } from '../lib/lounge';
-import { enterLoungeTable, leaveLoungeWait, listLoungeOpenTables, listLoungeSpaces, listLoungeSpaceTables, openLoungeTable, startLoungeSolo, waitLoungeSpace } from '../lib/loungeApi';
+import { enterLoungeTable, leaveLoungeWait, listLoungeOpenTables, listLoungeSpaces, listLoungeStoryTopics, listLoungeSpaceTables, openLoungeTable, startLoungeSolo, waitLoungeSpace } from '../lib/loungeApi';
 import { getLoungeCharacter, koreanSubject, koreanWith, loungeCharacters, type LoungeCharacter } from '../lib/loungeCharacters';
 import { useDialog } from '../lib/useDialog';
 import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrait } from '../lib/loungeCustomClient';
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
+import { isSuperAdminUser } from '../lib/superAdmin';
 import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
 /** With group rooms closed there are no open tables to fetch. */
@@ -132,6 +133,9 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const selected = loungeCharacters.find(character => character.id === params.get('character'));
   // The regular cast row: in the lobby's order, without the characters shown above as new.
   const newIds = new Set(loungeNewCharacters.map(item => item.id));
+  // What each character's stories are about, shown on its card.
+  const [topics, setTopics] = useState<Record<string, string[]>>({});
+  useEffect(() => { let cancelled = false; void listLoungeStoryTopics().then(value => { if (!cancelled) setTopics(value); }); return () => { cancelled = true; }; }, []);
   const lobbyCast = [...loungeLobbyCastOrder.map(id => loungeCharacters.find(character => character.id === id)), ...loungeCharacters.filter(character => !loungeLobbyCastOrder.includes(character.id))]
     .filter((character): character is LoungeCharacter => Boolean(character) && !newIds.has(character!.id));
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
@@ -158,8 +162,6 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         </LoungeRow>}
     </section>}
 
-    <LoungeNewCast />
-
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
       <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
@@ -174,14 +176,15 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
           return <li key={character.id}>
             <button type="button" className="lounge-cast-card" aria-haspopup="dialog" onClick={() => openSheet(character.id)}>
               <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
-              <span><strong>{character.name}</strong><small>{character.job}</small></span>
+              <span><strong>{character.name}</strong><small>{character.job}</small><TopicPill titles={topics[character.id]} /></span>
             </button>
             {loungeGroupRoomsEnabled && <p className="lounge-cast-count"><Users size={13} aria-hidden="true" /> {tables ? count ? `${count}개 방에서 대화 중` : '지금은 쉬는 중' : '확인 중'}</p>}
           </li>;
         })}
       </LoungeRow>
     </section>
-    <LoungeMemberCast user={user} />
+    <LoungeNewCast topics={topics} />
+    {isSuperAdminUser(user) && <LoungeMemberCast user={user} />}
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
     {selected && <LoungeCharacterSheet key={selected.id} character={selected} spaces={spaces} tables={tables}
       onCreate={() => { closeSheet(); setCreating({ host: selected.id }); }} onClose={closeSheet} />}
@@ -191,7 +194,13 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
 
 
 /** The characters that just arrived, first on the home: house characters and a public member character (see loungeNewCharacters). */
-function LoungeNewCast() {
+/** The topic of a character's stories on its card: the first story's title, and how many more there are. */
+function TopicPill({ titles }: { titles?: string[] }) {
+  if (!titles?.length) return null;
+  return <em className="lounge-cast-topic"><BookOpen size={11} aria-hidden="true" /><b>{titles[0]}</b>{titles.length > 1 && <i>외 {titles.length - 1}</i>}</em>;
+}
+
+function LoungeNewCast({ topics }: { topics: Record<string, string[]> }) {
   const [shared, setShared] = useState<LoungeCustomCharacterRow[]>([]);
   // Shown once the member's character is known (or failed to load): a card added later would shift the row's scroll snap.
   const [loaded, setLoaded] = useState(false);
@@ -204,12 +213,12 @@ function LoungeNewCast() {
     const link = `/lounge/characters/${item.id}${item.story ? '#stories' : ''}`;
     if (item.id.startsWith('c_')) {
       const row = shared.find(candidate => candidate.id === item.id);
-      return row ? [{ id: item.id, link, name: row.name, job: row.sheet.job, portrait: loungeCustomPortrait(row), color: '#2b2b2b', headline: item.headline }] : [];
+      return row ? [{ id: item.id, link, name: row.name, job: row.sheet.job, portrait: loungeCustomPortrait(row), color: '#2b2b2b', headline: item.headline, titles: undefined as string[] | undefined }] : [];
     }
     const character = getLoungeCharacter(item.id);
     if (!character) return [];
     const host = getLoungeHost(item.id);
-    return [{ id: item.id, link, name: character.name, job: character.job, portrait: host.portrait, color: host.color, headline: item.headline }];
+    return [{ id: item.id, link, name: character.name, job: character.job, portrait: host.portrait, color: host.color, headline: item.headline, titles: topics[item.id] }];
   });
   if (!loaded || !cards.length) return null;
   return <section className="lounge-home-section" aria-labelledby="lounge-new-cast-title">
@@ -222,7 +231,7 @@ function LoungeNewCast() {
         <Link to={card.link} className="lounge-cast-card">
           {card.portrait ? <img src={card.portrait} alt={`${card.name}의 사진`} loading="lazy" style={{ background: card.color }} /> : <span className="lounge-cast-card-empty" aria-hidden="true">✨</span>}
           <b className="lounge-new-badge">NEW</b>
-          <span><strong>{card.name}</strong><small>{card.job}</small></span>
+          <span><strong>{card.name}</strong><small>{card.job}</small><TopicPill titles={card.titles} /></span>
         </Link>
         <p className="lounge-cast-count">{card.headline}</p>
       </li>)}

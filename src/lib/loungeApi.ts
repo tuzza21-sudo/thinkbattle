@@ -242,6 +242,14 @@ export async function listLoungeScenarios(characterId: string): Promise<LoungeSc
   const { data, error } = await supabase.from('lounge_scenarios').select('*').eq('character_id', characterId).order('sort').order('created_at');
   return error ? [] : (data ?? []) as LoungeScenarioRow[];
 }
+/** The title of every active story, by character, in the order the character page shows them (for the topic on the lobby cards). */
+export async function listLoungeStoryTopics(): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase.from('lounge_scenarios').select('character_id,title,sort,created_at').order('sort').order('created_at');
+  if (error) return {};
+  const topics: Record<string, string[]> = {};
+  for (const row of (data ?? []) as Array<{ character_id: string; title: string }>) (topics[row.character_id] ??= []).push(row.title);
+  return topics;
+}
 /** Opens (or continues) a one-to-one chat in a scenario; returns the room id. */
 export const startLoungeScenario = (id: string, nickname: string, note?: string) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname, ...(note?.trim() ? { p_note: note.trim() } : {}) });
 /** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
