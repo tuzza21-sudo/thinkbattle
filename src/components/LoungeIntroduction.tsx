@@ -12,7 +12,7 @@ import './LoungeIntroduction.css';
 const bars = [14, 26, 38, 22, 46, 30, 18, 40, 28, 16, 34, 24, 44, 20, 32];
 /** Stories to show as examples. They link to the character's stories, where the current ones are listed. */
 const stories = [
-  { id: 'ina', title: '이혼 후 3년, 첫 소개팅', hook: '다시는 설렐 일 없다고 믿었던 날, 환하게 웃으며 나타난 그녀가 조건을 하나 건다.', genre: '로맨스' },
+  { id: 'closer', title: '6개월의 연인', hook: '결혼 압박을 피하려고 협상가를 6개월짜리 연인으로 고용했다. 그는 합의서부터 내밀고, 손을 잡기 전에도 먼저 묻는다.', genre: '계약 연애 · 로맨스' },
   { id: 'velvet', title: '검은 장미', hook: '5년 전 죽은 남자의 이름이 사라진 그림의 소유권 문서에 다시 나타났다. 그녀가 당신을 고른 이유는 무엇일까.', genre: '미스터리 · 로맨스' },
   { id: 'diplomat', title: '오래된 친구와의 썸', hook: '3년째 금요일 밤마다 앉는 조수석. 오늘은 회색 세단이 따라오고, 그녀가 말끝을 흐린다.', genre: '썸 · 서스펜스' },
   { id: 'guide', title: '장밋빛으로 물드는 시간', hook: '이탈리아 여행 닷새째, 모두가 고개를 넘자고 할 때 당신만 그의 편에 섰다.', genre: '여행 · 로맨스' },
@@ -79,7 +79,7 @@ export function LoungeIntroduction() {
   const page = useRef<HTMLElement>(null);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, []);
   useReveal(page);
-  const chatHost = getLoungeHost('ina'), callHost = getLoungeHost('guide');
+  const chatHost = getLoungeHost('ina'), callHost = getLoungeHost('diplomat');
   const nameOf = (id: string) => loungeCharacters.find(character => character.id === id)?.name ?? getLoungeHost(id).name;
   const heroFaces = ['ina', 'guide', 'velvet'] as const;
   return <main className="lounge-introduction" ref={page}>
@@ -166,7 +166,7 @@ export function LoungeIntroduction() {
         <div className="lounge-intro-call-shade" aria-hidden="true" />
         <div className="lounge-intro-call-body">
           <span className="lounge-intro-call-state"><i /> 통화 중 · 04:12</span>
-          <b>{nameOf('guide')}</b><small>이탈리아 가이드</small>
+          <b>{nameOf('diplomat')}</b><small>사회부 기자</small>
           <div className="lounge-intro-wave" aria-hidden="true">{bars.slice(0, 11).map((height, index) => <i key={index} style={{ height, animationDelay: `${index * 0.11}s` }} />)}</div>
           <div className="lounge-intro-call-buttons" aria-hidden="true"><span><Mic size={20} /></span><span className="end"><Phone size={20} /></span></div>
         </div>

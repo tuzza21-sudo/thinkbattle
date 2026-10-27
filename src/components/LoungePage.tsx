@@ -43,11 +43,11 @@ import './LoungeRoom.css';
 
 type Props = { user: AppUser | null; onGuestRequest: () => Promise<void>; onLoginRequest: () => void; onSignupRequest?: () => void; onUserUpdate?: (user: AppUser) => void; onLogout?: () => Promise<void> };
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
-function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onProfileRequest, onLogout, loggingOut, unread }: Props & { inRoom: boolean; introduction: boolean; onProfileRequest: () => void; loggingOut: boolean; unread: number }) {
+function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onProfileRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; onProfileRequest: () => void; loggingOut: boolean; unread: number }) {
   return <header className="lounge-header">
     {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 사석</Link>}
     <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>사석<span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
-    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && user && !user.isAnonymous && <Link to="/lounge/friends" className="lounge-header-friends" aria-label={unread ? `친구 · 안 읽은 쪽지 ${unread}개` : '친구'}><Heart size={15} /><span>친구</span>{unread > 0 && <em>{unread > 9 ? '9+' : unread}</em>}</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
+    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
         <button type="button" className="lounge-profile-button" onClick={onProfileRequest} aria-label={`${user.nickname}님 프로필 수정`}><span className="lounge-account-avatar">{user.loungeAvatarUrl ? <img src={user.loungeAvatarUrl} alt="" /> : <UserRound size={18} />}</span><span className="lounge-account-name"><strong>{user.nickname}</strong><small>프로필 수정</small></span></button>
         {onLogout && <button type="button" className="lounge-account-logout" disabled={loggingOut} onClick={() => void onLogout()} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>}
