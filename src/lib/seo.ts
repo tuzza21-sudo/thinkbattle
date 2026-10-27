@@ -2,7 +2,7 @@ import { loungeCharacters } from './loungeCharacters';
 
 export const SEO_ORIGIN = 'https://saseok.kr';
 const HOME_TITLE = '사석 — 진짜 대화는 사석에서';
-const HOME_DESCRIPTION = '혼자여도 괜찮아요. 성격이 뚜렷한 AI 캐릭터와 목소리로 이야기하고, 마음이 맞는 사람들과 함께 앉아 보세요. 목소리로 만나는 대화 라운지 사석.';
+const HOME_DESCRIPTION = '나를 기억하고, 함께한 시간만큼 가까워지는 AI 컴패니언 사석. 설레는 이야기의 주인공이 되고, 원하는 캐릭터와 시나리오를 직접 만들고, 목소리로 마음을 나눠 보세요.';
 
 export type PageSeo = { title: string; description: string; path: string; noindex: boolean };
 
