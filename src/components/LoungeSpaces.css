@@ -13,7 +13,7 @@
 /* A sideways row: four cards per view on a wide screen, arrows at both ends while there is more to see. */
 .lounge-row { --row-per:4; --row-gap:18px; position:relative; }
 .lounge-cast-row { --row-per:5; --row-arrow-top:45%; }
-.lounge-new-row { --row-per:4; }
+.lounge-new-row { --row-per:5; }
 .lounge-new-badge { position:absolute; top:12px; left:12px; padding:3px 9px; border-radius:20px; background:var(--l-green); color:#fffaf0; font-size:11px; font-weight:800; letter-spacing:.06em; box-shadow:0 2px 8px #0000004d; }
 .lounge-row-track { display:grid; grid-auto-flow:column; grid-auto-columns:calc((100% - (var(--row-per) - 1) * var(--row-gap)) / var(--row-per)); gap:var(--row-gap); margin:0 -8px -14px; padding:6px 8px 24px; scroll-padding-inline:8px; list-style:none; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none; }
 .lounge-row-track::-webkit-scrollbar { display:none; }
@@ -99,7 +99,7 @@
 .lounge-page .lounge-sheet-more { display:inline-flex; align-items:center; gap:4px; margin-top:auto; padding-top:6px; font-size:12px; color:var(--l-muted); }
 
 @media(max-width:1320px) { .lounge-row-arrow.prev { left:-16px; } .lounge-row-arrow.next { right:-16px; } }
-@media(max-width:1024px) { .lounge-row { --row-per:3; } .lounge-cast-row { --row-per:4; } .lounge-new-row { --row-per:3; } }
+@media(max-width:1024px) { .lounge-row { --row-per:3; } .lounge-cast-row { --row-per:4; } .lounge-new-row { --row-per:4; } }
 @media(max-width:760px) { .lounge-row { --row-per:2.2; --row-gap:12px; } .lounge-cast-row { --row-per:2.6; } .lounge-new-row { --row-per:2.3; } .lounge-row-arrow { width:38px; height:38px; top:calc(var(--row-arrow-top,38%) - 19px); } .lounge-row-arrow.prev { left:-12px; } .lounge-row-arrow.next { right:-12px; } }
 @media(max-width:640px) {
   .lounge-home-section { margin-top:22px; }
