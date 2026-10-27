@@ -195,3 +195,25 @@ test('guests cannot make characters', async () => {
     assert.equal((await handler(request({ action: 'draft' }))).status, 403);
   });
 });
+
+test('a member chooses among three women and three men, each tied to an ElevenLabs voice and a sample they can hear', async () => {
+  const { existsSync } = await import('node:fs');
+  for (const gender of ['female', 'male']) {
+    const listed = custom.loungeListedVoicePresets(gender);
+    assert.equal(listed.length, 3, `three ${gender} voices are offered`);
+    assert.ok(listed.every(preset => preset.gender === gender));
+    assert.equal(new Set(listed.map(preset => preset.eleven)).size, 3, 'the three are different voices');
+  }
+  assert.equal(custom.loungeListedVoicePresets('other').length, 6, 'no gender, all six');
+  for (const preset of custom.loungeVoicePresets) {
+    assert.match(preset.eleven, /^[A-Za-z0-9]{20}$/, `${preset.id} has an ElevenLabs voice id`);
+    assert.ok(existsSync(fileURLToPath(new URL(`../public${custom.loungeVoicePresetSample(preset.id)}`, import.meta.url))), `${preset.id} has its sample file`);
+  }
+  assert.ok(custom.loungeVoicePresets.some(preset => !preset.listed && preset.id === 'soft_male'), 'an earlier preset keeps working without being offered again');
+  // The chosen preset is the voice that speaks for the character (2026-10-27: before this every member character spoke with its gender's default).
+  const otherId = `c_${'b'.repeat(32)}`;
+  custom.registerLoungeCustomCharacterRow({ ...row, id: otherId, voice: 'playful_male', sheet: { ...sheet, gender: 'male' }, portrait_path: `${otherId}/draft-0123456789abcdef.webp` }, null);
+  assert.equal(lounge.loungeEngineVoice('eleven', otherId), custom.loungeVoicePresets.find(preset => preset.id === 'playful_male').eleven);
+  custom.registerLoungeCustomCharacterRow({ ...row, id: otherId, voice: 'deep_male', sheet: { ...sheet, gender: 'male' }, portrait_path: `${otherId}/draft-0123456789abcdef.webp` }, null);
+  assert.equal(lounge.loungeEngineVoice('eleven', otherId), custom.loungeVoicePresets.find(preset => preset.id === 'deep_male').eleven, 'a changed choice is followed');
+});

@@ -37,6 +37,15 @@ try {
   assert.equal((await one('select scenario->>\'prologue\' as p from voice_lounge_rooms where id=$1', [second])).p.length, '새로 쓴 프롤로그. '.repeat(1000).length, 'the long prologue is kept whole');
   assert.equal(await start(), second, 'and that room is continued after');
   assert.equal((await one("select count(*)::int as n from lounge_scenarios where character_id='closer' and active")).n, 1, '강무진 keeps one story');
+  // A note about the member (20261125): kept with the room's copy, and a room is continued only with the same note.
+  const withNote = async note => (await one("select start_lounge_scenario('closer-contract-love','손님1',$1) as id", [note])).id;
+  const noted = await withNote('낯을 가리지만 친해지면 장난이 많아요.');
+  assert.notEqual(noted, second, 'a note opens a room of its own');
+  assert.equal((await one("select scenario->>'member_note' as note from voice_lounge_rooms where id=$1", [noted])).note, '낯을 가리지만 친해지면 장난이 많아요.');
+  assert.equal(await withNote('낯을 가리지만 친해지면 장난이 많아요.'), noted, 'the same note continues the same room');
+  assert.notEqual(await withNote('다른 소개'), noted, 'another note opens another room');
+  assert.equal((await one("select scenario->>'member_note' as note from voice_lounge_rooms where id=$1", [second])).note, null, 'no note, none stored');
+  assert.equal((await one("select length(scenario->>'member_note')::int as n from voice_lounge_rooms where id=$1", [await withNote('가'.repeat(2500))])).n, 2000, 'a note is cut at 2,000 characters');
   await assert.rejects(db.query("update lounge_scenarios set prologue=$1 where id='closer-contract-love'", ['가'.repeat(12001)]), /prologue_check/);
-  console.log('PASS: a story continues while unchanged, a rewritten story opens a new room, prologues to 12,000 characters, one 강무진 story');
+  console.log('PASS: a story continues while unchanged, a rewritten story opens a new room, prologues to 12,000 characters, one 강무진 story, a note about the member');
 } finally { await db.close(); }

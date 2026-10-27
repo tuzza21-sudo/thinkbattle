@@ -596,8 +596,11 @@ export function loungeEngineVoice(engine: 'gemini' | 'eleven' | 'typecast', host
   let extra: Partial<Record<string, Partial<Record<string, string>>>> = {};
   try { extra = overrides ? JSON.parse(overrides) : {}; } catch { extra = {}; }
   const voices = { ...loungeEngineVoices[engine], ...(extra[engine] ?? {}) };
-  return voices[hostId] ?? voices[loungeHostGender(hostId)];
+  return voices[hostId] ?? (engine === 'eleven' ? customElevenVoices.get(hostId) : undefined) ?? voices[loungeHostGender(hostId)];
 }
+/** The ElevenLabs voices members chose for their own characters (from the voice presets), by character id. */
+const customElevenVoices = new Map<string, string>();
+export const registerLoungeCustomElevenVoice = (hostId: string, voiceId: string) => { customElevenVoices.set(hostId, voiceId); };
 const loungeHostGender = (hostId: string) => houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
 /** The ElevenLabs premade voice of a character, for when its library voice is refused (an account without a paid plan). */
 export const loungeElevenPremadeVoice = (hostId: string) => loungeElevenPremadeVoices[hostId] ?? loungeElevenPremadeVoices[loungeHostGender(hostId)];

@@ -24,7 +24,12 @@ export const loungeOneToOneStoriesOnly = true;
 /** The character page section that lists a character's stories. */
 export const loungeStoriesPath = (characterId: string) => `/lounge/characters/${characterId}#stories`;
 /** The copy of a scenario a room keeps (rooms.scenario), so editing the scenario does not change a story under way. */
-export type LoungeRoomScenario = Pick<LoungeScenarioRow, 'id' | 'title' | 'prologue' | 'user_role' | 'relationship' | 'place'>;
+export type LoungeRoomScenario = Pick<LoungeScenarioRow, 'id' | 'title' | 'prologue' | 'user_role' | 'relationship' | 'place'> & {
+  /** What the member wrote about themselves when they started (2026-10-28): told to the character, never spoken for the member. */
+  member_note?: string;
+};
+/** How long that note may be (characters): by plan 500, 1,000 and 2,000; 1,000 for everyone during the test opening. */
+export const loungeMemberNoteLimits = { standard: 500, plus: 1000, pro: 2000, current: 1000 } as const;
 
 /** Whether a name ends in a final consonant (and whether it is ㄹ), to choose 은/는, 이/가, 을/를, 과/와, (으)로. */
 function finalSound(name: string) {
@@ -67,7 +72,9 @@ const text = (value: unknown, max: number) => typeof value === 'string' ? value.
 export function normalizeLoungeRoomScenario(raw: unknown): LoungeRoomScenario | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const value = raw as Record<string, unknown>;
-  const scenario = { id: text(value.id, 60), title: text(value.title, 40), prologue: text(value.prologue, loungeScenarioLimits.prologue), user_role: text(value.user_role, 120), relationship: text(value.relationship, 200), place: text(value.place, 200) };
+  const scenario: LoungeRoomScenario = { id: text(value.id, 60), title: text(value.title, 40), prologue: text(value.prologue, loungeScenarioLimits.prologue), user_role: text(value.user_role, 120), relationship: text(value.relationship, 200), place: text(value.place, 200) };
+  const note = text(value.member_note, loungeMemberNoteLimits.pro);
+  if (note) scenario.member_note = note;
   return scenario.id && scenario.prologue ? scenario : undefined;
 }
 

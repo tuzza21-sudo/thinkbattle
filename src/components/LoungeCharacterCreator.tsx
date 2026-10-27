@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, BookOpen, Camera, Check, LoaderCircle, MessageCircle, Play, Send, Sparkles, Upload, Wand2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
@@ -7,7 +7,7 @@ import {
   setLoungeCustomStatus, startLoungeCustomChat, uploadLoungeCharacterPortrait, writeLoungeCharacterPrologue,
 } from '../lib/loungeApi';
 import {
-  loungeCustomLimit, loungeCustomRules, loungeCustomThemes, loungeVoicePresets, loungeVoicePresetSample, normalizeLoungeCustomSheet,
+  loungeCustomLimit, loungeCustomRules, loungeCustomThemes, loungeListedVoicePresets, loungeVoicePresetSample, loungeVoicePresets, normalizeLoungeCustomSheet,
   type LoungeCustomCharacterRow, type LoungeCustomGender, type LoungeCustomSheet,
 } from '../lib/loungeCustomCharacters';
 import { loadLoungeCustomCharacter, loungeCustomPortrait, registerLoungeCustomRow } from '../lib/loungeCustomClient';
@@ -17,8 +17,6 @@ import './LoungeCharacter.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const emptySheet: LoungeCustomSheet = { name: '', age: 28, gender: 'female', job: '', concept: '', intro: '', personality: '', tastes: '', tagline: '', look: '', greeting: '', prologue: '', userRole: '', storyRelationship: '', portraitPrompt: '' };
-// The voices to choose from follow the character's gender; "other" can choose any.
-const voiceGender: Record<string, 'female' | 'male'> = { calm_female: 'female', low_female: 'female', deep_male: 'male', soft_male: 'male', firm_male: 'male', playful_male: 'male' };
 const statusLabels: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화', pending: '공개 검수 중', public: '공개됨', rejected: '공개 반려' };
 
 /** An image the member picked, made smaller (longest side 1024 px) before it is sent. */
@@ -47,6 +45,10 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
   const [template, setTemplate] = useState<RelationshipTemplateId>('warm');
   const [flirtation, setFlirtation] = useState(true);
   const [voice, setVoice] = useState<string>(loungeVoicePresets[0].id);
+  // The sample being played, so choosing another stops it.
+  const sample = useRef<HTMLAudioElement | null>(null);
+  const listen = (id: string) => { sample.current?.pause(); sample.current = new Audio(loungeVoicePresetSample(id)); void sample.current.play().catch(() => {}); };
+  useEffect(() => () => { sample.current?.pause(); }, []);
   const [theme, setTheme] = useState<string>(loungeCustomThemes[0].id);
   const [drafted, setDrafted] = useState(false);
   const [row, setRow] = useState<LoungeCustomCharacterRow | null>(null);
@@ -91,7 +93,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
   });
   const changeGender = (gender: LoungeCustomGender) => {
     set('gender', gender);
-    if (gender !== 'other' && voiceGender[voice] !== gender) setVoice(loungeVoicePresets.find(preset => voiceGender[preset.id] === gender)!.id);
+    if (gender !== 'other' && !loungeListedVoicePresets(gender).some(preset => preset.id === voice)) setVoice(loungeListedVoicePresets(gender)[0].id);
   };
   const save = () => run('save', async () => {
     const result = await saveLoungeCharacter({ ...(row ? { id: row.id } : {}), sheet, template, flirtation, voice, theme });
@@ -165,7 +167,18 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     </section>
 
     <section className="lounge-creator-step">
-      <h2><span>5</span> 시작 프롤로그 <small>선택</small></h2>
+      <h2><span>5</span> 목소리</h2>
+      <p className="lounge-character-lead">음성 대화에서 쓰는 목소리예요. ▶를 눌러 들어 보고 고르세요. 성별을 바꾸면 그 성별의 목소리 세 가지가 나와요.</p>
+      <div className="lounge-creator-voices" role="radiogroup" aria-label="목소리">
+        {loungeListedVoicePresets(sheet.gender).map(preset => <div key={preset.id} className={`lounge-creator-voice-card ${voice === preset.id ? 'selected' : ''}`}>
+          <button type="button" role="radio" aria-checked={voice === preset.id} className="lounge-creator-voice-pick" onClick={() => { setVoice(preset.id); listen(preset.id); }}><strong>{preset.label}</strong><small>{preset.note}</small></button>
+          <button type="button" className="lounge-creator-voice-play" aria-label={`${preset.label} 미리 듣기`} onClick={() => listen(preset.id)}><Play size={15} /></button>
+        </div>)}
+      </div>
+    </section>
+
+    <section className="lounge-creator-step">
+      <h2><span>6</span> 시작 프롤로그 <small>선택</small></h2>
       <p className="lounge-character-lead">첫 대화가 시작되기 전의 이야기예요. 적어 두면 첫 대화가 이 장면에서 이야기처럼 시작해요. 비워 두면 편한 대화로 시작해요.</p>
       <Field label="프롤로그" hint="'당신'이 겪는 장면으로, 그가 말을 거는 순간까지" problem={problemFor('prologue')}>
         <textarea rows={8} value={sheet.prologue} maxLength={rules.prologue[1]} onChange={event => set('prologue', event.target.value)} placeholder={'예: 비가 그친 새벽 두 시, 방송국 로비는 텅 비어 있다. 막차를 놓친 당신이 자판기 앞에 서 있을 때, 엘리베이터 문이 열리고 낯익은 목소리가 들린다.\n\n"이 시간에 여기서 뭐 해요?"'} />
@@ -189,10 +202,6 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
         </div>
         <label className="lounge-creator-check"><input type="checkbox" checked={flirtation} onChange={event => setFlirtation(event.target.checked)} /> 관계가 깊어지면 가벼운 플러팅을 허용해요 (노골적인 표현은 하지 않아요)</label>
         <div className="lounge-creator-grid">
-          <Field label="목소리" hint="음성 대화에서 쓰여요">
-            <span className="lounge-creator-voice"><select value={voice} onChange={event => setVoice(event.target.value)}>{loungeVoicePresets.filter(preset => sheet.gender === 'other' || voiceGender[preset.id] === sheet.gender).map(preset => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select>
-              <button type="button" aria-label="목소리 미리 듣기" onClick={() => void new Audio(loungeVoicePresetSample(voice)).play().catch(() => {})}><Play size={14} /></button></span>
-          </Field>
           <Field label="대화할 장소"><select value={theme} onChange={event => setTheme(event.target.value)}>{loungeCustomThemes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         </div>
       </details>
@@ -200,7 +209,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     </section>
 
     {row && <section className="lounge-creator-step">
-      <h2><span>6</span> 대표 사진</h2>
+      <h2><span>7</span> 대표 사진</h2>
       <div className="lounge-creator-portrait">
         <figure>{candidate ? <img src={candidate.url} alt="새로 만든 대표 사진 후보" /> : portraitUrl ? <img src={portraitUrl} alt={`${row.name}의 대표 사진`} /> : <span><Camera size={28} />아직 사진이 없어요</span>}{candidate && <figcaption>후보</figcaption>}</figure>
         <div>
@@ -222,7 +231,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     </section>}
 
     {row?.portrait_path && <section className="lounge-creator-step">
-      <h2><span>7</span> 대화하기</h2>
+      <h2><span>8</span> 대화하기</h2>
       <div className="lounge-character-actions">
         <button type="button" className="lounge-character-cta" onClick={() => void startChat()} disabled={Boolean(busy)}>{busy === 'chat' ? <LoaderCircle size={16} className="lounge-spin" /> : <MessageCircle size={16} />}{koreanWith(row.name)} 대화 시작</button>
         {(row.status === 'private' || row.status === 'rejected') && <button type="button" className="lounge-character-secondary" onClick={() => void submit()} disabled={Boolean(busy)}><Send size={15} />공개 신청</button>}
