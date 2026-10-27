@@ -47,5 +47,16 @@ try {
   assert.equal((await one("select scenario->>'member_note' as note from voice_lounge_rooms where id=$1", [second])).note, null, 'no note, none stored');
   assert.equal((await one("select length(scenario->>'member_note')::int as n from voice_lounge_rooms where id=$1", [await withNote('가'.repeat(2500))])).n, 2000, 'a note is cut at 2,000 characters');
   await assert.rejects(db.query("update lounge_scenarios set prologue=$1 where id='closer-contract-love'", ['가'.repeat(12001)]), /prologue_check/);
-  console.log('PASS: a story continues while unchanged, a rewritten story opens a new room, prologues to 12,000 characters, one 강무진 story, a note about the member');
+  // Episodes (20261126): copied with the story, a change of them opens a new room, and the room's story state starts empty.
+  await db.query("update lounge_scenarios set episodes='[{\"title\":\"1화\",\"checkpoints\":[]}]'::jsonb where id='closer-contract-love'");
+  const episodic = await start();
+  assert.equal((await one("select jsonb_array_length(scenario->'episodes') as n, story_state from voice_lounge_rooms where id=$1", [episodic])).n, 1, 'the episodes are in the room copy');
+  assert.equal(await start(), episodic, 'and the room is continued while they are the same');
+  await db.query("update voice_lounge_rooms set story_state='{\"episode\":1}'::jsonb where id=$1", [episodic]);
+  await db.query("update lounge_scenarios set episodes='[{\"title\":\"1화\",\"checkpoints\":[]},{\"title\":\"2화\",\"checkpoints\":[]}]'::jsonb where id='closer-contract-love'");
+  const rewritten = await start();
+  assert.notEqual(rewritten, episodic, 'new episodes open a new room');
+  assert.equal((await one('select story_state from voice_lounge_rooms where id=$1', [rewritten])).story_state, null, 'starting again from the first episode');
+  await assert.rejects(db.query("update lounge_scenarios set episodes='{}'::jsonb where id='closer-contract-love'"), /episodes_check/);
+  console.log('PASS: a story continues while unchanged, a rewritten story opens a new room, prologues to 12,000 characters, one 강무진 story, a note about the member, episodes');
 } finally { await db.close(); }

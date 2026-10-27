@@ -21,8 +21,9 @@ const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.
 const relationshipLib = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const repliesLib = compile('../src/lib/loungeReplies.ts');
 const modelsLib = compile('../src/lib/loungeModels.ts');
-const scenariosLib = compile('../src/lib/loungeScenarios.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const storyLib = compile('../src/lib/loungeStory.ts');
+const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -3059,4 +3060,43 @@ test('a story room keeps what the member wrote about themselves, cut at the long
   assert.equal(scenariosLib.normalizeLoungeRoomScenario({ id: 'x-story', prologue: '프롤로그' }).member_note, undefined, 'no note, no field');
   assert.equal(scenariosLib.normalizeLoungeRoomScenario({ id: 'x-story', prologue: '프롤로그', member_note: '가'.repeat(3000) }).member_note.length, scenariosLib.loungeMemberNoteLimits.pro);
   assert.ok(scenariosLib.loungeMemberNoteLimits.standard < scenariosLib.loungeMemberNoteLimits.plus && scenariosLib.loungeMemberNoteLimits.plus < scenariosLib.loungeMemberNoteLimits.pro);
+});
+
+test('a story in episodes: the character leads the current episode, the checkpoints are checked after the reply, and the next episode opens after its ending', async () => {
+  const file = JSON.parse(readFileSync(new URL('../docs/stories/velvet-black-rose.json', import.meta.url), 'utf8'));
+  const scenario = { id: file.id, title: file.title, prologue: file.prologue, user_role: file.user_role, relationship: file.relationship, place: file.place, episodes: file.episodes };
+  const cases = [
+    { state: null, met: ['envelope'], saved: { episode: 0, done: ['envelope'], opened: true, complete: false } },
+    { state: { episode: 0, done: ['envelope', 'missing-lines', 'her-signature', 'choice'], opened: true }, met: [], saved: { episode: 1, done: [], opened: false, complete: false } },
+  ];
+  for (const item of cases) {
+    let reply, after, patch;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { patch = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_memories?')) return result([]);
+      if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+      if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+      if (url.includes('score_voice_lounge_memories')) return result([]);
+      if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null, scenario, story_state: item.state })]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '이 봉투, 5년 전에 제가 서명한 보고서예요.' }]);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+      if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 연회장 뒤 복도', events: [], memory_ops: [], story_checkpoints: item.met }); }
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*봉투를 보지 않는다* 그 표정, 안에 든 게 뭔지 이미 알죠.' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship') || url.includes('apply_voice_lounge_memory_ops')) return result(true);
+      throw new Error('Unexpected fetch ' + url);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    const input = JSON.parse(reply.input);
+    assert.equal(input.scenario.episodes, undefined, 'the model never sees the later episodes');
+    assert.equal(input.story_episode.number, 1); assert.equal(input.story_episode.total, 6);
+    assert.match(reply.instructions, /story_episode가 있으면 이 이야기는 여러 화로 나뉜다/);
+    assert.match(reply.instructions, /사용자의 대답이나 선택을 네가 대신 정하지 않는다/);
+    assert.ok(after.text.format.schema.properties.story_checkpoints, 'the call after the reply says which checkpoints were met');
+    assert.match(after.instructions, /사용자가 실제로 말하거나 고르거나 한 것만 인정하고/);
+    assert.equal(JSON.parse(after.input).scenario.episodes, undefined);
+    assert.deepEqual(patch?.story_state, item.saved);
+    if (item.state) assert.equal(input.story_episode.closing, 'ending', 'the reply after the last checkpoint tells the ending');
+  }
 });

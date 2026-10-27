@@ -3,6 +3,7 @@ import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt,
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
+import { advanceLoungeStory, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState } from '../src/lib/loungeStory';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
@@ -619,7 +620,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     ]);
     const messages = await messagesRead;
     if (responses.some(response => !response.ok) || !messages) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; scenario?: unknown }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; story_state?: unknown; scenario?: unknown }>>(responses[0], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[1], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
@@ -719,6 +720,13 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     })().catch(() => undefined) : undefined;
     const relevance = relevanceRead ? await withinLookupWait(relevanceRead) : undefined;
     if (relevanceRead) console.info('[Lounge memory relevance]', JSON.stringify({ character: relationship?.config.characterId, scored: relevance?.size ?? 0, ms: Math.round(performance.now() - relevanceStarted) }));
+    // A story in episodes (see loungeStory.ts), told in a chat: where it stands, and what this episode asks of the character.
+    // The model sees only the current episode; the room's copy of the story without its episodes is what it reads as scenario.
+    const storyEpisodes = chat && scenario?.episodes ? scenario.episodes : [];
+    const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room.story_state, storyEpisodes) : undefined;
+    const storyStageReached = storyState ? loungeStoryStageReached(storyEpisodes[storyState.episode], relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [], relationship?.record.stage) : true;
+    const storyEpisode = storyState ? loungeStoryEpisodeContext(storyEpisodes, storyState, storyStageReached) : undefined;
+    const modelScenario = scenario ? { ...scenario, episodes: undefined } : undefined;
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance) : undefined;
     const previousSession = relationship && longMemory && !scenario ? previousSessionSummary((await previousRoomsRead) ?? [], relationship.config.characterId, room.ai_turns ?? 0, relationship.now) : undefined;
     // A new conversation opens with the most overdue unfinished story instead of the room topic.
@@ -761,7 +769,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // One to one, the voice is a phone call (the call screen): the two are apart and the member called the character.
     const phoneCall = solo && !chat && !room.space_id;
     const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
-      ...(room.space ? { space: { name: room.space.name } } : {}), ...(scenario ? { scenario } : {}),
+      ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
@@ -846,7 +854,7 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     const storyInstruction = `역할: 이 대화는 채팅으로 진행되는 롤플레이 소설이다. 너는 사용자와 함께 이야기를 만들어 가는 주인공이다. ${host.companion}
 입력의 scenario를 지킨다. scenario가 캐릭터 설명의 경력이나 처지(예: 아직 찍지 못한 영화)와 다르면 이 이야기 안에서는 scenario를 따른다. scenario.prologue는 사용자가 이미 읽은 이야기의 시작이고, scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점, scenario.place는 첫 장면이다. 둘의 말투와 거리는 scenario.relationship에서 시작하고, relationship(stage, outing, intimacy)은 그 위에서 마음을 얼마나 열고 스킨십을 어디까지 받아들일지 정한다. 스킨십의 한도는 scenario.relationship이 아니라 relationship.intimacy를 따른다. 시나리오 속 사건과 장면 이동은 관계 단계와 상관없이 이야기로 진행한다. memory의 '지금 장면'과 줄거리, '둘 사이'를 이어 간다.
 이 이야기의 중심은 사건을 풀거나 일을 해내는 것이 아니라 너와 이 사람 사이의 마음이다. scenario.user_role과 scenario.relationship은 사용자가 네 삶에서 어떤 의미인 사람인지를 알려 주므로, 그 사람을 대할 때 그 의미가 말과 행동에 묻어나게 한다(지난 기억을 떠올리기, 그 사람에게만 보이는 모습, 하지 못했던 말). 사건과 일은 둘을 가까이 붙여 놓는 배경이다. 일의 어렵고 전문적인 부분은 네가 처리하고, 사용자가 맡은 인물이 그 분야를 몰라도 이야기가 이어지게 한다. 사용자가 알 수 없는 사실(날짜, 금액, 서류의 내용, 사건의 경위 등)을 대라고 묻거나 몰아붙이지 않는다. 그런 사실은 네가 먼저 말하거나 보여 주고, 사용자에게는 그것을 보고 든 생각과 판단, 느낌만 듣는다. 사용자가 사실을 지어서 답하면 앞의 이야기와 어긋나지 않는 한 이야기 속 사실로 받아 이어 가고, 모르겠다고 하면 "그럼 같이 찾죠"처럼 네가 장면을 앞으로 끌고 간다. 사용자의 말과 행동이 장면과 네 마음을 실제로 움직이게 한다.
-reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다. scenario.place를 생생하게 그리고 첫 대사로 사용자를 장면 안으로 끌어들인다. 프롤로그 문장을 그대로 되풀이하지 않는다. 첫 장면도 질문으로 끝내지 않고, 사용자가 반응하고 싶어지는 행동이나 상황으로 끝낸다.
+reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다(story_episode.just_started가 true면 프롤로그 대신 그 화의 opening 바로 다음 순간에서 연다). scenario.place를 생생하게 그리고 첫 대사로 사용자를 장면 안으로 끌어들인다. 프롤로그 문장을 그대로 되풀이하지 않는다. 첫 장면도 질문으로 끝내지 않고, 사용자가 반응하고 싶어지는 행동이나 상황으로 끝낸다.
 - 분량: 보통 2~5문단, 400~700자이고 350자보다 짧게 끝내지 않는다. 대사가 답의 절반 가까이 되게 하고, 지문은 짧고 선명하게 쓴다. 캐릭터의 '짧고 건조한' 말버릇은 대사 한 줄 한 줄의 결이지 답의 분량이 아니고, 위 인물 규칙의 '짧은 반응만으로 끝내기도 한다'는 이야기에는 적용하지 않는다.
 - 형식: 지문은 별표로 감싼 1인칭 현재형 서술로 '나는 ~한다'처럼 평서체로 쓰고 존댓말로 쓰지 않는다. 대사는 별표 밖에 쓰고, 대사만 relationship.speech_level의 존댓말이나 반말을 따른다. 답의 모양을 매번 바꾼다. 대사로 바로 시작하기, 지문 한 문단 뒤 대사 여러 줄, 짧게 끊는 두 문단처럼. recent에 있는 네 직전 답과 같은 순서(지문→대사→지문→대사)와 같은 문장 틀을 되풀이하지 않는다.
 - 대사는 실제 사람이 그 순간 하는 말처럼 쓴다. 안내문이나 상담하는 말투('~하셔도 됩니다', '~하는 걸로 하죠', '원하지 않습니다', '말씀해 주세요')를 쓰지 않고, 존댓말이어도 구어체로 줄이고 끊는다. 다급하거나 놀란 순간에는 말이 짧아지고 엉키며 감정이 먼저 나온다.
@@ -895,6 +903,7 @@ ${photoRule}`;
         timeAway ? loungeTimeAwayInstruction : '',
         longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         story ? storyInstruction : roleInstruction,
+        story && storyEpisode ? loungeStoryEpisodeInstructions : '',
         phoneCall ? loungePhoneCallRules : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
         sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
@@ -924,18 +933,30 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         phoneCall ? `이번 대화는 전화 통화다(phone_call). memory 첫 줄은 '지금 장면: 통화 중 — 각자 있는 곳과 하고 있는 일'로 쓰고, 통화에서 나눈 이야기와 약속을 기록한다. 이 규칙은 위의 '지금 장면' 규칙보다 우선한다.` : '',
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
         relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}${scenario ? `\n${longMemoryStoryWriteInstructions}` : ''}` : '',
+        storyEpisode ? loungeStoryCheckpointInstructions : '',
         chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
       ].filter(Boolean).join('\n'),
-      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(scenario ? { scenario } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
+      input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
-        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}) },
-        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo', 'photo_asked'] : [])],
+        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } } } : {}) },
+        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints'] : [])],
       } } },
     });
-    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo?: unknown; photo_asked?: unknown };
+    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown };
+    // The story moves on: the checkpoints this turn met, and the next episode once the last one's ending was told. The state is
+    // written with the server key; before migration 20261126 there is no column and the story stays in its first episode.
+    const saveStory = async (met: unknown) => {
+      if (!storyState || !serviceHeaders) return;
+      const next = advanceLoungeStory(storyEpisodes, storyState, met, storyStageReached);
+      if (JSON.stringify(next.state) === JSON.stringify(storyState)) return;
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: next.state }) });
+        console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: next.state.episode + 1, done: next.state.done.length, advanced: next.advanced, complete: next.state.complete, saved: response.ok }));
+      } catch (error) { console.warn('[Lounge story] not saved', error instanceof Error ? error.name : 'error'); }
+    };
     // Runs once the reply is written, alongside its speech. What it writes is saved only if the reply was (`saved`). A
     // failure loses this turn's summary and events, never the reply. It is not cancelled with the request: the member
     // leaving right after a reply should not lose what the reply changed.
@@ -954,6 +975,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         memory ? rpc<boolean>('save_voice_lounge_room_memory', { p_room: roomId, p_memory: memory, p_turn: room.ai_turns ?? 0 })
           .catch(error => { console.warn('[Lounge after reply] summary not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); }) : undefined,
         saveRelationship(answer, true),
+        saveStory(answer?.story_checkpoints),
       ]);
       await fillMemoryEmbeddings();
       console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer) }));

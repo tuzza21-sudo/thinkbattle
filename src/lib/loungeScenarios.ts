@@ -1,5 +1,6 @@
 // .js paths: the Node functions in api/ compile this file on its own, where imports must name the file.
 import type { LoungeHostId, LoungeThemeId } from './lounge.js';
+import { normalizeLoungeStoryEpisodes, type LoungeStoryEpisode } from './loungeStory.js';
 
 /**
  * Stories a member can start with a character (scenarios), kept in lounge_scenarios and edited by the super admin.
@@ -14,6 +15,8 @@ export type LoungeScenarioRow = {
   /** Told to the member before the story starts, in the second person. */
   prologue: string;
   user_role: string; relationship: string; place: string; theme: LoungeThemeId; sort: number; active: boolean;
+  /** A story in episodes (see loungeStory.ts); none for a story told in one go. */
+  episodes?: LoungeStoryEpisode[] | null;
 };
 /**
  * A house character's one-to-one conversation starts only from one of its stories (2026-10-23): the free chat and voice
@@ -27,6 +30,8 @@ export const loungeStoriesPath = (characterId: string) => `/lounge/characters/${
 export type LoungeRoomScenario = Pick<LoungeScenarioRow, 'id' | 'title' | 'prologue' | 'user_role' | 'relationship' | 'place'> & {
   /** What the member wrote about themselves when they started (2026-10-28): told to the character, never spoken for the member. */
   member_note?: string;
+  /** The story's episodes, copied with it (see loungeStory.ts). */
+  episodes?: LoungeStoryEpisode[];
 };
 /** How long that note may be (characters): by plan 500, 1,000 and 2,000; 1,000 for everyone during the test opening. */
 export const loungeMemberNoteLimits = { standard: 500, plus: 1000, pro: 2000, current: 1000 } as const;
@@ -75,6 +80,8 @@ export function normalizeLoungeRoomScenario(raw: unknown): LoungeRoomScenario | 
   const scenario: LoungeRoomScenario = { id: text(value.id, 60), title: text(value.title, 40), prologue: text(value.prologue, loungeScenarioLimits.prologue), user_role: text(value.user_role, 120), relationship: text(value.relationship, 200), place: text(value.place, 200) };
   const note = text(value.member_note, loungeMemberNoteLimits.pro);
   if (note) scenario.member_note = note;
+  const episodes = normalizeLoungeStoryEpisodes(value.episodes);
+  if (episodes.length) scenario.episodes = episodes;
   return scenario.id && scenario.prologue ? scenario : undefined;
 }
 
