@@ -12,6 +12,9 @@ type Props = {
   /** The member's nickname, told in place of "당신". */
   memberName?: string;
   onStart: () => void;
+  /** The word before the character's name ("프롤로그", or the episode for a story in episodes). */
+  kicker?: string;
+  startLabel?: string;
 };
 
 /**
@@ -20,7 +23,7 @@ type Props = {
  * character speaks only once the member starts the story. On a phone it fills the screen and scrolls; on a computer it
  * is a column over the scenery.
  */
-export function LoungeStoryIntro({ scenario, characterName, portrait, image, accent, memberName, onStart }: Props) {
+export function LoungeStoryIntro({ scenario, characterName, portrait, image, accent, memberName, onStart, kicker = '프롤로그', startLabel = '이야기 시작하기' }: Props) {
   const blocks = storyIntroBlocks(personalizeLoungeStory(scenario.prologue, memberName).split(/\n+/).map(paragraph => paragraph.trim()).filter(Boolean));
   const [shown, setShown] = useState(1);
   const startButton = useRef<HTMLButtonElement>(null);
@@ -47,7 +50,7 @@ export function LoungeStoryIntro({ scenario, characterName, portrait, image, acc
       <article className="lounge-story-intro-page">
         <header>
           <img src={portrait} alt="" />
-          <div><span>프롤로그 · {characterName}</span><h1 id="lounge-story-intro-title">{scenario.title}</h1></div>
+          <div><span>{kicker} · {characterName}</span><h1 id="lounge-story-intro-title">{scenario.title}</h1></div>
         </header>
         {blocks.slice(0, shown).map((block, index) => <div key={index} className="lounge-story-intro-block">{block.map((paragraph, line) =>
           <p key={line} className={/^["“]/.test(paragraph) ? 'lounge-story-intro-line' : undefined}>{paragraph}</p>)}</div>)}
@@ -57,7 +60,7 @@ export function LoungeStoryIntro({ scenario, characterName, portrait, image, acc
     <footer className="lounge-story-intro-footer" onClick={event => event.stopPropagation()}>
       <small>{personalizeLoungeStory('당신의 역할', memberName)} · {personalizeLoungeStory(scenario.user_role, memberName)}</small>
       <button ref={startButton} type="button" className="lounge-story-intro-start" onClick={done ? onStart : showAll}>
-        {done ? <>이야기 시작하기 <ArrowRight size={17} /></> : '끝까지 보기'}
+        {done ? <>{startLabel} <ArrowRight size={17} /></> : '끝까지 보기'}
       </button>
     </footer>
   </div>;
