@@ -10,7 +10,7 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
-import { loungeGroupRoomsEnabled } from '../lib/lounge';
+import { loungeGroupRoomsEnabled, loungeNewCharacters } from '../lib/lounge';
 
 /** With group rooms closed there are no open tables to fetch. */
 const noTables = async (): Promise<LoungeOpenTable[]> => [];
@@ -154,6 +154,8 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         </LoungeRow>}
     </section>}
 
+    <LoungeNewCast />
+
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
       <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
@@ -183,6 +185,46 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   </main>;
 }
 
+
+/** The characters that just arrived, first on the home: house characters and a public member character (see loungeNewCharacters). */
+function LoungeNewCast() {
+  const [shared, setShared] = useState<LoungeCustomCharacterRow[]>([]);
+  // Shown once the member's character is known (or failed to load): a card added later would shift the row's scroll snap.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    listPublicLoungeCharacters().then(rows => { if (!cancelled) setShared(rows); }).catch(() => { /* The member's card is left out. */ }).finally(() => { if (!cancelled) setLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
+  const cards = loungeNewCharacters.flatMap(item => {
+    const link = `/lounge/characters/${item.id}${item.story ? '#stories' : ''}`;
+    if (item.id.startsWith('c_')) {
+      const row = shared.find(candidate => candidate.id === item.id);
+      return row ? [{ id: item.id, link, name: row.name, job: row.sheet.job, portrait: loungeCustomPortrait(row), color: '#2b2b2b', headline: item.headline }] : [];
+    }
+    const character = getLoungeCharacter(item.id);
+    if (!character) return [];
+    const host = getLoungeHost(item.id);
+    return [{ id: item.id, link, name: character.name, job: character.job, portrait: host.portrait, color: host.color, headline: item.headline }];
+  });
+  if (!loaded || !cards.length) return null;
+  return <section className="lounge-home-section" aria-labelledby="lounge-new-cast-title">
+    <header className="lounge-home-subhead">
+      <h2 id="lounge-new-cast-title">신규 캐릭터</h2>
+      <p>새로 온 캐릭터예요. 카드를 누르면 이야기를 고를 수 있어요.</p>
+    </header>
+    <LoungeRow label="신규 캐릭터" className="lounge-cast-row lounge-new-row">
+      {cards.map(card => <li key={card.id}>
+        <Link to={card.link} className="lounge-cast-card">
+          {card.portrait ? <img src={card.portrait} alt={`${card.name}의 사진`} loading="lazy" style={{ background: card.color }} /> : <span className="lounge-cast-card-empty" aria-hidden="true">✨</span>}
+          <b className="lounge-new-badge">NEW</b>
+          <span><strong>{card.name}</strong><small>{card.job}</small></span>
+        </Link>
+        <p className="lounge-cast-count">{card.headline}</p>
+      </li>)}
+    </LoungeRow>
+  </section>;
+}
 
 const memberCastStatus: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화', pending: '공개 검수 중', public: '공개됨', rejected: '공개 반려' };
 /** Characters members made: the member's own (with where they stand) and public ones from everyone else. */

@@ -50,6 +50,18 @@ export function personalizeLoungeStory(story: string, name?: string | null) {
     : part.replace(/당신(으로|이라|이랑|이었|이야|은|이|을|과)?/g, (_, particle?: string) => who + (particle ? particles[particle] : ''))).join('');
 }
 
+/** Paragraphs are told in blocks of about this many characters: one paragraph at a time was tiring to read (2026-10-27). */
+export const storyIntroBlockSize = 420;
+export function storyIntroBlocks(paragraphs: readonly string[], size = storyIntroBlockSize) {
+  const blocks: string[][] = [];
+  let length = 0;
+  for (const paragraph of paragraphs) {
+    if (!blocks.length || length >= size) { blocks.push([]); length = 0; }
+    blocks[blocks.length - 1].push(paragraph); length += paragraph.length;
+  }
+  return blocks;
+}
+
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 /** A room's scenario as stored, or nothing when the room has none (or it is unreadable). */
 export function normalizeLoungeRoomScenario(raw: unknown): LoungeRoomScenario | undefined {
