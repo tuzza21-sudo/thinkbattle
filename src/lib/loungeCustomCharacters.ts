@@ -1,5 +1,5 @@
 // .js paths: the Node functions in api/ compile this file on its own, where imports must name the file.
-import { getLoungeHost, getLoungeTheme, isLoungeCustomCharacterId, loungeThemes, registerLoungeCustomHost, type LoungeHost, type LoungeHostId, type LoungeThemeId } from './lounge.js';
+import { getLoungeTheme, isLoungeCustomCharacterId, loungeThemes, registerLoungeCustomElevenVoice, registerLoungeCustomHost, type LoungeHost, type LoungeHostId, type LoungeThemeId } from './lounge.js';
 import { registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCharacters.js';
 import { registerCustomRelationshipConfig, relationshipFromTemplate, relationshipTemplateIds, relationshipTemplates, type RelationshipTemplateId } from './relationship/index.js';
 
@@ -41,20 +41,25 @@ export type LoungeCustomCharacterRow = {
 export const loungeCustomThemes = loungeThemes.filter(theme => ['rooftop', 'river', 'forest', 'hotellobby', 'hotel', 'cafe', 'seaside', 'embassy', 'lawlibrary', 'boardroom', 'cocktailbar', 'theater'].includes(theme.id));
 
 /**
- * Voices to choose from, each the voice of a house character (so it can be heard from that character's sample) with a
- * neutral delivery written for any character.
+ * Voices to choose from (2026-10-27): three women and three men, each the ElevenLabs voice of a house character (or the
+ * default voice of its gender), so a member's character speaks with a voice that was already tested in the lounge. Each has
+ * a short sample (public/lounge/voice-preset-<id>.mp3) to listen to before choosing. `listed: false` keeps a former
+ * preset working for characters made earlier without offering it again.
  */
 export const loungeVoicePresets = [
-  { id: 'calm_female', label: '차분하고 또렷한 여성 목소리', sampleOf: 'ina', voice: 'marin', speed: 1.08, tone: '차분하고 또렷한 음색으로, 가까이서 귀 기울이듯 부드럽고 따뜻하게 말한다' },
-  { id: 'low_female', label: '낮고 느긋한 여성 목소리', sampleOf: 'velvet', voice: 'sage', speed: 1.12, tone: '평소보다 낮은 허스키한 알토로, 서두르지 않고 여유 있게 말한다' },
-  { id: 'deep_male', label: '낮고 허스키한 남성 목소리', sampleOf: 'jaeseok', voice: 'onyx', speed: 1.1, tone: '낮고 묵직한 중저음으로, 담담하고 느긋하게 말한다' },
-  { id: 'soft_male', label: '부드럽고 다정한 남성 목소리', sampleOf: 'auditor', voice: 'echo', speed: 1.08, tone: '낮고 부드러운 음색으로, 차분하고 다정하게 말한다' },
-  { id: 'firm_male', label: '단단하고 힘 있는 남성 목소리', sampleOf: 'closer', voice: 'ash', speed: 1.1, tone: '단단한 중저음으로, 또렷하고 자신 있게 말한다' },
-  { id: 'playful_male', label: '능청스럽고 여유 있는 남성 목소리', sampleOf: 'trickster', voice: 'fable', speed: 1.12, tone: '부드럽고 능청스러운 음색으로, 여유 있는 템포에 웃음기를 남기며 말한다' },
+  { id: 'calm_female', gender: 'female', listed: true, label: '차분하고 부드러운 여성', note: '낮게 가라앉은 다정함', voice: 'marin', eleven: 'uyVNoMrnUku1dZyVEXwD', speed: 1.08, tone: '차분하고 또렷한 음색으로, 가까이서 귀 기울이듯 부드럽고 따뜻하게 말한다' },
+  { id: 'crisp_female', gender: 'female', listed: true, label: '또렷하고 자신감 있는 여성', note: '젊고 매끈한 또박또박', voice: 'shimmer', eleven: 'klanb3pDU1D10xdkFP9h', speed: 1.1, tone: '또렷하고 자신감 있는 음색으로, 밝고 경쾌하게 또박또박 말한다' },
+  { id: 'low_female', gender: 'female', listed: true, label: '낮고 허스키한 여성', note: '느긋하고 건조한 여유', voice: 'sage', eleven: 'gnWujHp24oqX3I03lRbU', speed: 1.12, tone: '평소보다 낮은 허스키한 알토로, 서두르지 않고 여유 있게 말한다' },
+  { id: 'deep_male', gender: 'male', listed: true, label: '따뜻하고 묵직한 남성', note: '담담하고 느긋한 중저음', voice: 'onyx', eleven: 'GFsKFsadyjMQ7MPv89Tw', speed: 1.1, tone: '낮고 묵직한 중저음으로, 담담하고 느긋하게 말한다' },
+  { id: 'firm_male', gender: 'male', listed: true, label: '단단하고 힘 있는 남성', note: '또렷하고 자신 있는', voice: 'ash', eleven: 'GLuWz93jOAhbFz7XKEDq', speed: 1.1, tone: '단단한 중저음으로, 또렷하고 자신 있게 말한다' },
+  { id: 'playful_male', gender: 'male', listed: true, label: '밝고 능청스러운 남성', note: '웃음기 있는 경쾌함', voice: 'fable', eleven: '1W00IGEmNmwmsDeYy7ag', speed: 1.12, tone: '부드럽고 능청스러운 음색으로, 여유 있는 템포에 웃음기를 남기며 말한다' },
+  { id: 'soft_male', gender: 'male', listed: false, label: '부드럽고 다정한 남성', note: '낮고 부드러운', voice: 'echo', eleven: 'CxErO97xpQgQXYmapDKX', speed: 1.08, tone: '낮고 부드러운 음색으로, 차분하고 다정하게 말한다' },
 ] as const;
 export type LoungeVoicePresetId = typeof loungeVoicePresets[number]['id'];
 export const getLoungeVoicePreset = (id?: string | null) => loungeVoicePresets.find(preset => preset.id === id) ?? loungeVoicePresets[0];
-export const loungeVoicePresetSample = (id: string) => getLoungeHost(getLoungeVoicePreset(id).sampleOf).voiceSample;
+/** The presets offered for a gender (all six for "other"). */
+export const loungeListedVoicePresets = (gender: LoungeCustomGender) => loungeVoicePresets.filter(preset => preset.listed && (gender === 'other' || preset.gender === gender));
+export const loungeVoicePresetSample = (id: string) => `/lounge/voice-preset-${getLoungeVoicePreset(id).id}.mp3`;
 
 /** What every sheet must have. Each problem names its field. The tagline, look and greeting may be empty (the AI writes them). */
 export const loungeCustomRules = {
@@ -211,6 +216,7 @@ export function registerLoungeCustomCharacterRow(row: LoungeCustomCharacterRow, 
   const sheet = normalizeLoungeCustomSheet(row.sheet);
   const preset = getLoungeVoicePreset(row.voice);
   const theme = getLoungeTheme(row.theme);
+  registerLoungeCustomElevenVoice(row.id, preset.eleven);
   const template = relationshipTemplateIds.includes(row.template) ? row.template : 'warm';
   const genderWord = sheet.gender === 'female' ? '여성' : sheet.gender === 'male' ? '남성' : '성인';
   const host: LoungeHost = {

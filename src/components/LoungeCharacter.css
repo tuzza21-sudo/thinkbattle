@@ -162,6 +162,20 @@
 .lounge-creator-choices small { font-size:12px; line-height:1.6; color:var(--c-muted); word-break:keep-all; }
 .lounge-creator-check { display:flex; align-items:flex-start; gap:8px; margin:14px 0; font-size:13px; line-height:1.6; color:var(--c-ink); word-break:keep-all; }
 .lounge-creator-check input { margin-top:4px; }
+.lounge-creator-voices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.lounge-creator-voice-card { display:flex; border:1px solid var(--c-line); border-radius:14px; background:#fff; overflow:hidden; }
+.lounge-creator-voice-card.selected { border-color:var(--c-accent); box-shadow:0 0 0 2px var(--c-accent) inset; }
+.lounge-creator-voice-pick { flex:1; display:grid; gap:4px; align-content:center; padding:14px; border:0; background:none; color:var(--c-ink); text-align:left; cursor:pointer; }
+.lounge-creator-voice-pick strong { font-size:14px; }
+.lounge-creator-voice-pick small { font-size:12px; color:var(--c-muted); }
+.lounge-creator-voice-play { flex-shrink:0; display:grid; place-items:center; width:44px; border:0; border-left:1px solid var(--c-line); background:#f6f2ea; color:var(--c-accent); cursor:pointer; }
+.lounge-scenario-note { margin:0 0 14px; padding:12px 16px; border:1px solid var(--c-line); border-radius:14px; background:#fff; }
+.lounge-scenario-note summary { cursor:pointer; font-weight:700; font-size:14px; }
+.lounge-scenario-note summary small { margin-left:6px; font-weight:400; color:var(--c-muted); }
+.lounge-scenario-note label { display:grid; gap:8px; margin-top:10px; }
+.lounge-scenario-note label>span { font-size:12.5px; line-height:1.6; color:var(--c-muted); word-break:keep-all; }
+.lounge-scenario-note textarea { width:100%; padding:10px 12px; border:1px solid var(--c-line); border-radius:10px; font:inherit; font-size:14px; line-height:1.6; resize:vertical; }
+.lounge-scenario-note label>small { justify-self:end; font-size:11px; color:var(--c-muted); }
 .lounge-creator-voice { display:flex; gap:8px; }
 .lounge-creator-voice button { flex-shrink:0; display:grid; place-items:center; width:44px; border:1px solid var(--c-line); border-radius:10px; background:#fff; color:var(--c-accent); cursor:pointer; }
 .lounge-creator-portrait { display:grid; grid-template-columns:220px minmax(0,1fr); gap:24px; align-items:start; }
@@ -178,7 +192,7 @@
 .lounge-character-photo-empty { display:grid; place-items:center; height:100%; font-size:64px; }
 @media(max-width:640px) {
   .lounge-creator-step { padding:18px 16px; }
-  .lounge-creator-grid,.lounge-creator-grid.three,.lounge-creator-choices,.lounge-creator-portrait { grid-template-columns:1fr; }
+  .lounge-creator-grid,.lounge-creator-grid.three,.lounge-creator-choices,.lounge-creator-voices,.lounge-creator-portrait { grid-template-columns:1fr; }
   .lounge-creator-portrait figure { max-width:240px; }
   .lounge-creator-field :is(input,select,textarea) { font-size:16px; }
   .lounge-creator-field>span { flex-wrap:wrap; }

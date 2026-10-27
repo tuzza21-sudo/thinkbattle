@@ -3,7 +3,7 @@ import { BookOpen, LoaderCircle, Play } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { listLoungeScenarios, startLoungeScenario } from '../lib/loungeApi';
-import { personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
+import { loungeMemberNoteLimits, personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 
@@ -18,6 +18,7 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
   const [scenarios, setScenarios] = useState<LoungeScenarioRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [note, setNote] = useState('');
   useEffect(() => {
     let cancelled = false;
     void listLoungeScenarios(characterId).then(rows => { if (!cancelled) setScenarios(rows); });
@@ -30,12 +31,20 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
   const start = async (id: string) => {
     if (!user) return;
     setBusy(id); setError('');
-    try { navigate(`/lounge/${await startLoungeScenario(id, user.nickname)}`); }
+    try { navigate(`/lounge/${await startLoungeScenario(id, user.nickname, note)}`); }
     catch (err) { setError(errorText(err)); setBusy(null); }
   };
   return <section id="stories" className="lounge-character-section lounge-scenarios">
     <h2><BookOpen size={18} /> 함께할 이야기</h2>
     <p className="lounge-character-lead">이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
+    {user && <details className="lounge-scenario-note">
+      <summary>나를 소개하고 시작하기 <small>선택</small></summary>
+      <label>
+        <span>내 성격, 말투, 좋아하는 것, 이 이야기에서 바라는 것을 적으면 캐릭터가 그걸 알고 시작해요. 이야기 속에서만 쓰이고, 아래 어느 이야기로 시작하든 같이 전해져요.</span>
+        <textarea rows={4} value={note} maxLength={loungeMemberNoteLimits.current} onChange={event => setNote(event.target.value)} placeholder="예: 낯을 가리지만 친해지면 장난을 많이 쳐요. 말은 짧고 느린 편이고, 고양이와 새벽 산책을 좋아해요. 이야기에서는 천천히 가까워지는 걸 바라요." />
+        <small>{note.length}/{loungeMemberNoteLimits.current}자</small>
+      </label>
+    </details>}
     <div className="lounge-scenario-list">
       {scenarios.map(scenario => <article key={scenario.id} className="lounge-scenario-card">
         <h3>{scenario.title}</h3>
