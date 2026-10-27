@@ -3036,3 +3036,13 @@ test('a story is told with the member\'s name: "당신" in the narration takes t
   assert.equal(scenariosLib.personalizeLoungeStory('당신은 "당신 꿈이 먼저야"라고 했다.', 'Sam'), 'Sam은 "당신 꿈이 먼저야"라고 했다.');
   assert.equal(scenariosLib.personalizeLoungeStory('당신은', ''), '당신은', 'no name, no change');
 });
+
+test('a story intro tells its paragraphs in blocks of several, not one line at a time', () => {
+  const paragraph = '가'.repeat(100);
+  const blocks = scenariosLib.storyIntroBlocks(Array.from({ length: 10 }, () => paragraph));
+  assert.ok(blocks.length >= 2 && blocks.length <= 3, 'a thousand characters come as two or three blocks');
+  assert.equal(blocks.flat().length, 10, 'no paragraph is lost');
+  assert.ok(blocks.slice(0, -1).every(block => block.join('').length >= scenariosLib.storyIntroBlockSize), 'a block fills up before the next starts');
+  assert.deepEqual(scenariosLib.storyIntroBlocks([]), []);
+  assert.equal(scenariosLib.storyIntroBlocks(['짧은 한 줄']).length, 1, 'a short story is one block');
+});

@@ -2,17 +2,17 @@
   "guide": {
     "portrait": {
       "file": "host-guide-v1.webp",
-      "prompt": "{{common}} A strikingly handsome fictional Korean man aged thirty-seven who has lived in Italy for over ten years: a warm, sun-kissed complexion, softly tousled dark hair pushed back with a few loose strands, light well-kept stubble, kind dark eyes with faint laugh lines, and an easy, warm half-smile as if he is about to tell you a story about the city. He wears a slightly rumpled light-blue linen shirt with the top button open and sleeves rolled up, a thin leather watch strap, and the strap of a worn canvas daypack on one shoulder. Background: a softly blurred Florence rooftop terrace at golden hour, terracotta roofs and the warm glow of an old stone dome in the distance, no readable signs. Soft flattering golden light with a gentle rim light on the hair. Elegant magazine-portrait quality, relaxed and natural, tasteful and not provocative."
+      "prompt": "{{common}} A strikingly handsome, polished fictional Korean man aged thirty-seven who has lived in Florence for over ten years: a clean-shaven, sharply defined face with refined features and clear healthy skin, dark hair neatly styled and swept back with a slight natural wave, confident dark eyes and a mischievous half-smile with one corner of his mouth raised, as if he has just teased you and is waiting for a comeback. He wears a crisp, well-fitted light-blue shirt with the top button open under a tailored navy linen jacket, a slim leather watch. Background: a softly blurred Florence rooftop terrace at golden hour, terracotta roofs and the warm glow of an old stone dome in the distance, no readable signs. Soft flattering golden light with a gentle rim light on the hair. Elegant men's-magazine portrait quality, clean and sophisticated, tasteful and not provocative."
     },
     "full": {
       "portrait": "host-guide-v1.webp",
       "file": "host-guide-full-v1.webp",
-      "prompt": "{{common}} He wears the same light-blue linen shirt with rolled sleeves as in the portrait, with beige chinos, worn leather walking shoes and the canvas daypack on one shoulder, and stands on an old stone bridge over a river in Florence at golden hour, terracotta buildings and warm light behind him, turned slightly toward the camera with a relaxed, welcoming smile. No readable signs."
+      "prompt": "{{common}} He wears the same crisp light-blue shirt and tailored navy linen jacket as in the portrait with slim beige trousers and polished brown leather shoes, and stands confidently on an old stone bridge over a river in Florence at golden hour, terracotta buildings and warm light behind him, one hand in his pocket, turned slightly toward the camera with a teasing half-smile. Clean and well groomed. No readable signs."
     },
     "work": {
       "portrait": "host-guide-v1.webp",
       "file": "host-guide-work-v1.webp",
-      "prompt": "{{common}} He is at work as a mountain trekking guide in the Italian Dolomites: wearing a light technical hiking jacket over a t-shirt, trekking trousers, hiking boots and a small backpack, he stands on a high alpine trail on a clear morning, pointing toward jagged pale limestone peaks for a small group of hikers seen from behind, green meadows and a small wooden mountain hut far below. Natural bright mountain light. Nothing readable on any sign."
+      "prompt": "{{common}} He is at work as a mountain trekking guide in the Italian Dolomites: well groomed and clean-shaven, wearing a sleek fitted technical hiking jacket in slate blue over a t-shirt, tailored trekking trousers, clean hiking boots and a small backpack, he stands on a high alpine trail on a clear morning, one arm pointing toward jagged pale limestone peaks with a confident smirk, a small group of hikers seen from behind, green meadows and a small wooden mountain hut far below. Natural bright mountain light. Nothing readable on any sign."
     }
   }
 }
