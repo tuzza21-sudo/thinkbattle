@@ -496,6 +496,49 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
   },
 ];
 
+/**
+ * Photos from each character's own day, always shown first in the page's gallery (2026-10-29). Drawn from the portraits
+ * with scripts/generate-lounge-gallery-photos.mjs (GPT image at low quality); the captions are the character's own.
+ */
+export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: string; caption: string }>> = {
+  auditor: [
+    { src: '/lounge/gallery/auditor-1.webp', caption: '주말엔 불 앞에 오래 서 있는 편이에요. 오늘은 버섯을 넣은 닭 요리. 간은 아직 보는 중.' },
+    { src: '/lounge/gallery/auditor-2.webp', caption: '새벽 한강 10km. 머리가 복잡한 날엔 생각보다 다리가 먼저 답을 내요.' },
+  ],
+  ina: [
+    { src: '/lounge/gallery/ina-1.webp', caption: '일요일 아침엔 남의 원고 말고 내가 고른 책. 고양이는 늘 페이지를 같이 넘겨요.' },
+    { src: '/lounge/gallery/ina-2.webp', caption: '헌책방에서 누가 밑줄 그어 둔 문장을 찾았어요. 그 사람 마음이 궁금해지는 밤.' },
+  ],
+  jaeseok: [
+    { src: '/lounge/gallery/jaeseok-1.webp', caption: '불 꺼진 극장 맨 뒷줄. 아직도 여기서 제일 좋은 생각이 나요.' },
+    { src: '/lounge/gallery/jaeseok-2.webp', caption: '밤샘 촬영 끝, 새벽 국수 한 그릇. 이 맛에 버팁니다.' },
+  ],
+  closer: [
+    { src: '/lounge/gallery/closer-1.webp', caption: '계약이 끝난 밤엔 한 잔만. 이긴 날일수록 조용히 마셔요.' },
+    { src: '/lounge/gallery/closer-2.webp', caption: '일요일 아침은 조항 없이 보내기로 했어요. 아직 연습 중입니다.' },
+  ],
+  velvet: [
+    { src: '/lounge/gallery/velvet-1.webp', caption: '문 닫은 갤러리에 혼자 남는 시간. 그림은 사람보다 솔직하거든.' },
+    { src: '/lounge/gallery/velvet-2.webp', caption: '이 도시는 밤에 더 정직해 보여. 시계는 여전히 멈춰 있고.' },
+  ],
+  trickster: [
+    { src: '/lounge/gallery/trickster-1.webp', caption: '녹화 끝나고 포장마차. 방송에서 못 한 농담은 여기서 다 터져요.' },
+    { src: '/lounge/gallery/trickster-2.webp', caption: '다음 주 오프닝 멘트 짜는 중. 웃긴 건 늘 누워 있을 때 와요.' },
+  ],
+  diplomat: [
+    { src: '/lounge/gallery/diplomat-1.webp', caption: '마감 없는 토요일. 자전거 타고 강변 한 바퀴, 오늘은 기사 생각 금지.' },
+    { src: '/lounge/gallery/diplomat-2.webp', caption: '새벽 두 시, 드디어 첫 문장이 나왔어요. 맥주는 축하용.' },
+  ],
+  lawyer: [
+    { src: '/lounge/gallery/lawyer-1.webp', caption: '비 오는 아침, 늘 같은 자리. 창밖 사람들 걸음만 봐도 하루가 읽혀요.' },
+    { src: '/lounge/gallery/lawyer-2.webp', caption: '쉬는 날 항구에서 만난 녀석. 경계심 많은 게 나랑 닮았네요.' },
+  ],
+  guide: [
+    { src: '/lounge/gallery/guide-1.webp', caption: '돌로미티 가을 길. 따라올 수 있으면 정상에서 커피는 내가 살게요.' },
+    { src: '/lounge/gallery/guide-2.webp', caption: '피렌체에서 에스프레소는 서서 한 번에. 천천히 마시면 관광객이에요.' },
+  ],
+};
+
 const newline = String.fromCharCode(10);
 /**
  * Who the character is, written for the language model: name, work, the life behind them, temperament and habits.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Coffee, Crown, DoorOpen, Hourglass, LoaderCircle, Plus, RefreshCw, Swords, Users, X } from 'lucide-react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, getLoungeTheme, isLoungeAgeGroup, loungeHostThemes, loungeAgeGroups, loungeAgeLimitLabel, loungeCharacterProfiles, loungeTopics, type LoungeAgeGroup, type LoungeHostId, type LoungeOpenTable, type LoungeSpace, type LoungeSpaceTable } from '../lib/lounge';
 import { enterLoungeTable, leaveLoungeWait, listLoungeOpenTables, listLoungeSpaces, listLoungeStoryTopics, listLoungeSpaceTables, openLoungeTable, startLoungeSolo, waitLoungeSpace } from '../lib/loungeApi';
@@ -130,6 +130,8 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const rooms = usePolled(loungeGroupRoomsEnabled ? listLoungeOpenTables : noTables, 15_000);
   const tables = rooms.value;
   const [creating, setCreating] = useState<{ space?: string; host?: LoungeHostId } | null>(null);
+  // The summary sheet over the home is for opening a group room with a character; with only one-to-one chats a card
+  // opens the character's page itself, and an old link to a sheet goes there too.
   const selected = loungeCharacters.find(character => character.id === params.get('character'));
   // The regular cast row: in the lobby's order, without the characters shown above as new.
   const newIds = new Set(loungeNewCharacters.map(item => item.id));
@@ -141,8 +143,13 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
   const openSheet = (id: string) => setParams({ character: id }, { state: { sheet: true } });
   const closeSheet = () => { if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1); else setParams({}, { replace: true }); };
+  const castCard = (character: LoungeCharacter, host: ReturnType<typeof getLoungeHost>) => <>
+    <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
+    <span><strong>{character.name}</strong><small>{character.job}</small><TopicPill titles={topics[character.id]} /></span>
+  </>;
   // Places with no open room follow the rooms, each inviting the first room there.
   const quietPlaces = spaces?.filter(space => !tables?.some(table => table.space_id === space.id)) ?? [];
+  if (selected && !loungeGroupRoomsEnabled) return <Navigate to={`/lounge/characters/${selected.id}`} replace />;
   return <main className="lounge-lobby lounge-home">
     {loungeGroupRoomsEnabled && <section className="lounge-home-section" aria-labelledby="lounge-rooms-title">
       <header className="lounge-home-intro">
@@ -174,10 +181,8 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         {lobbyCast.map(character => {
           const host = getLoungeHost(character.id), count = tables?.filter(table => table.host_persona === character.id).length ?? 0;
           return <li key={character.id}>
-            <button type="button" className="lounge-cast-card" aria-haspopup="dialog" onClick={() => openSheet(character.id)}>
-              <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
-              <span><strong>{character.name}</strong><small>{character.job}</small><TopicPill titles={topics[character.id]} /></span>
-            </button>
+            {loungeGroupRoomsEnabled ? <button type="button" className="lounge-cast-card" aria-haspopup="dialog" onClick={() => openSheet(character.id)}>{castCard(character, host)}</button>
+              : <Link to={`/lounge/characters/${character.id}`} className="lounge-cast-card">{castCard(character, host)}</Link>}
             {loungeGroupRoomsEnabled && <p className="lounge-cast-count"><Users size={13} aria-hidden="true" /> {tables ? count ? `${count}개 방에서 대화 중` : '지금은 쉬는 중' : '확인 중'}</p>}
           </li>;
         })}
