@@ -12,10 +12,27 @@ export type LoungeCharacterPost = {
   id: string; character_id: string; user_id: string | null; room_id: string | null;
   visibility: 'private' | 'public'; source: LoungePhotoSource; status: 'pending' | 'ready';
   scene: string; caption: string; image_path: string | null; created_at: string;
+  /** Which model made the photo (see loungeImageModels); missing before migration 20261128. */
+  image_model?: string | null;
 };
 export const loungePhotoBuckets = { private: 'lounge-character-private', public: 'lounge-character-public' } as const;
 /** gpt-image-2.5-sunburst keeps a reference face best (OpenAI calls it the editing-precision model). */
 export const loungePhotoModel = 'gpt-image-2.5-sunburst';
+/**
+ * The image models a member can choose in a chat's settings, to compare (2026-10-29). GPT is the one used until now
+ * (LOUNGE_IMAGE_QUALITY, medium by default); "low" is the same model at low quality. FLUX.2 runs on Black Forest Labs'
+ * API (BFL_API_KEY) with the character's reference photos: Klein 4B is the cheapest (about $0.014 a 1 MP image at
+ * launch), Pro the best of FLUX.
+ */
+export const loungeImageModels = [
+  { id: 'gpt', label: 'GPT 이미지', hint: '지금까지 쓰던 모델 · 보통 품질' },
+  { id: 'gpt-low', label: 'GPT 이미지 · low', hint: '같은 모델을 낮은 품질로 · 더 저렴하고 빨라요' },
+  { id: 'flux-klein', label: 'FLUX.2 Klein 4B', hint: '가장 저렴 · 한 장 약 $0.014~0.015' },
+  { id: 'flux-pro', label: 'FLUX.2 Pro', hint: 'FLUX의 고품질 모델' },
+] as const;
+export type LoungeImageModel = typeof loungeImageModels[number]['id'];
+export const isLoungeImageModel = (value: unknown): value is LoungeImageModel => loungeImageModels.some(model => model.id === value);
+export const loungeImageModelLabel = (id: string | null | undefined) => loungeImageModels.find(model => model.id === id)?.label;
 export const loungePhotoSize = '1024x1536';
 
 /** The character's portrait and, where there is one, a full-body photo: the references that keep the same face and build. */

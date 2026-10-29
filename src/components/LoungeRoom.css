@@ -1129,3 +1129,6 @@
 .lounge-memory-timeline b { font-size:14px; }
 .lounge-memory-timeline span { font-size:13px; opacity:.8; }
 .lounge-memory-timeline time { font-size:11px; opacity:.5; }
+
+/* Under a photo, the model that made it (to compare image models, 2026-10-29). */
+.lounge-photo-model { display:inline-block; margin:4px 0 0; padding:1px 8px; border-radius:999px; background:#0000004d; color:#fff5e8; font-size:10px; opacity:.75; }

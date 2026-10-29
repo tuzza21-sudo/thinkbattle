@@ -51,6 +51,8 @@ export default defineConfig(({ mode }) => {
     'LOUNGE_DAILY_POSTS',
     'LOUNGE_CHARACTER_MODEL',
     'LOUNGE_PORTRAIT_MODEL',
+    // FLUX.2 image models (Black Forest Labs), chosen in a chat's settings to compare with GPT.
+    'BFL_API_KEY',
     // Voice engines a member can choose in a call: their keys, the voice overrides, and the monthly allowances of the premium ones.
     'ELEVENLABS_API_KEY',
     'TYPECAST_API_KEY',
