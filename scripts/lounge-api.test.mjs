@@ -3094,7 +3094,9 @@ test('a story in episodes: the character leads the current episode, the checkpoi
     assert.match(reply.instructions, /story_episode가 있으면 이 이야기는 여러 화로 나뉜다/);
     assert.match(reply.instructions, /사용자의 대답이나 선택을 네가 대신 정하지 않는다/);
     assert.ok(after.text.format.schema.properties.story_checkpoints, 'the call after the reply says which checkpoints were met');
-    assert.match(after.instructions, /사용자가 실제로 말하거나 고르거나 한 것만 인정하고/);
+    assert.match(after.instructions, /사용자가 실제로 말하거나 보여 주거나 고른 것만 인정하고/);
+    // A checkpoint said earlier, or over several messages, still counts on a later turn.
+    assert.match(after.instructions, /앞서 했지만 아직 인정되지 않은 말 포함/);
     assert.equal(JSON.parse(after.input).scenario.episodes, undefined);
     assert.deepEqual(patch?.story_state, item.saved);
     if (item.state) assert.equal(input.story_episode.closing, 'ending', 'the reply after the last checkpoint tells the ending');

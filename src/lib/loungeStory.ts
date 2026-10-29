@@ -124,5 +124,9 @@ export const loungeStoryEpisodeInstructions = `story_episode가 있으면 이 �
 - 이 화에서는 story_episode.reveal의 것은 관계 단계와 상관없이 말해도 되고, keep의 것은 아직 말하지 않으며 암시도 하지 않는다. 다음 화의 일을 앞당기지 않는다.
 - just_started가 true면 이번 답은 이 화의 첫 장면이다. story_episode.opening 바로 다음 순간에서 장면을 열고, 사용자를 그 장면 안으로 끌어들인다. opening 문장을 되풀이하지 않는다.
 - closing이 'ending'이면 이 화의 일이 모두 이뤄졌다. 이번 답에서 story_episode.ending대로 이 화를 닫는다(다음 화는 다음 장면에서 열린다). 'waiting_for_trust'면 이 화의 일은 이뤄졌지만 둘 사이가 아직 다음으로 갈 만큼 가깝지 않다. 사건을 서두르지 않고 이 장면 안에서 둘의 이야기(믿음, 망설임, 서로에 대한 궁금함)를 나눈다. 'story_end'면 이야기의 마지막 화가 끝났다. ending으로 이야기를 닫고, 그 뒤로는 이야기 밖의 여운 있는 대화를 이어 간다.`;
-/** The instruction for the call after the reply: which checkpoints this turn met. */
-export const loungeStoryCheckpointInstructions = `story_checkpoints: story_episode.checkpoints_open 가운데 이번 턴(사용자의 가장 최근 발언과 캐릭터가 방금 한 답)으로 이뤄진 것의 id. 사용자가 실제로 말하거나 고르거나 한 것만 인정하고, 캐릭터 혼자 말한 것이나 앞으로 할 일은 인정하지 않는다. 없으면 빈 배열.`;
+/**
+ * The instruction for the call after the reply: which open checkpoints are met. A chat member often writes one thing in
+ * several messages, and a checkpoint missed on its turn stayed open for good (2026-10-29: 선우령's "봉투 속 보고서" was
+ * told and never counted), so everything the member said in `recent` counts, and the gist is enough.
+ */
+export const loungeStoryCheckpointInstructions = `story_checkpoints: story_episode.checkpoints_open 가운데 지금까지 이뤄진 것의 id. recent 안에서 사용자가 한 모든 발언(이번 턴에 여러 번 나눠 보낸 말, 앞서 했지만 아직 인정되지 않은 말 포함)과 캐릭터가 방금 한 답을 본다. 사용자가 실제로 말하거나 보여 주거나 고른 것만 인정하고, 캐릭터 혼자 말한 것이나 앞으로 할 일은 인정하지 않는다. what의 세부를 다 말하지 않아도 그 핵심(무엇을 털어놓았는지, 무엇을 골랐는지)이 사용자 말에 드러났으면 인정한다. 없으면 빈 배열.`;

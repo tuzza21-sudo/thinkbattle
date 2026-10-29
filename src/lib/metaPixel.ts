@@ -8,8 +8,11 @@ declare global { interface Window { fbq?: Fbq; _fbq?: Fbq } }
 
 export type MetaEventName = 'CompleteRegistration' | 'FirstConversation' | 'ConversationEngaged';
 
-/** A browser that sends "Do Not Track" or the Global Privacy Control signal is not measured at all. */
-export const metaTrackingAllowed = () => typeof window !== 'undefined' && navigator.doNotTrack !== '1' && !(navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl;
+/**
+ * A browser that sends "Do Not Track" or the Global Privacy Control signal is not measured at all, and neither is the
+ * local development server: it has no /api/meta-events (a 404 on every conversation) and its visits are not real ones.
+ */
+export const metaTrackingAllowed = () => !import.meta.env.DEV && typeof window !== 'undefined' && navigator.doNotTrack !== '1' && !(navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl;
 
 let started = false;
 export function initMetaPixel() {

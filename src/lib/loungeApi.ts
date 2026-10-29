@@ -179,9 +179,12 @@ async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, s
   if (response.ok && streaming && response.headers.get('content-type')?.includes('application/x-ndjson') && response.body) return { stream: response.body };
   const payload = await response.json().catch(() => null);
   const headerDelay = Number(response.headers.get('retry-after'));
-  const delay = headerDelay > 0 && Number.isFinite(headerDelay) ? Math.ceil(headerDelay) : 60;
+  // An answer without our JSON came from the hosting platform (a crashed or hung function), not from the lounge: it says
+  // its status so it can be told apart, and it is tried again soon instead of a minute later.
+  const platformFailure = !payload && response.status >= 500;
+  const delay = headerDelay > 0 && Number.isFinite(headerDelay) ? Math.ceil(headerDelay) : platformFailure ? 10 : 60;
   if (!response.ok) throw new LoungeApiError(
-    typeof payload?.error === 'string' ? payload.error : response.status === 429 ? '요청이 잠시 몰렸어요. 잠시 기다린 뒤 다시 시도해 주세요.' : '사회자 연결이 잠시 어려워요. 다시 시도해 주세요.',
+    typeof payload?.error === 'string' ? payload.error : response.status === 429 ? '요청이 잠시 몰렸어요. 잠시 기다린 뒤 다시 시도해 주세요.' : `사회자 연결이 잠시 어려워요(서버 ${response.status}). 다시 시도해 주세요.`,
     typeof payload?.code === 'string' ? payload.code : `lounge_http_${response.status}`,
     typeof payload?.retryable === 'boolean' ? payload.retryable : response.status === 429 || response.status >= 500,
     typeof payload?.retryAfterSeconds === 'number' && payload.retryAfterSeconds > 0 ? payload.retryAfterSeconds : delay,
