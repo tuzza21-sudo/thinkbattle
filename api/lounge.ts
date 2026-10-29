@@ -951,7 +951,8 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     const saveStory = async (met: unknown) => {
       if (!storyState || !serviceHeaders) return;
       const next = advanceLoungeStory(storyEpisodes, storyState, met, storyStageReached);
-      if (JSON.stringify(next.state) === JSON.stringify(storyState)) return;
+      // A turn that met nothing is logged too: a checkpoint that never counts is otherwise invisible.
+      if (JSON.stringify(next.state) === JSON.stringify(storyState)) { console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: storyState.episode + 1, done: storyState.done.length, open: (storyEpisode?.checkpoints_open ?? []).map(point => point.id), met: Array.isArray(met) ? met : [] })); return; }
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: next.state }) });
         console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: next.state.episode + 1, done: next.state.done.length, advanced: next.advanced, complete: next.state.complete, saved: response.ok }));

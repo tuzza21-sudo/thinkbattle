@@ -103,8 +103,10 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
 
   const disconnect = useCallback(() => {
     version.current += 1;
-    stopHost('disconnect'); stopMicrophone();
+    // The room is let go before the microphone: unpublishing it renegotiates with a connection that is closing
+    // ("could not createOffer with closed peer connection"), and disconnecting stops the track anyway.
     const current = roomRef.current; roomRef.current = null;
+    stopHost('disconnect'); stopMicrophone();
     void current?.disconnect();
     void outputContext.current?.close(); outputContext.current = null;
     elements.current.forEach(element => element.remove()); elements.current.clear();

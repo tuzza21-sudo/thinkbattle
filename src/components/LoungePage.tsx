@@ -904,6 +904,15 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const ended = room?.status === 'ended' || betaOut || Boolean(room?.expires_at && Date.parse(room.expires_at) <= clock);
   const disconnectAudio = audio.disconnect;
   useEffect(() => { if (ended || chat) disconnectAudio(); }, [ended, chat, disconnectAudio]);
+  // A room takes at most 120 replies. From the 110th a one-to-one chat goes on in a new room that keeps the story, where
+  // it stands and the latest messages; without this the character went silent at 120 until the room expired.
+  const carriedOn = useRef('');
+  const longChat = Boolean(chat && room && room.capacity === 1 && !room.space_id && room.host_id === user?.id && (room.ai_turns ?? 0) >= 110);
+  useEffect(() => {
+    if (!longChat || pending || carriedOn.current === roomId) return;
+    carriedOn.current = roomId;
+    void resumeLoungeChat(roomId).then(next => { if (mounted.current && next && next !== roomId) navigate(`/lounge/${next}`, { replace: true }); }).catch(() => {});
+  }, [longChat, pending, roomId, navigate]);
   useEffect(() => { if (ended || (!chat && !audio.connected)) hostRequest.current?.abort(); }, [ended, chat, audio.connected]);
   const [modelBusy, setModelBusy] = useState(false);
   const changeModel = async (model: string) => {
