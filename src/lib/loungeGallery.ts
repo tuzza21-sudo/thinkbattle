@@ -31,9 +31,12 @@ export async function signLoungeBackground(path: string) {
 
 /** The photos the character sent in this conversation, oldest first. Only the member's own are readable. */
 export async function loadLoungeRoomPhotos(roomId: string) {
-  const { data, error } = await supabase.from('lounge_character_posts').select(columns).eq('room_id', roomId).eq('status', 'ready').order('created_at').limit(60);
+  // With the model that made each photo, to compare models; before migration 20261128 there is no such column.
+  const read = (select: string) => supabase.from('lounge_character_posts').select(select).eq('room_id', roomId).eq('status', 'ready').order('created_at').limit(60);
+  let { data, error } = await read(`${columns},image_model`);
+  if (error && /image_model/.test(error.message)) ({ data, error } = await read(columns));
   if (error) throw new Error(error.message);
-  return withPhotoUrls((data ?? []) as LoungeCharacterPost[]);
+  return withPhotoUrls((data ?? []) as unknown as LoungeCharacterPost[]);
 }
 
 /** A character's gallery: their own public posts, and the photos they sent this member (empty when logged out). */

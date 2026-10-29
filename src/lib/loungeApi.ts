@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { loungeNeedsStudy, normalizeLoungeTopicBrief, type LoungeHelpKind, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeHostId, type LoungeAgeGroup, type LoungeThemeId, type LoungeRoom, type LoungeRoomSummary, type LoungeSpace, type LoungeSpaceTable, type LoungeOpenTable, type LoungeSpaceWait, type LoungeMember, type LoungeMessage, type LoungeTopicStudy } from './lounge';
 import type { LoungeHostReason, LoungeSession, LoungeSessionAction } from './loungeSession';
 import type { RelationshipView } from './relationship/types';
-import type { LoungeCharacterPost } from './loungePhotos';
+import { isLoungeImageModel, type LoungeCharacterPost, type LoungeImageModel } from './loungePhotos';
 import type { LoungeCustomCharacterRow, LoungeCustomSheet } from './loungeCustomCharacters';
 import type { LoungeScenarioRow } from './loungeScenarios';
 import type { LoungeMemberPersonaRow } from './loungePersonas';
@@ -204,8 +204,14 @@ export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 're
  * A photo from the character in the member's one-to-one room: `request` when the member asked, `character` when the
  * character sends one on their own. Takes 20 to 60 seconds. `skipped` means the character's own photos for today are used up.
  */
+/** The image model the member chose in a chat's settings (this browser); GPT until one is chosen. */
+const imageModelKey = 'lounge.imageModel';
+export function loadLoungeImageModel(): LoungeImageModel {
+  try { const value = localStorage.getItem(imageModelKey); return isLoungeImageModel(value) ? value : 'gpt'; } catch { return 'gpt'; }
+}
+export function saveLoungeImageModel(model: LoungeImageModel) { try { localStorage.setItem(imageModelKey, model); } catch { /* the choice lasts for this page */ } }
 export async function requestLoungePhoto(roomId: string, source: 'request' | 'character', request?: string) {
-  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, ...(request ? { request: request.slice(0, 200) } : {}) }) }, '사진 서버');
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, imageModel: loadLoungeImageModel(), ...(request ? { request: request.slice(0, 200) } : {}) }) }, '사진 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { post?: LoungeCharacterPost; left?: number; skipped?: boolean };
@@ -214,7 +220,7 @@ export async function requestLoungePhoto(roomId: string, source: 'request' | 'ch
 export const setLoungeRoomBackground = (roomId: string, theme: LoungeThemeId | null) => loungeRpc<void>('set_lounge_room_background', { p_room: roomId, p_theme: theme });
 /** A background made from the member's description (20 to 60 seconds). Returns the stored image and its signed address. */
 export async function makeLoungeRoomBackground(roomId: string, prompt: string) {
-  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, request: prompt.slice(0, 300) }) }, '배경 서버');
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, imageModel: loadLoungeImageModel(), request: prompt.slice(0, 300) }) }, '배경 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '배경을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_background_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { image: string; prompt: string; left: number };
