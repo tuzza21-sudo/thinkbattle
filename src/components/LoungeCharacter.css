@@ -11,32 +11,38 @@
 
 .lounge-character-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
 .lounge-character-back { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--c-muted); }
-.lounge-character-nav>div { display:flex; gap:6px; overflow-x:auto; padding:2px; }
+.lounge-character-nav>div { display:flex; gap:6px; overflow-x:auto; padding:2px; scrollbar-width:none; }
+.lounge-character-nav>div::-webkit-scrollbar { display:none; }
 .lounge-character-nav>div a { flex-shrink:0; border-radius:50%; opacity:.55; transition:opacity .2s, box-shadow .2s; }
 .lounge-character-nav>div a:hover,.lounge-character-nav>div a[aria-current=page] { opacity:1; }
 .lounge-character-nav>div a[aria-current=page] { box-shadow:0 0 0 2px var(--c-accent); }
 .lounge-character-nav .lounge-host-photo { width:36px; height:36px; display:block; }
 
-.lounge-character-hero { display:grid; grid-template-columns:minmax(260px,400px) minmax(0,1fr); gap:44px; align-items:start; }
-.lounge-character-photo { position:relative; margin:0; aspect-ratio:2/3; border-radius:22px; overflow:hidden; background:var(--character-accent,#ddd); box-shadow:0 18px 40px #2b2a2026; }
+/* The top of the page: the photo at work beside the name, the card's line, the traits and the way into a conversation.
+   On a phone the name sits over the bottom of the photo. */
+.lounge-character-hero { display:grid; grid-template-columns:minmax(280px,420px) minmax(0,1fr); grid-template-rows:auto 1fr; grid-template-areas:"photo head" "photo intro"; column-gap:48px; align-items:start; }
+.lounge-character-photo { grid-area:photo; position:relative; margin:0; aspect-ratio:2/3; border-radius:24px; overflow:hidden; background:var(--character-accent,#ddd); box-shadow:0 22px 48px #2b2a2030; }
 .lounge-character-photo.portrait { aspect-ratio:1; }
 .lounge-character-photo img { width:100%; height:100%; object-fit:cover; display:block; }
-.lounge-character-photo figcaption { position:absolute; left:12px; bottom:10px; padding:3px 8px; border-radius:20px; background:#0007; color:#fff; font-size:10px; }
-.lounge-character-intro { padding-top:14px; min-width:0; }
-.lounge-character-eyebrow { display:inline-block; padding:4px 10px; border-radius:20px; background:var(--c-soft); color:var(--c-accent); font-size:11px; font-weight:700; }
-.lounge-character-intro h1 { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 12px; margin:14px 0 10px; font-size:clamp(32px,4vw,46px); letter-spacing:-1.5px; line-height:1.2; }
-.lounge-character-intro h1 small { font-size:16px; font-weight:600; letter-spacing:-.3px; color:var(--c-accent); }
-.lounge-character-tagline { font-size:16px; line-height:1.7; color:var(--c-muted); word-break:keep-all; }
-.lounge-character-intro blockquote { margin:22px 0; padding:14px 18px; border-left:3px solid var(--c-accent); background:var(--c-soft); border-radius:0 12px 12px 0; font-size:17px; line-height:1.7; font-weight:600; word-break:keep-all; }
-.lounge-character-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; margin:0; }
+.lounge-character-photo figcaption { position:absolute; left:12px; top:12px; padding:4px 9px; border-radius:20px; background:#0006; color:#fff; font-size:10px; backdrop-filter:blur(6px); }
+.lounge-character-head { grid-area:head; min-width:0; padding-top:18px; }
+.lounge-character-eyebrow { display:inline-block; padding:5px 11px; border-radius:20px; background:var(--c-soft); color:var(--c-accent); font-size:12px; font-weight:700; }
+.lounge-character-head h1 { display:flex; flex-direction:column; gap:8px; margin:14px 0 0; font-size:clamp(36px,4.4vw,54px); letter-spacing:-1.8px; line-height:1.08; }
+.lounge-character-head h1 small { font-size:16px; font-weight:650; letter-spacing:-.3px; color:var(--c-accent); }
+.lounge-character-intro { grid-area:intro; min-width:0; padding-top:22px; }
+.lounge-character-tagline { margin:0; padding:16px 20px; border-left:3px solid var(--c-accent); border-radius:0 14px 14px 0; background:var(--c-soft); font-size:17px; line-height:1.75; font-weight:600; color:var(--c-ink); word-break:keep-all; }
+.lounge-character-chips { display:flex; flex-wrap:wrap; gap:6px; margin:16px 0 0; padding:0; list-style:none; }
+.lounge-character-chips li { padding:6px 12px; border-radius:99px; border:1px solid color-mix(in srgb,var(--c-accent) 35%,transparent); background:var(--c-card); color:var(--c-accent); font-size:12.5px; font-weight:650; }
+.lounge-character-summary { margin:14px 0 0; font-size:14px; line-height:1.8; color:var(--c-muted); word-break:keep-all; }
+.lounge-character-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; margin:14px 0 0; }
 .lounge-character-facts>div { min-width:0; padding:10px 0; border-bottom:1px solid var(--c-line); }
 .lounge-character-facts>div:last-child:nth-child(odd) { grid-column:1 / -1; }
 .lounge-character-facts dt { font-size:11px; color:var(--c-muted); }
 .lounge-character-facts dd { margin:3px 0 0; font-size:13px; line-height:1.6; }
-.lounge-character-intro .lounge-character-section { margin-top:26px; }
-.lounge-character-intro .lounge-character-story { padding:24px 26px; }
-.lounge-character-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; }
-.lounge-character .lounge-character-cta { display:inline-flex; align-items:center; gap:8px; padding:14px 18px; border-radius:12px; background:var(--c-accent); color:#fff; font-size:14px; font-weight:700; }
+.lounge-character-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-top:22px; }
+.lounge-character .lounge-character-cta { display:inline-flex; align-items:center; gap:8px; padding:14px 18px; border:0; border-radius:12px; background:var(--c-accent); color:#fff; font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+.lounge-character-actions>button.lounge-character-cta { padding:16px 28px; border-radius:14px; font-size:16px; box-shadow:0 12px 26px color-mix(in srgb,var(--c-accent) 32%,transparent); }
+.lounge-character-cta-note { font-size:12px; color:var(--c-muted); }
 .lounge-character.night .lounge-character-cta { color:#1c121c; }
 .lounge-character .lounge-character-secondary { display:inline-flex; align-items:center; gap:6px; padding:12px 14px; border-radius:12px; border:1px solid var(--c-line); background:var(--c-card); color:var(--c-ink); font-size:13px; }
 .lounge-character .lounge-character-secondary[aria-pressed=true] { border-color:var(--c-accent); color:var(--c-accent); }
@@ -46,10 +52,20 @@
 .lounge-character-section>h2 svg { color:var(--c-accent); }
 .lounge-character-lead { margin:-4px 0 16px; font-size:13px; line-height:1.8; color:var(--c-muted); }
 .lounge-character-story { padding:28px 32px; border-radius:20px; background:var(--c-card); border:1px solid var(--c-line); }
-.lounge-character-story p { font-size:15px; line-height:2; color:var(--c-ink); word-break:keep-all; }
+.lounge-character-story p { max-width:780px; font-size:15px; line-height:2; color:var(--c-ink); word-break:keep-all; }
 .lounge-character-story p+p { margin-top:14px; }
 .lounge-character.night .lounge-character-story { background:linear-gradient(160deg,#241826,#1a121b); }
 .lounge-character-subtitle { font-size:14px; margin:20px 0 10px; }
+/* How the relationship moves, folded away at the end of the page. */
+.lounge-character-more { border-radius:20px; background:var(--c-card); border:1px solid var(--c-line); }
+.lounge-character-more>summary { display:flex; align-items:center; gap:8px; padding:20px 24px; list-style:none; cursor:pointer; font-size:18px; font-weight:750; letter-spacing:-.5px; color:var(--c-ink); }
+.lounge-character-more>summary::-webkit-details-marker { display:none; }
+.lounge-character-more>summary svg { color:var(--c-accent); }
+.lounge-character-more-arrow { margin-left:auto; transition:transform .2s; }
+.lounge-character-more[open] .lounge-character-more-arrow { transform:rotate(180deg); }
+.lounge-character-subsection { padding:0 24px 24px; }
+.lounge-character-subsection .lounge-character-subtitle { display:flex; align-items:center; gap:6px; margin:4px 0 12px; font-size:15px; }
+.lounge-character-more .lounge-character-moves article { background:var(--c-soft); border-color:transparent; }
 
 .lounge-character-mystery,.lounge-character-traits,.lounge-character-lens { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .lounge-character-lens { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -106,20 +122,40 @@
 
 @media(max-width:900px) {
   .lounge-character,.lounge-character.night { padding:14px 20px 40px; }
-  .lounge-character-hero { grid-template-columns:1fr; gap:22px; }
-  .lounge-character-photo { max-width:420px; width:100%; justify-self:center; }
+  .lounge-character-hero { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto; grid-template-areas:"photo" "intro"; max-width:620px; margin:0 auto; }
+  .lounge-character-photo { aspect-ratio:4/5; width:100%; }
+  .lounge-character-photo img { object-position:50% 16%; }
+  .lounge-character-head { grid-area:photo; align-self:end; z-index:1; padding:96px 20px 20px; border-radius:0 0 24px 24px; background:linear-gradient(180deg,transparent,#000000b8 62%); }
+  .lounge-page .lounge-character .lounge-character-head h1 { color:#fff; font-size:clamp(34px,9vw,44px); }
+  .lounge-character-head h1 small { color:#f1e6d2; font-size:15px; }
+  .lounge-character-eyebrow { background:#ffffff2e; color:#fff; backdrop-filter:blur(6px); }
+  .lounge-character-intro { padding-top:18px; }
   .lounge-character-mystery,.lounge-character-traits { grid-template-columns:1fr; }
 }
 @media(max-width:640px) {
   .lounge-character,.lounge-character.night { padding:12px 14px 32px; }
-  .lounge-character-nav { flex-direction:column; align-items:flex-start; }
-  .lounge-character-nav>div { max-width:100%; }
-  .lounge-character-photo { max-width:none; }
+  .lounge-character-nav { gap:10px; margin-bottom:12px; }
+  .lounge-character-back { flex-shrink:0; }
+  .lounge-character-nav>div { min-width:0; }
+  .lounge-character-nav .lounge-host-photo { width:32px; height:32px; }
+  .lounge-character-photo { border-radius:20px; }
+  .lounge-character-head { border-radius:0 0 20px 20px; }
+  .lounge-character-tagline { font-size:15.5px; padding:14px 16px; }
+  .lounge-character-cta-note { flex:1 1 100%; text-align:center; }
+  .lounge-character-more>summary { padding:18px; font-size:16px; }
+  .lounge-character-subsection { padding:0 14px 16px; }
   .lounge-character-facts,.lounge-character-moves,.lounge-character-lens,.lounge-character-relations { grid-template-columns:1fr; }
   .lounge-character-story { padding:20px 18px; }
   .lounge-character-story p { font-size:14px; }
   .lounge-character-actions>* { flex:1 1 100%; justify-content:center; }
   .lounge-character-section { margin-top:34px; }
+}
+
+/* On a phone the way into a conversation stays above the tab bar until its own place in the page scrolls by. */
+@media(max-width:760px) {
+  .lounge-character-intro>.lounge-character-start { position:sticky; bottom:calc(76px + env(safe-area-inset-bottom)); z-index:5; padding:10px; border-radius:18px; background:color-mix(in srgb,var(--c-card) 90%,transparent); backdrop-filter:blur(10px); box-shadow:0 10px 28px #0000002b; }
+  .lounge-character-start>button.lounge-character-cta { flex:1 1 100%; justify-content:center; padding:14px; }
+  .lounge-character-start .lounge-character-cta-note { margin-top:-2px; }
 }
 
 /* gallery: the character's own day (public) and the photos sent to this member */
@@ -129,13 +165,28 @@
 .lounge-gallery-tabs span { font-size:11px; color:var(--c-muted); }
 .lounge-gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
 .lounge-gallery-grid figure { margin:0; border-radius:16px; overflow:hidden; background:var(--c-card); border:1px solid var(--c-line); min-width:0; }
-.lounge-gallery-grid a { display:block; aspect-ratio:2/3; background:var(--c-soft); }
+.lounge-gallery-grid button { display:block; width:100%; aspect-ratio:2/3; padding:0; border:0; background:var(--c-soft); cursor:zoom-in; overflow:hidden; }
+.lounge-gallery-grid button img { transition:transform .3s; }
+.lounge-gallery-grid button:hover img { transform:scale(1.03); }
+.lounge-gallery-grid + .lounge-gallery-empty { margin-top:12px; }
 .lounge-gallery-grid img { display:block; width:100%; height:100%; object-fit:cover; }
 .lounge-gallery-grid figcaption { display:grid; gap:4px; padding:10px 12px 12px; font-size:12.5px; line-height:1.6; color:var(--c-ink); word-break:keep-all; }
 .lounge-gallery-grid time { font-size:11px; color:var(--c-muted); }
 .lounge-gallery-empty { display:flex; align-items:center; gap:8px; padding:18px; border-radius:16px; border:1px dashed var(--c-line); color:var(--c-muted); font-size:13px; line-height:1.7; }
 .lounge-gallery-note { display:block; margin-top:10px; color:var(--c-muted); font-size:11.5px; }
 @media(max-width:640px) { .lounge-gallery-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } }
+/* a gallery photo opened over the page */
+.lounge-gallery-viewer { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; padding:60px 16px 24px; background:#0b0a09f7; }
+.lounge-gallery-viewer figure { display:grid; gap:12px; justify-items:center; max-width:min(600px,100%); margin:0; }
+.lounge-gallery-viewer img { display:block; max-width:100%; max-height:calc(100dvh - 190px); border-radius:14px; object-fit:contain; }
+.lounge-gallery-viewer figcaption { display:grid; gap:4px; max-width:520px; color:#f4efe6; font-size:14px; line-height:1.6; text-align:center; word-break:keep-all; }
+.lounge-gallery-viewer figcaption small { color:#bdb6aa; font-size:12px; }
+.lounge-gallery-viewer :is(.lounge-gallery-viewer-close,.lounge-gallery-viewer-step) { position:absolute; display:grid; place-items:center; border:0; border-radius:50%; background:#ffffff26; color:#fff; cursor:pointer; }
+.lounge-gallery-viewer-close { top:12px; right:12px; width:40px; height:40px; }
+.lounge-gallery-viewer-step { top:50%; width:44px; height:44px; translate:0 -50%; }
+.lounge-gallery-viewer-step.prev { left:12px; }
+.lounge-gallery-viewer-step.next { right:12px; }
+@media(max-width:640px) { .lounge-gallery-viewer-step { top:auto; bottom:18px; translate:none; } }
 
 /* making a character: numbered steps, fields with their limits, relationship type cards, portrait */
 .lounge-creator { max-width:880px; }

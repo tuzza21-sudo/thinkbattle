@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, LoaderCircle, Play } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
-import { listLoungeScenarios, startLoungeScenario } from '../lib/loungeApi';
+import { startLoungeScenario } from '../lib/loungeApi';
 import { loungeMemberNoteLimits, personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -12,18 +12,12 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
  * prologue is told first and the character opens the scene. Nothing is shown while there are none (or before the
  * scenarios are installed).
  */
-export function LoungeScenarioCards({ characterId, user }: { characterId: string; user: AppUser | null }) {
+export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScenarioRow[]; user: AppUser | null }) {
   const navigate = useNavigate();
   const { hash } = useLocation();
-  const [scenarios, setScenarios] = useState<LoungeScenarioRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
-  useEffect(() => {
-    let cancelled = false;
-    void listLoungeScenarios(characterId).then(rows => { if (!cancelled) setScenarios(rows); });
-    return () => { cancelled = true; };
-  }, [characterId]);
   // "둘만의 이야기" links here (#stories): the list appears once loaded, so it is scrolled to then.
   const listed = scenarios.length > 0;
   useEffect(() => { if (listed && hash === '#stories') document.getElementById('stories')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [listed, hash]);
@@ -35,8 +29,8 @@ export function LoungeScenarioCards({ characterId, user }: { characterId: string
     catch (err) { setError(errorText(err)); setBusy(null); }
   };
   return <section id="stories" className="lounge-character-section lounge-scenarios">
-    <h2><BookOpen size={18} /> 함께할 이야기</h2>
-    <p className="lounge-character-lead">이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
+    <h2><BookOpen size={18} /> 대화 시작하기</h2>
+    <p className="lounge-character-lead">함께할 이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
     {user && <details className="lounge-scenario-note">
       <summary>나를 소개하고 시작하기 <small>선택</small></summary>
       <label>
