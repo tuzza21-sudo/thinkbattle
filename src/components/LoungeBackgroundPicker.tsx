@@ -7,13 +7,18 @@ const tile = (image: string) => ({ backgroundImage: `url('${image}')`, backgroun
 
 /**
  * The background of a one-to-one conversation, changed as the story moves: one of the places, the conversation's own,
- * or a place the member describes (made as an image, a few a day). Opens as a sheet over the room.
+ * or a place the member describes (made as an image, a few a day). Opens as a sheet over the room, from its own button
+ * or, with `open` and `onOpenChange`, from somewhere else (the chat's settings menu) without the button.
  */
-export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake }: {
+export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, open: openFromOutside, onOpenChange }: {
   current: LoungeRoomBackground | null; ownTheme: LoungeThemeId;
   onPick: (theme: LoungeThemeId | null) => Promise<void>; onMake: (prompt: string) => Promise<void>;
+  open?: boolean; onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openHere, setOpenHere] = useState(false);
+  const controlled = openFromOutside !== undefined;
+  const open = controlled ? openFromOutside : openHere;
+  const setOpen = (value: boolean) => { if (controlled) onOpenChange?.(value); else setOpenHere(value); };
   const [prompt, setPrompt] = useState(current?.prompt ?? '');
   const [busy, setBusy] = useState<'pick' | 'make' | ''>('');
   const [error, setError] = useState('');
@@ -39,7 +44,7 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake }: {
   };
   const own = getLoungeTheme(ownTheme);
   return <>
-    <button type="button" ref={trigger} className="lounge-background-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} title="배경 바꾸기"><ImageIcon size={16} /><span>배경</span></button>
+    {!controlled && <button type="button" ref={trigger} className="lounge-background-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} title="배경 바꾸기"><ImageIcon size={16} /><span>배경</span></button>}
     {open && <>
       <div className="lounge-background-backdrop" onClick={() => { if (!busy) close(); }} />
       <section className="lounge-background-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>

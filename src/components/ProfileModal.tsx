@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Check, LoaderCircle, Mail, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
-import { LoungeAvatarEditor } from './LoungeAvatarEditor';
+import { LoungePersonaManager } from './LoungePersonaManager';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
 import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 import { saveLoungeProfile } from '../lib/auth';
@@ -92,7 +92,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
     }
   };
 
-  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '대화 라운지' ? '편한 이름과 프로필 사진으로, 내 대화석을 꾸며요.' : serviceName + '에서 사용할 이름과 프로필 사진을 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
+  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '대화 라운지' ? '편한 이름과 소개, 대화 속 나의 모습을 정해요.' : serviceName + '에서 사용할 이름과 소개, 페르소나를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
     <div className="lounge-account-identity"><Mail size={17} /><div><small>로그인 계정</small><span>{user.email || '소셜 계정 · 이메일 정보 없음'}</span></div></div>
     <span className="lounge-account-section-label">01 · 대화에서 불릴 이름</span>
     <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSave(); }} aria-busy={loading}>
@@ -110,7 +110,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
         {introState === 'saved' && <p className="lounge-account-success" role="status"><Check size={16} />소개를 저장했어요.</p>}
         <button type="submit" className="btn btn-primary lounge-account-submit" disabled={introState !== 'idle'}>{introState === 'saving' ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{introState === 'saving' ? '저장 중…' : introState === 'saved' ? '저장했어요' : '소개 저장'}</button>
       </form>
-      <LoungeAvatarEditor user={user} onSaved={onProfileUpdated} />
+      <span className="lounge-account-section-label">03 · 대화 속 나 (페르소나)</span>
+      <LoungePersonaManager />
     </>}
   </LoungeAccountDialog>;
 };

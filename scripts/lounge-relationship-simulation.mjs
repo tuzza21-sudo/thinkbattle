@@ -134,7 +134,7 @@ async function liveRun(id) {
   dotenv.config({ path: '.env.local' });
   if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required for --live');
   const compile = (path, require) => { const exports = {}; new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require); return exports; };
-  const libs = { lounge: compile('../src/lib/lounge.ts'), loungeStudy: compile('../src/lib/loungeStudy.ts'), loungeFilmStudy: compile('../src/lib/loungeFilmStudy.ts'), loungeSession: compile('../src/lib/loungeSession.ts') };
+  const libs = { lounge: compile('../src/lib/lounge.ts'), loungePersonas: compile('../src/lib/loungePersonas.ts'), loungeStudy: compile('../src/lib/loungeStudy.ts'), loungeFilmStudy: compile('../src/lib/loungeFilmStudy.ts'), loungeSession: compile('../src/lib/loungeSession.ts') };
   const handler = compile('../api/lounge.ts', path => path.endsWith('/relationship') ? relationship : libs[path.split('/').at(-1)] ?? libs.lounge).default;
   const config = relationship.getRelationshipConfig(id), host = libs.lounge.getLoungeHost(id);
   const roomId = 'lounge-00000000-0000-4000-8000-0000000000' + String(Object.keys(scripts).indexOf(id) + 10);

@@ -14,7 +14,7 @@ const relationship = loadTs(fileURLToPath(new URL('../src/lib/relationship/index
 const dotenv = await import('dotenv'); dotenv.config({ path: '.env.local', quiet: true });
 if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required');
 const compile = (path, require) => { const exports = {}; new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require); return exports; };
-const libs = { lounge: compile('../src/lib/lounge.ts'), loungeStudy: compile('../src/lib/loungeStudy.ts'), loungeFilmStudy: compile('../src/lib/loungeFilmStudy.ts'), loungeSession: compile('../src/lib/loungeSession.ts') };
+const libs = { lounge: compile('../src/lib/lounge.ts'), loungePersonas: compile('../src/lib/loungePersonas.ts'), loungeStudy: compile('../src/lib/loungeStudy.ts'), loungeFilmStudy: compile('../src/lib/loungeFilmStudy.ts'), loungeSession: compile('../src/lib/loungeSession.ts') };
 const handler = compile('../api/lounge.ts', path => path.endsWith('/relationship') ? relationship : libs[path.split('/').at(-1)] ?? libs.lounge).default;
 
 const sessions = [
