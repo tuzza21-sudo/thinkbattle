@@ -27,6 +27,8 @@ const loungeLookupWaitMs = 500;
  * LOUNGE_REPLY_STALL_MS changes it.
  */
 const loungeReplyStallMs = () => Number(process.env.LOUNGE_REPLY_STALL_MS) || 15_000;
+/** Added to a reply asked again after an empty or refused one. */
+const loungeInCharacterRetryRule = '직전 시도에서 답을 쓰지 못했다. 이번에는 반드시 text에 캐릭터의 답을 쓴다. 상대의 말이 노골적이었다면 그 단어를 되풀이하거나 묘사하지 않고, 지금 관계 단계에 맞는 은근한 반응(설렘, 도발, 장난스럽게 혼내기, 다가가기, 장면 전환)으로 같은 장면 안에서 대화를 이어 간다. 대화를 끝내거나 침묵하지 않는다.';
 /**
  * The embedding of the question usually answers in 150-500 ms but now and then takes longer; a single 700 ms limit lost
  * about one lookup in five. A second request after `hedgeAfterMs` takes whichever answers first.
@@ -1331,10 +1333,12 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai', fast = false) => {
+          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             partialLength = 0;
-            const request = fast && replyReasoning !== 'none' ? { ...modelRequest, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
+            const base = fast && replyReasoning !== 'none' ? { ...modelRequest, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
+            // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
+            const request = inCharacter ? { ...base, instructions: `${base.instructions}\n${loungeInCharacterRetryRule}` } : base;
             const stall = new AbortController();
             let begun = false;
             const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('reply stalled', 'TimeoutError')); }, loungeReplyStallMs());
@@ -1385,6 +1389,12 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
                 if (error instanceof Error && error.name === 'ReplyStall') {
                   console.warn('[Lounge API] reply stalled, answering without reasoning', JSON.stringify({ model: chatModel.id, afterMs: Math.round(performance.now() - attemptStarted) }));
                   return await attemptReply('openai', true);
+                }
+                // An empty answer (a refusal, e.g. after an explicit message) left the character silent: the turn failed and
+                // the next one was refused the same way. It is answered once more, asked to stay in character.
+                if (error instanceof LoungeUpstreamError && ['openai_empty_response', 'openai_invalid_response'].includes(error.code)) {
+                  console.warn('[Lounge API] reply was empty, answering again in character', JSON.stringify({ code: error.code, model: chatModel.id }));
+                  return await attemptReply('openai', false, true);
                 }
                 if (!transientUpstream(error) || performance.now() - attemptStarted > 10_000) throw error;
                 console.warn('[Lounge API] model request retried', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : String(error).slice(0, 120) }));

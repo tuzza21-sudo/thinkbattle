@@ -483,7 +483,9 @@ test('touch opens up with the relationship: none at first, hands and a hug next,
     assert.doesNotMatch(intimacy(stages[1]), /키스도/, `${config.characterId} no kiss at the second stage`);
     if (!config.adultFlirtation || stages.length < 4) continue;
     assert.match(intimacy(stages[2]), /키스도 성격에 따라/, `${config.characterId} third stage`);
-    assert.match(intimacy(stages[2]), /잠자리는 아직 이르다/, `${config.characterId} not yet a night together`);
+    assert.match(intimacy(stages[2]), /잠자리는 보통 아직 이르다/, `${config.characterId} usually not yet a night together`);
+    assert.match(intimacy(stages[2]), /분위기가 무르익고 상대가 원하며 네 마음도 기울었으면 성격에 따라 망설이다 잠자리까지 받아들일 수 있고/, `${config.characterId} but now and then it may come`);
+    assert.match(intimacy(stages[3]), /침대 위의 장면도 그린다/, `${config.characterId} the bed is told through feeling`);
     assert.match(intimacy(stages[3]), /잠자리까지 받아들일 수 있다/, `${config.characterId} fourth stage`);
     assert.match(intimacy(stages[3]), /성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.*장면을 끊고.*시간을 건너뛰어/, `${config.characterId} told by cutting away`);
     assert.match(intimacy(stages[3]), /이야기부터 하자며 미루지 않고/, `${config.characterId} does not put it off`);
@@ -569,4 +571,13 @@ test('pace: a warm conversation reaches the second stage within about 12 turns, 
       assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
     }
   }
+});
+
+test('a sexual word or a bold touch is answered in character and never ends the conversation; only a repeat after a refusal or force crosses the line', () => {
+  assert.match(relationship.attractionReactionRule, /수동적으로 받기만 하지 않는다/);
+  assert.match(relationship.attractionReactionRule, /대화를 끝내거나\("오늘은 여기까지", "먼저 갈게"\) 자리를 떠나거나 입을 닫지 않는다/);
+  assert.match(relationship.coercionReactionRule, /대담한 말이나 장난스러운 손길 한 번은 강요가 아니라/);
+  const events = relationship.relationshipEventInstructionsFor(configs.velvet);
+  assert.match(events, /노골적인 성적 말이나 대담한 스킨십 시도도 그 자체로는 분류하지 않는다/);
+  assert.match(events, /분명히 선을 그은 뒤에도 같은 요구를 되풀이하거나, 강요·협박·모욕을 할 때만 분류한다/);
 });
