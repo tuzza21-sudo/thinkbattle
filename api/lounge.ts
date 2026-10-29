@@ -1,3 +1,4 @@
+import { loungeMemberPersonaRule, loungeRoomPersona, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
 import { getLoungeCharacter, loungeCharacterRules, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
@@ -611,6 +612,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       : Promise.resolve(null);
     // Long-term memory and the previous one-to-one conversation, read in parallel; LOUNGE_LONG_MEMORY=off turns both off.
     const memoryRowsRead = readMemoryRows(user.id);
+    // The member's personas (who they are in a conversation), read alongside; before migration 20261128 there are none.
+    const personasRead = serviceHeaders
+      ? fetchTimed(`${url}/rest/v1/lounge_member_personas?user_id=eq.${encodeURIComponent(user.id)}&select=id,title,call_name,job,personality,details,is_default`, { headers: serviceHeaders })
+        .then(async response => response.ok ? await readJson<LoungeMemberPersonaRow[]>(response, 'lounge') : []).catch(() => [] as LoungeMemberPersonaRow[])
+      : Promise.resolve([] as LoungeMemberPersonaRow[]);
     const previousRoomsRead = serviceHeaders && process.env.LOUNGE_LONG_MEMORY !== 'off'
       ? fetchTimed(`${url}/rest/v1/voice_lounge_rooms?host_id=eq.${encodeURIComponent(user.id)}&or=(capacity.eq.1,space_id.not.is.null)&id=neq.${encodeURIComponent(roomId)}&order=created_at.desc&limit=12&select=host_persona,memory,created_at`, { headers: serviceHeaders })
         .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
@@ -622,7 +628,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     ]);
     const messages = await messagesRead;
     if (responses.some(response => !response.ok) || !messages) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; story_state?: unknown; scenario?: unknown }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; story_state?: unknown; scenario?: unknown; member_persona?: unknown }>>(responses[0], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[1], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
@@ -694,6 +700,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const memberName = members.find(member => member.user_id === user.id)?.nickname?.replace(/\s+/g, ' ').trim().slice(0, 20);
     // The place the member chose for the scene (the background button of a one-to-one conversation).
     const chosenBackground = solo && !room.space_id ? readLoungeRoomBackground(room.background) : null;
+    // Who the member is in this conversation: the persona chosen for the room (read fresh, so an edit shows at once), or their default.
+    const memberPersona = solo && !room.space_id ? loungeRoomPersona(room.member_persona, await personasRead) : undefined;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
@@ -772,6 +780,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const phoneCall = solo && !chat && !room.space_id;
     const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
+      ...(memberPersona ? { member_persona: memberPersona } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
@@ -908,6 +917,7 @@ ${photoRule}`;
         story && storyEpisode ? loungeStoryEpisodeInstructions : '',
         phoneCall ? loungePhoneCallRules : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
+        memberPersona ? loungeMemberPersonaRule : '',
         sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
         // A story room with the voice on keeps to the story, in the voice rules.
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',

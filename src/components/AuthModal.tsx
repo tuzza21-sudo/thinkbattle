@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, LoaderCircle, LogIn, Mail, UserPlus } from 'lucide-react';
 import { signInWithEmail, signUpWithEmail, signInWithKakao, signInWithGoogle, EmailConfirmationRequiredError } from '../lib/auth';
 import type { AppUser, AppUserGender } from '../types';
-import { AvatarPhotoInput, LoungeAvatarEditor } from './LoungeAvatarEditor';
+import { LoungeAvatarEditor } from './LoungeAvatarEditor';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
 import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 
@@ -204,7 +204,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
         {isSignup && <label className="form-field"><span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span><input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} autoComplete="new-password" placeholder={isEnglish ? 'Once more' : '한 번 더 입력'} type="password" required disabled={loading} /></label>}
       </div>
       {isSignup && <>
-        <details className="lounge-account-photo-details"><summary>{isEnglish ? 'Add a profile photo' : '프로필 사진 올리기'}<span>{isEnglish ? 'optional' : '선택'}</span></summary><p className="avatar-signup-intro">{isEnglish ? 'Pick a photo now and confirm it right after signup. It does not have to be your face. You can also do this later.' : '사진을 골라 두면 가입 직후 바로 적용할 수 있어요. 본인 얼굴이 아니어도 괜찮아요. 나중에 프로필에서 올려도 돼요.'}</p><AvatarPhotoInput file={photo} onChange={setPhoto} disabled={loading} language={language} /></details>
         <div className="lounge-account-intro"><p className="avatar-signup-intro">{isEnglish ? 'Age group, region and a short introduction are required. They appear on your profile card in rooms, and you can change them later in your profile.' : '나이대·지역·자기소개는 꼭 입력해 주세요. 대화방에서 내 프로필을 눌렀을 때 보이고, 나중에 프로필에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} required /></div>
         <label className="legal-consent-check"><input type="checkbox" checked={acceptedTerms} disabled={loading} onChange={event => setAcceptedTerms(event.target.checked)} /><span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span></label>
       </>}

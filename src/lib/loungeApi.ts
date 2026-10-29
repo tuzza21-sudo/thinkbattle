@@ -5,6 +5,7 @@ import type { RelationshipView } from './relationship/types';
 import type { LoungeCharacterPost } from './loungePhotos';
 import type { LoungeCustomCharacterRow, LoungeCustomSheet } from './loungeCustomCharacters';
 import type { LoungeScenarioRow } from './loungeScenarios';
+import type { LoungeMemberPersonaRow } from './loungePersonas';
 
 export class LoungeApiError extends Error {
   code: string | undefined;
@@ -286,3 +287,42 @@ export function prepareLoungeTopic(roomId: string) {
   topicPreparations.set(roomId, preparation);
   return preparation;
 }
+
+/** What a character remembers of the member, the relationship's important events and its timeline (migration 20261128). */
+export type LoungeMemoryItem = { id: string; kind: string; summary: string; follow_up: string | null; importance: number; created_at: string; updated_at: string };
+export type LoungeRelationshipEvent = { type: string; summary: string; at: string; importance: number; turn: number };
+export type LoungeMemoryBook = {
+  memories: LoungeMemoryItem[];
+  relationship: { stage: string; events: LoungeRelationshipEvent[]; started_at: string; turn_count: number; last_at: string | null } | null;
+  milestones: Array<{ from: string | null; to: string; at: string }>;
+  limit: number;
+};
+export const getMyLoungeMemory = (characterId: string) => loungeRpc<LoungeMemoryBook | null>('get_my_lounge_memory', { p_character: characterId });
+export const editMyLoungeMemory = (id: string, summary: string, followUp: string) => loungeRpc<boolean>('edit_my_lounge_memory', { p_id: id, p_summary: summary, p_follow_up: followUp });
+export const forgetMyLoungeMemory = (id: string) => loungeRpc<boolean>('forget_my_lounge_memory', { p_id: id });
+export const addMyLoungeMemory = (characterId: string, kind: string, summary: string, followUp: string) => loungeRpc<string>('add_my_lounge_memory', { p_character: characterId, p_kind: kind, p_summary: summary, p_follow_up: followUp });
+export const forgetMyLoungeEvent = (characterId: string, at: string, summary: string) => loungeRpc<boolean>('forget_my_lounge_event', { p_character: characterId, p_at: at, p_summary: summary });
+
+/** The member's personas (see loungePersonas.ts). Before migration 20261128 the table is missing and this says so. */
+const personaFailure = (error: { message?: string; code?: string }) => /schema cache|does not exist|Could not find|42P01/i.test(`${error.message} ${error.code}`)
+  ? new Error('페르소나 기능을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.')
+  : new Error(/다섯 개/.test(error.message ?? '') ? '페르소나는 다섯 개까지 만들 수 있어요.' : '페르소나를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+export async function listMyLoungePersonas() {
+  const { data, error } = await supabase.from('lounge_member_personas').select('id,title,call_name,job,personality,details,is_default').order('created_at');
+  if (error) throw personaFailure(error);
+  return (data ?? []) as LoungeMemberPersonaRow[];
+}
+export async function saveMyLoungePersona(persona: Omit<LoungeMemberPersonaRow, 'id'> & { id?: string }) {
+  const { id, ...fields } = persona;
+  const { data, error } = id
+    ? await supabase.from('lounge_member_personas').update(fields).eq('id', id).select('id,title,call_name,job,personality,details,is_default').single()
+    : await supabase.from('lounge_member_personas').insert(fields).select('id,title,call_name,job,personality,details,is_default').single();
+  if (error) throw personaFailure(error);
+  return data as LoungeMemberPersonaRow;
+}
+export async function deleteMyLoungePersona(id: string) {
+  const { error } = await supabase.from('lounge_member_personas').delete().eq('id', id);
+  if (error) throw personaFailure(error);
+}
+/** The persona of one's own one-to-one room: one of one's personas, none, or (both empty) the default. */
+export const setLoungeRoomPersona = (roomId: string, personaId: string | null, none = false) => loungeRpc<Record<string, unknown> | null>('set_lounge_room_persona', { p_room: roomId, p_persona: personaId, p_none: none });

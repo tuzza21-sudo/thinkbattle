@@ -1070,3 +1070,62 @@
 .lounge-relationship-focus .met b { color:#9fe3b4; }
 .lounge-relationship-focus .short b { color:#ffc48f; }
 .lounge-relationship-legend { margin:7px 0 0; font-size:10px; opacity:.6; }
+
+/* A one-to-one chat's settings (2026-10-29): "대화 설정" beside the relationship card, a menu of the record, the
+   background and the memories, with the persona (and the photo model) to choose below. */
+.lounge-relationship-row { display:flex; align-items:flex-start; gap:8px; }
+.lounge-relationship-row>.lounge-relationship,.lounge-relationship-row>span:first-child { flex:1; min-width:0; }
+.lounge-chat-settings { position:relative; flex-shrink:0; }
+.lounge-chat-settings-toggle { display:flex; align-items:center; gap:6px; height:34px; padding:0 12px; border:1px solid #ffffff2e; border-radius:999px; background:#0d1410b3; color:#fff5e8; font-size:12px; cursor:pointer; backdrop-filter:blur(10px); }
+.lounge-chat-settings-toggle[aria-expanded=true] { border-color:var(--lounge-accent,#ead0a3); }
+.lounge-chat-settings-menu { position:absolute; z-index:60; top:calc(100% + 6px); right:0; display:grid; gap:10px; width:min(280px,calc(100vw - 40px)); max-height:min(70dvh,560px); overflow-y:auto; padding:10px; border:1px solid #ffffff2e; border-radius:16px; background:var(--lounge-surface,#242421); box-shadow:0 18px 40px #0009; color:#fff5e8; }
+.lounge-chat-settings-items { display:grid; gap:4px; }
+.lounge-chat-settings-items button { display:flex; align-items:center; gap:10px; width:100%; padding:10px; border:0; border-radius:10px; background:transparent; color:inherit; font-size:14px; text-align:left; cursor:pointer; }
+.lounge-chat-settings-items button:hover,.lounge-chat-settings-items button:focus-visible { background:#ffffff14; }
+.lounge-chat-settings-items small { display:block; margin-top:1px; font-size:11px; opacity:.6; }
+.lounge-chat-settings-choice { display:grid; gap:2px; margin:0; padding:8px 4px 2px; border:0; border-top:1px solid #ffffff1f; }
+.lounge-chat-settings-choice legend { padding:0 6px 4px; font-size:11px; font-weight:700; opacity:.7; }
+.lounge-chat-settings-choice label { display:flex; align-items:flex-start; gap:8px; padding:7px 6px; border-radius:8px; font-size:13px; cursor:pointer; }
+.lounge-chat-settings-choice label:hover { background:#ffffff0f; }
+.lounge-chat-settings-choice input { margin-top:3px; accent-color:var(--lounge-accent,#ead0a3); }
+.lounge-chat-settings-choice small { display:block; font-size:11px; opacity:.6; }
+.lounge-chat-settings-choice p { margin:4px 6px 0; font-size:11px; opacity:.6; }
+.lounge-chat-settings-choice:disabled { opacity:.6; }
+.lounge-relationship-memory-note b { color:var(--lounge-accent,#ead0a3); }
+
+/* The memories, the important moments and the timeline of a relationship. */
+.lounge-memory-sheet { gap:10px; }
+.lounge-memory-tabs { display:flex; gap:6px; }
+.lounge-memory-tabs button { flex:1; padding:8px 6px; border:1px solid #ffffff24; border-radius:999px; background:transparent; color:#fff5e8; font-size:13px; cursor:pointer; }
+.lounge-memory-tabs button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; font-weight:700; }
+.lounge-memory-panel { display:grid; gap:10px; }
+.lounge-memory-note,.lounge-memory-fine,.lounge-memory-empty { margin:0; font-size:12px; line-height:1.6; opacity:.75; }
+.lounge-memory-fine { font-size:11px; opacity:.55; }
+.lounge-memory-list { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.lounge-memory-list li { display:flex; justify-content:space-between; gap:8px; padding:10px 12px; border:1px solid #ffffff1c; border-radius:12px; background:#ffffff08; }
+.lounge-memory-list li>div:first-child { display:grid; gap:3px; min-width:0; }
+.lounge-memory-list p { margin:0; font-size:14px; line-height:1.5; }
+.lounge-memory-list small { font-size:12px; opacity:.7; }
+.lounge-memory-list time { font-size:11px; opacity:.5; }
+.lounge-memory-kind { justify-self:start; padding:1px 8px; border-radius:999px; background:#ffffff14; color:var(--lounge-accent,#ead0a3); font-size:11px; }
+.lounge-memory-actions { display:flex; gap:4px; flex-shrink:0; align-self:flex-start; }
+.lounge-memory-actions button { display:grid; place-items:center; width:30px; height:30px; border:1px solid #ffffff24; border-radius:9px; background:transparent; color:#fff5e8; cursor:pointer; }
+.lounge-memory-actions button:disabled { opacity:.5; }
+.lounge-memory-add { display:flex; align-items:center; justify-content:center; gap:6px; padding:10px; border:1px dashed #ffffff40; border-radius:12px; background:transparent; color:#fff5e8; font-size:13px; cursor:pointer; }
+.lounge-memory-editor { display:grid; gap:8px; width:100%; }
+.lounge-memory-editor label { display:grid; gap:4px; font-size:12px; }
+.lounge-memory-editor label small { opacity:.6; }
+.lounge-memory-editor textarea,.lounge-memory-editor input,.lounge-memory-editor select { width:100%; padding:8px 10px; border:1px solid #ffffff2e; border-radius:9px; background:#0000002e; color:#fff5e8; font:inherit; font-size:14px; }
+.lounge-memory-editor>div { display:flex; justify-content:flex-end; gap:8px; }
+.lounge-memory-editor>div button { display:flex; align-items:center; gap:5px; padding:7px 14px; border:1px solid #ffffff2e; border-radius:999px; background:transparent; color:#fff5e8; cursor:pointer; }
+.lounge-memory-editor>div button.primary { border-color:transparent; background:var(--lounge-accent,#ead0a3); color:#1d2520; font-weight:700; }
+.lounge-memory-timeline { position:relative; display:grid; gap:14px; margin:4px 0 0; padding:0 0 0 22px; list-style:none; }
+.lounge-memory-timeline::before { content:''; position:absolute; left:6px; top:6px; bottom:6px; width:2px; background:#ffffff24; }
+.lounge-memory-timeline li { position:relative; display:grid; gap:2px; }
+.lounge-memory-timeline li::before { content:''; position:absolute; left:-20px; top:5px; width:10px; height:10px; border-radius:50%; background:#ffffff40; }
+.lounge-memory-timeline li.up::before { background:#7fd39a; }
+.lounge-memory-timeline li.down::before { background:#f0a46b; }
+.lounge-memory-timeline li.now::before { background:var(--lounge-accent,#ead0a3); box-shadow:0 0 0 4px #ead0a333; }
+.lounge-memory-timeline b { font-size:14px; }
+.lounge-memory-timeline span { font-size:13px; opacity:.8; }
+.lounge-memory-timeline time { font-size:11px; opacity:.5; }
