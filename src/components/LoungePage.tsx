@@ -542,6 +542,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const nextHostAttempt = useRef(0);
   // The member's latest message when an AI turn last failed: a newer one asks again (see hostTurn).
   const failedAtMessage = useRef(0);
+  // One-to-one failures in a row that passed without a notice (see hostTurn); each waits longer before the next try.
+  const quietFailures = useRef(0);
   // A call the member just placed from the chat: the character picks up first, once, when the call is connected.
   const callPlaced = useRef(false);
   // A story opens with its prologue full screen, and the character speaks only once the member starts it (LoungeStoryIntro).
@@ -1065,7 +1067,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       // A voice reply speaks with the engine the member chose (none chosen: the character's own).
       const response = await requestLoungeHost(roomId, reason, controller.signal, kind, undefined, callStart);
       if (!mounted.current || controller.signal.aborted) { await response.stream?.cancel(); return; }
-      if (!response.skipped) setError('');
+      if (!response.skipped) { setError(''); quietFailures.current = 0; }
       if (response.stream && chatTurn) {
         // A chat reply is text only: show it as soon as it arrives, then reload the room once it is saved.
         for await (const event of readLoungeStream(response.stream, controller.signal)) {
@@ -1114,7 +1116,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         }, canWaitForAudio);
         if (mounted.current) await refreshAfterMessage();
       }
-      if (response.audioError) setError('사회자 음성을 준비하지 못했어요. 대화 기록에서 사회자의 말을 확인해 주세요.');
+      // One to one the words are in the conversation already; a missing voice is not worth a notice there.
+      if (response.audioError && !(state.room.capacity === 1 && !state.room.space_id)) setError('사회자 음성을 준비하지 못했어요. 대화 기록에서 사회자의 말을 확인해 주세요.');
       if (response.audio && !current.current.audio.speakers.length && current.current.room?.status === 'active') { spoke = true; await current.current.audio.playHost(response.audio); }
     } catch (err) {
       // After the reply was saved, a broken stream only loses the photo; the conversation has moved on.
@@ -1137,6 +1140,17 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       // anyway, and the room's refresh shows it. The page waits for it quietly instead of showing an error.
       if (chatTurn && err instanceof LoungeApiError && ['lounge_stream_interrupted', 'lounge_network_error'].includes(err.code ?? '')) {
         hostBlocked.current = false; nextHostAttempt.current = Date.now() + 20_000;
+        return;
+      }
+      // One to one (a chat or a call), a failure that passes on its own is not shown: a crashed or slow server instance
+      // ("internal error", a bare 500 on 2026-10-29), a reply or a voice that came late. The page asks again a little
+      // later, 3 s, then 6, 12, up to 30, while the member's message is unanswered. Only what the member must act on
+      // (sound off, session over, an allowance used up, credits gone) is still said.
+      const solo = current.current.room?.capacity === 1 && !current.current.room.space_id;
+      if (solo && (!(err instanceof LoungeApiError) || (err.retryable && err.code !== 'lounge_audio_not_ready'))) {
+        hostBlocked.current = false;
+        nextHostAttempt.current = Date.now() + Math.min(30, 3 * 2 ** quietFailures.current) * 1000;
+        quietFailures.current++;
         return;
       }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.
