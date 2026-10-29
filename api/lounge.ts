@@ -1518,10 +1518,16 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     if (claimedTicket) await rpc<void>('release_voice_lounge_host', { p_room: requestRoom, p_ticket: claimedTicket }, true).catch(() => {});
     console.error('[Lounge API] request failed', JSON.stringify(error instanceof LoungeUpstreamError
       ? { action: requestAction, released: Boolean(claimedTicket), code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
-      : { action: requestAction, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code }));
+      : { action: requestAction, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code,
+        // On 2026-10-29 a turn failed with a bare "internal error" and nothing said where it came from.
+        stack: error instanceof Error ? error.stack?.split('\n').slice(1, 6).map(line => line.trim()).join(' | ').slice(0, 600) : undefined }));
     if (error instanceof LoungeUpstreamError) return json({ error: error.message, code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds, databaseCode: error.databaseCode, rpc: error.rpc, upstreamStatus: error.upstreamStatus }, error.status);
     // A timed-out request used to reach the screen as "The operation was aborted due to timeout".
     if (error instanceof Error && error.name === 'TimeoutError') return json({ error: 'AI 서버 응답이 늦어지고 있어요. 잠시 뒤 다시 말씀해 주세요.', code: 'lounge_upstream_timeout', retryable: true, retryAfterSeconds: 3 }, 504);
-    return json({ error: error instanceof Error ? error.message : '라운지 연결을 다시 확인해 주세요.' }, 502);
+    // Our own messages are Korean; anything else ("internal error" from the runtime on 2026-10-29) is not shown as is.
+    // Such a failure was passing on its own (the next turn a minute later went through), so the page tries again soon
+    // instead of a minute later.
+    const shown = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '사회자 연결이 잠시 끊겼어요. 곧 다시 시도할게요.';
+    return json({ error: shown, code: 'lounge_internal_error', retryable: true, retryAfterSeconds: 3 }, 502);
   }
 }
