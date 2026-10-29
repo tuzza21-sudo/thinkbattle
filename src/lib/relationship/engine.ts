@@ -239,19 +239,33 @@ function stageProgress(scores: Scores, condition: StageCondition) {
 }
 
 /**
+ * The scores that matter for this character: its own metrics, and the shared ones its stages ask for. On 2026-10-29
+ * every character's card showed the same five shared bars (흥미, 존중, 편안함…), some of which none of its stages used.
+ */
+export function relationshipShownMetrics(config: RelationshipConfig) {
+  const asked = new Set(enabledStages(config).flatMap(stage => Object.keys(stage.enter.min ?? {})));
+  const unique = new Set(config.uniqueMetrics.map(metric => metric.id));
+  const shown = relationshipMetrics(config).filter(metric => unique.has(metric) || asked.has(metric));
+  return shown.length ? shown : relationshipMetrics(config);
+}
+
+/**
  * The stage, labels and scores for everyone (the chat shows them as a status card with bars, so a member sees the
- * relationship grow); mood and history only when `debug` is requested by a developer.
+ * relationship grow); mood and history only when `debug` is requested by a developer. Each score carries what the next
+ * stage asks of it (`need`), so the card can show what is growing well and what is still short.
  */
 export function describeRelationship(record: RelationshipRecord, config: RelationshipConfig, options: { mood?: Mood; debug?: boolean } = {}): RelationshipView {
   const stages = enabledStages(config);
   const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   const index = Math.max(0, stages.indexOf(stage)), next = stages[index + 1];
+  const needs = next?.enter.min ?? {};
   return {
     characterId: config.characterId,
     macroState: { id: stage.id, label: stage.label },
     stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter) : 1 },
-    metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, {
+    metrics: Object.fromEntries(relationshipShownMetrics(config).map(metric => [metric, {
       name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]), score: record.scores[metric],
+      ...(typeof needs[metric] === 'number' && needs[metric]! > 0 ? { need: needs[metric] } : {}),
     }])),
     ...(options.debug ? { debug: {
       scores: record.scores, mood: options.mood ?? initialMood(config), pending: record.pending,

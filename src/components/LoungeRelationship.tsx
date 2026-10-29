@@ -23,6 +23,10 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
   const stage = view.stage;
   const progress = Math.round((stage?.progress ?? 0) * 100);
   const deltas = shown ? Object.entries(shown.delta).filter(([metric]) => view.metrics[metric]) : [];
+  // Against what the next stage asks: the scores already there (closest to done first) and the ones still short (furthest first).
+  const asked = Object.values(view.metrics).filter(metric => metric.need);
+  const ready = asked.filter(metric => (metric.score ?? 0) >= metric.need!).sort((a, b) => (b.score ?? 0) / b.need! - (a.score ?? 0) / a.need!).slice(0, 2);
+  const short = asked.filter(metric => (metric.score ?? 0) < metric.need!).sort((a, b) => (b.need! - (b.score ?? 0)) - (a.need! - (a.score ?? 0))).slice(0, 2);
   return <div className={`lounge-relationship ${shown?.stage === 'promoted' ? 'celebrating' : ''}`}>
     <details>
       <summary>
@@ -38,11 +42,19 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
       <div className="lounge-relationship-panel">
         {stage && <p className="lounge-relationship-line">“{stage.line}”</p>}
         <p className="lounge-relationship-next">{stage?.next ? <>다음 단계 <b>{stage.next}</b> · {progress}%</> : '가장 가까운 사이예요.'}</p>
-        <ul className="lounge-relationship-bars">{Object.entries(view.metrics).map(([id, metric]) => <li key={id}>
-          <span>{metric.name}</span>
-          <span className="lounge-relationship-bar"><i style={{ width: `${metric.score ?? 0}%` }} /></span>
-          <small>{metric.label}</small>
-        </li>)}</ul>
+        {(ready.length > 0 || short.length > 0) && <p className="lounge-relationship-focus">
+          {ready.length > 0 && <span className="met">잘 쌓이고 있어요 · <b>{ready.map(metric => metric.name).join(', ')}</b></span>}
+          {short.length > 0 && <span className="short">더 필요해요 · <b>{short.map(metric => metric.name).join(', ')}</b></span>}
+        </p>}
+        <ul className="lounge-relationship-bars">{Object.entries(view.metrics).map(([id, metric]) => {
+          const state = !metric.need ? '' : (metric.score ?? 0) >= metric.need ? 'met' : 'short';
+          return <li key={id} className={state}>
+            <span>{metric.name}</span>
+            <span className="lounge-relationship-bar"><i style={{ width: `${metric.score ?? 0}%` }} />{metric.need && <em style={{ left: `${metric.need}%` }} title={`다음 단계에 필요한 만큼 (${metric.need})`} />}</span>
+            <small>{metric.label}{state && <b>{state === 'met' ? '충분' : `${metric.need! - (metric.score ?? 0)} 부족`}</b>}</small>
+          </li>;
+        })}</ul>
+        {asked.length > 0 && <p className="lounge-relationship-legend">막대의 세로선은 다음 단계에 필요한 만큼이에요.</p>}
         <section className="lounge-relationship-memory" aria-label="기억하는 이야기">
           <h3>기억하는 이야기</h3>
           {view.remembered?.length

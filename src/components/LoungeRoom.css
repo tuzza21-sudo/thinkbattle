@@ -1040,3 +1040,33 @@
 @media (max-width:760px) {
   .lounge-model-picker { display:none !important; }
 }
+
+/* One to one (2026-10-29): the member's own seat and its "함께하는 사람들 1 / 1" line are gone, and the character's photo
+   is larger, without the frame around it (a speaking cue that a chat never uses). */
+.has-room .lounge-one-to-one .lounge-participant-roster { display:none; }
+.has-room .lounge-one-to-one .lounge-moderator-avatar { box-shadow:none; border:0; background:none; }
+@media (min-width:761px) and (min-height:501px) {
+  .has-room .lounge-room-main.lounge-one-to-one,.has-room .lounge-room-main.lounge-one-to-one:has(.lounge-seats.seats-1) { --lounge-profile-size:170px; }
+  .has-room .lounge-one-to-one .lounge-conversation-space { grid-template-columns:minmax(150px,210px) minmax(0,1fr); }
+}
+@media (max-width:760px) {
+  .has-room .lounge-room-main.lounge-one-to-one .lounge-stage .lounge-moderator-avatar { width:84px; }
+  .has-room .lounge-one-to-one .lounge-moderator-info h2 { font-size:15px; }
+}
+
+/* The status card against the next stage (2026-10-29): a thin line on each bar marks what the next stage asks; a score
+   that has reached it turns green, one still short is warm, and a line above names the best and the most needed. */
+.lounge-relationship-bar { overflow:visible; }
+.lounge-relationship-bar i { overflow:hidden; }
+.lounge-relationship-bar em { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px; border-radius:1px; background:#fff; opacity:.85; }
+.lounge-relationship-bars li.met .lounge-relationship-bar i { background:linear-gradient(90deg, #7fd39a, #c8f2d4); }
+.lounge-relationship-bars li.short .lounge-relationship-bar i { background:linear-gradient(90deg, #f0a46b, #ffd9b8); }
+.lounge-relationship-bars li.short>span:first-child { opacity:1; font-weight:700; }
+.lounge-relationship-bars small b { margin-left:5px; font-weight:700; }
+.lounge-relationship-bars li.met small b { color:#9fe3b4; }
+.lounge-relationship-bars li.short small b { color:#ffc48f; }
+.lounge-relationship-focus { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 9px; font-size:11px; }
+.lounge-relationship-focus span { padding:3px 8px; border-radius:999px; background:#ffffff12; }
+.lounge-relationship-focus .met b { color:#9fe3b4; }
+.lounge-relationship-focus .short b { color:#ffc48f; }
+.lounge-relationship-legend { margin:7px 0 0; font-size:10px; opacity:.6; }

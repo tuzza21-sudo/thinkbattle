@@ -87,7 +87,8 @@ export type TurnLog = {
   protectedTurn: boolean;
 };
 
-export type MetricView = { label: string; score?: number };
+/** A score as the card shows it; `need` is what the next stage asks of it, when it asks anything. */
+export type MetricView = { label: string; score?: number; need?: number };
 /** What one turn changed, sent to the page as soon as it is saved: what the member did, the scores it moved, a stage change. */
 export type RelationshipChange = {
   events: Array<{ type: string; label: string; up: boolean }>;
