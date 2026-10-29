@@ -41,8 +41,8 @@ export function LoungeCall(props: LoungeCallProps) {
     : props.lobby ? '전화 거는 중…'
     : props.hostSpeaking ? '말하는 중'
     : props.userSpeaking ? '듣고 있어요'
-    : props.replyDelayed ? '연결이 잠시 느려요'
-    : props.pending ? '…'
+    // A slow reply looks like any wait ("…"): the page keeps trying by itself, so there is nothing to say about it.
+    : props.pending || props.replyDelayed ? '…'
     : !props.micOn && !props.preview ? '음소거 중이에요'
     : '';
   const connectLabel = props.connecting ? '연결 중…' : !props.connected ? '다시 연결' : !props.audioReady ? '소리 켜기' : props.starting ? '준비 중…' : '통화 이어가기';
