@@ -1903,7 +1903,7 @@ test('a member\'s character speaks as itself, with its own relationship type; an
 test('the deep model reasons in a chat; a voice reply and the fast model do not', async () => {
   // [room model, voice on, effort, the OpenAI model]; the Sol models are picked in the room's settings (2026-10-30).
   for (const [aiModel, voiceOn, effort, openaiModel] of [['gpt-reasoning', false, 'medium', 'gpt-6-luna'], ['gpt-reasoning', true, 'none', 'gpt-6-luna'], [null, false, 'none', 'gpt-6-luna'],
-    ['gpt-sol', false, 'none', 'gpt-6-sol'], ['gpt-sol', true, 'none', 'gpt-6-sol'], ['gpt-sol-next', false, 'low', 'gpt-6.1-sol'], ['gpt-sol-next', true, 'none', 'gpt-6-sol']]) {
+    ['gpt-sol', false, 'none', 'gpt-6-sol'], ['gpt-sol', true, 'none', 'gpt-6-sol'], ['gpt-terra', false, 'none', 'gpt-6.1-terra'], ['gpt-terra', true, 'none', 'gpt-6-luna'], ['gpt-sol-next', false, 'low', 'gpt-6.1-sol'], ['gpt-sol-next', true, 'none', 'gpt-6-sol']]) {
     let body, after;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -3108,7 +3108,7 @@ test('a story in episodes: the character leads the current episode, the checkpoi
 });
 
 test('the Sol models are offered after the two GPT ones, and GPT-6.1 Sol (which cannot run without reasoning) falls back to Sol when it stalls or the reply is spoken', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gpt-reasoning', 'gpt-sol', 'gpt-sol-next']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gpt-reasoning', 'gpt-sol', 'gpt-terra', 'gpt-sol-next']);
   const next = modelsLib.getLoungeChatModel('gpt-sol-next');
   assert.equal(next.model, 'gpt-6.1-sol'); assert.notEqual(next.reasoning, 'none', 'gpt-6.1-sol refuses a request without reasoning');
   assert.equal(next.stallModel, 'gpt-6-sol'); assert.equal(modelsLib.getLoungeChatModel(next.voiceFallback).reasoning, 'none');
