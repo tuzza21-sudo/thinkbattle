@@ -17,7 +17,10 @@ test('《검은 장미》 is six episodes, each with checkpoints the page keeps,
   assert.deepEqual(episodes.map(episode => episode.number), [1, 2, 3, 4, 5, 6]);
   assert.equal(episodes[0].opening, '', 'the first episode opens with the prologue');
   for (const episode of episodes) {
-    assert.ok(episode.checkpoints.length >= 3, `episode ${episode.number} asks for a few moments`);
+    // 2026-10-30: the member answers with feelings and choices, at most three a episode; she reads the records herself.
+    assert.ok(episode.checkpoints.length >= 2 && episode.checkpoints.length <= 3, `episode ${episode.number} asks for two or three moments`);
+    assert.match(episode.lead, /선우령이 직접 읽고/, `episode ${episode.number}: the case's details are hers to explain`);
+    for (const point of episode.checkpoints) assert.doesNotMatch(point.detail, /경로|패턴|이니셜|순서를 말하|짚는다/, `${point.id} does not ask the member to work out the case`);
     assert.ok(episode.lead && episode.goal && episode.ending, `episode ${episode.number} says how she leads it and how it ends`);
     if (episode.gate) assert.ok(velvetStages.includes(episode.gate), `episode ${episode.number}: ${episode.gate} is a stage of hers`);
     if (episode.number > 1) assert.ok(episode.opening.length > 100, `episode ${episode.number} opens with a scene`);
@@ -28,19 +31,19 @@ test('《검은 장미》 is six episodes, each with checkpoints the page keeps,
 
 test('a story starts in its first episode, and the state is kept to the checkpoints of the episode it is in', () => {
   assert.deepEqual(story.normalizeLoungeStoryState(null, episodes), { episode: 0, done: [], opened: true, complete: false });
-  assert.deepEqual(story.normalizeLoungeStoryState({ episode: 1, done: ['order', 'envelope', 'order'], opened: false }, episodes), { episode: 1, done: ['order'], opened: false, complete: false }, 'an id from another episode is dropped');
+  assert.deepEqual(story.normalizeLoungeStoryState({ episode: 1, done: ['escape', 'envelope', 'escape'], opened: false }, episodes), { episode: 1, done: ['escape'], opened: false, complete: false }, 'an id from another episode is dropped');
   assert.equal(story.normalizeLoungeStoryState({ episode: 99 }, episodes).episode, 5, 'never past the last episode');
 });
 
 test('the character is told only the current episode: what is open, what is done, and when to close it', () => {
   const first = story.loungeStoryEpisodeContext(episodes, { episode: 0, done: ['envelope'], opened: true, complete: false }, true);
   assert.equal(first.number, 1); assert.equal(first.total, 6);
-  assert.deepEqual(first.checkpoints_open.map(point => point.id), ['missing-lines', 'her-signature', 'choice']);
-  assert.deepEqual(first.checkpoints_done, ['봉투 속 보고서를 털어놓기']);
+  assert.deepEqual(first.checkpoints_open.map(point => point.id), ['her-signature', 'choice']);
+  assert.deepEqual(first.checkpoints_done, ['봉투를 보여 줄지 정하기']);
   assert.equal(first.closing, undefined, 'not closed while something is open');
   assert.equal(first.just_started, undefined, 'the first episode is opened by the prologue');
   assert.ok(!JSON.stringify(first).includes(episodes[1].title), 'nothing of the next episode');
-  const all = ['envelope', 'missing-lines', 'her-signature', 'choice'];
+  const all = ['envelope', 'her-signature', 'choice'];
   assert.equal(story.loungeStoryEpisodeContext(episodes, { episode: 0, done: all, opened: true, complete: false }, true).closing, 'ending');
   // The second episode needs her interest: done but not trusted enough yet, the two keep talking in the scene.
   const second = episodes[1].checkpoints.map(point => point.id);
@@ -51,11 +54,11 @@ test('the character is told only the current episode: what is open, what is done
 
 test('a turn ticks the checkpoints it met, and the next episode follows once the ending was told and the stage allows it', () => {
   const start = { episode: 0, done: [], opened: true, complete: false };
-  let step = story.advanceLoungeStory(episodes, start, ['envelope', 'not-a-checkpoint', 'order'], true);
+  let step = story.advanceLoungeStory(episodes, start, ['envelope', 'not-a-checkpoint', 'escape'], true);
   assert.deepEqual(step.state.done, ['envelope'], 'only checkpoints of this episode count'); assert.equal(step.advanced, false);
-  step = story.advanceLoungeStory(episodes, { ...start, done: ['envelope', 'missing-lines', 'her-signature'] }, ['choice'], true);
+  step = story.advanceLoungeStory(episodes, { ...start, done: ['envelope', 'her-signature'] }, ['choice'], true);
   assert.equal(step.state.episode, 0, 'the turn that meets the last checkpoint does not move on: the next reply tells the ending');
-  assert.equal(step.state.done.length, 4);
+  assert.equal(step.state.done.length, 3);
   step = story.advanceLoungeStory(episodes, step.state, [], true);
   assert.deepEqual(step.state, { episode: 1, done: [], opened: false, complete: false }); assert.equal(step.advanced, true);
   // Episode two: all done, but she is not interested enough yet.
@@ -96,7 +99,7 @@ test('replies without progress make the character lead more firmly, and meeting 
   state = story.advanceLoungeStory(episodes, state, ['envelope'], true).state;
   assert.equal(state.idle, undefined, 'a met checkpoint starts the count again');
   assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).pace, 'follow');
-  assert.equal(story.loungeStoryEpisodeContext(episodes, { ...state, done: ['envelope', 'missing-lines', 'her-signature', 'choice'] }, true).pace, undefined, 'nothing to lead toward once all are met');
+  assert.equal(story.loungeStoryEpisodeContext(episodes, { ...state, done: ['envelope', 'her-signature', 'choice'] }, true).pace, undefined, 'nothing to lead toward once all are met');
   assert.equal(story.normalizeLoungeStoryState({ ...state, idle: 7 }, episodes).idle, 7, 'the count is kept with the room');
 });
 
