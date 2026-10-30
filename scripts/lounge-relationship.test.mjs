@@ -34,12 +34,13 @@ test('every shipped character configuration is valid and starts from its configu
 });
 
 test('one-to-one speech starts polite for everyone; every character that turns casual does so at its third stage (2026-10-30)', () => {
-  const casualStage = { auditor: 'KNOWS_YOUR_MIND', closer: 'SERIOUS_PLAYER', velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER' };
+  const casualStage = { auditor: 'KNOWS_YOUR_MIND', closer: 'SERIOUS_PLAYER', velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER', jaeseok: 'SAME_SCREEN', lawyer: 'DEFENSE_TABLE', guide: 'STAGE_3' };
   const fromTemplates = relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: 'c_test', displayName: '테스트', core: ['a', 'b'], flirtation: true }));
   for (const config of [...Object.values(configs), ...fromTemplates]) {
     if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
+  assert.equal(Object.values(configs).filter(config => !config.casualFromStage).length, 0, 'no character stays polite for good');
   for (const config of Object.values(configs)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
@@ -325,7 +326,9 @@ test('romantic tension opens stage by stage: the first stage never starts it, th
     // Without the setting the guidance is not sent at all.
     assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stages[1].id }, { ...config, adultFlirtation: false }, initialMood(config)).stage.romance, undefined, `${id} without the setting`);
   }
-  for (const stage of configs.lawyer.stages) assert.ok(configs.lawyer.stageRomance[stage.id].includes('존댓말'), `lawyer ${stage.id} stays polite`);
+  // He speaks politely until the third stage, then casually (2026-10-30).
+  configs.lawyer.stages.slice(0, 2).forEach(stage => assert.ok(configs.lawyer.stageRomance[stage.id].includes('존댓말'), `lawyer ${stage.id} stays polite`));
+  configs.lawyer.stages.slice(2).forEach(stage => assert.ok(!configs.lawyer.stageRomance[stage.id].includes('존댓말'), `lawyer ${stage.id} speaks casually`));
   // 선우령 is cold at the first stage: she turns a flirt down, not just declines to start one, and flirting does not raise her interest.
   assert.deepEqual(validateRelationshipConfig(configs.velvet), []);
   const velvetFirst = relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).stage;
@@ -401,15 +404,15 @@ test('the reporter grows by banter and a spark, and the closeness comes with the
   assert.ok(config.stages.find(stage => stage.id === 'SOMEONE_SPECIAL').hint.includes('현실에서 만나자는 약속, 독점, 질투는 하지 않고'));
 });
 
-test('the detective grows by candour and steadiness, never by being questioned, and stays polite at every stage', () => {
+test('the detective grows by candour and steadiness, never by being questioned, and speaks politely until the third stage', () => {
   const lawyer = run(configs.lawyer, [[event('ANSWERS_DIRECTLY')], [event('EVADES_QUESTION')], [event('CONTRADICTS_SELF')], [event('ADMITS_ERROR')], [event('REMEMBERS_DETAIL')], [event('SHOWS_CARE')]]);
   assert.ok(lawyer.logs[0].delta.directness > 0 && lawyer.logs[3].delta.consistency > 0 && lawyer.logs[4].delta.consistency > 0 && lawyer.logs[5].delta.trust > 0);
   assert.deepEqual(lawyer.logs[1].delta, {}); assert.deepEqual(lawyer.logs[2].delta, {});
   assert.deepEqual(configs.lawyer.uniqueMetrics.map(metric => metric.name), ['솔직함', '한결같음']);
-  for (const config of [configs.lawyer]) {
-    assert.equal(config.casualFromStage, undefined, `${config.characterId} never turns casual`);
-    for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'polite', `${config.characterId} ${stage.id}`);
-  }
+  // 2026-10-30: he and 임시우 turn casual at the third stage like everyone else.
+  assert.equal(configs.lawyer.casualFromStage, 'DEFENSE_TABLE');
+  assert.deepEqual(configs.lawyer.stages.map(stage => relationshipPromptContext({ ...createRelationship(configs.lawyer), stage: stage.id }, configs.lawyer, initialMood(configs.lawyer)).speech_level), ['polite', 'polite', 'casual', 'casual']);
+  assert.doesNotMatch(JSON.stringify(configs.lawyer.stageRomance.CO_COUNSEL + configs.lawyer.stages[3].hint), /존댓말/);
 });
 
 test('the optional attached stage stays closed while it is disabled', () => {
@@ -492,6 +495,18 @@ test('invitations to go somewhere together open up with the relationship: not at
     assert.match(outing(stages.at(-1)), /기꺼이 받아들여/, `${config.characterId} closest stage`);
   }
   assert.match(relationship.relationshipOutingGuidance(2, 4), /대부분의 제안/);
+});
+
+test('the third and fourth stages ask the same of every character about touch, whatever their gender (2026-10-30)', () => {
+  for (const config of Object.values(configs)) {
+    const stages = config.stages.filter(stage => stage.enabled !== false);
+    const romance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).stage.romance ?? '';
+    assert.match(romance(stages[2]), /남성이든 여성이든 이 단계의 스킨십\(키스, 깊은 키스, 포옹\)은 같은 한도로/, `${config.characterId} third stage`);
+    assert.match(romance(stages[3]), /남성이든 여성이든 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지/, `${config.characterId} fourth stage`);
+    assert.doesNotMatch(romance(stages[1]), /남성이든 여성이든/, `${config.characterId} second stage is unchanged`);
+    assert.doesNotMatch(romance(stages[0]), /남성이든 여성이든/, `${config.characterId} first stage is unchanged`);
+  }
+  assert.match(JSON.stringify(configs.guide.stageRomance.STAGE_3), /키스와 포옹에도 응한다/, 'the guide no longer stops at a hand and a shoulder');
 });
 
 test('touch opens up with the relationship: none at first, hands and a hug next, a kiss at the third, a night together from the fourth', () => {

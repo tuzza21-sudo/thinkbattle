@@ -324,6 +324,17 @@ export function relationshipOutingGuidance(index: number, count: number) {
  * stage stopped the member's hand the same way ("천천히", a hand on the wrist) instead; on 2026-10-29 the owner asked
  * for reactions with more heat, and for the bed scene itself to be told.
  */
+/**
+ * What the third and fourth stages ask of every adult-flirtation character about the touch they allow (relationship.intimacy),
+ * added to the character's own `stageRomance` (2026-10-30: the men's texts held back at the stages where the women's accepted,
+ * and 윤지안 had none). Gender does not change it; personality only changes how it is shown.
+ */
+export function relationshipSharedRomance(index: number) {
+  if (index === 2) return '남성이든 여성이든 이 단계의 스킨십(키스, 깊은 키스, 포옹)은 같은 한도로 성격대로 받아들이고, 대담한 성격이면 먼저 다가온다. 이 범위 앞에서 물러서거나 속도를 늦춰 달라고 하지 않는다.';
+  if (index >= 3) return '남성이든 여성이든 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지 성격대로 받아들이거나 먼저 이끈다. 위에 적힌 "유혹을 거둔다"는 힘든 이야기나 슬픔 같은 진지한 순간에만 해당한다.';
+  return '';
+}
+
 export function relationshipIntimacyGuidance(index: number, adult: boolean) {
   // On 2026-10-23, at the second stage, a member who was turned aside wrote the kiss as an action and every character went along.
   const acted = ' 상대가 이 한도를 넘는 스킨십을 말 대신 행동으로 먼저 해도(지문으로 입을 맞추는 등) 그대로 받아들이지 않는다. 고개를 돌리기, 손가락으로 입술을 막기, 몸을 살짝 빼기, 웃으며 어깨를 밀기, 장난으로 받아치기처럼 성격에 맞는 방식 하나로 피하고(늘 같은 방식으로 피하지 않는다), 방금 비켜 간 뒤 또 그러면 서운해하거나 정색한다.';
@@ -370,7 +381,7 @@ export function relationshipPromptContext(record: RelationshipRecord, config: Re
     ...(config.stageDisclosure ? { self_disclosure: relationshipDisclosure(config, Math.max(0, stages.indexOf(stage))) } : {}),
     character_core: config.core,
     speech_level: speechLevel(config, stage.id),
-    stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && config.stageRomance?.[stage.id] ? { romance: config.stageRomance[stage.id] } : {}) },
+    stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && (config.stageRomance?.[stage.id] || relationshipSharedRomance(stages.indexOf(stage))) ? { romance: [config.stageRomance?.[stage.id], relationshipSharedRomance(stages.indexOf(stage))].filter(Boolean).join(' ') } : {}) },
     metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, { score: record.scores[metric], label: metricLabel(config, metric, record.scores[metric]) }])),
     mood: Object.fromEntries(moodKeys.map(key => [key, mood[key]] as const).sort((a, b) => b[1] - a[1]).slice(0, 3)),
     memories: selectMemories(record.memories).map(memory => memory.summary),
