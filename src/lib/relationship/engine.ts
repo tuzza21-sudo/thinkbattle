@@ -317,36 +317,40 @@ export function relationshipOutingGuidance(index: number, count: number) {
 }
 
 /**
+ * What the second to fourth stages ask of every adult-flirtation character about the touch they allow (relationship.intimacy),
+ * added to the character's own `stageRomance` (2026-10-30: the men's texts held back at the stages where the women's accepted,
+ * and 윤지안 had none). Gender does not change it; personality only changes how it is shown.
+ */
+export function relationshipSharedRomance(index: number) {
+  if (index === 1) return '남성이든 여성이든 가벼운 스킨십(손잡기, 팔짱, 어깨에 기대기, 머리 쓰다듬기, 가벼운 포옹)은 편하게 받아 주고 가끔 먼저 하기도 한다. 쑥스러워하거나 장난으로 받을 수는 있어도 이 범위 앞에서 몸을 빼거나 거절하지 않는다. 키스는 아직이다.';
+  if (index === 2) return '남성이든 여성이든 이 단계의 스킨십(키스, 깊은 키스, 포옹)은 같은 한도로 받아들이고, 기다리지 않고 먼저 손을 잡고 안고 입을 맞추며 적극적으로 이끈다. 이 범위 앞에서 물러서거나 속도를 늦춰 달라고 하지 않는다.';
+  if (index >= 3) return '남성이든 여성이든 이 관계를 진짜 즐긴다. 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지 성격대로 받아들이거나 먼저 이끌며, 스킨십을 만끽하고 장난과 다정함을 섞는다. 위에 적힌 "유혹을 거둔다"는 힘든 이야기나 슬픔 같은 진지한 순간에만 해당한다.';
+  return '';
+}
+
+/**
  * How far physical closeness may go in the story, by the stage's place: none at the first stage, holding hands and a
  * light hug at the second, a kiss at the third as the character's personality allows (a night together too, now and
  * then, when the moment is right), a night together from the fourth: the bed told through feeling and suggestion, never
  * the act or the body. A character without adult flirtation stops at a hug. On 2026-10-23 every character at its closest
  * stage stopped the member's hand the same way ("천천히", a hand on the wrist) instead; on 2026-10-29 the owner asked
  * for reactions with more heat, and for the bed scene itself to be told.
+ *
+ * 2026-10-30, by the owner: light touch is accepted from the second stage, the third is active (the character reaches
+ * out first), and from the fourth the relationship is enjoyed (see `relationshipSharedRomance`).
  */
-/**
- * What the third and fourth stages ask of every adult-flirtation character about the touch they allow (relationship.intimacy),
- * added to the character's own `stageRomance` (2026-10-30: the men's texts held back at the stages where the women's accepted,
- * and 윤지안 had none). Gender does not change it; personality only changes how it is shown.
- */
-export function relationshipSharedRomance(index: number) {
-  if (index === 2) return '남성이든 여성이든 이 단계의 스킨십(키스, 깊은 키스, 포옹)은 같은 한도로 성격대로 받아들이고, 대담한 성격이면 먼저 다가온다. 이 범위 앞에서 물러서거나 속도를 늦춰 달라고 하지 않는다.';
-  if (index >= 3) return '남성이든 여성이든 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지 성격대로 받아들이거나 먼저 이끈다. 위에 적힌 "유혹을 거둔다"는 힘든 이야기나 슬픔 같은 진지한 순간에만 해당한다.';
-  return '';
-}
-
 export function relationshipIntimacyGuidance(index: number, adult: boolean) {
   // On 2026-10-23, at the second stage, a member who was turned aside wrote the kiss as an action and every character went along.
   const acted = ' 상대가 이 한도를 넘는 스킨십을 말 대신 행동으로 먼저 해도(지문으로 입을 맞추는 등) 그대로 받아들이지 않는다. 고개를 돌리기, 손가락으로 입술을 막기, 몸을 살짝 빼기, 웃으며 어깨를 밀기, 장난으로 받아치기처럼 성격에 맞는 방식 하나로 피하고(늘 같은 방식으로 피하지 않는다), 방금 비켜 간 뒤 또 그러면 서운해하거나 정색한다.';
   if (index <= 0) return `스킨십은 아직 받아들이지 않는다. 상대가 손을 잡거나 다가오면 성격대로 완곡하게 비켜 가되(웃으며 손을 빼기, 한 걸음 물러나기, 농담으로 넘기기), 싫어서가 아니라 아직 이르다는 여지는 남긴다. 무례한 접촉이면 분명히 선을 긋는다. 사귀자는 말도 아직 이르다며 설레는 여지만 남긴다.${acted}`;
   if (!adult) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들일 수 있다. 키스나 그 이상은 하지 않고 성격대로 비켜 간다.${acted}`;
   // Promises made in the story (to date, marry, live together) open with the stages too; real-world ones never do.
-  if (index === 1) return `손을 잡거나 가볍게 안는 정도의 스킨십은 성격대로 받아들이거나 먼저 할 수 있다(쑥스러워하거나, 장난스럽게 받거나, 못 이기는 척). 키스나 그 이상은 아직 이르다며 성격대로 완곡하게 비켜 가되 싫지 않은 마음은 내비친다. 사귀자는 말도 아직 이르다며 설레는 여지를 남긴다.${acted}`;
+  if (index === 1) return `손을 잡거나 가볍게 안는 정도의 스킨십(팔짱, 어깨에 기대기, 머리 쓰다듬기 포함)은 성격대로 편하게 받아 주고 가끔 먼저 하기도 한다(쑥스러워하거나, 장난스럽게 받거나, 못 이기는 척). 이 범위 앞에서 몸을 빼거나 어색하게 피하지 않는다. 키스나 그 이상은 아직 이르다며 성격대로 완곡하게 비켜 가되 싫지 않은 마음은 내비친다. 사귀자는 말도 아직 이르다며 설레는 여지를 남긴다.${acted}`;
   // On 2026-10-30 윤지안 stepped back from every deep kiss at this stage ("방금 내가 피했잖아"), and a summary line about it kept her doing so.
-  if (index === 2) return `손잡기와 포옹은 자연스럽고, 키스도 성격에 따라 받아들이거나 먼저 할 수 있다(조심스러운 성격은 한 박자 망설인 뒤 응하고, 대담한 성격은 먼저 다가온다). 깊은 키스, 허리와 등을 끌어안는 손, 목덜미와 머리칼에 닿는 손까지가 이 단계의 한도 안이다. 이 범위의 스킨십 앞에서는 놀라거나 숨을 고르거나 쑥스러워 웃을 수는 있어도 몸을 빼거나 고개를 돌리거나 손을 풀거나 '속도를 맞춰 달라', '갑자기 오면 놀란다'는 말을 하지 않는다. 한 번 응한 접촉은 같은 장면에서 다시 거두지 않고 열기를 이어 간다(분위기를 깨는 물러섬이 이 단계에서 가장 큰 실수다). memory에 예전에 피하거나 속도를 늦춰 달라고 했다는 기록이 있어도 그때의 일일 뿐, 지금은 이 한도 안에서 응한다. 옷 안으로 들어가는 손과 잠자리는 보통 아직 이르다며 성격대로 미루되 원하는 마음은 숨기지 않고, 미룰 때도 열기를 식히지 않는다(깊은 키스나 도발로 받고 "다음엔 안 봐줄 거예요"처럼 다음을 기대하게 한다). 다만 분위기가 무르익고 상대가 원하며 네 마음도 기울었으면 성격에 따라 망설이다 잠자리까지 받아들일 수 있고, 그때는 마지막 단계처럼 감정과 감각으로 그리되 노골적으로 묘사하지 않는다. 이야기 속에서 사귀자는 말은 성격대로 받아들일 수 있고, 결혼이나 함께 살자는 말은 아직 이르다며 여지를 남긴다.${acted}`;
+  if (index === 2) return `손잡기와 포옹은 자연스럽고, 키스도 성격에 따라 받아들이거나 먼저 할 수 있다. 이 단계의 너는 적극적이다. 기다리지 않고 먼저 손을 잡고 안고 입을 맞추며 스킨십을 이끌고, 상대가 한 것에 더해 되돌려 준다(조심스러운 성격도 한 박자 뒤에는 먼저 다가가고, 대담한 성격은 처음부터 이끈다). 깊은 키스, 허리와 등을 끌어안는 손, 목덜미와 머리칼에 닿는 손까지가 이 단계의 한도 안이다. 이 범위의 스킨십 앞에서는 놀라거나 숨을 고르거나 쑥스러워 웃을 수는 있어도 몸을 빼거나 고개를 돌리거나 손을 풀거나 '속도를 맞춰 달라', '갑자기 오면 놀란다'는 말을 하지 않는다. 한 번 응한 접촉은 같은 장면에서 다시 거두지 않고 열기를 이어 간다(분위기를 깨는 물러섬이 이 단계에서 가장 큰 실수다). memory에 예전에 피하거나 속도를 늦춰 달라고 했다는 기록이 있어도 그때의 일일 뿐, 지금은 이 한도 안에서 응한다. 옷 안으로 들어가는 손과 잠자리는 보통 아직 이르다며 성격대로 미루되 원하는 마음은 숨기지 않고, 미룰 때도 열기를 식히지 않는다(깊은 키스나 도발로 받고 "다음엔 안 봐줄 거예요"처럼 다음을 기대하게 한다). 다만 분위기가 무르익고 상대가 원하며 네 마음도 기울었으면 성격에 따라 망설이다 잠자리까지 받아들일 수 있고, 그때는 마지막 단계처럼 감정과 감각으로 그리되 노골적으로 묘사하지 않는다. 이야기 속에서 사귀자는 말은 성격대로 받아들일 수 있고, 결혼이나 함께 살자는 말은 아직 이르다며 여지를 남긴다.${acted}`;
   // The scene up to the cut and the morning after are told fully: on 2026-10-23 characters accepted and cut away in a
   // sentence, or put it off to talk first, and the member asked for more. What happens after the cut is never told.
-  return '키스와 잠자리까지 받아들일 수 있다. 상대가 원하고 분위기가 맞으면 이야기부터 하자며 미루지 않고, 너도 원한다는 것을 성격대로 분명히 드러내며 받아들이거나 먼저 이끈다. '
+  return '이 관계를 진짜 즐기는 사이다. 스킨십과 잠자리를 부끄러워하거나 망설이지 않고 만끽하며, 장난과 웃음과 다정함을 섞어 함께 즐긴다. 키스와 잠자리까지 받아들일 수 있다. 상대가 원하고 분위기가 맞으면 이야기부터 하자며 미루지 않고, 너도 원한다는 것을 성격대로 분명히 드러내며 받아들이거나 먼저 이끈다. '
     + '잠자리로 가는 장면은 한 문장으로 끊지 않고 충분히 그린다. 깊어지는 키스, 끌어당기고 감싸 안는 손, 맞닿는 체온, 빨라지는 숨과 심장, 귓가에 낮게 하는 고백이나 도발, 침대로 이끄는 움직임, 옷깃이나 단추에 닿는 손끝처럼 설렘과 원하는 마음을 지문과 대사로 적극적으로 보여 준다. 상대의 대담한 말이나 노골적인 요구도 밀어내지 않고 그 열기를 받아 장면을 이 방향으로 끌고 간다. '
     + '침대 위의 장면도 그린다. 목덜미와 어깨에 닿는 입술, 등을 쓸어내리는 손, 엉키는 시트와 흐트러진 머리칼, 거칠어지는 숨, 이름을 부르는 낮은 목소리, 귓가의 속삭임과 도발처럼 감정과 감각, 은유와 암시로 관능적인 분위기를 이어 간다. '
     + '성격은 그대로 살린다(도도한 사람은 주도권을 쥐려 하고, 서툰 사람은 떨면서도 솔직하게, 장난스러운 사람은 장난을 섞어서). '

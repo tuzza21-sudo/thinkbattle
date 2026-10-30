@@ -497,13 +497,19 @@ test('invitations to go somewhere together open up with the relationship: not at
   assert.match(relationship.relationshipOutingGuidance(2, 4), /대부분의 제안/);
 });
 
-test('the third and fourth stages ask the same of every character about touch, whatever their gender (2026-10-30)', () => {
+test('touch grows the same for every character, whatever their gender: light at the second stage, active at the third, enjoyed at the fourth (2026-10-30)', () => {
   for (const config of Object.values(configs)) {
     const stages = config.stages.filter(stage => stage.enabled !== false);
     const romance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).stage.romance ?? '';
     assert.match(romance(stages[2]), /남성이든 여성이든 이 단계의 스킨십\(키스, 깊은 키스, 포옹\)은 같은 한도로/, `${config.characterId} third stage`);
-    assert.match(romance(stages[3]), /남성이든 여성이든 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지/, `${config.characterId} fourth stage`);
-    assert.doesNotMatch(romance(stages[1]), /남성이든 여성이든/, `${config.characterId} second stage is unchanged`);
+    assert.match(romance(stages[2]), /먼저 손을 잡고 안고 입을 맞추며 적극적으로 이끈다/, `${config.characterId} third stage is active`);
+    assert.match(romance(stages[3]), /남성이든 여성이든 이 관계를 진짜 즐긴다. 끌림과 원하는 마음을 숨기지 않고 relationship.intimacy의 한도까지/, `${config.characterId} fourth stage`);
+    assert.match(romance(stages[1]), /남성이든 여성이든 가벼운 스킨십\(손잡기, 팔짱, 어깨에 기대기, 머리 쓰다듬기, 가벼운 포옹\)은 편하게 받아 주고/, `${config.characterId} second stage accepts light touch`);
+    assert.match(romance(stages[1]), /키스는 아직이다/, `${config.characterId} but no kiss yet`);
+    const guidance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).intimacy;
+    assert.match(guidance(stages[1]), /팔짱, 어깨에 기대기, 머리 쓰다듬기 포함.*몸을 빼거나 어색하게 피하지 않는다/, `${config.characterId} second stage`);
+    assert.match(guidance(stages[2]), /이 단계의 너는 적극적이다. 기다리지 않고 먼저/, `${config.characterId} third stage`);
+    assert.match(guidance(stages[3]), /^이 관계를 진짜 즐기는 사이다/, `${config.characterId} fourth stage`);
     assert.doesNotMatch(romance(stages[0]), /남성이든 여성이든/, `${config.characterId} first stage is unchanged`);
   }
   assert.match(JSON.stringify(configs.guide.stageRomance.STAGE_3), /키스와 포옹에도 응한다/, 'the guide no longer stops at a hand and a shoulder');
