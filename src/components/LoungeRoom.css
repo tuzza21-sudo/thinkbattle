@@ -990,6 +990,9 @@
 .lounge-background-make button { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border:0; border-radius:999px; background:var(--lounge-accent); color:var(--lounge-surface,#242421); font-size:13px; font-weight:800; cursor:pointer; }
 .lounge-background-make button:disabled { opacity:.5; cursor:default; }
 .lounge-background-error { margin:0; font-size:12.5px; color:#ffc9bf; }
+.lounge-background-match { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 14px; border:1px solid var(--lounge-accent); border-radius:999px; background:#ffffff0d; color:var(--lounge-accent); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.lounge-background-match:disabled { opacity:.6; cursor:default; }
+.lounge-background-label { margin:4px 0 -4px; font-size:12px; font-weight:700; color:#fff5e8b3; }
 @media (max-width:760px) { .lounge-background-make textarea { font-size:16px; } .lounge-background-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; } .lounge-background-grid button { aspect-ratio:1; } .lounge-background-grid button span { padding:5px 6px; font-size:11px; } }
 
 /* the *action* shortcut in the message box */

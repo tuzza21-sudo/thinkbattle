@@ -31,7 +31,7 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
     // Every file of the relationship folder, so a character added later is part of the graph without editing this list.
     const relationship = [...['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates'].map(name => `src/lib/relationship/${name}.ts`), ...readdirSync(resolve(workspace, 'src/lib/relationship/configs')).filter(name => name.endsWith('.ts')).map(name => `src/lib/relationship/configs/${name}`)];
-    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', ...relationship]) {
+    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(target, ts.transpileModule(readFileSync(resolve(workspace, file), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText);

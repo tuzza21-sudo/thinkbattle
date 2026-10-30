@@ -1,7 +1,9 @@
-import { isLoungeCustomCharacterId } from '../src/lib/lounge.js';
+import { isLoungeCustomCharacterId, loungeThemes } from '../src/lib/lounge.js';
+import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios.js';
+import { loungeStoryEpisodeAt, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
-import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
+import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
 
 /**
@@ -9,6 +11,9 @@ import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, ty
  * POST {action:'photo', roomId, source:'request'|'character', request?}: a photo for the member in their one-to-one room,
  *   within the daily allowance. The scene and the character's caption are written first, then the image is made from
  *   the character's reference photos and stored privately under the member's folder.
+ * POST {action:'background', roomId, request}: a background made from the member's description, kept privately.
+ * POST {action:'scene', roomId}: the background for where the conversation is now, from the places and the shared scenes
+ *   or made and shared (see sceneBackground).
  * GET (Vercel cron, with CRON_SECRET): one public post from each character's day, at most once a day.
  */
 type NodeRequest = { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
@@ -229,6 +234,83 @@ async function gptBackground(context: Context, request: string, model: LoungeIma
   return webp(Uint8Array.from(atob(b64), character => character.charCodeAt(0)));
 }
 
+/**
+ * The background for where the member's one-to-one conversation is now: a story's current episode (rewritten to what
+ * the two settled, when it was), else the scene the chat's summary keeps, else the story's first place. A story episode
+ * that already has a shared scene gets it at once; otherwise the model picks a place or a shared scene that fits, or a
+ * new one is made and shared. Saved on the room as chosen for the scene (`auto`), with the episode it is for.
+ */
+async function sceneBackground(context: Context, userId: string, roomId: string) {
+  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory`, { headers: serviceHeaders(context) });
+  const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown }> : [];
+  if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
+  const scenario = normalizeLoungeRoomScenario(room.scenario);
+  const episodes = scenario?.episodes ?? [];
+  const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
+  const episode = state ? loungeStoryEpisodeAt(episodes, state) : undefined;
+  const scene = episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;
+  if (!scene) return json({ background: null });
+  const key = scenario && episode ? loungeSceneKey(scenario.id, episode.number, state?.adapted ? episode.scene : undefined) : undefined;
+  const saveOnRoom = async (background: Record<string, unknown>) => {
+    const value = { ...background, auto: true, ...(episode ? { episode: episode.number } : {}) };
+    const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: value }) }).catch(() => null);
+    console.info('[Lounge scene]', JSON.stringify({ key, chosen: background.theme ?? (background.scene ? 'shared' : 'blank'), saved: Boolean(saved?.ok) }));
+    return json({ background: value });
+  };
+  type SceneRow = { id: string; scene_key: string | null; description: string; image_path: string };
+  const sharedScene = (row: SceneRow) => saveOnRoom({ scene: row.id, image: row.image_path, prompt: row.description });
+  if (key) {
+    const known = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?scene_key=eq.${encodeURIComponent(key)}&select=id,scene_key,description,image_path`, { headers: serviceHeaders(context) });
+    const [row] = known.ok ? await known.json() as SceneRow[] : [];
+    if (row) return sharedScene(row);
+  }
+  // The places, and the shared scenes most used and most recent, for the model to choose from.
+  const listed = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?select=id,scene_key,description,image_path&order=uses.desc,created_at.desc&limit=40`, { headers: serviceHeaders(context) });
+  const shared = listed.ok ? await listed.json() as SceneRow[] : [];
+  const places = [...loungeThemes.map(theme => ({ id: theme.id, description: `${theme.name}: ${theme.subtitle}` })), ...shared.map(row => ({ id: row.id, description: row.description }))];
+  let match: ReturnType<typeof readLoungeSceneMatch>;
+  try {
+    const response = await timed('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${context.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
+      model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 1200, store: false, prompt_cache_key: 'lounge-scene-match',
+      instructions: loungeSceneMatchInstructions, input: JSON.stringify({ scene, places }),
+      text: { format: { type: 'json_schema', name: 'lounge_scene_match', strict: true, schema: loungeSceneMatchSchema } },
+    }) }, 30_000);
+    const result = await response.json() as { output?: Array<{ content?: Array<{ type: string; text?: string }> }> };
+    match = readLoungeSceneMatch(JSON.parse((result.output ?? []).flatMap(item => item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('')), places.map(place => place.id));
+  } catch { match = undefined; }
+  if (match && 'id' in match) {
+    const chosen = match.id;
+    const theme = loungeThemes.find(item => item.id === chosen);
+    if (theme) return saveOnRoom({ theme: theme.id });
+    const row = shared.find(item => item.id === chosen);
+    if (row) return sharedScene(row);
+  }
+  const place = match && 'place' in match ? match.place : scene;
+  // A new scene, within the member's allowance for the day; past it (or when it fails) the empty space.
+  const kst = new Date(Date.now() + 9 * 3_600_000);
+  const todayStart = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3_600_000).toISOString();
+  const made = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?created_by=eq.${userId}&created_at=gte.${encodeURIComponent(todayStart)}&select=id`, { headers: serviceHeaders(context) });
+  if (!made.ok || (await made.json() as unknown[]).length >= loungeSceneDaily) return saveOnRoom({ blank: true });
+  try {
+    const image = await gptBackground(context, place, 'gpt-low');
+    const path = `scenes/${crypto.randomUUID()}.${image.ext}`;
+    await upload(context, loungePhotoBuckets.public, path, image.bytes, image.type);
+    const inserted = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?on_conflict=scene_key`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify({ scene_key: key ?? null, description: place, image_path: path, created_by: userId }) });
+    const [row] = inserted.ok ? await inserted.json() as SceneRow[] : [];
+    if (row) return sharedScene(row);
+    // Another member's conversation made this episode's scene at the same time: theirs is used.
+    if (key) {
+      const again = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?scene_key=eq.${encodeURIComponent(key)}&select=id,scene_key,description,image_path`, { headers: serviceHeaders(context) });
+      const [other] = again.ok ? await again.json() as SceneRow[] : [];
+      if (other) return sharedScene(other);
+    }
+    console.warn('[Lounge scene] not shared', inserted.status);
+  } catch (error) {
+    console.warn('[Lounge scene] not made', error instanceof LoungePhotoError ? error.code : error instanceof Error ? error.name : 'error');
+  }
+  return saveOnRoom({ blank: true });
+}
+
 /** Once a day, one post from each character's own day to their public gallery. */
 async function dailyPosts(context: Context) {
   const settings = await timed(`${context.base}/rest/v1/lounge_image_settings?id=eq.1&select=enabled`, { headers: serviceHeaders(context) });
@@ -275,7 +357,7 @@ async function handle(req: Request) {
     let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown };
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = body.roomId;
-    const background = body.action === 'background';
+    const background = body.action === 'background' || body.action === 'scene';
     if ((body.action !== 'photo' && !background) || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || (!background && !['request', 'character'].includes(body.source ?? ''))) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
     const auth = await timed(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization } });
     if (!auth.ok) return json({ error: '로그인 세션이 만료됐어요.' }, 401);
@@ -284,6 +366,7 @@ async function handle(req: Request) {
     if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
     const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
     const model: LoungeImageModel = isLoungeImageModel(body.imageModel) ? body.imageModel : 'gpt';
+    if (body.action === 'scene') return await sceneBackground(context, user.id, roomId);
     if (background) return await memberBackground(context, user.id, roomId, request, model);
     return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request, model);
   } catch (error) {

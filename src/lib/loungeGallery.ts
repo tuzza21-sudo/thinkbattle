@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isLoungeSceneImage } from './lounge';
 import { loungePhotoBuckets, type LoungeCharacterPost } from './loungePhotos';
 
 /** A post with an address the browser can show: public photos by their public URL, private ones by a signed URL. */
@@ -23,10 +24,24 @@ export async function withPhotoUrls(posts: readonly LoungeCharacterPost[]): Prom
   });
 }
 
-/** The address of a background the member made for their conversation (kept privately under their folder). */
+/**
+ * The address of a background image: a scene shared by every member by its public URL, one the member made for their
+ * conversation (kept privately under their folder) by a signed one.
+ */
 export async function signLoungeBackground(path: string) {
+  if (isLoungeSceneImage(path)) return supabase.storage.from(loungePhotoBuckets.public).getPublicUrl(path).data.publicUrl;
   const { data } = await supabase.storage.from(loungePhotoBuckets.private).createSignedUrl(path, 7200);
   return data?.signedUrl ?? null;
+}
+
+/** A background made for a scene and shared by every member (lounge_scene_backgrounds). */
+export type LoungeSharedScene = { id: string; description: string; image_path: string; url: string };
+/** The shared scenes, most picked and newest first; empty before migration 20261129. */
+export async function loadLoungeSharedScenes(limit = 30): Promise<LoungeSharedScene[]> {
+  const { data, error } = await supabase.from('lounge_scene_backgrounds').select('id,description,image_path').order('uses', { ascending: false }).order('created_at', { ascending: false }).limit(limit);
+  if (error) return [];
+  return ((data ?? []) as Array<Omit<LoungeSharedScene, 'url'>>).filter(row => isLoungeSceneImage(row.image_path))
+    .map(row => ({ ...row, url: supabase.storage.from(loungePhotoBuckets.public).getPublicUrl(row.image_path).data.publicUrl }));
 }
 
 /** The photos the character sent in this conversation, oldest first. Only the member's own are readable. */

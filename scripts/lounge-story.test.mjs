@@ -84,3 +84,37 @@ test('a story file with a broken episode is refused before anything is sent', ()
   assert.ok(problems.some(problem => /episode 2/.test(problem)));
   assert.ok(problems.some(problem => /no opening/.test(problem)));
 });
+
+test('replies without progress make the character lead more firmly, and meeting a checkpoint lets it follow again', () => {
+  let state = { episode: 0, done: [], opened: true, complete: false };
+  assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).pace, 'follow');
+  for (let turn = 0; turn < story.loungeStoryPaceTurns.nudge; turn++) state = story.advanceLoungeStory(episodes, state, [], true).state;
+  assert.equal(state.idle, story.loungeStoryPaceTurns.nudge);
+  assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).pace, 'nudge');
+  for (let turn = state.idle; turn < story.loungeStoryPaceTurns.steer; turn++) state = story.advanceLoungeStory(episodes, state, [], true).state;
+  assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).pace, 'steer');
+  state = story.advanceLoungeStory(episodes, state, ['envelope'], true).state;
+  assert.equal(state.idle, undefined, 'a met checkpoint starts the count again');
+  assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).pace, 'follow');
+  assert.equal(story.loungeStoryEpisodeContext(episodes, { ...state, done: ['envelope', 'missing-lines', 'her-signature', 'choice'] }, true).pace, undefined, 'nothing to lead toward once all are met');
+  assert.equal(story.normalizeLoungeStoryState({ ...state, idle: 7 }, episodes).idle, 7, 'the count is kept with the room');
+});
+
+test('what the two settled is kept across episodes, told to the character, and the next episode can be rewritten to it', () => {
+  const settled = '다음 주 토요일 저녁, 쿠킹 스튜디오 대신 일반 식당에서 만나기로 했다';
+  let step = story.advanceLoungeStory(episodes, { episode: 0, done: [], opened: true, complete: false }, [], true, [settled, '']);
+  assert.deepEqual(step.state.facts, [settled]);
+  assert.deepEqual(story.loungeStoryEpisodeContext(episodes, step.state, true).agreed, [settled]);
+  step = story.advanceLoungeStory(episodes, { ...step.state, done: episodes[0].checkpoints.map(point => point.id) }, [], true, [settled]);
+  assert.equal(step.advanced, true); assert.deepEqual(step.state.facts, [settled], 'the same fact once, carried into the next episode');
+  const second = episodes[1];
+  const adapted = story.readLoungeStoryAdaptation({ opening: '토요일 저녁, 골목 안쪽의 작은 비스트로.', scene: '토요일 저녁, 작은 비스트로', goal: '', lead: '', ending: '', checkpoints: [{ id: second.checkpoints[0].id, detail: '식당에서 바뀐 일' }, { id: 'made-up', detail: 'x' }] }, second, 1);
+  assert.equal(adapted.scene, '토요일 저녁, 작은 비스트로'); assert.equal(adapted.goal, second.goal, 'what the model left empty stays as written');
+  assert.deepEqual(adapted.checkpoints.map(point => point.id), second.checkpoints.map(point => point.id), 'the checkpoints keep their ids; an unknown one is dropped');
+  const state = story.normalizeLoungeStoryState({ ...step.state, adapted }, episodes);
+  const episode = story.loungeStoryEpisodeAt(episodes, state);
+  assert.equal(episode.opening, '토요일 저녁, 골목 안쪽의 작은 비스트로.'); assert.equal(episode.title, second.title);
+  assert.equal(story.loungeStoryEpisodeContext(episodes, state, true).checkpoints_open[0].what, '식당에서 바뀐 일');
+  assert.equal(story.normalizeLoungeStoryState({ ...state, episode: 2, opened: false }, episodes).adapted, undefined, 'a rewrite of another episode is not used');
+  assert.equal(story.readLoungeStoryAdaptation({ scene: '' }, second, 1), undefined, 'a rewrite without a scene is refused');
+});
