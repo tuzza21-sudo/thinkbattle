@@ -59,9 +59,10 @@ async function kissScene(host = 'diplomat') {
   if (host === 'auditor') {
     const [vip] = await (await fetch(`${(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL).replace(/\/$/, '')}/rest/v1/lounge_scenarios?select=*&id=eq.auditor-vip-match`, { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` } })).json();
     return { name: '서도현 3단계 · 딥 키스', host: 'auditor', scenario: { id: vip.id, title: vip.title, prologue: vip.prologue, user_role: vip.user_role, relationship: vip.relationship, place: vip.place },
-      row: { ...row, character_id: 'auditor', stage: 'KNOWS_YOUR_MIND', scores: { trust: 48, comfort: 62, respect: 50, interest: 90, openness: 40, resonance: 66, epistemicHonesty: 58 } },
+      row: { ...row, character_id: 'auditor', stage: args.find(arg => arg.startsWith('--stage='))?.split('=')[1] ?? 'KNOWS_YOUR_MIND', scores: { trust: 48, comfort: 62, respect: 50, interest: 90, openness: 40, resonance: 66, epistemicHonesty: 58 } },
       memory: '지금 장면: 밤, 호텔 라운지 뒤 조용한 복도'+String.fromCharCode(92)+'n둘 사이: 서로 마음이 기운 것을 알고, 손을 잡은 채 짧게 입을 맞췄다.',
-      chat: [['human', '*그의 목덜미를 감싸고 입술을 포개며 천천히 깊게 키스한다. 혀끝이 닿는다*'], ['host', '*숨을 고르며 맞잡은 손에 힘을 준다* 갑자기 오면… 나도 놀라죠.'], ['human', '*그의 허리를 끌어안고 더 깊이 입을 맞춘다*']] };
+      chat: args.find(arg => arg.startsWith('--say=')) ? [['human', args.find(arg => arg.startsWith('--say=')).slice(6)]]
+        : [['human', '*그의 목덜미를 감싸고 입술을 포개며 천천히 깊게 키스한다. 혀끝이 닿는다*'], ['host', '*숨을 고르며 맞잡은 손에 힘을 준다* 갑자기 오면… 나도 놀라죠.'], ['human', '*그의 허리를 끌어안고 더 깊이 입을 맞춘다*']] };
   }
   const base = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL).replace(/\/$/, ''), key = process.env.SUPABASE_SERVICE_ROLE_KEY, headers = { apikey: key, Authorization: `Bearer ${key}` };
   const [story] = await (await fetch(`${base}/rest/v1/lounge_scenarios?select=*&id=eq.diplomat-old-friend-fling`, { headers })).json();
