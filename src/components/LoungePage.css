@@ -66,6 +66,8 @@
 .lounge-account-name strong { max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
 .lounge-account-name small { color:var(--l-muted); font-size:10px; }
 .lounge-account button.lounge-account-logout { padding:10px; }
+.lounge-account a.lounge-persona-link { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--l-line); border-radius:10px; background:var(--l-paper); color:var(--l-ink); padding:10px 14px; font-size:12px; text-decoration:none; }
+.lounge-account a.lounge-persona-link:hover { border-color:#9caa8a; background:#f0f3e7; }
 .lounge-guest-label { font-size:11px; color:var(--l-muted); }
 .lounge-account-error { max-width:1232px; margin:16px auto!important; padding:12px 20px; color:#914f27; background:#fff0e5; font-size:12px; }
 @media(max-width:760px) {

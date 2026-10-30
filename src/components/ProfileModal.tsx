@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Check, LoaderCircle, Mail, Save } from 'lucide-react';
+import { Check, LoaderCircle, Mail, Save, UserCog } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
-import { LoungePersonaManager } from './LoungePersonaManager';
+import { Link } from 'react-router-dom';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
 import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 import { saveLoungeProfile } from '../lib/auth';
@@ -111,7 +111,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
         <button type="submit" className="btn btn-primary lounge-account-submit" disabled={introState !== 'idle'}>{introState === 'saving' ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{introState === 'saving' ? '저장 중…' : introState === 'saved' ? '저장했어요' : '소개 저장'}</button>
       </form>
       <span className="lounge-account-section-label">03 · 대화 속 나 (페르소나)</span>
-      <LoungePersonaManager />
+      <p className="lounge-persona-note">캐릭터와 1:1로 대화할 때의 나(이름, 직업, 성격)는 전용 페이지에서 대화 전에 만들고 고쳐요. 기본 페르소나는 새 대화마다 자동으로 쓰여요.</p>
+      <Link to="/lounge/personas" className="btn lounge-persona-open" onClick={onClose}><UserCog size={16} />내 페르소나 관리하기</Link>
     </>}
   </LoungeAccountDialog>;
 };

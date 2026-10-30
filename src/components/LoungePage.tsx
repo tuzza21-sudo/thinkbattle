@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, UserRound, Users, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, UserCog, UserRound, Users, X, Image as ImageIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
@@ -55,6 +55,7 @@ function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequ
     <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
         <button type="button" className="lounge-profile-button" onClick={onProfileRequest} aria-label={`${user.nickname}님 프로필 수정`}><span className="lounge-account-avatar">{user.loungeAvatarUrl ? <img src={user.loungeAvatarUrl} alt="" /> : <UserRound size={18} />}</span><span className="lounge-account-name"><strong>{user.nickname}</strong><small>프로필 수정</small></span></button>
+        <Link to="/lounge/personas" className="lounge-persona-link" title="대화 속 나(페르소나)를 만들고 고쳐요"><UserCog size={15} aria-hidden="true" />페르소나</Link>
         {onLogout && <button type="button" className="lounge-account-logout" disabled={loggingOut} onClick={() => void onLogout()} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>}
       </> : <>
         {user?.isAnonymous && <span className="lounge-guest-label">게스트로 참여 중</span>}
@@ -1369,7 +1370,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     options={loungeImageModels.map(model => ({ value: model.id, label: model.label, hint: model.hint }))} note="캐릭터가 보내는 사진과 직접 만드는 배경에 쓰여요. 사진 아래에 만든 모델이 표시돼요." /> : null;
   const personaChoice = chatSettings && personas ? <LoungeSettingsChoice title="대화 속 나 (페르소나)" value={personaValue} busy={personaBusy} onChange={value => void choosePersona(value)}
     options={[{ value: 'default', label: '기본 페르소나', hint: defaultPersona ? defaultPersona.title : '없음' }, ...personas.map(item => ({ value: item.id, label: item.title, hint: [item.job, item.personality].filter(Boolean).join(' · ') || undefined })), { value: 'none', label: '페르소나 없이' }]}
-    note={personas.length ? undefined : '프로필에서 페르소나를 만들면 여기서 고를 수 있어요.'} /> : null;
+    note={personas.length ? undefined : '대화 전에 "내 페르소나" 페이지(사석 상단의 페르소나)에서 만들어 두면 여기서 고를 수 있어요.'} /> : null;
   const settingsChoices = personaChoice || imageModelChoice ? <>{personaChoice}{imageModelChoice}</> : undefined;
   return <>{memoryOpen && <LoungeMemorySheet characterId={room.host_persona} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} onClose={() => setMemoryOpen(false)} />}{episodeIntro && room.scenario && episode && <LoungeStoryIntro scenario={{ ...room.scenario, title: `${episode.number}화 · ${episode.title}`, prologue: episode.opening || episode.scene }} kicker={`${room.scenario.title} ${episode.number}화`} startLabel={`${episode.number}화 시작하기`} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} portrait={getLoungeHost(room.host_persona).portrait} image={episodeImage} accent={storyTheme.accent} memberName={members.find(member => member.user_id === user.id)?.nickname ?? user.nickname} onStart={startEpisode} />}
   {storyIntro && room.scenario && <LoungeStoryIntro scenario={room.scenario} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} portrait={getLoungeHost(room.host_persona).portrait} image={storyTheme.image} accent={storyTheme.accent} memberName={members.find(member => member.user_id === user.id)?.nickname ?? user.nickname} onStart={startStory} />}

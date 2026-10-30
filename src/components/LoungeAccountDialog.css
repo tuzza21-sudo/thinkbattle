@@ -148,6 +148,8 @@
 .lounge-persona-actions button { display:grid; place-items:center; width:32px; height:32px; border:1px solid #ffffff1f; border-radius:9px; background:transparent; color:#dbe0d2; cursor:pointer; }
 .lounge-persona-actions button[aria-pressed=true] { color:#dbc28e; }
 .lounge-persona-actions button:disabled { opacity:.5; cursor:default; }
+.lounge-account-dialog a.lounge-persona-open { display:inline-flex; align-items:center; justify-content:center; gap:7px; width:fit-content; padding:11px 16px; border:1px solid #e6c99466; border-radius:12px; background:transparent; color:#e6c994; font-size:13px; font-weight:600; text-decoration:none; }
+.lounge-account-dialog a.lounge-persona-open:hover { background:#e6c99414; }
 .lounge-persona-add { display:flex; align-items:center; justify-content:center; gap:6px; padding:11px; border:1px dashed #ffffff40; border-radius:12px; background:transparent; color:#e6dfcf; font-size:13px; cursor:pointer; }
 .lounge-persona-add small { color:#9fae98; }
 .lounge-persona-form { padding:14px; border:1px solid #ffffff1f; border-radius:14px; background:#ffffff06; }

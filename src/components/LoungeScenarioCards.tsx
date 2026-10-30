@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, LoaderCircle, Play } from 'lucide-react';
+import { BookOpen, LoaderCircle, Play, UserCog } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
-import { startLoungeScenario } from '../lib/loungeApi';
+import { listMyLoungePersonas, startLoungeScenario } from '../lib/loungeApi';
 import { loungeMemberNoteLimits, personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -18,6 +18,15 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  // The member's default persona, told before a story starts: it is used from the first reply (undefined while loading).
+  const [personaName, setPersonaName] = useState<string | null | undefined>();
+  const member = Boolean(user && !user.isAnonymous);
+  useEffect(() => {
+    if (!member) return;
+    let cancelled = false;
+    void listMyLoungePersonas().then(list => { if (!cancelled) setPersonaName(list.find(item => item.is_default)?.title ?? null); }, () => { if (!cancelled) setPersonaName(null); });
+    return () => { cancelled = true; };
+  }, [member]);
   // "둘만의 이야기" links here (#stories): the list appears once loaded, so it is scrolled to then.
   const listed = scenarios.length > 0;
   useEffect(() => { if (listed && hash === '#stories') document.getElementById('stories')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [listed, hash]);
@@ -31,6 +40,7 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
   return <section id="stories" className="lounge-character-section lounge-scenarios">
     <h2><BookOpen size={18} /> 대화 시작하기</h2>
     <p className="lounge-character-lead">함께할 이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
+    {member && personaName !== undefined && <p className="lounge-scenario-persona"><UserCog size={15} aria-hidden="true" /><span>대화 속 나(페르소나) <b>{personaName ?? '없음'}</b>{personaName ? '으로 시작해요.' : ' · 대화 전에 만들어 두면 캐릭터가 알고 시작해요.'}</span><Link to="/lounge/personas">{personaName ? '바꾸기' : '만들기'}</Link></p>}
     {user && <details className="lounge-scenario-note">
       <summary>나를 소개하고 시작하기 <small>선택</small></summary>
       <label>
