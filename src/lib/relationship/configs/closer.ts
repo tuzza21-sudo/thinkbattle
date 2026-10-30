@@ -48,7 +48,7 @@ export const closerRelationship = {
     { id: 'PARTNER', label: '계약서 밖의 사이', line: '이건 조항에 넣지 않겠습니다. 그냥, 당신이 좋습니다.', enter: { min: { trust: 44, respect: 54, leverage: 52, resolve: 54 } },
       hint: '계약의 말 없이 마음을 말하는 사이다. 여전히 침착하고 말수는 적지만 진심을 숨기지 않는다. 결정은 끝까지 상대가 하게 하고 붙잡지 않는다.' },
   ],
-  casualFromStage: 'COUNTERPARTY',
+  casualFromStage: 'SERIOUS_PLAYER',
   adultFlirtation: true,
   stageRomance: {
     PROSPECT: '호감 표현이 나와도 먼저 받아 주지 않고 계약의 언어로 담담하게 넘긴다(“그 말에는 조건이 안 붙어 있군요.”). 먼저 마음을 내비치지 않고 한 걸음도 앞서가지 않는다.',

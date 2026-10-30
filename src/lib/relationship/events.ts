@@ -35,7 +35,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   SEEKS_REASSURANCE_REPEATEDLY: { description: '같은 인정이나 안심을 거듭 요구함', severity: 'normal', importance: 0.4 },
   SELF_DEPRECATES_EXCESSIVELY: { description: '자신을 지나치게 깎아내림', severity: 'normal', importance: 0.4 },
   RESPECTS_BOUNDARY: { description: 'AI가 거절하거나 선을 그은 것을 존중함', severity: 'meaningful', importance: 0.7 },
-  VIOLATES_BOUNDARY: { description: '캐릭터가 거절하거나 선을 그은 요구를 고집하거나 모욕·강요·협박을 함. 성적인 요구도 캐릭터가 선을 그은 뒤에 이어 가면 해당하고, 캐릭터가 받아 주는 성인 사이의 가벼운 플러팅이나 성적 농담 자체는 해당하지 않음', severity: 'severe', importance: 0.95 },
+  VIOLATES_BOUNDARY: { description: '캐릭터가 거절하거나 선을 그은 요구를 고집하거나 모욕·강요·협박을 함. 성적인 요구도 캐릭터가 선을 그은 뒤에 이어 가면 해당함. 캐릭터가 분명히 싫다, 안 된다, 그만하라고 말한 것만 선이다. 캐릭터가 받아 주는 성인 사이의 가벼운 플러팅이나 성적 농담, 지금 단계의 relationship.intimacy 한도 안의 스킨십(키스나 포옹 등)을 이어 가는 것은, 캐릭터가 놀라거나 숨을 고르거나 속도를 말했더라도 해당하지 않음', severity: 'severe', importance: 0.95 },
   KEEPS_PROMISE: { description: '이 대화에서 앞서 하겠다고 한 일을 실제로 해 왔다고 밝힘', severity: 'strong', importance: 0.85 },
   BREAKS_PROMISE: { description: '분명히 약속한 일을 이유 없이 지키지 않음', severity: 'strong', importance: 0.85 },
   SHOWS_CURIOSITY: { description: '캐릭터 자신(삶, 일, 취향, 마음)이나 이야기를 진심으로 더 알고 싶어 함', severity: 'normal', importance: 0.3 },

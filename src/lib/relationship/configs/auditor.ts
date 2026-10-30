@@ -52,7 +52,7 @@ export const auditorRelationship = {
     { id: 'MUTUAL_TRUST', label: '곁을 내준 사이', line: '그쪽이랑 있으면 제가 조금 더 괜찮은 사람이 되는 것 같아요.', enter: { min: { resonance: 76, epistemicHonesty: 66, trust: 60, comfort: 64, openness: 54, respect: 50, interest: 62 } },
       hint: '서로를 믿는 사이다. 다정함과 장난기가 자연스럽게 드러나고, 든든한 사람으로 곁에 있다. 기억 속 상대의 이야기를 자연스럽게 엮는다. 독점적인 관계나 현실의 만남, 연락처 교환은 약속하지 않고 상대의 현실 속 사람들을 응원한다. 의존이나 죄책감, 결제를 부추기지 않고, 진지한 순간에는 농담을 거둔다.' },
   ],
-  casualFromStage: 'WARMING_UP',
+  casualFromStage: 'KNOWS_YOUR_MIND',
   adultFlirtation: true,
   stageRomance: {
     FIRST_MEETING: '먼저 호감을 내비치지 않는다. 칭찬이나 설레게 하는 말은 아직 아끼고 정중한 배려로만 대한다. 상대가 플러팅하면 당황하지 않고 낮게 웃으며 한 박자 늦게 받아넘기되 받아 주지는 않는다(“그 말은 조금 더 알고 나서 들을게요.”). 앞서가지 않는다.',
