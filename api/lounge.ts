@@ -955,11 +955,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
-        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } } } : {}) },
-        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts'] : [])],
+        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } }, story_choice: { type: 'string' } } : {}) },
+        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts', 'story_choice'] : [])],
       } } },
     });
-    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown };
+    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown; story_choice?: unknown };
     // The next episode, rewritten to what the two settled that differs from the story as written (a restaurant instead of
     // the cooking studio). Without an answer the episode opens as written, with the facts still told to the character.
     const adaptEpisode = async (state: LoungeStoryState, memory: string | undefined) => {
@@ -981,23 +981,25 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
     };
     // The story moves on: the checkpoints this turn met, what the two settled, and the next episode once the last one's
     // ending was told. The state is written with the server key; before migration 20261126 there is no column and the
-    // story stays in its first episode.
-    const saveStory = async (met: unknown, settled: unknown, memory: string | undefined) => {
+    // story stays in its first episode. The state saved is returned, for the page to show at once (the choices the reply
+    // put to the member).
+    const saveStory = async (met: unknown, settled: unknown, asked: unknown, memory: string | undefined): Promise<LoungeStoryState | undefined> => {
       if (!storyState || !serviceHeaders) return;
-      const next = advanceLoungeStory(storyEpisodes, storyState, met, storyStageReached, settled);
+      const next = advanceLoungeStory(storyEpisodes, storyState, met, storyStageReached, settled, asked);
       // A turn that met nothing is logged too: a checkpoint that never counts is otherwise invisible.
       if (JSON.stringify(next.state) === JSON.stringify(storyState)) { console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: storyState.episode + 1, done: storyState.done.length, open: (storyEpisode?.checkpoints_open ?? []).map(point => point.id), met: Array.isArray(met) ? met : [] })); return; }
       const adapted = next.advanced ? await adaptEpisode(next.state, memory) : undefined;
       const state = adapted ? { ...next.state, adapted } : next.state;
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
-        console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: state.episode + 1, done: state.done.length, idle: state.idle ?? 0, facts: state.facts?.length ?? 0, advanced: next.advanced, adapted: Boolean(adapted), complete: state.complete, saved: response.ok }));
+        console.info('[Lounge story]', JSON.stringify({ host: host.id, episode: state.episode + 1, done: state.done.length, idle: state.idle ?? 0, facts: state.facts?.length ?? 0, asking: state.asking ?? null, advanced: next.advanced, adapted: Boolean(adapted), complete: state.complete, saved: response.ok }));
+        return response.ok ? state : undefined;
       } catch (error) { console.warn('[Lounge story] not saved', error instanceof Error ? error.name : 'error'); }
     };
     // Runs once the reply is written, alongside its speech. What it writes is saved only if the reply was (`saved`). A
     // failure loses this turn's summary and events, never the reply. It is not cancelled with the request: the member
     // leaving right after a reply should not lose what the reply changed.
-    const afterReply = async (reply: string, saved: Promise<boolean>): Promise<{ answer?: AfterReply; relationship?: { relationship: RelationshipView; change: RelationshipChange } }> => {
+    const afterReply = async (reply: string, saved: Promise<boolean>): Promise<{ answer?: AfterReply; relationship?: { relationship: RelationshipView; change: RelationshipChange }; story?: LoungeStoryState }> => {
       const started = performance.now();
       let answer: AfterReply | undefined;
       try {
@@ -1008,15 +1010,15 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
       } catch (error) { console.warn('[Lounge after reply] not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
       if (!await saved) return {};
       const memory = answer?.memory.trim();
-      const [, relationshipSaved] = await Promise.all([
+      const [, relationshipSaved, storySaved] = await Promise.all([
         memory ? rpc<boolean>('save_voice_lounge_room_memory', { p_room: roomId, p_memory: memory, p_turn: room.ai_turns ?? 0 })
           .catch(error => { console.warn('[Lounge after reply] summary not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); }) : undefined,
         saveRelationship(answer, true),
-        saveStory(answer?.story_checkpoints, answer?.story_facts, memory),
+        saveStory(answer?.story_checkpoints, answer?.story_facts, answer?.story_choice, memory),
       ]);
       await fillMemoryEmbeddings();
       console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer) }));
-      return { answer, relationship: relationshipSaved };
+      return { answer, relationship: relationshipSaved, story: storySaved };
     };
     // Memories without an embedding (new, changed, or from before memories had one) get one, a few per reply.
     const fillMemoryEmbeddings = async () => {
@@ -1478,9 +1480,11 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             else console.warn('[Lounge API] spoken reply was not saved');
             await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); });
             await speech;
-            const { answer, relationship: relationshipSaved } = await after;
+            const { answer, relationship: relationshipSaved, story: storySaved } = await after;
             // The chat's status card: the new stage and scores, and what the member's message changed.
             if (relationshipSaved) send({ type: 'relationship', ...relationshipSaved });
+            // Where the story is now, so the choices the reply put to the member show without waiting for the room's reload.
+            if (storySaved) send({ type: 'story', state: storySaved });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
             const photo = chatPhotos && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
             if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });

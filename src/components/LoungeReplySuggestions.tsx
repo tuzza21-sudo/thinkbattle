@@ -57,3 +57,38 @@ export function LoungeReplyPanel({ state, logRef, followRef }: { state: LoungeRe
     {state.error && <p className="lounge-reply-error" role="alert">{state.error}</p>}
   </section>;
 }
+
+/**
+ * A story's choice (see loungeStory.ts): once the character has put a moment with choices to the member ("지금 합의할 수
+ * 있습니까?"), its choices show here like the suggested replies, and picking one sends it as the member's words. The member
+ * may write their own answer instead, or close the panel.
+ */
+export function LoungeStoryChoicePanel({ choice, send, disabled, logRef, followRef }: { choice: { id: string; label: string; choices: string[] }; send: (text: string) => Promise<void>; disabled: boolean; logRef: RefObject<HTMLDivElement | null>; followRef: RefObject<boolean> }) {
+  const [closed, setClosed] = useState('');
+  const [sending, setSending] = useState('');
+  const [error, setError] = useState('');
+  const panel = useRef<HTMLElement>(null);
+  const shown = closed !== choice.id;
+  useEffect(() => {
+    if (!shown) return;
+    followRef.current = true;
+    const frame = requestAnimationFrame(() => {
+      const log = logRef.current;
+      if (log) log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
+      panel.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [shown, choice.id, logRef, followRef]);
+  if (!shown) return null;
+  const pick = async (text: string) => {
+    if (disabled || sending) return;
+    setSending(text); setError('');
+    try { await send(text); setClosed(choice.id); } catch (err) { setError(errorText(err)); } finally { setSending(''); }
+  };
+  return <section className="lounge-reply-panel lounge-story-choice" ref={panel} aria-label="이야기 선택">
+    <div className="lounge-reply-head"><b>어떻게 할까요?</b><button type="button" className="lounge-reply-close" onClick={() => setClosed(choice.id)} aria-label="선택 닫기"><X size={16} /></button></div>
+    <ul>{choice.choices.map(text => <li key={text}><button type="button" disabled={disabled || Boolean(sending)} onClick={() => void pick(text)}><span>{text}</span>{sending === text ? <LoaderCircle size={15} className="lounge-spin" /> : <Send size={15} />}</button></li>)}</ul>
+    <div className="lounge-reply-foot"><small>{choice.label} · 직접 써서 답해도 돼요.</small></div>
+    {error && <p className="lounge-reply-error" role="alert">{error}</p>}
+  </section>;
+}

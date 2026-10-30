@@ -13,6 +13,9 @@ dotenv.config({ path: '.env.local', quiet: true });
 const storyLib = loadTs(fileURLToPath(new URL('../src/lib/loungeStory.ts', import.meta.url)));
 const scenarios = loadTs(fileURLToPath(new URL('../src/lib/loungeScenarios.ts', import.meta.url)));
 
+/** How long an episode's texts may be (normalizeLoungeStoryEpisodes keeps no more). */
+const episodeLimits = { opening: 4000, scene: 400, goal: 600, lead: 1500, ending: 600 };
+
 /** The problems of a story file, by field; none means it can be saved. */
 export function checkStory(story) {
   const problems = [];
@@ -30,6 +33,13 @@ export function checkStory(story) {
       const valid = kept[index]?.checkpoints.length ?? 0;
       if (valid !== ids.length) problems.push(`episode ${index + 1}: ${ids.length - valid} checkpoint(s) with a bad id, label or detail`);
       if (index > 0 && !String(episode.opening ?? '').trim()) problems.push(`episode ${index + 1}: no opening (only the first episode opens with the prologue)`);
+      // A text over its limit would be cut short where the page reads it, and choices it cannot use are dropped.
+      for (const [field, max] of Object.entries(episodeLimits)) if (String(episode[field] ?? '').trim().length > max) problems.push(`episode ${index + 1}: ${field} is ${String(episode[field]).trim().length} characters, at most ${max}`);
+      (episode.checkpoints ?? []).forEach(point => {
+        if (point.choices === undefined) return;
+        const choices = kept[index]?.checkpoints.find(item => item.id === point.id)?.choices ?? [];
+        if (!Array.isArray(point.choices) || choices.length !== point.choices.length) problems.push(`episode ${index + 1}: ${point.id} needs 2-4 different choices of at most 60 characters`);
+      });
     });
   }
   return problems;

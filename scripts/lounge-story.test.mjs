@@ -118,3 +118,50 @@ test('what the two settled is kept across episodes, told to the character, and t
   assert.equal(story.normalizeLoungeStoryState({ ...state, episode: 2, opened: false }, episodes).adapted, undefined, 'a rewrite of another episode is not used');
   assert.equal(story.readLoungeStoryAdaptation({ scene: '' }, second, 1), undefined, 'a rewrite without a scene is refused');
 });
+
+test('a checkpoint with choices shows them once the character puts that moment to the member, until the member answers', () => {
+  const raw = [{ title: '선택', checkpoints: [
+    { id: 'talk', label: '말하기', detail: 'x' },
+    { id: 'kiss', label: '합의에 답하기', detail: 'x', choices: ['허락할게요.', '안 돼요.', '허락할게요.', ''] },
+    { id: 'one', label: '하나뿐', detail: 'x', choices: ['혼자'] },
+  ] }];
+  const [episode] = story.normalizeLoungeStoryEpisodes(raw);
+  assert.deepEqual(episode.checkpoints[1].choices, ['허락할게요.', '안 돼요.'], 'the same choice once, an empty one dropped');
+  assert.equal(episode.checkpoints[0].choices, undefined); assert.equal(episode.checkpoints[2].choices, undefined, 'one choice is no choice');
+  const episodes = [episode];
+  const start = story.normalizeLoungeStoryState(null, episodes);
+  assert.equal(story.advanceLoungeStory(episodes, start, [], true, [], 'talk').state.asking, undefined, 'a checkpoint without choices is answered in words');
+  let state = story.advanceLoungeStory(episodes, start, ['talk'], true, [], 'kiss').state;
+  assert.equal(state.asking, 'kiss');
+  assert.deepEqual(story.loungeStoryChoices(episodes, state), { id: 'kiss', label: '합의에 답하기', choices: ['허락할게요.', '안 돼요.'] });
+  assert.deepEqual(story.loungeStoryEpisodeContext(episodes, state, true).checkpoints_open.find(point => point.id === 'kiss').choices, ['허락할게요.', '안 돼요.'], 'the character knows the choices');
+  assert.equal(story.normalizeLoungeStoryState(state, episodes).asking, 'kiss', 'kept with the room');
+  assert.equal(story.advanceLoungeStory(episodes, state, [], true, [], '').state.asking, undefined, 'a reply that moved on clears it');
+  state = story.advanceLoungeStory(episodes, state, ['kiss'], true, [], 'kiss').state;
+  assert.equal(state.asking, undefined, 'a choice made is not asked again');
+  assert.equal(story.loungeStoryChoices(episodes, { ...state, asking: 'kiss' }), undefined);
+  assert.equal(story.normalizeLoungeStoryState({ ...start, asking: 'made-up' }, episodes).asking, undefined);
+});
+
+for (const [file, characterId, count] of [['closer-contract-love', 'closer', 5], ['auditor-vip-match', 'auditor', 6]]) {
+  test(`${file} continues the story card's own prologue, with gates that are real stages and a branch the member picks`, () => {
+    const file_ = JSON.parse(readFileSync(new URL(`../docs/stories/${file}.json`, import.meta.url), 'utf8'));
+    const kept = story.normalizeLoungeStoryEpisodes(file_.episodes);
+    const stages = relationship.relationshipConfigs[characterId].stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
+    assert.deepEqual(checkStory(file_), []);
+    assert.equal(file_.id, file, 'the existing card, not a second one');
+    assert.equal(kept.length, count);
+    assert.equal(kept[0].opening, '', 'the first episode follows the prologue');
+    for (const episode of kept) if (episode.gate) assert.ok(stages.includes(episode.gate), `episode ${episode.number}: ${episode.gate}`);
+    assert.ok(kept.some(episode => episode.checkpoints.some(point => point.choices)), 'the member picks at least one branch');
+  });
+}
+
+test('《6개월의 연인》 keeps its secrets until their episode, never says "아가씨", and ends its first part with three months left', () => {
+  const closer = story.normalizeLoungeStoryEpisodes(JSON.parse(readFileSync(new URL('../docs/stories/closer-contract-love.json', import.meta.url), 'utf8')).episodes);
+  assert.deepEqual(closer.map(episode => episode.checkpoints.filter(point => point.choices).map(point => point.id)), [[], ['kiss'], ['the-register'], ['that-night'], ['sign']]);
+  assert.ok(closer[0].keep.some(item => item.includes('시행사')) && closer[2].reveal.some(item => item.includes('시행사')), 'the company is kept, then told in the third');
+  assert.ok(closer.every(episode => episode.keep.length), 'he keeps something in every episode');
+  assert.ok(!JSON.stringify(closer).includes('아가씨'), 'the member is 상무님, whatever their gender');
+  assert.match(closer[4].ending, /남은 3개월/);
+});

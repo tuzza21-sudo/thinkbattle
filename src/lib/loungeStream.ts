@@ -13,8 +13,10 @@ export type LoungeStreamEvent =
   | { type: 'saved' }
   /** After the reply, once the relationship is saved: the new state and what the member's message changed (the chat's status card). */
   | { type: 'relationship'; relationship: RelationshipView; change: RelationshipChange }
+  /** After the reply, once a story's state is saved (rooms.story_state): with the choices the reply put to the member. */
+  | { type: 'story'; state: unknown }
   | { type: 'error'; error: string; code?: string; retryable?: boolean; retryAfterSeconds?: number };
-const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'relationship', 'done', 'error'];
+const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'relationship', 'story', 'done', 'error'];
 
 // NDJSON frames may split anywhere, including inside a Korean UTF-8 character.
 export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, signal?: AbortSignal) {
