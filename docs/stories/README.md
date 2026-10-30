@@ -15,6 +15,10 @@
 6. 관계가 아직 모자라면 사건을 서두르지 않고 그 장면 안에서 둘의 이야기를 이어 가요.
 7. 채팅 맨 위에는 "검은 장미 · 2화 / 6화" 진행 표시가 있고, 누르면 이번 화의 진행 조건(회원용 문구)이 체크 표시와 함께 보여요.
 8. 진행 상황은 방마다 `voice_lounge_rooms.story_state`에 남아요(`{episode, done, opened, complete}`).
+9. 고르는 순간(2026-10-30)에는 선택지를 넣을 수 있어요. 그런 진행 조건(`choices`)은 이렇게 진행돼요.
+   - 캐릭터가 그 순간에서 답을 멈추면 채팅 아래에 "답변 추천"과 같은 모양의 선택 버튼이 떠요.
+   - 고른 문장이 회원의 말로 올라가요. 직접 써서 답해도 돼요.
+   - 선택지가 없는 조건은 지금처럼 회원이 짧게 직접 답해요.
 
 ## 파일 형식 (`docs/stories/<id>.json`)
 
@@ -27,7 +31,7 @@
 | `scene` | 그 화의 장소와 때(캐릭터용) |
 | `goal` | 그 화에서 이뤄질 일 |
 | `lead` | 캐릭터가 그 화를 어떻게 이끄는지. 보여 줄 자료, 털어놓는 순간, 위기, 조연(캐릭터가 장면 속 인물로 연기해요)을 여기에 써요. |
-| `checkpoints[]` | 진행 조건 3~5개. `id`(영문 소문자·숫자·하이픈), `label`(회원에게 보이는 짧은 할 일), `detail`(무엇이 채워져야 인정되는지, 판정용) |
+| `checkpoints[]` | 진행 조건 3~5개. `id`(영문 소문자·숫자·하이픈), `label`(회원에게 보이는 짧은 할 일), `detail`(무엇이 채워져야 인정되는지, 판정용), 고르는 순간이면 `choices`(회원이 할 말이나 행동 2~4개, 60자 이내, 행동은 괄호로) |
 | `reveal` | 그 화에서는 관계 단계와 상관없이 말해도 되는 것 |
 | `keep` | 아직 말하지 않는 것(다음 화의 비밀) |
 | `gate` | 다음 화로 가려면 필요한 관계 단계 id(예: 선우령 `INTRIGUED`, `RESPECTFULLY_ENGAGED`). 비우면 조건만으로 넘어가요. |
@@ -40,7 +44,8 @@ node scripts/upsert-lounge-story.mjs docs/stories/<id>.json            # 검사�
 node scripts/upsert-lounge-story.mjs docs/stories/<id>.json --apply    # DB에 저장
 ```
 
-- 《검은 장미》는 `scripts/stories/velvet-black-rose.mjs`로 JSON을 만들어요(긴 글을 따옴표 걱정 없이 쓰려고요). `node scripts/stories/velvet-black-rose.mjs` 뒤에 위 명령을 실행해요.
+- 《검은 장미》는 `scripts/stories/velvet-black-rose.mjs`로 JSON을 만들어요(긴 글을 따옴표 걱정 없이 쓰려고요). `node scripts/stories/velvet-black-rose.mjs` 뒤에 위 명령을 실행해요. 서도현의 《VIP 매칭, 첫 만남》(`auditor-vip-match.mjs`)과 강무진의 《6개월의 연인》(`closer-contract-love.mjs`)도 같아요.
+- 이미 있는 이야기 카드에 화를 붙일 때는 새 id로 따로 만들지 말고 그 카드의 id와 프롤로그를 그대로 써요. 그래야 회원이 읽은 프롤로그에서 1화가 이어지고, 카드도 둘로 나뉘지 않아요. 두 이야기 모두 이렇게 만들었어요(서도현의 《맞선, 그 후》는 《VIP 매칭, 첫 만남》 뒤로 옮겨 붙이고 숨겼어요).
 - 처음 한 번은 `supabase/migrations/20261126000000_lounge_story_episodes.sql`을 실행해야 화 정보가 저장돼요. 그 전에는 프롤로그만 저장되고 이야기는 한 번에 진행돼요.
 - 이미 시작된 방은 그 방의 사본을 그대로 쓰고, 화 정보가 바뀐 뒤 새로 시작하면 새 방으로 1화부터 시작해요.
 
@@ -50,3 +55,4 @@ node scripts/upsert-lounge-story.mjs docs/stories/<id>.json --apply    # DB에 �
 - 회원이 알 수 없는 사실(금액, 날짜, 서류 내용)은 `lead`에서 캐릭터가 보여 주게 하고, 회원에게는 해석과 판단을 맡겨요.
 - `label`은 다음 화를 앞서 말하지 않게 써요.
 - `reveal`과 `keep`이 화마다 이어지게 해요. 앞 화의 `keep`이 뒤 화의 `reveal`로 풀리는 구조예요.
+- `choices`는 갈림길에만 써요(허락한다 / 거절한다 / 먼저 한다). 어느 선택지를 골라도 그 진행 조건이 채워지게 쓰고, 선택지마다 캐릭터가 어떻게 반응하는지는 `lead`에 적어요. 회원의 생각을 듣는 순간(어머니의 질문에 답하기)에는 선택지를 두지 않아요.
