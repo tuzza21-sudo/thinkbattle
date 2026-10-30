@@ -33,8 +33,13 @@ test('every shipped character configuration is valid and starts from its configu
   assert.equal(createRelationship(configs.auditor).scores.resonance, 30);
 });
 
-test('one-to-one speech starts polite for everyone; six characters turn casual from a later stage', () => {
-  const casualStage = { auditor: 'WARMING_UP', closer: 'COUNTERPARTY', velvet: 'INTRIGUED', trickster: 'BANTER_PARTNER', diplomat: 'GOOD_CHEMISTRY', ina: 'FLUTTER' };
+test('one-to-one speech starts polite for everyone; every character that turns casual does so at its third stage (2026-10-30)', () => {
+  const casualStage = { auditor: 'KNOWS_YOUR_MIND', closer: 'SERIOUS_PLAYER', velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER' };
+  const fromTemplates = relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: 'c_test', displayName: '테스트', core: ['a', 'b'], flirtation: true }));
+  for (const config of [...Object.values(configs), ...fromTemplates]) {
+    if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
+  }
+  assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
   for (const config of Object.values(configs)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);

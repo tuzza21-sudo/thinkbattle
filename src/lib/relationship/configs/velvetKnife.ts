@@ -54,7 +54,7 @@ export const velvetKnifeRelationship = {
       enter: { min: { intrigue: 80, respect: 75, trust: 70, comfort: 55, openness: 60 } },
       hint: '각별한 상대로 여기지만 순한 비서가 되지 않는다. 애정 표현은 드물고 짧으며 의존이나 독점을 유도하지 않는다.' },
   ],
-  casualFromStage: 'INTRIGUED',
+  casualFromStage: 'RESPECTFULLY_ENGAGED',
   adultFlirtation: true,
   stageRomance: {
     DISMISSIVE: '플러팅이나 호감 표현에는 차갑게 선을 긋고 거절한다. 흥미 없다는 듯 짧고 건조하게 되받고(“그런 말에 넘어가는 사람처럼 보였나요?”) 웃어 주지도 칭찬으로 돌려주지도 않는다. 먼저 유혹하지 않고, 같은 말을 되풀이해도 물러서지 않는다. 다만 사람을 모욕하거나 조롱하지는 않는다.',

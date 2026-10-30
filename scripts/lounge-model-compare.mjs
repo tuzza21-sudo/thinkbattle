@@ -52,6 +52,19 @@ const personaScene = { name: '페르소나 · 저녁 메뉴', persona: { title: 
   state: { episode: 1, done: ['her-confession', 'escape'], opened: true }, memory: '지금 장면: 수장고 지상 하역장, 탈출 직후. 그녀의 코트가 어깨에 걸려 있다.\n둘 사이: 90초 동안 서로를 믿고 문을 열었다.',
   chat: [['human', '오늘 너무 피곤해요. 저녁 뭘 먹어야 할지 모르겠어요.'], ['host', '*잔기침을 삼키고 코트 깃을 여민다* 손은 좀 괜찮아요?']] };
 
+// With --kiss, 윤지안 at her third stage (설레는 사이) in the story the member reported (2026-10-30): the member goes on to a deep
+// kiss after she asked for a slower pace, and she kept stepping back. Her story and the summary of that room are read from the database.
+async function kissScene() {
+  const base = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL).replace(/\/$/, ''), key = process.env.SUPABASE_SERVICE_ROLE_KEY, headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const [story] = await (await fetch(`${base}/rest/v1/lounge_scenarios?select=*&id=eq.diplomat-old-friend-fling`, { headers })).json();
+  if (!story) throw new Error('the story diplomat-old-friend-fling is not in the database');
+  return { name: '윤지안 3단계 · 딥 키스', host: 'diplomat',
+    scenario: { id: story.id, title: story.title, prologue: story.prologue, user_role: story.user_role, relationship: story.relationship, place: story.place },
+    row: { ...row, character_id: 'diplomat', stage: 'FLUTTERING', scores: { spark: 62, trust: 20, banter: 94, comfort: 65, respect: 73, interest: 100, openness: 50 } },
+    memory: '지금 장면: 밤, 조용한 골목의 가게 앞 벤치\n둘 사이: 오래된 친구에서 썸으로 가까워지는 중. 지안은 순대국집 뒤 먼저 손을 내밀었고, 골목에서 키스한 뒤에도 마음은 있지만 속도를 맞춰 달라고 했다.\n줄거리: 둘은 추리 영화 내기를 하고 순대국과 소주를 먹으며 손을 잡았다. 지안이 먼저 짧게 키스했지만, 사용자가 지안의 허리를 잡고 더 깊이 다가가자 고개를 돌려 피했다.\n남은 것: 지안이 멈추면 멈춰 달라는 경계를 사용자가 존중할지.',
+    chat: [['human', '*그녀의 허리를 끌어안고 입술을 포개며 천천히 깊게 키스한다. 혀끝이 닿는다*'], ['host', '*입술이 닿자 나는 눈을 감는다. 맞잡은 손에 힘이 들어가고, 숨이 조금 가빠진다* 야… 갑자기 오면 나도 놀라지.'], ['human', '*그녀의 입술을 느끼며 더 깊이 들어간다*']] };
+}
+
 async function capture(scene) {
   let reply;
   const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? '나' : '선우령', kind, text, created_at: new Date().toISOString() }));
@@ -63,10 +76,10 @@ async function capture(scene) {
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('lounge_member_personas?')) return result(scene.persona ? [{ id: 'p1', is_default: true, ...scene.persona }] : []);
     if (url.includes('voice_lounge_memories?')) return result([]);
-    if (url.includes('voice_lounge_relationships?')) return result([row]);
+    if (url.includes('voice_lounge_relationships?')) return result([scene.row ?? row]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: story.title, host_persona: 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario, story_state: scene.state }]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: story.title, host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: scene.scenario ?? scenario, story_state: scene.state ?? null }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
@@ -97,10 +110,11 @@ async function ask(request, model, effort) {
 }
 
 const args = process.argv.slice(2), withPersona = args.includes('--persona');
-const [outPath = 'model-compare.json', ...picked] = args.filter(arg => arg !== '--persona');
+const withKiss = args.includes('--kiss');
+const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-for (const scene of withPersona ? [personaScene] : scenes) {
+for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene()] : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
