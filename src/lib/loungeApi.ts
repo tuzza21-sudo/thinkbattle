@@ -218,6 +218,26 @@ export async function requestLoungePhoto(roomId: string, source: 'request' | 'ch
 }
 /** The background of the member's own one-to-one conversation: one of the places, or null for the conversation's own. */
 export const setLoungeRoomBackground = (roomId: string, theme: LoungeThemeId | null) => loungeRpc<void>('set_lounge_room_background', { p_room: roomId, p_theme: theme });
+/**
+ * The member's pick for their conversation's background: a place, the empty space or a shared scene, with the story
+ * episode it is for. Before migration 20261129 only a place can be saved, the older way.
+ */
+export type LoungeBackgroundChoice = { theme: LoungeThemeId } | { blank: true } | { scene: string };
+export async function chooseLoungeRoomBackground(roomId: string, choice: LoungeBackgroundChoice, episode?: number) {
+  try {
+    return await loungeRpc<unknown>('choose_lounge_room_background', { p_room: roomId, p_choice: { ...choice, ...(episode ? { episode } : {}) } });
+  } catch (error) {
+    if ('theme' in choice) return setLoungeRoomBackground(roomId, choice.theme);
+    throw error;
+  }
+}
+/** The background for where the conversation is now (a story's episode or the chat's scene): picked, or made and shared. */
+export async function matchLoungeSceneBackground(roomId: string) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'scene', roomId }) }, '배경 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '장면에 맞는 배경을 찾지 못했어요.', typeof payload?.code === 'string' ? payload.code : `lounge_scene_http_${response.status}`, payload?.retryable !== false, 10);
+  return payload as { background: unknown };
+}
 /** A background made from the member's description (20 to 60 seconds). Returns the stored image and its signed address. */
 export async function makeLoungeRoomBackground(roomId: string, prompt: string) {
   const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, imageModel: loadLoungeImageModel(), request: prompt.slice(0, 300) }) }, '배경 서버');

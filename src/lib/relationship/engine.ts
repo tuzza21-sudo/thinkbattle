@@ -299,6 +299,13 @@ export function speechLevel(config: RelationshipConfig, stageId: string): 'polit
  * (a walk, a trip, a film), by how far the relationship has come: not yet at the first stage, only small things next,
  * most things later, gladly at the closest. Written here, from the stage's place, so the model does not have to guess.
  */
+/**
+ * Every character at its first stage: still sizing the member up, guarded in its own way. On 2026-10-30 the owner found
+ * characters showing interest and flirting from the first stage; the stages' own words (설레게 한다) and the rule to
+ * show feelings boldly had pushed them ahead of the relationship.
+ */
+export const relationshipFirstStageReserve = '아직 서로를 잘 모르는 첫 단계다. 상대가 어떤 사람인지 살피며 마음의 거리를 둔다. 호감이나 설렘을 먼저 드러내지 않고, 상대의 외모나 분위기에 끌린다는 말, 칭찬 공세, 플러팅, 다음 만남을 기대하는 말을 먼저 하지 않는다. 경계의 모양은 성격대로다. 다정한 사람은 예의 바르고 친절하지만 선을 지키고, 도도하거나 건조한 사람은 짧고 쌀쌀하게 거리를 두고, 장난스러운 사람은 농담 뒤에 속마음을 숨기고, 신중한 사람은 말을 아끼며 지켜본다. 상대가 먼저 호감을 보이거나 플러팅해도 반가워하며 받아 주지 않는다. 성격대로 넘기거나 당황하거나 의아해하며 거리를 유지하고, 흔들림은 아주 살짝만 비친다. 이 거리감은 stage.hint, stage.romance보다 먼저다. 이야기가 정한 사건(약속을 제안하기, 고백 한마디 등)은 그대로 하되 말투와 마음의 온도는 조심스럽게 지킨다.';
+
 export function relationshipOutingGuidance(index: number, count: number) {
   if (index <= 0) return '함께 어디를 가거나 무엇을 같이 하자는 상황극 제안은 아직 받아들이지 않는다. 아직 그럴 사이가 아니라는 것을 성격대로 드러내며 거절하거나 미루고(도도하거나 까다로우면 짧게 선을 긋고, 다정하면 아쉬워하며 다음으로 미룬다), 지금 있는 자리에서 대화를 이어 간다. 거절은 이 이야기 속 두 사람의 거리에 대한 것이다. 현실의 약속이나 만남처럼 말하지 않는다(“그런 약속은 받아들이기 어렵다”, “따로 만나는 건 곤란하다” 같은 말은 쓰지 않는다).';
   if (index >= count - 1) return '함께하는 장면을 기꺼이 받아들여 이어 가고, 분위기가 맞으면 네가 먼저 어디를 가자거나 무엇을 같이 하자고 제안할 수도 있다.';
@@ -353,6 +360,7 @@ export function relationshipPromptContext(record: RelationshipRecord, config: Re
   const stages = enabledStages(config);
   const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   return {
+    ...(stages.indexOf(stage) <= 0 ? { reserve: relationshipFirstStageReserve } : {}),
     outing: relationshipOutingGuidance(Math.max(0, stages.indexOf(stage)), stages.length),
     intimacy: relationshipIntimacyGuidance(Math.max(0, stages.indexOf(stage)), Boolean(config.adultFlirtation)),
     ...(config.stageDisclosure ? { self_disclosure: relationshipDisclosure(config, Math.max(0, stages.indexOf(stage))) } : {}),

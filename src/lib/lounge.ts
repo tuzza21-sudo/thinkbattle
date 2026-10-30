@@ -427,18 +427,29 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
   return choices[hash % choices.length];
 }
 /**
- * What a member chose for a room's background (rooms.background): one of the backgrounds above, or an image made from
- * their own description, kept privately under their folder (lounge-character-private).
+ * What a room's background is (rooms.background): one of the backgrounds above; an image made from the member's own
+ * description, kept privately under their folder (lounge-character-private); one of the scenes shared by every member
+ * (lounge_scene_backgrounds, public under scenes/); or an empty, neutral space. `episode` is the story episode it was
+ * chosen in, and `auto` marks one chosen for the scene rather than by the member.
  */
-export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string };
+export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string; scene?: string; blank?: true; episode?: number; auto?: true };
+export const isLoungeSceneImage = (path?: string | null) => /^scenes\/[\w.-]{1,120}\.(webp|jpg)$/.test(path ?? '');
 export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | null {
   if (!raw || typeof raw !== 'object') return null;
   const value = raw as Record<string, unknown>;
   const theme = loungeThemes.find(item => item.id === value.theme)?.id;
-  const image = typeof value.image === 'string' && /^[0-9a-f-]{36}\/backgrounds\/[\w.-]{1,120}\.webp$/.test(value.image) ? value.image : undefined;
+  const image = typeof value.image === 'string' && /^[0-9a-f-]{36}\/backgrounds\/[\w.-]{1,120}\.(webp|jpg)$/.test(value.image) ? value.image : undefined;
+  const scene = typeof value.scene === 'string' && /^[0-9a-f-]{36}$/.test(value.scene) && typeof value.image === 'string' && isLoungeSceneImage(value.image) ? value.scene : undefined;
   const prompt = typeof value.prompt === 'string' ? value.prompt.replace(/\s+/g, ' ').trim().slice(0, 300) : undefined;
-  return image ? { image, ...(prompt ? { prompt } : {}) } : theme ? { theme } : null;
+  const episode = typeof value.episode === 'number' && Number.isInteger(value.episode) && value.episode >= 1 && value.episode <= 12 ? value.episode : undefined;
+  const extra = { ...(episode ? { episode } : {}), ...(value.auto === true ? { auto: true as const } : {}) };
+  if (image) return { image, ...(prompt ? { prompt } : {}), ...extra };
+  if (scene) return { scene, image: value.image as string, ...(prompt ? { prompt } : {}), ...extra };
+  if (value.blank === true) return { blank: true, ...extra };
+  return theme ? { theme, ...extra } : null;
 }
+/** The empty space a member can pick, and the neutral scene while a story's own background is being found. */
+export const loungeBlankScene = { name: '빈 공간', image: 'radial-gradient(120% 90% at 50% 18%, #3a3530 0%, #1d1b1e 55%, #111113 100%)', accent: '#d9cfc2', surface: '#18171b' } as const;
 /**
  * The scene a room shows: the background the member chose, else the story's own (a story room keeps the theme its
  * scenario names), else one of the character's.

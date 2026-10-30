@@ -581,3 +581,14 @@ test('a sexual word or a bold touch is answered in character and never ends the 
   assert.match(events, /노골적인 성적 말이나 대담한 스킨십 시도도 그 자체로는 분류하지 않는다/);
   assert.match(events, /분명히 선을 그은 뒤에도 같은 요구를 되풀이하거나, 강요·협박·모욕을 할 때만 분류한다/);
 });
+
+test('every character is guarded at its first stage, and only there', () => {
+  for (const config of Object.values(configs)) {
+    const record = createRelationship(config);
+    const first = relationshipPromptContext(record, config, initialMood(config));
+    assert.match(first.reserve, /호감이나 설렘을 먼저 드러내지 않/, `${config.characterId} at the first stage`);
+    const next = config.stages.filter(stage => stage.enabled !== false)[1];
+    assert.equal(relationshipPromptContext({ ...record, stage: next.id }, config, initialMood(config)).reserve, undefined, `${config.characterId} past it`);
+    assert.doesNotMatch(config.stageRomance?.[config.stages[0].id] ?? '', /설레게 한다/, `${config.characterId} does not set out to flutter at the first stage`);
+  }
+});
