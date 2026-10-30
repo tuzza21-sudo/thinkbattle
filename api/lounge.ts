@@ -903,7 +903,7 @@ ${photoRule}`;
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
       // The fast model replies without reasoning (as since the lounge began as a voice service, where the wait before the
       // first word matters most); the "deep" model reasons. Reasoning counts toward the output limit.
-      model: 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
+      model: chatModel.model ?? 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
       // Requests with the same key go to the same cache, so a character's long instructions are found there more often:
       // on 2026-10-21 one turn in the middle of a conversation missed the cache and read about 10,000 tokens anew.
       prompt_cache_key: `lounge-${host.id}`,
@@ -1372,7 +1372,7 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
           const attemptReply = async (provider: 'openai' | 'gemini' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             partialLength = 0;
-            const base = fast && replyReasoning !== 'none' ? { ...modelRequest, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
+            const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
             const request = inCharacter ? { ...base, instructions: `${base.instructions}\n${loungeInCharacterRetryRule}` } : base;
             const stall = new AbortController();

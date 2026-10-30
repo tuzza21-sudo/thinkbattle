@@ -1901,7 +1901,9 @@ test('a member\'s character speaks as itself, with its own relationship type; an
 });
 
 test('the deep model reasons in a chat; a voice reply and the fast model do not', async () => {
-  for (const [aiModel, voiceOn, effort] of [['gpt-reasoning', false, 'medium'], ['gpt-reasoning', true, 'none'], [null, false, 'none']]) {
+  // [room model, voice on, effort, the OpenAI model]; the Sol models are picked in the room's settings (2026-10-30).
+  for (const [aiModel, voiceOn, effort, openaiModel] of [['gpt-reasoning', false, 'medium', 'gpt-6-luna'], ['gpt-reasoning', true, 'none', 'gpt-6-luna'], [null, false, 'none', 'gpt-6-luna'],
+    ['gpt-sol', false, 'none', 'gpt-6-sol'], ['gpt-sol', true, 'none', 'gpt-6-sol'], ['gpt-sol-next', false, 'low', 'gpt-6.1-sol'], ['gpt-sol-next', true, 'none', 'gpt-6-sol']]) {
     let body, after;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -1915,6 +1917,7 @@ test('the deep model reasons in a chat; a voice reply and the fast model do not'
       throw new Error(`Unexpected ${url}`);
     }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
     assert.equal(body.reasoning.effort, effort, `${aiModel} ${voiceOn ? 'voice' : 'chat'}`);
+    assert.equal(body.model, openaiModel, `${aiModel} ${voiceOn ? 'voice' : 'chat'} asks ${openaiModel}`);
     assert.equal(body.max_output_tokens >= 3000, effort !== 'none', 'reasoning gets room in the output limit');
     // Nobody waits for the call after the reply, so it reasons a little whichever model answers.
     assert.equal(after.reasoning.effort, 'low');
@@ -3102,4 +3105,13 @@ test('a story in episodes: the character leads the current episode, the checkpoi
     assert.deepEqual(patch?.story_state, item.saved);
     if (item.state) assert.equal(input.story_episode.closing, 'ending', 'the reply after the last checkpoint tells the ending');
   }
+});
+
+test('the Sol models are offered after the two GPT ones, and GPT-6.1 Sol (which cannot run without reasoning) falls back to Sol when it stalls or the reply is spoken', () => {
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gpt-reasoning', 'gpt-sol', 'gpt-sol-next']);
+  const next = modelsLib.getLoungeChatModel('gpt-sol-next');
+  assert.equal(next.model, 'gpt-6.1-sol'); assert.notEqual(next.reasoning, 'none', 'gpt-6.1-sol refuses a request without reasoning');
+  assert.equal(next.stallModel, 'gpt-6-sol'); assert.equal(modelsLib.getLoungeChatModel(next.voiceFallback).reasoning, 'none');
+  assert.equal(modelsLib.getLoungeChatModel('gpt-sol').model, 'gpt-6-sol');
+  assert.equal(modelsLib.getLoungeChatModel('made-up').id, 'gpt', 'an unknown model is the fast GPT');
 });
