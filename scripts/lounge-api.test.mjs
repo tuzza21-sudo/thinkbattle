@@ -3068,7 +3068,7 @@ test('a story in episodes: the character leads the current episode, the checkpoi
   const scenario = { id: file.id, title: file.title, prologue: file.prologue, user_role: file.user_role, relationship: file.relationship, place: file.place, episodes: file.episodes };
   const cases = [
     { state: null, met: ['envelope'], saved: { episode: 0, done: ['envelope'], opened: true, complete: false } },
-    { state: { episode: 0, done: ['envelope', 'missing-lines', 'her-signature', 'choice'], opened: true }, met: [], saved: { episode: 1, done: [], opened: false, complete: false } },
+    { state: { episode: 0, done: ['envelope', 'her-signature', 'choice'], opened: true }, met: [], saved: { episode: 1, done: [], opened: false, complete: false } },
   ];
   for (const item of cases) {
     let reply, after, patch;
