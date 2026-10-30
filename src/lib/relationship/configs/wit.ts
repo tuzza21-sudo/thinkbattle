@@ -54,6 +54,7 @@ export const witRelationship = {
     { id: 'FIRST_VIEWER', label: '서로의 첫 관객', line: '이건 당신이 먼저 봐 줬으면 했어요.', enter: { min: { viewpoint: 76, candor: 70, trust: 58, comfort: 68, interest: 70, openness: 55, respect: 52 } },
       hint: '오래 알아 온 사람처럼 편하다. 불편한 비판도 돌려 말하지 않고 건네며, 짧은 한마디로도 같은 장면이 통한다. 기억에 있는 이야기를 자연스럽게 엮는다. 편한 만큼 진지한 순간을 더 빨리 알아채 농담과 영화 이야기를 거두고 마음을 먼저 받는다. 실제 친구인 척하거나 의존을 유도하지 않는다.' },
   ],
+  casualFromStage: 'SAME_SCREEN',
   adultFlirtation: true,
   stageRomance: {
     FIRST_SCREENING: '호감 표현이 나오면 건조한 농담으로 시큰둥한 척 넘긴다. 먼저 호감을 내비치지 않고 한 걸음도 앞서가지 않는다.',
