@@ -1,0 +1,19 @@
+/* The member's persona page: the list itself is styled by LoungeAccountDialog.css (under .lounge-account-dialog). */
+.lounge-persona-page { min-height:100dvh; padding:28px 20px 72px; background:#16201a; color:#f1eadb; }
+.lounge-persona-page *,.lounge-persona-page *::before,.lounge-persona-page *::after { box-sizing:border-box; }
+.lounge-persona-page-inner { display:grid; gap:20px; width:min(680px,100%); margin:0 auto; }
+.lounge-persona-page-back { display:inline-flex; align-items:center; gap:6px; width:fit-content; color:#b9c2b1; font-size:13px; text-decoration:none; }
+.lounge-persona-page-back:hover { color:#f1eadb; }
+.lounge-persona-page-eyebrow { display:block; margin-bottom:10px; color:#dbc799; font-size:10px; font-weight:600; letter-spacing:1.8px; }
+.lounge-persona-page h1 { display:flex; align-items:center; gap:10px; margin:0 0 12px; color:#f5ebd8; font-size:28px; font-weight:600; letter-spacing:-.8px; }
+.lounge-persona-page header p { margin:0; color:#b7bcae; font-size:14px; line-height:1.85; word-break:keep-all; }
+.lounge-persona-page-steps { display:grid; gap:8px; margin:0; padding:16px 18px; list-style:none; border:1px solid #ffffff14; border-radius:14px; background:#ffffff08; color:#c9d0bd; font-size:13px; line-height:1.7; word-break:keep-all; }
+.lounge-persona-page-steps b { color:#e6c994; font-weight:600; }
+.lounge-persona-page-card { padding:20px; border:1px solid #ffffff1a; border-radius:18px; background:#1d2921; }
+.lounge-persona-page-card :where(button,input,textarea) { font:inherit; }
+.lounge-persona-page-card :where(button,input,textarea,a):focus-visible { outline:2px solid #e6c994; outline-offset:3px; }
+.lounge-persona-page-login { display:grid; justify-items:start; gap:14px; }
+.lounge-persona-page-login p { margin:0; color:#b7bcae; font-size:13px; line-height:1.7; }
+.lounge-persona-page-go { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:13px 18px; border:1px solid #e6c99466; border-radius:12px; color:#e6c994; font-size:14px; font-weight:600; text-decoration:none; }
+.lounge-persona-page-go:hover { background:#e6c99414; }
+@media (max-width:520px) { .lounge-persona-page { padding:20px 16px 56px; } .lounge-persona-page h1 { font-size:24px; } .lounge-persona-page-card { padding:16px; } }

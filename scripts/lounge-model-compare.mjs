@@ -47,6 +47,11 @@ const scenes = [
     chat: [['human', '…네.'], ['host', '*잔을 입에 대지 않은 채* 5년 전 그 보고서, 당신은 확인했어요?']] },
 ];
 
+// With --persona, the one scene runs with a persona the member made (the default one), to see whether the character uses it.
+const personaScene = { name: '페르소나 · 저녁 메뉴', persona: { title: '게임 스튜디오 대표', call_name: '해준', job: '인디 게임 스튜디오 대표', personality: '말수가 적고 신중하다. 피곤할수록 농담이 줄어든다', details: '고양이 두 마리와 산다. 매운 음식을 좋아하고 커피는 못 마신다' },
+  state: { episode: 1, done: ['her-confession', 'escape'], opened: true }, memory: '지금 장면: 수장고 지상 하역장, 탈출 직후. 그녀의 코트가 어깨에 걸려 있다.\n둘 사이: 90초 동안 서로를 믿고 문을 열었다.',
+  chat: [['human', '오늘 너무 피곤해요. 저녁 뭘 먹어야 할지 모르겠어요.'], ['host', '*잔기침을 삼키고 코트 깃을 여민다* 손은 좀 괜찮아요?']] };
+
 async function capture(scene) {
   let reply;
   const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? '나' : '선우령', kind, text, created_at: new Date().toISOString() }));
@@ -56,7 +61,8 @@ async function capture(scene) {
     if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') return new Response(null, { status: 204 });
     if (url.includes('/auth/')) return result({ id: 'user-1' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
-    if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?')) return result([]);
+    if (url.includes('lounge_member_personas?')) return result(scene.persona ? [{ id: 'p1', is_default: true, ...scene.persona }] : []);
+    if (url.includes('voice_lounge_memories?')) return result([]);
     if (url.includes('voice_lounge_relationships?')) return result([row]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
@@ -90,10 +96,11 @@ async function ask(request, model, effort) {
   return { model, effort, ms, text, inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
-const [outPath = 'model-compare.json', ...picked] = process.argv.slice(2);
+const args = process.argv.slice(2), withPersona = args.includes('--persona');
+const [outPath = 'model-compare.json', ...picked] = args.filter(arg => arg !== '--persona');
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-for (const scene of scenes) {
+for (const scene of withPersona ? [personaScene] : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));

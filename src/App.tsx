@@ -48,6 +48,7 @@ const SimulationSessionPage = lazy(async () => ({ default: (await import('./comp
 const PersonalTrainingPage = lazy(async () => ({ default: (await import('./components/PersonalTrainingPage')).PersonalTrainingPage }));
 const LegalPage = lazy(async () => ({ default: (await import('./components/LegalPage')).LegalPage }));
 const LoungePage = lazy(async () => ({ default: (await import('./components/LoungePage')).LoungePage }));
+const LoungePersonaPage = lazy(async () => ({ default: (await import('./components/LoungePersonaPage')).LoungePersonaPage }));
 
 function App() {
   const { pathname } = useLocation();
@@ -64,6 +65,7 @@ function App() {
   useEffect(() => {
     const pageTitles: Record<string, string> = {
       '/lounge': '사석',
+      '/lounge/personas': '내 페르소나 · 사석',
       '/debate': '토론 훈련',
       '/battle/new': 'AI 토론',
       '/history': '훈련 기록',
@@ -203,6 +205,7 @@ function App() {
         <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/create" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/create/:editId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/personas" element={<LoungePersonaPage user={user} onLoginRequest={requestLogin} />} />
         <Route path="/lounge/characters/:characterId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />

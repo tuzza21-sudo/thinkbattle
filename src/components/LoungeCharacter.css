@@ -220,6 +220,10 @@
 .lounge-creator-voice-pick strong { font-size:14px; }
 .lounge-creator-voice-pick small { font-size:12px; color:var(--c-muted); }
 .lounge-creator-voice-play { flex-shrink:0; display:grid; place-items:center; width:44px; border:0; border-left:1px solid var(--c-line); background:#f6f2ea; color:var(--c-accent); cursor:pointer; }
+.lounge-scenario-persona { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:10px 14px; border:1px solid var(--c-line); border-radius:12px; background:var(--c-soft); color:var(--c-muted); font-size:13px; line-height:1.6; }
+.lounge-scenario-persona b { color:var(--c-ink); }
+.lounge-scenario-persona span { flex:1 1 220px; min-width:0; word-break:keep-all; }
+.lounge-scenario-persona a { font-weight:700; color:var(--c-accent); }
 .lounge-scenario-note { margin:0 0 14px; padding:12px 16px; border:1px solid var(--c-line); border-radius:14px; background:#fff; }
 .lounge-scenario-note summary { cursor:pointer; font-weight:700; font-size:14px; }
 .lounge-scenario-note summary small { margin-left:6px; font-weight:400; color:var(--c-muted); }
