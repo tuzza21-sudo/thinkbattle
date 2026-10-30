@@ -27,6 +27,8 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
   const asked = Object.values(view.metrics).filter(metric => metric.need);
   const ready = asked.filter(metric => (metric.score ?? 0) >= metric.need!).sort((a, b) => (b.score ?? 0) / b.need! - (a.score ?? 0) / a.need!).slice(0, 2);
   const short = asked.filter(metric => (metric.score ?? 0) < metric.need!).sort((a, b) => (b.need! - (b.score ?? 0)) - (a.need! - (a.score ?? 0))).slice(0, 2);
+  // Only the scores the next stage asks for (2026-10-30): the ones later stages use showed as bars that seemed required.
+  const bars = Object.entries(view.metrics).filter(([, metric]) => !asked.length || metric.need);
   return <div className={`lounge-relationship ${shown?.stage === 'promoted' ? 'celebrating' : ''}`}>
     <details>
       <summary>
@@ -46,7 +48,7 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
           {ready.length > 0 && <span className="met">잘 쌓이고 있어요 · <b>{ready.map(metric => metric.name).join(', ')}</b></span>}
           {short.length > 0 && <span className="short">더 필요해요 · <b>{short.map(metric => metric.name).join(', ')}</b></span>}
         </p>}
-        <ul className="lounge-relationship-bars">{Object.entries(view.metrics).map(([id, metric]) => {
+        <ul className="lounge-relationship-bars">{bars.map(([id, metric]) => {
           const state = !metric.need ? '' : (metric.score ?? 0) >= metric.need ? 'met' : 'short';
           return <li key={id} className={state}>
             <span>{metric.name}</span>

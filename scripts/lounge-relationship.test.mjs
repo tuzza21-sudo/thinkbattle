@@ -78,9 +78,24 @@ test('3. stages follow each character\'s own threshold rules, not an average', (
   assert.equal(run(config, [[event('SHOWS_CURIOSITY')], [event('ASKS_GOOD_QUESTION')], [event('SHOWS_CARE')]], lopsided).record.stage, 'DISMISSIVE');
   const ready = withScores(config, { intrigue: 55, interest: 55 });
   const { record, logs } = run(config, [[event('SHOWS_CARE')], [event('SHOWS_CARE')], [event('ASKS_GOOD_QUESTION')]], ready);
-  assert.deepEqual(logs.map(log => log.stageAfter), ['DISMISSIVE', 'DISMISSIVE', 'INTRIGUED']);
-  assert.equal(logs[2].stageChange, 'promoted');
+  assert.deepEqual(logs.map(log => log.stageAfter), ['DISMISSIVE', 'INTRIGUED', 'INTRIGUED'], 'two turns in a row with the conditions met');
+  assert.equal(logs[1].stageChange, 'promoted');
   assert.equal(record.stage, 'INTRIGUED');
+});
+
+test('3b. once every bar is past its line, the member\'s next replies promote even when they carry no event, and a turn below the line starts over', () => {
+  const config = configs.auditor;
+  const entry = config.stages[1].enter.min;
+  const ready = withScores(config, Object.fromEntries(Object.entries(entry).map(([metric, value]) => [metric, value])));
+  // 2026-10-30: 서도현 at comfort 39/39 and every other bar past its line stayed in the first stage over replies without an event.
+  const quiet = run(config, [[], []], ready);
+  assert.deepEqual(quiet.logs.map(log => log.stageChange), [null, 'promoted']);
+  assert.equal(quiet.record.stage, config.stages[1].id);
+  const noReply = processTurn({ record: ready, config, mood: initialMood(config), events: [], hasUserTurn: false, now: later(0) });
+  assert.deepEqual(noReply.record.pending, ready.pending, 'a turn without the member (silence, an opening) does not count');
+  const below = run(config, [[], [event('VIOLATES_BOUNDARY')], []], ready);
+  assert.equal(below.record.stage, config.stages[0].id, 'dropping below the line starts the count again');
+  assert.deepEqual(below.record.pending, { direction: null, turns: 0 });
 });
 
 test('4. hysteresis: oscillating around a threshold neither promotes nor flips the stage each turn', () => {

@@ -6,7 +6,8 @@ export const relationshipSettings = {
   fullConfidence: 0.8,
   lowConfidenceWeight: 0.7,
   maxEventsPerTurn: 3,
-  promotionStabilityTurns: 3,
+  /** Replies by the member in a row with the next stage's conditions met before it is reached (was 3 meaningful turns until 2026-10-30). */
+  promotionStabilityTurns: 2,
   demotionStabilityTurns: 3,
   hysteresisBand: 8,
   /** Only repetition within a few consecutive turns is damped; steady good behaviour keeps counting. */
@@ -149,7 +150,7 @@ export function processTurn({ record, config, mood, events, hasUserTurn, now }: 
   })) as Mood;
 
   const meaningful = accepted.length > 0;
-  const stageResult = evaluateStage(config, record, scores, meaningful, severity === 'severe');
+  const stageResult = evaluateStage(config, record, scores, meaningful, severity === 'severe', hasUserTurn);
   const recentEvents = [...record.recentEvents, ...chosen.map(event => ({ type: event.type, turn, at }))].slice(-settings.recentEventLimit);
   const memories = rememberEvents(record.memories, accepted, chosen, turn, at);
   return {
@@ -164,10 +165,12 @@ export function processTurn({ record, config, mood, events, hasUserTurn, now }: 
 }
 
 /**
- * Promotion needs the next stage's conditions on several consecutive meaningful turns.
+ * Promotion needs the next stage's conditions on a few of the member's turns in a row. Every turn the member spoke
+ * counts, not only turns with an event (2026-10-30: 서도현's bars were all past the line, and the stage stayed while
+ * replies without an event did not count); a turn below the line starts the count again.
  * Demotion uses a lower hold line (hysteresis) and is immediate only after a severe event.
  */
-export function evaluateStage(config: RelationshipConfig, record: RelationshipRecord, scores: Scores, meaningful: boolean, severe: boolean) {
+export function evaluateStage(config: RelationshipConfig, record: RelationshipRecord, scores: Scores, meaningful: boolean, severe: boolean, userTurn = meaningful) {
   const settings = relationshipSettings;
   const stages = enabledStages(config);
   let index = Math.max(0, stages.findIndex(stage => stage.id === record.stage));
@@ -183,11 +186,11 @@ export function evaluateStage(config: RelationshipConfig, record: RelationshipRe
       if (pending.turns >= settings.demotionStabilityTurns) { index--; pending = { direction: null, turns: 0 }; change = 'demoted'; }
     }
   } else if (index + 1 < stages.length && meets(scores, stages[index + 1].enter) && !severe) {
-    if (meaningful) {
+    if (userTurn) {
       pending = { direction: 'up', turns: pending.direction === 'up' ? pending.turns + 1 : 1 };
       if (pending.turns >= settings.promotionStabilityTurns) { index++; pending = { direction: null, turns: 0 }; change = 'promoted'; }
     }
-  } else if (meaningful || severe) pending = { direction: null, turns: 0 };
+  } else if (meaningful || severe || (userTurn && pending.direction === 'up')) pending = { direction: null, turns: 0 };
   return { stage: stages[index].id, pending, change };
 }
 
