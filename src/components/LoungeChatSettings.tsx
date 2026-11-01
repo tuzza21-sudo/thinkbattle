@@ -4,7 +4,7 @@ import { Settings2 } from 'lucide-react';
 export type LoungeSettingsItem = { key: string; icon: ReactNode; label: string; hint?: string; onSelect: () => void };
 
 /**
- * "대화 설정" beside the relationship card of a one-to-one chat (2026-10-29): the conversation's tools in one menu (the
+ * "대화 설정" in the top buttons of a one-to-one chat, beside 나가기 (2026-10-29; it sat beside the relationship card until 2026-11-02): the conversation's tools in one menu (the
  * record, the background, the memories) and its choices below them (the persona, the photo model). Before, the record
  * and the background were buttons at the top and the memories sat at the bottom of the relationship card.
  */

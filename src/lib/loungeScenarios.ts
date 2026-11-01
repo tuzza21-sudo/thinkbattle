@@ -68,6 +68,11 @@ export function personalizeLoungeStory(story: string, name?: string | null) {
 
 /** Paragraphs are told in blocks of about this many characters: one paragraph at a time was tiring to read (2026-10-27). */
 export const storyIntroBlockSize = 420;
+/**
+ * How long a prologue's next block waits (2026-11-02): in proportion to the characters of the block just told, so a long
+ * one is read before the next comes in. It used to be 1.4 s whatever the block, which was too quick to read.
+ */
+export const storyIntroReadMs = (block: readonly string[]) => Math.min(20_000, Math.max(3_000, block.join('').length * 40));
 export function storyIntroBlocks(paragraphs: readonly string[], size = storyIntroBlockSize) {
   const blocks: string[][] = [];
   let length = 0;

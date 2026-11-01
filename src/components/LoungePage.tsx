@@ -298,6 +298,7 @@ function RoomView(props: RoomViewProps) {
         onConnect={props.onConnect} onMic={props.onMic} onTopic={() => props.onAsk('topic')} onChat={props.onVoiceToggle} onHangUp={props.onVoiceToggle ?? props.onLeave} />
     </main>;
   }
+  const chatSettingsMenu = props.settingsItems ? <LoungeChatSettings items={[{ key: 'journal', icon: <MessageCircle size={16} />, label: '대화 기록', onSelect: () => { journalToggle.current = document.querySelector<HTMLButtonElement>('.lounge-chat-settings-toggle'); setJournalOpen(true); } }, ...props.settingsItems]}>{props.settingsChoices}</LoungeChatSettings> : null;
   return <main className={`lounge-room-main ${solo && !space ? 'lounge-one-to-one' : ''}`} data-theme={theme.id} style={roomStyle} ref={roomElement}>
     {safetyNotice}
     {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 참가자·AI 연결 없이 분위기를 둘러보는 화면이에요. 손들기와 대화 순서도 미리 살펴보세요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
@@ -309,7 +310,7 @@ function RoomView(props: RoomViewProps) {
             {props.settingsItems ? null : props.backgroundPicker}
             {needsConnection && <button type="button" className="lounge-connect-button" onClick={props.onConnect} disabled={props.connecting || (props.connected && props.audioReady && props.starting)}>{props.connecting || props.starting ? <LoaderCircle size={14} className="lounge-spin" /> : <Headphones size={14} />}{props.connecting ? '연결 중…' : !props.connected ? '연결 재시도' : !props.audioReady ? '소리 켜기' : props.starting ? '준비 중…' : '대화 다시 시작'}</button>}
             {props.status === 'lobby' && props.isHost && !solo && <button type="button" className="lounge-start-button" onClick={props.onStart} disabled={props.starting || props.members.length < loungeMinimumParticipants(props.capacity) || !props.connected || !props.audioReady}>{props.starting ? <LoaderCircle size={14} className="lounge-spin" /> : <Play size={14} />}함께 시작하기</button>}
-            {!props.settingsItems && <button type="button" ref={journalToggle} className="lounge-journal-toggle" aria-expanded={journalOpen} aria-controls={journalId} onClick={event => toggleJournal(event.currentTarget)}><MessageCircle size={16} /> 대화 기록</button>}{props.settingsItems && props.backgroundPicker}{props.inviteUrl && !solo && <button type="button" onClick={() => { void navigator.clipboard.writeText(props.inviteUrl!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); }).catch(() => setSendError('주소창의 링크를 복사해 친구에게 보내 주세요.')); }}><Copy size={16} />{copied ? '복사했어요!' : '친구 초대'}</button>}<button type="button" onClick={props.onLeave}><X size={18} /> 나가기</button></div></div>
+            {!props.settingsItems && <button type="button" ref={journalToggle} className="lounge-journal-toggle" aria-expanded={journalOpen} aria-controls={journalId} onClick={event => toggleJournal(event.currentTarget)}><MessageCircle size={16} /> 대화 기록</button>}{props.settingsItems && props.backgroundPicker}{props.inviteUrl && !solo && <button type="button" onClick={() => { void navigator.clipboard.writeText(props.inviteUrl!).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 2000); }).catch(() => setSendError('주소창의 링크를 복사해 친구에게 보내 주세요.')); }}><Copy size={16} />{copied ? '복사했어요!' : '친구 초대'}</button>}{chatSettingsMenu}<button type="button" onClick={props.onLeave}><X size={18} /> 나가기</button></div></div>
           {!(solo && !space) && <div className="lounge-table-topic"><span>{props.topicPicker ? '지금 이야기' : '오늘의 이야기'}</span><h2>{props.topicPicker ? props.topicPicker.topic ?? '주제 없이 자유롭게' : props.topic}</h2></div>}
         </div>
         <div className="lounge-conversation-space">
@@ -342,11 +343,8 @@ function RoomView(props: RoomViewProps) {
             </div>
             <section className="lounge-participant-speech" aria-label="참가자들의 발언">
               <h2><MessageCircle size={14} />나누는 이야기</h2>
-              {/* One to one, the relationship is a status card over the conversation, with the chat's settings beside it. */}
-              {solo && (props.relationship || props.settingsItems) && <div className="lounge-relationship-row">
-                {props.relationship ? <LoungeRelationship view={props.relationship} change={props.relationshipChange} /> : <span />}
-                {props.settingsItems && <LoungeChatSettings items={[{ key: 'journal', icon: <MessageCircle size={16} />, label: '대화 기록', onSelect: () => { journalToggle.current = document.querySelector<HTMLButtonElement>('.lounge-chat-settings-toggle'); setJournalOpen(true); } }, ...props.settingsItems]}>{props.settingsChoices}</LoungeChatSettings>}
-              </div>}
+              {/* One to one, the relationship is a status card over the conversation; the chat's settings are at the top, beside 나가기. */}
+              {solo && props.relationship && <div className="lounge-relationship-row"><LoungeRelationship view={props.relationship} change={props.relationshipChange} /></div>}
               <div className={`lounge-participant-log ${spotlightLatest ? 'spotlight' : ''}`} ref={participantLog} role="log" aria-label="라운지 대화" onScroll={event => { const element = event.currentTarget; followParticipantLog.current = spotlightLatest ? element.scrollTop >= spotlightAnchor.current - 24 : element.scrollHeight - element.scrollTop - element.clientHeight < 48; }}>
                 {props.storyProgress}
                 {props.scenario && <div className="lounge-prologue" role="note" aria-label="이야기의 시작"><span>프롤로그 · {props.scenario.title}</span><p>{personalizeLoungeStory(props.scenario.prologue, (props.members.find(member => member.id === props.currentUserId)?.name))}</p><small>{personalizeLoungeStory('당신의 역할', (props.members.find(member => member.id === props.currentUserId)?.name))} · {personalizeLoungeStory(props.scenario.user_role, (props.members.find(member => member.id === props.currentUserId)?.name))}</small></div>}

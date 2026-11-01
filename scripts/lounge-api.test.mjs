@@ -3186,6 +3186,16 @@ test('a story intro tells its paragraphs in blocks of several, not one line at a
   assert.equal(scenariosLib.storyIntroBlocks(['짧은 한 줄']).length, 1, 'a short story is one block');
 });
 
+test('the next block of a prologue waits in proportion to the block just told', () => {
+  const wait = length => scenariosLib.storyIntroReadMs(['가'.repeat(length)]);
+  assert.equal(wait(100), 4000);
+  assert.equal(wait(300), 12000);
+  assert.ok(wait(300) > wait(100) * 2, 'twice the text, about twice the wait');
+  assert.equal(wait(5), 3000, 'a short block still gets time to read');
+  assert.equal(wait(5000), 20000, 'and a long one is not waited on forever');
+  assert.equal(scenariosLib.storyIntroReadMs(['가'.repeat(100), '나'.repeat(100)]), 8000, 'a block counts all its paragraphs');
+});
+
 test('a story room keeps what the member wrote about themselves, cut at the longest note', () => {
   const room = scenariosLib.normalizeLoungeRoomScenario({ id: 'x-story', title: '제목', prologue: '프롤로그', user_role: '역할', relationship: '관계', place: '장소', member_note: '  낯을 가려요.  ' });
   assert.equal(room.member_note, '낯을 가려요.');

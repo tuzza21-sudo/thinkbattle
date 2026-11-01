@@ -926,10 +926,12 @@
 .lounge-story-intro-page header img { width:56px; height:56px; flex:none; border-radius:50%; object-fit:cover; border:2px solid var(--story-intro-accent); }
 .lounge-story-intro-page header span { display:block; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--story-intro-accent); }
 .lounge-story-intro-page h1 { margin:4px 0 0; font-size:23px; line-height:1.3; letter-spacing:-.01em; color:#fff; }
-.lounge-story-intro-block { margin:0 0 22px; animation:lounge-story-intro-line .9s ease-out both; }
-.lounge-story-intro-page p { margin:0 0 18px; font-size:17px; line-height:1.9; word-break:keep-all; overflow-wrap:break-word; }
-.lounge-story-intro-block>p:last-child { margin-bottom:0; }
-.lounge-story-intro-page p.lounge-story-intro-line { padding-left:14px; border-left:2px solid var(--story-intro-accent); color:#fff; font-style:italic; }
+.lounge-story-intro-block { margin:0 0 28px; animation:lounge-story-intro-line .9s ease-out both; }
+.lounge-story-intro-page p { margin:0 0 20px; font-size:17px; line-height:1.85; word-break:keep-all; overflow-wrap:break-word; text-wrap:pretty; }
+.lounge-story-intro-page p.lounge-story-intro-line { margin-bottom:10px; padding-left:14px; border-left:2px solid var(--story-intro-accent); color:#fff; font-style:italic; }
+.lounge-story-intro-page p.lounge-story-intro-line:has(+ :not(.lounge-story-intro-line)),.lounge-story-intro-page p.lounge-story-intro-line:last-child { margin-bottom:20px; }
+.lounge-story-intro-block>p:last-child { margin-bottom:0 !important; }
+.lounge-story-intro-page p.lounge-story-intro-note { padding:10px 14px; border-radius:10px; background:#ffffff14; border-left:2px solid #ffffff4d; font-size:15px; line-height:1.7; color:#fff5e8d9; }
 .lounge-story-intro-more { display:block; margin-top:6px; font-size:12px; color:#fff5e880; animation:lounge-story-intro-blink 1.8s ease-in-out infinite; }
 .lounge-story-intro-footer { flex:none; display:flex; flex-direction:column; align-items:stretch; gap:10px; padding:14px 20px calc(16px + env(safe-area-inset-bottom)); background:#0b0a0df2; border-top:1px solid #ffffff1f; }
 .lounge-story-intro-footer small { max-width:640px; width:100%; margin:0 auto; font-size:12.5px; line-height:1.5; color:#fff5e8b3; }
@@ -1079,12 +1081,17 @@
 .lounge-relationship-row { display:flex; align-items:flex-start; gap:8px; }
 .lounge-relationship-row>.lounge-relationship,.lounge-relationship-row>span:first-child { flex:1; min-width:0; }
 .lounge-chat-settings { position:relative; flex-shrink:0; }
-.lounge-chat-settings-toggle { display:flex; align-items:center; gap:6px; height:34px; padding:0 12px; border:1px solid #ffffff2e; border-radius:999px; background:#0d1410b3; color:#fff5e8; font-size:12px; cursor:pointer; backdrop-filter:blur(10px); }
+/* The toggle takes the top buttons' look (.lounge-room-top-actions button); the menu's own buttons are set back below. */
+.lounge-chat-settings-toggle { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
 .lounge-chat-settings-toggle[aria-expanded=true] { border-color:var(--lounge-accent,#ead0a3); }
 .lounge-chat-settings-menu { position:absolute; z-index:60; top:calc(100% + 6px); right:0; display:grid; gap:10px; width:min(280px,calc(100vw - 40px)); max-height:min(70dvh,560px); overflow-y:auto; padding:10px; border:1px solid #ffffff2e; border-radius:16px; background:var(--lounge-surface,#242421); box-shadow:0 18px 40px #0009; color:#fff5e8; }
 .lounge-chat-settings-items { display:grid; gap:4px; }
 .lounge-chat-settings-items button { display:flex; align-items:center; gap:10px; width:100%; padding:10px; border:0; border-radius:10px; background:transparent; color:inherit; font-size:14px; text-align:left; cursor:pointer; }
 .lounge-chat-settings-items button:hover,.lounge-chat-settings-items button:focus-visible { background:#ffffff14; }
+.has-room .lounge-room-top-actions .lounge-chat-settings-items button { padding:10px; border:0; border-radius:10px; background:transparent; font-size:14px; gap:10px; text-shadow:none; min-height:0; }
+.has-room .lounge-room-top-actions .lounge-chat-settings-items button:hover,.has-room .lounge-room-top-actions .lounge-chat-settings-items button:focus-visible { background:#ffffff14; }
+.has-room .lounge-room-top-actions .lounge-chat-settings-items button svg { width:16px; height:16px; }
+@media (max-width:760px) { .lounge-chat-settings-menu { right:auto; left:0; } }
 .lounge-chat-settings-items small { display:block; margin-top:1px; font-size:11px; opacity:.6; }
 .lounge-chat-settings-choice { display:grid; gap:2px; margin:0; padding:8px 4px 2px; border:0; border-top:1px solid #ffffff1f; }
 .lounge-chat-settings-choice legend { padding:0 6px 4px; font-size:11px; font-weight:700; opacity:.7; }
