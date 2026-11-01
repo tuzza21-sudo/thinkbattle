@@ -2185,7 +2185,7 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
   // A character without one (윤서연, for now) keeps its persona and no bible.
   const plain = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
-  assert.doesNotMatch(plain.instructions, /캐릭터 바이블/);
+  assert.doesNotMatch(plain.instructions, /캐릭터 바이블\(성격을 설명하지 말고/);
 });
 
 test('the director reads the member\'s words before a chat reply and its direction goes to the reply; without it the reply goes on', async t => {

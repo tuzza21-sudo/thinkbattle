@@ -100,12 +100,33 @@ const florenceScenes = [
   { stage: 'STAGE_2', name: '피렌체 7 · 사진 부탁', memory: '지금 장면: 미켈란젤로 광장 난간 앞, 해 질 녘. 아래로 두오모와 아르노강이 내려다보인다\n둘 사이: 서로 번호를 먼저 달라고 할지를 두고 내기가 걸렸다.',
     chat: [['human', '사진좀 부탁드려요 사진 잘 찍으세요??'], ['host', '여기가 피렌체에서 노을이 제일 늦게까지 남는 자리예요. 십 분이면 두오모가 금색이 돼요.']] },
 ].map(scene => ({ ...scene, host: 'guide', scenario: florence, row: florenceRow(scene.stage) }));
+// With --daily, the turns members found dull or out of character on 2026-11-01: 한지오's questions at the Dolomites
+// hut (his replies were maxims about mountains) and 선우령's everyday scenes (she had become a softly agreeable date).
+const dolomites = { id: 'guide-enrosadira', title: '장밋빛으로 물드는 시간', user_role: '7일짜리 피렌체·베네치아·돌로미티 소규모 여행에 혼자 참가한 여행자. 일행 중 유일하게 그의 결정을 믿어 준 사람',
+  relationship: '가이드와 손님. 모두가 원망할 때 당신만 자기 편에 섰던 날 밤이다.', place: '돌로미티 고개 아래 작은 산장의 테라스. 비가 그친 해 질 녘',
+  prologue: '닷새째, 돌로미티. 고개를 앞두고 지오가 돌아서자고 했고, 당신이 제일 먼저 돌아섰다. 산장에 도착하고 이십 분 뒤 하늘이 갈라졌다. 비가 그친 저녁, 테라스에서 지오가 찻잔 두 개를 들고 왔다.' };
+const dailyScenes = [
+  { host: 'guide', scenario: dolomites, row: florenceRow('STAGE_1'), name: '돌로미티 1 · 피렌체 어디', memory: '지금 장면: 산장 테라스, 해 질 녘, 찻잔 두 개\n둘 사이: 오늘 지오의 결정을 믿어 준 손님과 가이드.',
+    chat: [['human', '피렌체 어디가 좋아요?'], ['host', '*찻잔을 난간에 둔다* 이 색은 오래 안 가요. 아까 먼저 돌아서 줘서 고마웠어요. 차 식기 전에 드세요.']] },
+  { host: 'guide', scenario: dolomites, row: florenceRow('STAGE_1'), name: '돌로미티 2 · 우리는 어디', memory: '지금 장면: 산장 테라스, 해 질 녘\n둘 사이: 손님이 피렌체에서 좋은 곳을 물었고 지오가 올트라르노를 권했다.',
+    chat: [['human', '돌로미티는 어디가 좋나요? 저희는 어디가죠?'], ['host', '피렌체는 올트라르노요. 해 질 무렵 산토 스피리토 광장이 제일 좋아요.']] },
+  { host: 'guide', scenario: dolomites, row: florenceRow('STAGE_1'), name: '돌로미티 3 · 풍경 좋은 데', memory: '지금 장면: 산장 테라스, 저녁\n둘 사이: 내일 코스를 이야기하는 중.',
+    chat: [['human', '풍경 좋은데로 가요'], ['host', '내일은 날씨 보고 정할게요. 오늘처럼 구름이 쌓이면 고개는 안 갑니다.']] },
+  { host: 'velvet', name: '선우령 1 · 남자 안 만나요', memory: '지금 장면: 공항 근처 카페, 김민서를 보낸 뒤\n둘 사이: 하루 종일 같은 사람을 쫓다가 처음으로 마주 앉았다.',
+    chat: [['human', '우리 이러고 있으니까 잘 어울리는거 같은데 우령씨는 남자 안만나요?'], ['host', '오늘은 여기까지 해요. 민서 씨는 붙잡지 않은 게 맞았어요.']] },
+  { host: 'velvet', name: '선우령 2 · 바닷가 회', memory: '지금 장면: 공항 근처 카페\n둘 사이: 사생활은 비켜 갔지만 차 한 잔은 피하지 않았다.',
+    chat: [['human', '언제 한번 우리 드라이브 하고 바람도 쇨겸 바닷가쪽 갈래요? 인천쪽 오니까 바닷가 보고 싶은데 회도 한접시 하구요'], ['host', '가끔 차 정도는 괜찮아요. 매번 사건 얘기만 한다고 타박하지만 않으면.']] },
+  { host: 'velvet', name: '선우령 3 · 싼 거 골랐네', memory: '지금 장면: 바닷가 횟집, 창밖으로 밤바다\n둘 사이: 드라이브 끝에 회를 먹으러 왔다.',
+    chat: [['human', '싼 거 골랐네요. 나는 도미나 뭐 다금바리 고를 줄 알았는데. 다행이다.'], ['host', '광어로 하죠. 담백해서 좋아요.']] },
+  { host: 'velvet', name: '선우령 4 · 예쁘다', memory: '지금 장면: 바닷가 횟집\n둘 사이: 식사가 거의 끝나 간다.',
+    chat: [['human', '우령씨 오늘 진짜 예쁘네요'], ['host', '바다는 밤에 보는 게 낫네요. 낮에는 너무 다 보여서.']] },
+];
 
 let directorMs;
 async function capture(scene) {
   let reply;
   directorMs = undefined;
-  const memberName = scene.host === 'guide' ? '지수' : '나';
+  const memberName = scene.host ? '지수' : '나';
   const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? memberName : scene.host === 'guide' ? '한지오' : '선우령', kind, text, created_at: new Date().toISOString() }));
   const saved = { ...process.env }, originalFetch = globalThis.fetch;
   Object.assign(process.env, { OPENAI_API_KEY: 'test-key', SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'test-anon', APP_ORIGIN: 'https://app.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key' });
@@ -155,12 +176,12 @@ async function ask(request, model, effort) {
   return { model, effort, ms, text, ...(read ? { read } : {}), inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
-const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence');
+const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily');
 const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')), withKiss = Boolean(kissArg), kissHost = kissArg?.split('=')[1] ?? 'diplomat';
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence ? florenceScenes.filter(scene => !only || scene.name.includes(only)) : scenes) {
+for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
