@@ -2191,9 +2191,15 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
   assert.match(instructions, /보통 사람들이 너를 대하는 방식: 12년 동안/);
   assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
-  // A character without one (윤서연, for now) keeps its persona and no bible.
-  const plain = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
-  assert.doesNotMatch(plain.instructions, /캐릭터 바이블\(성격을 설명하지 말고/);
+  // Every house character has one (2026-11-01), with what it never says, what never changes and humour shown by example.
+  for (const character of charactersLib.loungeCharacters) {
+    assert.ok(character.bible, `${character.name} has a bible`);
+    assert.ok(character.bible.reactions.length >= 5 && character.bible.invariants.length >= 3, `${character.name}'s bible has rules`);
+    assert.ok(character.bible.humorExamples?.good.length && character.bible.humorExamples.bad.length, `${character.name} has humour examples`);
+    assert.ok(character.baseline && character.specialToMe, `${character.name} says how people usually treat them and why this member differs`);
+  }
+  const ina = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
+  assert.match(ina.instructions, /캐릭터 바이블\(성격을 설명하지 말고/);
 });
 
 test('the director reads the member\'s words before a chat reply and its direction goes to the reply; without it the reply goes on', async t => {

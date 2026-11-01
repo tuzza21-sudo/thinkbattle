@@ -121,6 +121,15 @@ const dailyScenes = [
   { host: 'velvet', name: '선우령 4 · 예쁘다', memory: '지금 장면: 바닷가 횟집\n둘 사이: 식사가 거의 끝나 간다.',
     chat: [['human', '우령씨 오늘 진짜 예쁘네요'], ['host', '바다는 밤에 보는 게 낫네요. 낮에는 너무 다 보여서.']] },
 ];
+// With --bibles, the seven characters whose bibles were written on 2026-11-01 get the same three lines at their first
+// stage, texting in the evening: an everyday question, a light jab and an invitation.
+const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'trickster', 'diplomat', 'lawyer'].flatMap(host => {
+  const config = relationshipLib.getRelationshipConfig(host);
+  const firstRow = { ...row, character_id: host, stage: config.stages[0].id, scores: { ...config.initial } };
+  const memory = '지금 장면: 저녁, 각자 있는 곳에서 메시지를 주고받는 중\n둘 사이: 며칠 전 처음 이야기를 나눴다.';
+  return [['오늘 뭐 했어요?', '오늘 좀 길었네요.'], ['생각보다 평범하시네요.', '그런 말 처음 들어 보는 건 아니에요.'], ['같이 저녁 먹으러 갈래요?', '저녁은 아직이에요.']]
+    .map(([said, before], index) => ({ host, name: `${host} ${index + 1}`, memory, row: firstRow, scenario: null, chat: [['human', said], ['host', before]] }));
+});
 
 let directorMs;
 // With --room=<id>, the member's last turns in a real room are replayed with what that room really had: the messages
@@ -164,7 +173,7 @@ async function capture(scene) {
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
     if (url.includes('voice_lounge_rooms?') && scene.room) return result([{ ...scene.room, memory: scene.memory, voice_on: false, space_id: null }]);
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: (scene.scenario ?? scenario).title, host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: scene.scenario ?? scenario, story_state: scene.state ?? null }]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: ('scenario' in scene ? scene.scenario?.title ?? '저녁 대화' : scenario.title), host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: 'scenario' in scene ? scene.scenario : scenario, story_state: scene.state ?? null }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: memberName, last_seen: '' }]);
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
@@ -201,13 +210,13 @@ async function ask(request, model, effort) {
   return { model, effort, ms, text, ...(read ? { read } : {}), inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
-const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily');
+const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily'), withBibles = args.includes('--bibles');
 const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')), withKiss = Boolean(kissArg), kissHost = kissArg?.split('=')[1] ?? 'diplomat';
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
 const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7);
-for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
+for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withBibles ? bibleScenes : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
