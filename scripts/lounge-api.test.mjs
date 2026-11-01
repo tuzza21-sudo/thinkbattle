@@ -2186,7 +2186,9 @@ test('a chat reply is short and kept within 1200 characters; a voice reply keeps
 
 test('a character with a bible shows it in a chat: rules of behaviour, how people usually treat them, why this member differs', async () => {
   const { instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide' });
-  assert.match(instructions, /캐릭터 바이블\(성격을 설명하지 말고 아래 규칙대로/);
+  assert.match(instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다. 대사를 정해 주는 것이 아니므로/);
+  // Ways of reacting, never lines: quoted lines in the bibles were copied word for word (2026-11-01).
+  assert.match(instructions, /웃음이 나는 상황과 방식\(정해진 대사가 아니다/);
   assert.match(instructions, /이럴 때 이렇게 한다:\n- 함께 하자는 제안을 아직 받을 수 없을 때 → /);
   assert.match(instructions, /\n- 무시하거나 선을 그을 때/);
   assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
@@ -2200,7 +2202,7 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
     assert.ok(character.baseline && character.specialToMe, `${character.name} says how people usually treat them and why this member differs`);
   }
   const ina = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
-  assert.match(ina.instructions, /캐릭터 바이블\(성격을 설명하지 말고/);
+  assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
 });
 
 test('the director reads the member\'s words before a chat reply and its direction goes to the reply; without it the reply goes on', async t => {
