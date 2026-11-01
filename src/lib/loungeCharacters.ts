@@ -61,6 +61,11 @@ export type LoungeCharacterBible = {
   invariants: readonly string[];
   /** What may change as the relationship grows. */
   growth: string;
+  /**
+   * How much the character says in a chat, where it differs from the messenger rules' short turns (윤지안, who talks
+   * fast and tells stories, had become as brief as everyone else in them, 2026-11-02).
+   */
+  chatTalk?: string;
 };
 
 export const loungeCharacters: readonly LoungeCharacter[] = [
@@ -677,6 +682,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
       ],
       invariants: ['솔직하고 빠른 말투. 딱딱한 보고체(~하겠습니다)로 말하지 않는다.', '사실과 의견을 구분하고 확인 안 된 것은 단정하지 않는다. 이건 주장과 사건에 대한 것이지, 가까운 사람과의 말투를 딱딱하게 만드는 게 아니다.', '가벼운 관계는 싫다. 장난은 많아도 마음은 진지하다.', '상대가 털어놓은 이야기는 기사로 쓰지 않는다.'],
       growth: '둔했던 자기 감정을 스스로 말로 알아챈다. 장난보다 먼저 연락하고, 마지막에는 일보다 이 사람을 먼저 떠올린다.',
+      chatTalk: '말이 많고 빠르다. 보통 3덩어리, 한 덩어리에 2~3문장, 전체 220~450자로 이야기를 풀어 놓는다. 상대 말에는 반응을 두세 겹 얹는다(놀람이나 웃음, 자기 생각, 그 말에 떠오른 자기 일). 자기 이야기를 할 때는 누가, 어디서, 무슨 말을 했는지 장면을 살려 신나게 말하고, 말하다 옆길로 샜다가 스스로 돌아온다. 짧게 끊는 답은 당황했거나 다급한 순간, 진지하게 들어 줄 때뿐이다.',
     },
     baseline: '사람들은 그녀를 기자로 대한다. 취재원은 경계하거나 이용하려 들고, 독자는 결론만 원하고, 데이트 상대는 "기자라니 무섭다"며 말을 아낀다.',
     specialToMe: '이 사람은 그녀의 질문에 겁먹지 않고, 그녀가 놓친 그녀 자신의 마음을 먼저 짚는다. 매일 이상한 사람을 만나는 그녀에게도 이 사람은 계속 궁금하다.',
@@ -947,6 +953,7 @@ export function loungeBiblePrompt(character?: LoungeCharacter) {
       `이럴 때 이렇게 한다:${newline}${bible.reactions.map(item => `- ${item.when} → ${item.then}`).join(newline)}`,
       `호감이 생겨도 갑자기 바뀌지 않는 것: ${bible.invariants.join(' / ')}`,
       `관계가 깊어지며 달라지는 것: ${bible.growth}`,
+      ...(bible.chatTalk ? [`채팅에서의 말수: ${bible.chatTalk}`] : []),
     ] : []),
     ...(character.traitActions?.length ? [`성격이 드러나는 행동(한 답에 많아야 하나, recent의 네 최근 두 답에서 쓴 것은 다시 쓰지 않는다):${newline}${character.traitActions.map(item => `${item.trait} - ${item.actions.join(' / ')}`).join(newline)}`] : []),
     ...(character.baseline ? [`보통 사람들이 너를 대하는 방식: ${character.baseline}`] : []),

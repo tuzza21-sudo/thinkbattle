@@ -3026,6 +3026,13 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
 });
 
+test('a character who talks a lot says how much in the bible, and the messenger rules let it run longer', () => {
+  const jian = charactersLib.loungeBiblePrompt(charactersLib.getLoungeCharacter('diplomat'));
+  assert.match(jian, /채팅에서의 말수: 말이 많고 빠르다\. 보통 3덩어리/);
+  assert.match(messengerLib.loungeMessengerRules, /채팅에서의 말수가 있으면 덩어리 수와 분량은 그것을 따른다\(그때도 550자를 넘기지 않는다\)/);
+  assert.doesNotMatch(charactersLib.loungeBiblePrompt(charactersLib.getLoungeCharacter('velvet')), /채팅에서의 말수/, 'the others keep the short turns');
+});
+
 test('a call in a room started from a story keeps the case in the background and the summary in the chat\'s form', async () => {
   // On 2026-11-01 선우령 talked of nothing but the story's case on a call: the call had neither rule, and its summary
   // went back to a case log ("다음: 곧 벌어질 일") that the chat after it read again.
@@ -3046,7 +3053,10 @@ test('a call in a room started from a story keeps the case in the background and
   assert.match(reply.instructions, /phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다/);
   assert.match(reply.instructions, /대화의 중심은 둘 사이다/);
   assert.match(reply.instructions, /둘의 말투와 처음 거리는 scenario.relationship과 scenario.prologue에서 시작한다/);
-  assert.match(reply.instructions, /사건이나 일은 사용자가 꺼낼 때만/);
+  assert.match(reply.instructions, /사건이나 일은 먼저 꺼내지 않고, 사용자가 꺼낼 때만/);
+  // Every call starts from the two, not the case: the recent talk, the summary, what the member has told.
+  assert.match(reply.instructions, /받자마자 사건이나 일 이야기를 꺼내지 않는다/);
+  assert.match(reply.instructions, /먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories/);
   assert.match(after.instructions, /memory는 둘의 대화 기록이다/);
   assert.doesNotMatch(after.instructions, /다음: 곧 벌어질 일/);
 });
