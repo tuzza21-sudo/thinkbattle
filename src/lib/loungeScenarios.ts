@@ -24,6 +24,12 @@ export type LoungeScenarioRow = {
  * have no stories, keep their chat. Set to false to open the free one-to-one again.
  */
 export const loungeOneToOneStoriesOnly = true;
+/**
+ * Stories in which the character already speaks 반말 to the member from the prologue on, whatever the stage's speech
+ * level (2026-11-01): 윤지안 and her friend of three years had been speaking politely, as the first stage asks of
+ * strangers, since a rule saying "follow the prologue" did not hold against the stage. The rest start politely.
+ */
+export const loungeScenarioCasualStart: ReadonlySet<string> = new Set(['diplomat-old-friend-fling']);
 /** The character page section that lists a character's stories. */
 export const loungeStoriesPath = (characterId: string) => `/lounge/characters/${characterId}#stories`;
 /** The copy of a scenario a room keeps (rooms.scenario), so editing the scenario does not change a story under way. */
