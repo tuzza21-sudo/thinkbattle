@@ -24,7 +24,11 @@ const modelsLib = compile('../src/lib/loungeModels.ts');
 const storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const messengerLib = compile('../src/lib/loungeMessenger.ts');
+// The director is a call of its own before each one-to-one reply (2026-11-01); the tests that fake the model answer one
+// call per turn, so it is off here except in its own tests.
+process.env.LOUNGE_DIRECTOR ??= 'off';
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -1848,14 +1852,26 @@ test('a one-to-one room is a chat until its voice is turned on; *actions* are sh
   assert.ok(JSON.stringify(lounge.loungeGeminiSpeechRequest('diplomat', '와, 진짜요?')).includes(lounge.loungeSpeechExpression));
 });
 
-const chatTurn = async ({ voiceOn, replyText, photo, anonymous = false }) => {
+/** The story layer (story instruction, episodes) for the tests of it: a chat is a messenger conversation since 2026-11-01. */
+const storyLayer = (t, { episodes = false } = {}) => {
+  const saved = { messenger: process.env.LOUNGE_MESSENGER, episodes: process.env.LOUNGE_STORY_EPISODES };
+  process.env.LOUNGE_MESSENGER = 'off';
+  if (episodes) process.env.LOUNGE_STORY_EPISODES = 'on';
+  t.after(() => {
+    if (saved.messenger === undefined) delete process.env.LOUNGE_MESSENGER; else process.env.LOUNGE_MESSENGER = saved.messenger;
+    if (saved.episodes === undefined) delete process.env.LOUNGE_STORY_EPISODES; else process.env.LOUNGE_STORY_EPISODES = saved.episodes;
+  });
+};
+
+const chatTurn = async ({ voiceOn, replyText, photo, anonymous = false, host = 'ina', messages = [] }) => {
   const spoken = [];
   let input, instructions, schema, events, after, summary;
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host', is_anonymous: anonymous });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 2 }]);
-    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: host, memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 2 }]);
+    if (url.includes('voice_lounge_messages?')) return result(messages);
+    if (url.includes('voice_lounge_members?')) return result([]);
     if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '영화 이야기를 했다.', ...(photo ?? {}) }); }
     if (url.endsWith('/responses')) { const body = JSON.parse(init.body); ({ instructions } = body); schema = body.text.format.schema; input = JSON.parse(body.input); return modelAnswer({ text: replyText }); }
     if (url.includes('finish_voice_lounge_reply')) return result(true);
@@ -1903,7 +1919,7 @@ test('a member\'s character speaks as itself, with its own relationship type; an
 test('the deep model reasons in a chat; a voice reply and the fast model do not', async () => {
   // [room model, voice on, effort, the OpenAI model]; the Sol models are picked in the room's settings (2026-10-30).
   for (const [aiModel, voiceOn, effort, openaiModel] of [['gpt-reasoning', false, 'medium', 'gpt-6-luna'], ['gpt-reasoning', true, 'none', 'gpt-6-luna'], [null, false, 'none', 'gpt-6-luna'],
-    ['gpt-sol', false, 'none', 'gpt-6-sol'], ['gpt-sol', true, 'none', 'gpt-6-sol'], ['gpt-terra', false, 'none', 'gpt-6.1-terra'], ['gpt-terra', true, 'none', 'gpt-6-luna'], ['gpt-sol-next', false, 'low', 'gpt-6.1-sol'], ['gpt-sol-next', true, 'none', 'gpt-6-sol']]) {
+    ['gpt-sol', false, 'none', 'gpt-6-sol'], ['gpt-sol', true, 'none', 'gpt-6-sol'], ['gpt-terra', false, 'none', 'gpt-6.1-terra'], ['gpt-terra', true, 'none', 'gpt-6.1-terra'], ['gpt-sol-next', false, 'low', 'gpt-6.1-sol'], ['gpt-sol-next', true, 'none', 'gpt-6-sol']]) {
     let body, after;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
@@ -2002,7 +2018,7 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
       });
       assert.equal(geminiBody.generationConfig.responseMimeType, 'application/json');
       assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'text', 'the same JSON shape, text first');
-      assert.match(geminiBody.systemInstruction.parts[0].text, /reply_medium=chat이면/, 'the same instructions');
+      assert.match(geminiBody.systemInstruction.parts[0].text, /메신저처럼 짧게 주고받는 1:1 대화/, 'the same instructions');
       assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
       if (geminiWorks) {
         assert.equal(openaiCalled, false);
@@ -2019,17 +2035,20 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
 });
 
 test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
-  const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
+  const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo_subject: 'character', photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
   // The reply shows the photo being sent; the call after it writes the scene from that.
   assert.deepEqual(asked.schema.required, ['text']);
   assert.equal(asked.input.photos, true);
   assert.match(asked.instructions, /사진은 채팅에서 photos=true일 때만 보낼 수 있다/);
-  assert.deepEqual(asked.after.text.format.schema.required.slice(-2), ['photo', 'photo_asked']);
-  assert.match(asked.after.instructions, /photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만/);
+  assert.deepEqual(asked.after.text.format.schema.required.slice(-3), ['photo_subject', 'photo', 'photo_asked']);
+  assert.match(asked.after.instructions, /photo: photo_subject가 character이고 방금 답에서 캐릭터가 자기 모습이 담긴 사진/);
   assert.deepEqual(typesOf(asked.events), ['host', 'saved', 'photo', 'done']);
   assert.deepEqual(asked.events[2], { type: 'photo', scene: '작업실 창가에서 야경을 등지고 찍은 셀카', asked: true });
   const none = await chatTurn({ voiceOn: false, replyText: '그래서요?', photo: { photo: '', photo_asked: false } });
   assert.deepEqual(typesOf(none.events), ['host', 'saved', 'done']);
+  // Only the character can be drawn: a photo the character takes of the member (2026-11-01) is told in the reply, not made.
+  const member = await chatTurn({ voiceOn: false, replyText: '*난간 앞에 세우고 셔터를 누른다* 자, 잘 나왔네요.', photo: { photo_subject: 'member', photo: '난간 앞에 선 사용자', photo_asked: false } });
+  assert.deepEqual(typesOf(member.events), ['host', 'saved', 'done']);
   // A guest's character does not offer photos, and a voice reply has no photo either.
   for (const turn of [await chatTurn({ voiceOn: false, replyText: '그래서요?', anonymous: true }), await chatTurn({ voiceOn: true, replyText: '그래서요?' })]) {
     assert.equal(turn.after.text.format.schema.properties.photo, undefined);
@@ -2038,7 +2057,8 @@ test('a chat reply can come with a photo: the scene goes to the browser after th
   }
 });
 
-test('a chat started from a story is told as a story; with the voice on it stays in the story under the voice rules', async () => {
+test('a chat started from a story is told as a story; with the voice on it stays in the story under the voice rules', async t => {
+  storyLayer(t);
   const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '선우령이 연출한 전시의 오프닝 파티. 당신은 이 전시를 혹평한 평론가다.', user_role: '전시를 혹평한 미술 평론가', relationship: '서로를 의식하는 앙숙', place: '갤러리 홀' };
   for (const voiceOn of [false, true]) {
     let reply, after;
@@ -2085,7 +2105,8 @@ test('a chat started from a story is told as a story; with the voice on it stays
   }
 });
 
-test('a story knows what the member said about themselves, records only that, and keeps the real world out of the scene', async () => {
+test('a story knows what the member said about themselves, records only that, and keeps the real world out of the scene', async t => {
+  storyLayer(t);
   const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다. 오늘 밤 둘이 같은 무대에 선다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
   let reply, after;
   await withServiceKey(() => run(async (url, init) => {
@@ -2118,48 +2139,90 @@ test('a story knows what the member said about themselves, records only that, an
   assert.match(reply.instructions, /답의 마지막 문장은 물음표로 끝나지 않는다/);
 });
 
-test('a chat reply is text only and the model is told it is a chat', async () => {
+test('a chat reply is text only and the model is told it is a messenger conversation with someone really there', async () => {
   const { spoken, input, instructions, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
-  // Almost every chat reply has an action, and it is a reaction to what the member just said or did, never a prop
-  // touched for its own sake or the same gesture again; the member's actions and thoughts are read from context.
-  assert.match(instructions, /거의 모든 답에 별표로 감싼 지문을 1~2개 넣는다. 지문은 방금 상대가 한 말이나 행동에 대한 네 반응이다/);
-  assert.match(instructions, /상대가 행동을 썼으면 그 행동에 몸으로 반응한다/);
-  assert.match(instructions, /반응 없이 소품만 만지거나 바라보는 동작\(잔·시계 만지기, 창밖 보기\)은 지문으로 쓰지 않는다/);
-  assert.match(instructions, /recent에서 네 최근 두 답에 쓴 동작·소품·표정은 다시 쓰지 않는다/);
-  // Reactions are big but stay in character; voice replies react in words instead of stage directions.
-  assert.match(instructions, /반응을 미지근하게 하지 않는다/);
-  assert.match(instructions, /성격을 바꾸지 않고 그 성격 그대로의 감정을 크게 보여 준다/);
-  assert.match(instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
+  // Short turns, but the two may be together (a trip, a meal): what they do together goes on a little every reply.
+  assert.match(instructions, /메신저처럼 짧게 주고받는 1:1 대화지만, 둘은 실제로 같은 시간을 보내고 있다/);
+  assert.match(instructions, /받아들이면 그 장면으로 옮겨 가 실제로 함께 하는 것처럼 이어 간다/);
+  assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
+  assert.match(instructions, /말풍선처럼 1~3덩어리로 쓰고/);
+  // Actions and the inner voice: why the member's words moved the character, never props for their own sake.
+  assert.match(instructions, /지문에는 상대의 말이나 행동이 네 마음을 왜, 어떻게 움직였는지/);
+  assert.match(instructions, /의미 없는 동작, 풍경 설명, 외모·소품 묘사는 쓰지 않고/);
   assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
-  // Going somewhere or doing something together follows the relationship; accepted, it is played out as a scene, and
-  // a refusal is the character's, never "I am an AI".
-  assert.match(instructions, /받아들일지는 relationship.outing을 따른다/);
-  assert.match(instructions, /거절할 때도 'AI라서 못 한다'/);
-  assert.match(instructions, /받아들이면 이야기 속에서 그 장면으로 함께 옮겨 가/);
-  assert.match(instructions, /상황극은 현실의 만남이 아니므로 이 규칙에 해당하지 않는다/);
+  assert.match(instructions, /곧바로 사과하며 물러서지 않는다/);
+  assert.match(instructions, /마지막 문장은 물음표로 끝나지 않는다/);
+  // The story layer and the group rules are not in a messenger chat.
+  assert.doesNotMatch(instructions, /롤플레이 소설/);
+  assert.doesNotMatch(instructions, /reply_medium=chat이면 글로 주고받는 롤플레이 채팅이다/);
   // The scene in play is kept on the summary's first line, written by the call after the reply and read by the next one.
   assert.match(after.instructions, /memory 첫 줄에 '지금 장면: '/);
-  assert.match(instructions, /첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다/);
   assert.equal(summary.p_memory, '영화 이야기를 했다.');
   assert.deepEqual(spoken, [], 'no speech is made for a chat');
   assert.deepEqual(typesOf(events), ['host', 'saved', 'done']);
   assert.equal(events[0].text, '*잔을 내려놓으며* 그래서, 결론은요?');
 });
 
-test('a chat reply may run to 1200 characters; a voice reply keeps the 600-character limit', async () => {
+test('a chat reply is short and kept within 1200 characters; a voice reply keeps its own rules and 600 characters', async () => {
   const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long });
   assert.equal(chat.events[0].text.length, 1200);
-  assert.match(chat.instructions, /채팅의 대사는 지문을 빼고 최소 5문장, 보통 5~7문장\(200~450자\)이다. 4문장 이하로 짧게 끝내지 않는다/);
-  // A dry character keeps its tone, not a shorter reply; the one-to-one 140 characters are for voice.
-  assert.match(chat.instructions, /'짧고 건조한 한 문장' 같은 버릇은 문장 하나하나의 호흡과 결을 말하는 것이고 답의 분량이 아니다/);
-  assert.match(chat.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
-  assert.match(chat.instructions, /목소리로 말할 때는 공감 한마디, 내 생각 한 가지, 떠오른 연상이나 가벼운 반응만으로 끝내도 된다/);
-  assert.match(chat.instructions, /이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다/);
+  assert.match(chat.instructions, /전체는 보통 80~280자이고 400자를 넘기지 않는다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long });
   assert.equal(voice.events[0].text.length, 600);
+  assert.match(voice.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
+  assert.match(voice.instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
+});
+
+test('a character with a bible shows it in a chat: rules of behaviour, how people usually treat them, why this member differs', async () => {
+  const { instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide' });
+  assert.match(instructions, /캐릭터 바이블\(성격을 설명하지 말고 아래 규칙대로/);
+  assert.match(instructions, /이럴 때 이렇게 한다:\n- 무시하거나 선을 그을 때/);
+  assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
+  assert.match(instructions, /보통 사람들이 너를 대하는 방식: 12년 동안/);
+  assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
+  // A character without one (윤서연, for now) keeps its persona and no bible.
+  const plain = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
+  assert.doesNotMatch(plain.instructions, /캐릭터 바이블/);
+});
+
+test('the director reads the member\'s words before a chat reply and its direction goes to the reply; without it the reply goes on', async t => {
+  const saved = process.env.LOUNGE_DIRECTOR;
+  process.env.LOUNGE_DIRECTOR = 'on';
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = saved; });
+  const messages = [{ id: 2, user_id: 'host', nickname: '지수', kind: 'human', text: '사진좀 부탁드려요', created_at: '2026-11-01T00:00:00Z' }];
+  const direction = { reading: '자기를 찍어 달라는 부탁', tone: '장난', request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', behavior: '빛과 포즈를 잡아 준다', goal: '자리를 잡아 주고 찍는다', ending: '행동' };
+  for (const works of [true, false]) {
+    let asked, reply;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '여행', host_persona: 'guide', memory: '지금 장면: 광장', capacity: 1, space_id: null, voice_on: false, ai_turns: 2 }]);
+      if (url.includes('voice_lounge_messages?')) return result(messages);
+      if (url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
+        asked = JSON.parse(init.body);
+        return works ? modelAnswer(direction) : result({ error: { message: 'down' } }, 500);
+      }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 광장' });
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '거기 서 봐요.' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      throw new Error(`Unexpected ${url}`);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      await response.text();
+    });
+    // The director reads the latest words and the character's bible; it is a light call of its own.
+    assert.equal(asked.model, 'gpt-6-luna');
+    assert.equal(asked.reasoning.effort, 'none');
+    assert.equal(JSON.parse(asked.input).latest, '사진좀 부탁드려요');
+    assert.match(asked.instructions, /너는 1:1 대화의 연출가다/);
+    assert.match(asked.instructions, /이럴 때 이렇게 한다:/);
+    assert.deepEqual(JSON.parse(reply.input).direction, works ? direction : undefined);
+    assert.match(reply.instructions, /direction이 있으면 이번 턴을 위해 미리 읽어 둔 사용자 말의 해석과 방향이다/);
+  }
 });
 
 test('with the voice on, the reply is spoken without its *actions*', async () => {
@@ -3066,7 +3129,8 @@ test('a story room keeps what the member wrote about themselves, cut at the long
   assert.ok(scenariosLib.loungeMemberNoteLimits.standard < scenariosLib.loungeMemberNoteLimits.plus && scenariosLib.loungeMemberNoteLimits.plus < scenariosLib.loungeMemberNoteLimits.pro);
 });
 
-test('a story in episodes: the character leads the current episode, the checkpoints are checked after the reply, and the next episode opens after its ending', async () => {
+test('a story in episodes: the character leads the current episode, the checkpoints are checked after the reply, and the next episode opens after its ending', async t => {
+  storyLayer(t, { episodes: true });
   const file = JSON.parse(readFileSync(new URL('../docs/stories/velvet-black-rose.json', import.meta.url), 'utf8'));
   const scenario = { id: file.id, title: file.title, prologue: file.prologue, user_role: file.user_role, relationship: file.relationship, place: file.place, episodes: file.episodes };
   const cases = [

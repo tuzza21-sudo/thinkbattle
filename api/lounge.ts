@@ -1,10 +1,11 @@
 import { loungeMemberPersonaRule, loungeRoomPersona, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
-import { getLoungeCharacter, loungeCharacterRules, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
+import { getLoungeCharacter, loungeCharacterRules, loungeBiblePrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
+import { loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeMessengerChat, loungeMessengerRules, readLoungeDirection } from '../src/lib/loungeMessenger';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { advanceLoungeStory, loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
+import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
@@ -714,6 +715,23 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId)), relationshipConfig, now);
       return { config: relationshipConfig, record, mood: moodFromRoom(relationshipConfig, room.ai_mood), now };
     })() : undefined;
+    // The director (see loungeMessenger.ts) reads the member's latest words while memories and knowledge are looked up,
+    // and sets the turn's direction. It never holds a reply up for long: slow or failed, the reply goes on without it.
+    const directorCharacter = getLoungeCharacter(host.id);
+    const directorStarted = performance.now();
+    const directorRead = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off'
+      && process.env.LOUNGE_DIRECTOR !== 'off' && directorCharacter && messages[0]?.kind === 'human' ? (async () => {
+        const state = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : undefined;
+        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+          model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,
+          // A short summary instead of the whole life story: the director's time is mostly its output, but less to read helps.
+          instructions: [loungeDirectorInstructions, `인물 요약: ${directorCharacter.name}, ${directorCharacter.age}, ${directorCharacter.role}. ${directorCharacter.tagline}`,
+            loungeBiblePrompt(directorCharacter) || `성격: ${directorCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
+          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, speechLevel: state?.speech_level, memory: String(room.memory ?? ''), messages: [...messages].reverse() })),
+          text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
+        }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
+        return readLoungeDirection(JSON.parse(modelOutputText(result) ?? ''));
+      })().catch(() => undefined) : undefined;
     // A story is fiction, but the member is a real person playing a role: the character knows what they said about
     // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
     // happens in it. The real world is not brought into the story: no follow-up of a real plan as its opening, and no
@@ -734,7 +752,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     if (relevanceRead) console.info('[Lounge memory relevance]', JSON.stringify({ character: relationship?.config.characterId, scored: relevance?.size ?? 0, ms: Math.round(performance.now() - relevanceStarted) }));
     // A story in episodes (see loungeStory.ts), told in a chat: where it stands, and what this episode asks of the character.
     // The model sees only the current episode; the room's copy of the story without its episodes is what it reads as scenario.
-    const storyEpisodes = chat && scenario?.episodes ? scenario.episodes : [];
+    const storyEpisodes = chat && (loungeStoryEpisodesOn || process.env.LOUNGE_STORY_EPISODES === 'on') && scenario?.episodes ? scenario.episodes : [];
     const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room.story_state, storyEpisodes) : undefined;
     const storyStageReached = storyState ? loungeStoryStageReached(storyEpisodes[storyState.episode], relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [], relationship?.record.stage) : true;
     const storyEpisode = storyState ? loungeStoryEpisodeContext(storyEpisodes, storyState, storyStageReached) : undefined;
@@ -794,7 +812,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const spaceInstruction = room.space ? `너는 '${room.space.name}'에서 열린 대화방에 초대받아 대화를 돕는 ${characterName}이다. 방을 연 방장이 주제와 너를 골랐고, 손님은 아무 때나 들어오고 나간다. topic이 있으면 방장이 정한 지금의 주제다. topic이 null이면 장소와 네 캐릭터에 어울리는 가벼운 이야기로 시작하고 주제를 강요하지 않는다.
 ` : '';
     const groupRelationshipInstruction = groupConfig ? `participants_relationship은 네가 각 참가자와 쌓아 온 관계다. 그 사람에게 말할 때의 말투와 온도에만 반영하고 점수나 단계 이름은 말하지 않는다. 다른 사람이 함께 있으므로 누구의 지난 대화, 기억, 사적인 이야기도 먼저 꺼내지 않는다. asker가 있으면 그 사람이 너를 직접 불러 물은 것이다. 질문이 그 사람 자신의 지난 이야기에 관한 것일 때만 asker.memories를 근거로, 다른 사람 앞에서 말해도 되는 범위에서 짧게 답한다. 사적이거나 민감한 내용이면 둘이 있을 때 이야기하자고 한다. 다른 참가자의 지난 이야기는 어떤 경우에도 말하지 않는다.\n` : '';
-    const photoRule = `사진은 채팅에서 photos=true일 때만 보낼 수 있다. 상대가 사진이나 지금 모습을 보여 달라고 했을 때, 또는 네가 지금 있는 곳·옷차림·풍경을 이야기하다 사진 한 장을 보내는 게 자연스러운 드문 순간에만 보낸다. 먼저 보내는 사진은 한 대화에 많아야 한 번이고, relationship.stage가 첫 단계면 상대가 부탁하지 않는 한 먼저 보내지 않는다. 사진을 보낼 때는 지문과 대사에 사진을 찍거나 보내는 장면이 분명히 드러나게 한다(예: *휴대폰을 들어 한 장 찍는다*). 사진은 그 장면을 보고 따로 만들어지므로, 보내지 않을 때는 사진을 찍거나 보낸다고 쓰지 않는다. 노출이나 성적인 사진은 보내지 않고 그런 부탁은 캐릭터답게 받아넘긴다. photos=false이면 사진을 보내지 않고, 부탁받으면 지금은 보낼 수 없다고 캐릭터답게 넘긴다.`;
+    const photoRule = `사진은 채팅에서 photos=true일 때만 보낼 수 있다. 상대가 사진이나 지금 모습을 보여 달라고 했을 때, 또는 네가 지금 있는 곳·옷차림·풍경을 이야기하다 사진 한 장을 보내는 게 자연스러운 드문 순간에만 보낸다. 먼저 보내는 사진은 한 대화에 많아야 한 번이고, relationship.stage가 첫 단계면 상대가 부탁하지 않는 한 먼저 보내지 않는다. 사진을 보낼 때는 지문과 대사에 사진을 찍거나 보내는 장면이 분명히 드러나게 한다(예: *휴대폰을 들어 한 장 찍는다*). 보내는 사진에는 언제나 네 모습이 담긴다(셀카, 누가 찍어 준 네 사진). 상대가 사진을 부탁하면("사진 좀 찍어 주세요", "사진 부탁해요") 풍경이 아니라 상대를 찍어 달라는 뜻으로 먼저 받는다. 상대를 찍어 주거나 풍경을 찍어 주는 것은 사진을 보내는 일이 아니라 장면 속 행동이다. 먼저 상대를 잘 나오는 자리에 세우고 포즈와 시선을 잡아 준 뒤(예: 전망이 트인 난간 앞, 빛이 얼굴에 닿는 쪽) 상대의 휴대폰으로 찍어 주고, 찍힌 사진이 어떤지(구도, 빛, 상대의 표정)를 지문과 대사로 보여 주며, 사진을 보낸다고 쓰지 않는다. 사진은 그 장면을 보고 따로 만들어지므로, 보내지 않을 때는 사진을 찍거나 보낸다고 쓰지 않는다. 노출이나 성적인 사진은 보내지 않고 그런 부탁은 캐릭터답게 받아넘긴다. photos=false이면 사진을 보내지 않고, 부탁받으면 지금은 보낼 수 없다고 캐릭터답게 넘긴다.`;
     const roleInstruction = spaceInstruction + groupRelationshipInstruction + (solo ? `역할: 사람 한 명과 이야기하는 대화 상대다. 진행자나 인터뷰어가 아니다. ${host.companion}
 1:1에서는 자연스러운 대화 상대처럼 이야기한다. ${relationship ? 'relationship.speech_level에 맞는 말투와' : '일상적인 존댓말과'} 짧은 호흡으로 상대가 방금 한 말에 바로 반응한다. 목록·소제목·강의식 해설이나 '정리하면', '핵심은', '함께 살펴보겠습니다' 같은 발표 말투를 쓰지 않는다.
 대화는 주고받는 것이다. 매번 질문하지 않는다. 목소리로 말할 때는 공감 한마디, 내 생각 한 가지, 떠오른 연상이나 가벼운 반응만으로 끝내도 된다. 질문은 이야기가 정말 궁금할 때만 하나 하고, 매번 질문으로 끝내지 않는다. 공감, 분석, 조언, 질문을 한 답변에 모두 넣지 않는다. 같은 형식의 답을 반복하지 않는다.
@@ -864,7 +882,10 @@ session.stage와 question은 방의 분야에 맞춘 이야기 카드다. 영화
     // also fix what that try showed: the same paragraph order every time, the same prop again and again, too little
     // dialogue, and a character that turned every advance aside.
     const story = split && chat && Boolean(scenario);
-    const storyInstruction = `역할: 이 대화는 채팅으로 진행되는 롤플레이 소설이다. 너는 사용자와 함께 이야기를 만들어 가는 주인공이다. ${host.companion}
+    // A one-to-one chat is a messenger conversation (see loungeMessenger.ts): a story card only sets its opening, and the
+    // story instruction below waits for the story layer to come back. LOUNGE_MESSENGER=off brings the stories back.
+    const messenger = split && chat && solo && !room.space_id && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off';
+    const storyInstruction =`역할: 이 대화는 채팅으로 진행되는 롤플레이 소설이다. 너는 사용자와 함께 이야기를 만들어 가는 주인공이다. ${host.companion}
 입력의 scenario를 지킨다. scenario가 캐릭터 설명의 경력이나 처지(예: 아직 찍지 못한 영화)와 다르면 이 이야기 안에서는 scenario를 따른다. scenario.prologue는 사용자가 이미 읽은 이야기의 시작이고, scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점, scenario.place는 첫 장면이다. 둘의 말투와 거리는 scenario.relationship에서 시작하고, relationship(stage, outing, intimacy)은 그 위에서 마음을 얼마나 열고 스킨십을 어디까지 받아들일지 정한다. 스킨십의 한도는 scenario.relationship이 아니라 relationship.intimacy를 따른다. 시나리오 속 사건과 장면 이동은 관계 단계와 상관없이 이야기로 진행한다. memory의 '지금 장면'과 줄거리, '둘 사이'를 이어 간다.
 이 이야기의 중심은 사건을 풀거나 일을 해내는 것이 아니라 너와 이 사람 사이의 마음이다. scenario.user_role과 scenario.relationship은 사용자가 네 삶에서 어떤 의미인 사람인지를 알려 주므로, 그 사람을 대할 때 그 의미가 말과 행동에 묻어나게 한다(지난 기억을 떠올리기, 그 사람에게만 보이는 모습, 하지 못했던 말). 사건과 일은 둘을 가까이 붙여 놓는 배경이다. 일의 어렵고 전문적인 부분은 네가 처리하고, 사용자가 맡은 인물이 그 분야를 몰라도 이야기가 이어지게 한다. 사용자가 알 수 없는 사실(날짜, 금액, 서류의 내용, 사건의 경위 등)을 대라고 묻거나 몰아붙이지 않는다. 그런 사실은 네가 먼저 말하거나 보여 주고, 사용자에게는 그것을 보고 든 생각과 판단, 느낌만 듣는다. 사용자가 사실을 지어서 답하면 앞의 이야기와 어긋나지 않는 한 이야기 속 사실로 받아 이어 가고, 모르겠다고 하면 "그럼 같이 찾죠"처럼 네가 장면을 앞으로 끌고 간다. 사용자의 말과 행동이 장면과 네 마음을 실제로 움직이게 한다.
 reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연다(story_episode.just_started가 true면 프롤로그 대신 그 화의 opening 바로 다음 순간에서 연다). scenario.place를 생생하게 그리고 첫 대사로 사용자를 장면 안으로 끌어들인다. 프롤로그 문장을 그대로 되풀이하지 않는다. 첫 장면도 질문으로 끝내지 않고, 사용자가 반응하고 싶어지는 행동이나 상황으로 끝낸다.
@@ -881,6 +902,9 @@ reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연�
 - 사용자가 맡은 인물의 행동, 대사, 마음은 대신 정하지 않는다. 주변 인물이 사용자에게 말을 걸게 할 수는 있다. 지문의 '나'는 언제나 너 자신(이 캐릭터)이다. 사용자의 행동을 '나는'으로 쓰거나 사용자의 선택(코스를 고르기, 대답하기, 커피를 받기)을 네가 이미 한 것처럼 쓰지 않는다. 프롤로그가 사용자의 대답이나 선택을 기다리며 끝났다면, 첫 장면에서도 그 기다림을 네 쪽에서 이어 간다(재촉하기, 장난, 다른 행동). 사용자 대신 답하지 말고, 사용자가 답할 때까지 기다린다.
 - 캐릭터 설명의 소품과 시그니처 동작(예: 손목시계, 잔)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다.
 ${photoRule}`;
+    const messengerInstruction = [`역할: 사람 한 명과 이야기하는 대화 상대다. 진행자, 인터뷰어, 작가가 아니다. ${host.companion}`, loungeBiblePrompt(character), loungeMessengerRules, photoRule].filter(Boolean).join('\n');
+    const direction = directorRead ? await directorRead : undefined;
+    if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { tone: direction.tone, reaction: direction.reaction, ending: direction.ending, request: Boolean(direction.request), quote: Boolean(direction.quote) } : {}) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
     const knowledge = await withinLookupWait(knowledgeRead) ?? [];
@@ -903,19 +927,19 @@ ${photoRule}`;
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
       // The fast model replies without reasoning (as since the lounge began as a voice service, where the wait before the
       // first word matters most); the "deep" model reasons. Reasoning counts toward the output limit.
-      model: chatModel.model ?? 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
+      model: chatModel.model ?? 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (messenger ? 1000 : story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
       // Requests with the same key go to the same cache, so a character's long instructions are found there more often:
       // on 2026-10-21 one turn in the middle of a conversation missed the cache and read about 10,000 tokens anew.
       prompt_cache_key: `lounge-${host.id}`,
       instructions: [
         `${persona ? `${persona}\n${solo ? loungeOneToOneCharacterRules : loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${solo ? '사람의 가치나 인격은 평가하지 않는다.' : relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,
-        ...(story ? [] : [reactionRules, topicRules]), closingRules,
+        ...(story || messenger ? [] : [reactionRules, topicRules]), closingRules,
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
         timeAway ? loungeTimeAwayInstruction : '',
         longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
-        story ? storyInstruction : roleInstruction,
+        messenger ? messengerInstruction : story ? storyInstruction : roleInstruction,
         story && storyEpisode ? loungeStoryEpisodeInstructions : '',
         phoneCall ? loungePhoneCallRules : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
@@ -925,7 +949,7 @@ ${photoRule}`;
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
-      input: JSON.stringify({ ...context, ...(split && chat ? { photos: chatPhotos } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: split
+      input: JSON.stringify({ ...context, ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: split
         ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
           ? writesMemory
@@ -948,18 +972,19 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
         relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}${scenario ? `\n${longMemoryStoryWriteInstructions}` : ''}` : '',
         storyEpisode ? loungeStoryCheckpointInstructions : '',
-        chatPhotos ? `photo: 방금 답에서 캐릭터가 사진을 찍거나 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
-photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다.` : '',
+        chatPhotos ? `photo_subject: 방금 답에서 캐릭터가 찍은 사진에 누가 담겼는지다. character는 캐릭터 자신(셀카, 누가 찍어 준 캐릭터의 사진), member는 사용자(캐릭터가 사용자를 찍어 줌), scenery는 사람 없는 풍경이나 물건, none은 사진을 찍는 장면이 없음이다. 사용자가 자기를 찍어 달라고 해서 찍어 준 사진은 member다.
+photo: photo_subject가 character이고 방금 답에서 캐릭터가 자기 모습이 담긴 사진(셀카, 누가 찍어 준 캐릭터의 사진)을 상대에게 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 캐릭터가 사용자를 찍어 주거나 풍경만 찍는 장면, 사용자의 휴대폰으로 찍는 장면은 보내는 사진이 아니므로 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
+photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다. 사용자 자신이나 풍경을 찍어 달라는 부탁은 false다.` : '',
       ].filter(Boolean).join('\n'),
       input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
-        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } }, story_choice: { type: 'string' } } : {}) },
-        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts', 'story_choice'] : [])],
+        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo_subject: { type: 'string', enum: ['character', 'member', 'scenery', 'none'] }, photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } }, story_choice: { type: 'string' } } : {}) },
+        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo_subject', 'photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts', 'story_choice'] : [])],
       } } },
     });
-    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown; story_choice?: unknown };
+    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo_subject?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown; story_choice?: unknown };
     // The next episode, rewritten to what the two settled that differs from the story as written (a restaurant instead of
     // the cooking studio). Without an answer the episode opens as written, with the facts still told to the character.
     const adaptEpisode = async (state: LoungeStoryState, memory: string | undefined) => {
@@ -1486,7 +1511,9 @@ photo_asked: 사용자의 가장 최근 발언이 사진이나 지금 모습을 
             // Where the story is now, so the choices the reply put to the member show without waiting for the room's reload.
             if (storySaved) send({ type: 'story', state: storySaved });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
-            const photo = chatPhotos && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
+            // Only a photo of the character can be made (from their reference photos): on 2026-11-01 a member asked 한지오
+            // to take their picture and got his, twice. So the call names who is in it, and anything else makes none.
+            const photo = chatPhotos && answer?.photo_subject === 'character' && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
             if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {

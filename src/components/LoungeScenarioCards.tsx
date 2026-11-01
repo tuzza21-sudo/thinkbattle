@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, LoaderCircle, Play, UserCog } from 'lucide-react';
+import { BookOpen, LoaderCircle, Play, RotateCcw, UserCog } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
-import { listMyLoungePersonas, startLoungeScenario } from '../lib/loungeApi';
+import { listLoungeChats, listMyLoungePersonas, startLoungeScenario } from '../lib/loungeApi';
 import { loungeMemberNoteLimits, personalizeLoungeStory, type LoungeScenarioRow } from '../lib/loungeScenarios';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -27,16 +27,26 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
     void listMyLoungePersonas().then(list => { if (!cancelled) setPersonaName(list.find(item => item.is_default)?.title ?? null); }, () => { if (!cancelled) setPersonaName(null); });
     return () => { cancelled = true; };
   }, [member]);
+  // The stories the member is in the middle of (their latest conversation with the character is in one): those offer
+  // to go on or to start again from the prologue (2026-11-01).
+  const [begun, setBegun] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!member) return;
+    let cancelled = false;
+    void listLoungeChats().then(chats => { if (!cancelled) setBegun(new Set(chats.filter(chat => chat.story).map(chat => `${chat.character_id}|${chat.story}`))); }, () => {});
+    return () => { cancelled = true; };
+  }, [member]);
   // "둘만의 이야기" links here (#stories): the list appears once loaded, so it is scrolled to then.
   const listed = scenarios.length > 0;
   useEffect(() => { if (listed && hash === '#stories') document.getElementById('stories')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, [listed, hash]);
   if (!scenarios.length) return null;
-  const start = async (id: string) => {
+  const start = async (id: string, fresh = false) => {
     if (!user) return;
-    setBusy(id); setError('');
-    try { navigate(`/lounge/${await startLoungeScenario(id, user.nickname, note)}`); }
-    catch (err) { setError(errorText(err)); setBusy(null); }
+    setBusy(fresh ? `${id}|fresh` : id); setError('');
+    try { navigate(`/lounge/${await startLoungeScenario(id, user.nickname, note, fresh)}`); }
+    catch (err) { setError(fresh ? '지금은 처음부터 시작할 수 없어요. 잠시 뒤 다시 시도해 주세요.' : errorText(err)); setBusy(null); }
   };
+  const spinner = (key: string, icon: typeof Play) => { const Icon = icon; return busy === key ? <LoaderCircle size={15} className="lounge-spin" /> : <Icon size={15} />; };
   return <section id="stories" className="lounge-character-section lounge-scenarios">
     <h2><BookOpen size={18} /> 대화 시작하기</h2>
     <p className="lounge-character-lead">함께할 이야기를 고르면 짧은 프롤로그가 먼저 나오고, 장면 속에서 대화가 시작돼요.</p>
@@ -54,8 +64,12 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
         <h3>{scenario.title}</h3>
         <p>{personalizeLoungeStory(scenario.hook, user?.nickname)}</p>
         <small>{personalizeLoungeStory('당신의 역할', user?.nickname)} · {personalizeLoungeStory(scenario.user_role, user?.nickname)}</small>
-        {user ? <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{busy === scenario.id ? <LoaderCircle size={15} className="lounge-spin" /> : <Play size={15} />}이 이야기로 시작</button>
-          : <Link to="/lounge" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>}
+        {!user ? <Link to="/lounge" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>
+          : begun.has(`${scenario.character_id}|${scenario.title}`) ? <div className="lounge-scenario-actions">
+            <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{spinner(scenario.id, Play)}기존 대화 이어하기</button>
+            <button type="button" className="lounge-character-cta lounge-scenario-restart" disabled={Boolean(busy)} onClick={() => void start(scenario.id, true)}>{spinner(`${scenario.id}|fresh`, RotateCcw)}처음부터 하기</button>
+          </div>
+          : <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{spinner(scenario.id, Play)}이 이야기로 시작</button>}
       </article>)}
     </div>
     {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}

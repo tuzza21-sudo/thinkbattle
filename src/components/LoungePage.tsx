@@ -21,7 +21,7 @@ import { LoungeSpeechPicker } from './LoungeSpeechPicker';
 import { LoungeCall } from './LoungeCall';
 import { LoungeStoryIntro } from './LoungeStoryIntro';
 import { LoungeStoryProgress } from './LoungeStoryProgress';
-import { loungeStoryChoices, loungeStoryEpisodeAt, normalizeLoungeStoryState } from '../lib/loungeStory';
+import { loungeStoryChoices, loungeStoryEpisodeAt, loungeStoryEpisodesOn, normalizeLoungeStoryState } from '../lib/loungeStory';
 import { LoungeChatsPage, LoungeSettingsPage, LoungeTabBar } from './LoungeTabs';
 import { personalizeLoungeStory, type LoungeRoomScenario } from '../lib/loungeScenarios';
 import { restrictedLoungeMembers } from '../lib/loungeInteraction';
@@ -625,7 +625,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   // Only a story that has not begun: once the character has spoken, the prologue stays as the box at the top of the chat.
   const storyIntro = Boolean(room?.scenario && isHost && room.capacity === 1 && !storyStarted && !messages.some(message => message.kind === 'host'));
   // A story in episodes: once an episode is done the next one opens full screen, and its first scene is told when the member starts it.
-  const storyEpisodes = room?.scenario?.episodes ?? [];
+  const storyEpisodes = loungeStoryEpisodesOn ? room?.scenario?.episodes ?? [] : [];
   const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room?.story_state, storyEpisodes) : null;
   const [episodeShown, setEpisodeShown] = useState(() => { try { return Number(sessionStorage.getItem(`lounge.episodeShown.${roomId}`)) || 0; } catch { return 0; } });
   const episodeIntro = Boolean(storyState && isHost && room?.capacity === 1 && storyState.episode > 0 && !storyState.opened && episodeShown < storyState.episode);

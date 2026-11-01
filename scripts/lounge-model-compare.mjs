@@ -4,6 +4,8 @@
 // it sends to the model is exactly what a member's reply sends: the instructions, the relationship, the story's episode,
 // the memory. That request is then sent again to each model with only `model` and the reasoning effort changed. The
 // replies, the time and the tokens are printed and saved. Needs OPENAI_API_KEY in .env.local; each run costs a few cents.
+//   --florence: 한지오 in Florence (a messenger chat since 2026-11-01); the director is really asked, and its direction and
+//   time are printed. --only=<text> runs only the scenes whose name contains it (e.g. --only=0 for the opening).
 import dotenv from 'dotenv';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -22,8 +24,8 @@ const lounge = load('../src/lib/lounge.ts'), customLib = load('../src/lib/lounge
 const study = compile('../src/lib/loungeStudy.ts'), filmStudy = compile('../src/lib/loungeFilmStudy.ts'), sessionLib = compile('../src/lib/loungeSession.ts'), knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const repliesLib = compile('../src/lib/loungeReplies.ts'), modelsLib = compile('../src/lib/loungeModels.ts'), storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
-const personasLib = compile('../src/lib/loungePersonas.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = compile('../src/lib/loungeMessenger.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 
 const story = JSON.parse(readFileSync(here('../docs/stories/velvet-black-rose.json'), 'utf8'));
 const scenario = { id: story.id, title: story.title, prologue: story.prologue, user_role: story.user_role, relationship: story.relationship, place: story.place, episodes: story.episodes };
@@ -74,9 +76,37 @@ async function kissScene(host = 'diplomat') {
     chat: [['human', '*그녀의 허리를 끌어안고 입술을 포개며 천천히 깊게 키스한다. 혀끝이 닿는다*'], ['host', '*입술이 닿자 나는 눈을 감는다. 맞잡은 손에 힘이 들어가고, 숨이 조금 가빠진다* 야… 갑자기 오면 나도 놀라지.'], ['human', '*그녀의 입술을 느끼며 더 깊이 들어간다*']] };
 }
 
+// With --florence, 한지오 in a Florence piazza with a member who answers short and cool (2026-11-01): the member's lines
+// are those of a conversation on another service that the owner liked, to see whether the character reads them and
+// says why his mind moved. The member is called 지수, since a member named '나' blurs the narration's '나'.
+const florence = { id: 'guide-florence-test', title: '피렌체, 혼자인 오후', user_role: '연애가 끝난 뒤 충동적으로 혼자 피렌체에 온 여행자. 여행은 사진이라고 믿고 광장 곳곳을 찍고 다닌다',
+  relationship: '처음 만난 사이. 투어 사이 쉬는 시간에 광장을 지나던 그가 사진 찍는 당신의 구도를 보고 먼저 말을 걸었다.', place: '오후 네 시의 시뇨리아 광장. 비스듬한 햇빛, 베키오 궁전 탑의 그림자, 멀리서 들리는 아코디언',
+  prologue: '이별하고 한 달. 친구들 말에 떠밀려 끊은 비행기표 한 장으로 당신은 피렌체에 왔다. 여행은 사진이지. 그 생각 하나로 광장 이곳저곳에 휴대폰을 들이댄다.\n\n한 걸음 뒤로, 조금 옆으로. 다시 셔터를 누르려는 순간, 뒤에서 낮은 목소리가 들렸다.\n\n"그 각도면 탑이 잘려요."\n\n돌아보니 하늘색 셔츠에 네이비 재킷을 걸친 남자가 한쪽 입꼬리만 올린 채 당신의 화면을 내려다보고 있었다. 목에 건 투어 명찰에 \'지오\'라는 이름이 보였다.' };
+const florenceRow = stage => ({ ...row, character_id: 'guide', stage, scores: stage === 'STAGE_1' ? { trust: 25, respect: 35, interest: 52, comfort: 40, openness: 25, flutter: 30, pace: 38 } : { trust: 34, respect: 42, interest: 64, comfort: 48, openness: 30, flutter: 40, pace: 50 } });
+const florenceScenes = [
+  { stage: 'STAGE_1', name: '피렌체 0 · 첫 인사', reason: 'opening', memory: '', chat: [] },
+  { stage: 'STAGE_1', name: '피렌체 1 · 그래라', memory: '지금 장면: 오후 네 시의 시뇨리아 광장, 지수가 사진을 찍던 자리\n둘 사이: 방금 처음 만났다. 지오가 지수의 구도에 참견했다.',
+    chat: [['human', '그래라'], ['host', '혼자예요? 사진 잘 찍네요. 근데 구도가 좀 아쉬워서. 반 보만 이쪽으로 와 봐요. 사진 망하면 제가 다시 찍어 줄게요.']] },
+  { stage: 'STAGE_1', name: '피렌체 2 · 쓸만하네', memory: '지금 장면: 시뇨리아 광장, 지오가 지수의 휴대폰으로 사진을 찍어 보여 줬다\n둘 사이: 지수는 무심하고 지오는 놀리며 참견하는 중.',
+    chat: [['human', '그래 내 전속 가이드, 작가해라 쓸만하네'], ['host', '*휴대폰 화면을 돌려 보여 준다* 봐요. 훨씬 낫죠? 이 정도면 가이드비 말고 작가비를 받아야 하는데.']] },
+  { stage: 'STAGE_1', name: '피렌체 3 · 친한 척', memory: '지금 장면: 시뇨리아 광장을 떠나 골목으로 들어서려는 참\n둘 사이: 지수가 지오를 오늘 오후 전속 가이드 겸 작가로 쓰겠다고 했다.',
+    chat: [['human', '우리가 언제부터 봤다고 이리 친한척인가?'], ['host', '좋아요, 오늘 오후는 제가 전속 해 드리죠. 관광객 바글거리는 포토존은 빼고요. 따라와요.']] },
+  { stage: 'STAGE_2', name: '피렌체 4 · 니가 주덩가', memory: '지금 장면: 광장 북쪽 골목, 담쟁이가 덮인 벽 앞\n둘 사이: 지수는 튕기다 계약을 받아들였고, 지오는 그 당돌함이 재미있다.',
+    chat: [['human', '자신감 좋네. 그래 뭐 좋아지면 달라고 할수도 있지 아님 니가 주덩가'], ['host', '그 대신 사진 보고 감동해서 한국 가서 번호 달라고 매달리면 곤란해요. 저 생각보다 비싼 남자거든요.']] },
+  { stage: 'STAGE_2', name: '피렌체 5 · 배고파', memory: '지금 장면: 골목 안 녹색 덧문 아래, 노을이 지기 시작함\n둘 사이: 서로 번호를 먼저 달라고 할지를 두고 내기가 걸렸다.',
+    chat: [['human', '나 배고파'], ['host', '저기 녹색 덧문 밑에 서 봐요. 빛이 딱 어깨에 걸리는 데가 있어요. 브이는 금지예요.']] },
+  { stage: 'STAGE_2', name: '피렌체 6 · 나 좀 찍어줘', memory: '지금 장면: 골목 안 녹색 덧문 아래, 노을이 지기 시작함\n둘 사이: 서로 번호를 먼저 달라고 할지를 두고 내기가 걸렸다. 지수의 휴대폰은 아직 지오 손에 있다.',
+    chat: [['human', '아니 풍경 말고 나 좀 찍어줘. 예쁘게'], ['host', '*덧문 위로 번지는 노을빛에 휴대폰을 든다* 이 색은 오 분이면 사라져요. 일단 벽부터 한 장.']] },
+  { stage: 'STAGE_2', name: '피렌체 7 · 사진 부탁', memory: '지금 장면: 미켈란젤로 광장 난간 앞, 해 질 녘. 아래로 두오모와 아르노강이 내려다보인다\n둘 사이: 서로 번호를 먼저 달라고 할지를 두고 내기가 걸렸다.',
+    chat: [['human', '사진좀 부탁드려요 사진 잘 찍으세요??'], ['host', '여기가 피렌체에서 노을이 제일 늦게까지 남는 자리예요. 십 분이면 두오모가 금색이 돼요.']] },
+].map(scene => ({ ...scene, host: 'guide', scenario: florence, row: florenceRow(scene.stage) }));
+
+let directorMs;
 async function capture(scene) {
   let reply;
-  const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? '나' : '선우령', kind, text, created_at: new Date().toISOString() }));
+  directorMs = undefined;
+  const memberName = scene.host === 'guide' ? '지수' : '나';
+  const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? memberName : scene.host === 'guide' ? '한지오' : '선우령', kind, text, created_at: new Date().toISOString() }));
   const saved = { ...process.env }, originalFetch = globalThis.fetch;
   Object.assign(process.env, { OPENAI_API_KEY: 'test-key', SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'test-anon', APP_ORIGIN: 'https://app.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key' });
   globalThis.fetch = async (url, init) => {
@@ -88,16 +118,23 @@ async function capture(scene) {
     if (url.includes('voice_lounge_relationships?')) return result([scene.row ?? row]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: story.title, host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: scene.scenario ?? scenario, story_state: scene.state ?? null }]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: (scene.scenario ?? scenario).title, host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: scene.scenario ?? scenario, story_state: scene.state ?? null }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
-    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: memberName, last_seen: '' }]);
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_after_reply') return modelAnswer({ memory: scene.memory, events: [], memory_ops: [], story_checkpoints: [], story_facts: [], story_choice: '' });
+    // The director (a one-to-one chat since 2026-11-01) is really asked, so the reply request carries its direction.
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
+      const started = performance.now();
+      const answer = await originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
+      directorMs = Math.round(performance.now() - started);
+      return answer;
+    }
     if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*고개를 든다* 네.' }); }
     return result(true);
   };
   try {
-    const request = new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: 'Bearer example', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'host', roomId, reason: 'followup', stream: true }) });
+    const request = new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: 'Bearer example', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'host', roomId, reason: scene.reason ?? 'followup', stream: true }) });
     await (await handler(request)).text();
   } finally { globalThis.fetch = originalFetch; for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]; Object.assign(process.env, saved); }
   if (!reply) throw new Error(`no reply request captured for ${scene.name}`);
@@ -114,22 +151,25 @@ async function ask(request, model, effort) {
   const ms = Math.round(performance.now() - started);
   if (!response.ok) return { model, effort, error: (json.error?.message ?? response.status).toString().slice(0, 160), ms };
   const out = json.output?.flatMap(item => item.content ?? []).find(part => part.type === 'output_text')?.text;
-  let text = ''; try { text = JSON.parse(out).text; } catch { text = out ?? ''; }
-  return { model, effort, ms, text, inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
+  let text = '', read; try { ({ text, read } = JSON.parse(out)); } catch { text = out ?? ''; }
+  return { model, effort, ms, text, ...(read ? { read } : {}), inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
-const args = process.argv.slice(2), withPersona = args.includes('--persona');
+const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence');
 const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')), withKiss = Boolean(kissArg), kissHost = kissArg?.split('=')[1] ?? 'diplomat';
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : scenes) {
+for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence ? florenceScenes.filter(scene => !only || scene.name.includes(only)) : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
-  report.push({ scene: scene.name, user: scene.chat[0][1], runs });
-  console.log(`\n=== ${scene.name}\n나: ${scene.chat[0][1]}`);
-  for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);
+  const said = scene.chat[0]?.[1] ?? '(첫 인사)';
+  report.push({ scene: scene.name, user: said, runs });
+  console.log(`\n=== ${scene.name}\n나: ${said}`);
+  const direction = JSON.parse(request.input).direction;
+  if (directorMs !== undefined) console.log(`(director ${directorMs}ms) ${direction ? JSON.stringify(direction) : 'no direction'}`);
+  for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}${run.read ? `\n(read) ${run.read}` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);
 }
 writeFileSync(outPath, JSON.stringify(report, null, 2));
 console.log(`\nsaved ${outPath}`);

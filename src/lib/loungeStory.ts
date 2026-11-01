@@ -10,6 +10,12 @@
  * story is a file, not code.
  */
 
+/**
+ * Off since 2026-11-01: a one-to-one chat is a messenger conversation (loungeMessenger.ts) and a story card sets only its
+ * opening (the prologue). Episodes stay in the stories and in this file for the story layer to come back.
+ */
+export const loungeStoryEpisodesOn = false;
+
 export type LoungeStoryCheckpoint = {
   /** Short, stable id (letters, numbers and hyphens). */
   id: string;
