@@ -2148,7 +2148,10 @@ test('a chat reply is text only and the model is told it is a messenger conversa
   assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
   assert.match(instructions, /말풍선처럼 1~3덩어리로 쓰고/);
   // Actions and the inner voice: why the member's words moved the character, never props for their own sake.
-  assert.match(instructions, /지문에는 상대의 말이나 행동이 네 마음을 왜, 어떻게 움직였는지/);
+  assert.match(instructions, /거의 모든 답에 별표로 감싼 지문을 하나 넣고/);
+  assert.match(instructions, /지문의 중심은 행동이 아니라 속마음이다/);
+  // Plain means no quip, not no inner voice: the thoughts had nearly gone once replies were asked to be plain.
+  assert.match(instructions, /담백하다는 건 농담과 재치 있는 마무리를 빼는 것이지 속마음을 빼는 것이 아니다/);
   assert.match(instructions, /의미 없는 동작, 풍경 설명, 외모·소품 묘사는 쓰지 않고/);
   assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
