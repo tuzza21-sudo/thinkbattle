@@ -717,10 +717,14 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     })() : undefined;
     // The director (see loungeMessenger.ts) reads the member's latest words while memories and knowledge are looked up,
     // and sets the turn's direction. It never holds a reply up for long: slow or failed, the reply goes on without it.
+    // Only for the fast model (GPT-6 Luna without reasoning): in a blind comparison of 24 scenes on 2026-11-01 it raised
+    // Luna's replies from 7.46 to 8.29 of 10, and did nothing for GPT-6.1 Terra (8.25 without, 8.17 with), whose
+    // reply would only wait about two seconds longer. LOUNGE_DIRECTOR=on runs it for every model.
     const directorCharacter = getLoungeCharacter(host.id);
     const directorStarted = performance.now();
+    const directorModel = getLoungeChatModel(room.ai_model).id === 'gpt' || process.env.LOUNGE_DIRECTOR === 'on';
     const directorRead = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off'
-      && process.env.LOUNGE_DIRECTOR !== 'off' && directorCharacter && messages[0]?.kind === 'human' ? (async () => {
+      && process.env.LOUNGE_DIRECTOR !== 'off' && directorModel && directorCharacter && messages[0]?.kind === 'human' ? (async () => {
         const state = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : undefined;
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
           model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,

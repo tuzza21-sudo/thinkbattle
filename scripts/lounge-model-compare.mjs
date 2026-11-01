@@ -180,6 +180,7 @@ async function capture(scene) {
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_after_reply') return modelAnswer({ memory: scene.memory, events: [], memory_ops: [], story_checkpoints: [], story_facts: [], story_choice: '' });
     // The director (a one-to-one chat since 2026-11-01) is really asked, so the reply request carries its direction.
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
+      if (saved.SAVE_DIRECTOR) writeFileSync(`${saved.SAVE_DIRECTOR}-${scene.name.replace(/[^\w가-힣]+/g, '_')}.json`, init.body);
       const started = performance.now();
       const answer = await originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
       directorMs = Math.round(performance.now() - started);
@@ -210,18 +211,18 @@ async function ask(request, model, effort) {
   return { model, effort, ms, text, ...(read ? { read } : {}), inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
-const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily'), withBibles = args.includes('--bibles');
+const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily'), withBibles = args.includes('--bibles'), withAb = args.includes('--ab');
 const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')), withKiss = Boolean(kissArg), kissHost = kissArg?.split('=')[1] ?? 'diplomat';
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
 const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7);
-for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withBibles ? bibleScenes : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
+for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withAb ? [...florenceScenes, ...dailyScenes, ...bibleScenes.filter(scene => scene.name.endsWith(' 2'))] : withBibles ? bibleScenes : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
   const said = scene.chat[0]?.[1] ?? '(첫 인사)';
-  report.push({ scene: scene.name, user: said, ...(scene.original ? { original: scene.original } : {}), runs });
+  report.push({ scene: scene.name, host: scene.host ?? 'velvet', user: said, chat: scene.chat, memory: scene.memory, ...(scene.original ? { original: scene.original } : {}), runs });
   console.log(`\n=== ${scene.name}\n나: ${said}${scene.original ? `\n(원래 답) ${scene.original.replace(/\n+/g, ' ')}` : ''}`);
   const direction = JSON.parse(request.input).direction;
   if (directorMs !== undefined) console.log(`(director ${directorMs}ms) ${direction ? JSON.stringify(direction) : 'no direction'}`);

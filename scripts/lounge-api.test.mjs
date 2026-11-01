@@ -2205,18 +2205,19 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
 });
 
-test('the director reads the member\'s words before a chat reply and its direction goes to the reply; without it the reply goes on', async t => {
+test('the director reads the member\'s words before a fast-model chat reply and its direction goes to the reply; without it the reply goes on', async t => {
   const saved = process.env.LOUNGE_DIRECTOR;
-  process.env.LOUNGE_DIRECTOR = 'on';
+  // Neither 'off' (the default of these tests) nor 'on' (every model): it runs for the fast model only.
+  process.env.LOUNGE_DIRECTOR = 'auto';
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = saved; });
   const messages = [{ id: 2, user_id: 'host', nickname: '지수', kind: 'human', text: '사진좀 부탁드려요', created_at: '2026-11-01T00:00:00Z' }];
-  const direction = { reading: '자기를 찍어 달라는 부탁', tone: '장난', request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', behavior: '빛과 포즈를 잡아 준다', goal: '자리를 잡아 주고 찍는다', ending: '행동' };
-  for (const works of [true, false]) {
+  const direction = { tone: '장난', request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다', ending: '행동' };
+  for (const [works, aiModel] of [[true, undefined], [false, undefined], [true, 'gpt-terra']]) {
     let asked, reply;
     await run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'host' });
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
-      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '여행', host_persona: 'guide', memory: '지금 장면: 광장', capacity: 1, space_id: null, voice_on: false, ai_turns: 2 }]);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '여행', host_persona: 'guide', memory: '지금 장면: 광장', capacity: 1, space_id: null, voice_on: false, ai_turns: 2, ai_model: aiModel }]);
       if (url.includes('voice_lounge_messages?')) return result(messages);
       if (url.includes('voice_lounge_members?')) return result([]);
       if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
@@ -2231,6 +2232,8 @@ test('the director reads the member\'s words before a chat reply and its directi
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       await response.text();
     });
+    // GPT-6.1 Terra keeps to the rules without it (a blind comparison, 2026-11-01), so its replies do not wait for one.
+    if (aiModel === 'gpt-terra') { assert.equal(asked, undefined); assert.equal(JSON.parse(reply.input).direction, undefined); continue; }
     // The director reads the latest words and the character's bible; it is a light call of its own.
     assert.equal(asked.model, 'gpt-6-luna');
     assert.equal(asked.reasoning.effort, 'none');
