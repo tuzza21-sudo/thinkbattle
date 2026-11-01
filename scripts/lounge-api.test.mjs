@@ -2187,7 +2187,8 @@ test('a chat reply is short and kept within 1200 characters; a voice reply keeps
 test('a character with a bible shows it in a chat: rules of behaviour, how people usually treat them, why this member differs', async () => {
   const { instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide' });
   assert.match(instructions, /캐릭터 바이블\(성격을 설명하지 말고 아래 규칙대로/);
-  assert.match(instructions, /이럴 때 이렇게 한다:\n- 무시하거나 선을 그을 때/);
+  assert.match(instructions, /이럴 때 이렇게 한다:\n- 함께 하자는 제안을 아직 받을 수 없을 때 → /);
+  assert.match(instructions, /\n- 무시하거나 선을 그을 때/);
   assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
   assert.match(instructions, /보통 사람들이 너를 대하는 방식: 12년 동안/);
   assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
