@@ -123,7 +123,7 @@ const dailyScenes = [
 ];
 // With --bibles, the seven characters whose bibles were written on 2026-11-01 get the same three lines at their first
 // stage, texting in the evening: an everyday question, a light jab and an invitation.
-const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'trickster', 'diplomat', 'lawyer'].flatMap(host => {
+const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer', 'guide'].flatMap(host => {
   const config = relationshipLib.getRelationshipConfig(host);
   const firstRow = { ...row, character_id: host, stage: config.stages[0].id, scores: { ...config.initial } };
   const memory = '지금 장면: 저녁, 각자 있는 곳에서 메시지를 주고받는 중\n둘 사이: 며칠 전 처음 이야기를 나눴다.';
