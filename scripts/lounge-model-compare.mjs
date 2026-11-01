@@ -199,7 +199,8 @@ async function capture(scene) {
 
 async function ask(request, model, effort) {
   const body = { ...request, model, reasoning: { effort }, store: false };
-  delete body.stream; delete body.prompt_cache_key;
+  // The cache key is kept: without it the same instructions often missed the cache in these runs and were written again.
+  delete body.stream;
   body.max_output_tokens = Math.max(body.max_output_tokens, effort === 'none' ? 1400 : 4000);
   const started = performance.now();
   const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${realKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -216,10 +217,21 @@ const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')),
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7);
+const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7), lastPrompt = new Map(), dryRows = [];
 for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withAb ? [...florenceScenes, ...dailyScenes, ...bibleScenes.filter(scene => scene.name.endsWith(' 2'))] : withBibles ? bibleScenes : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
+  // The summary is rewritten after every reply, so a dry run changes its start each turn as a real room would.
+  if (args.includes('--dry') && scene.room) scene.memory = `${dryRows.length}턴 뒤 요약. ${scene.memory}`;
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
+  // --dry builds the requests without asking any model (2026-11-01): how much of each prompt is the same as the last one
+  // to the same character, which is what the provider's cache can reuse; the rest is written to the cache again.
+  if (args.includes('--dry')) {
+    const prompt = `${request.instructions}\n${request.input}`, last = lastPrompt.get(scene.host ?? 'velvet');
+    let same = 0; if (last) while (same < prompt.length && prompt[same] === last[same]) same++;
+    lastPrompt.set(scene.host ?? 'velvet', prompt);
+    dryRows.push({ scene: scene.name, instructions: request.instructions.length, input: request.input.length, same: last ? same : null });
+    continue;
+  }
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
   const said = scene.chat[0]?.[1] ?? '(첫 인사)';
   report.push({ scene: scene.name, host: scene.host ?? 'velvet', user: said, chat: scene.chat, memory: scene.memory, ...(scene.original ? { original: scene.original } : {}), runs });
@@ -227,6 +239,11 @@ for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [persona
   const direction = JSON.parse(request.input).direction;
   if (directorMs !== undefined) console.log(`(director ${directorMs}ms) ${direction ? JSON.stringify(direction) : 'no direction'}`);
   for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}${run.read ? `\n(read) ${run.read}` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);
+}
+if (dryRows.length) {
+  for (const row of dryRows) console.log(`${row.scene.padEnd(24)} instructions ${row.instructions} input ${row.input} | same as the last prompt: ${row.same ?? '-'} chars${row.same === null ? '' : ` (${Math.round(row.same / (row.instructions + row.input + 1) * 100)}%)`}`);
+  const later = dryRows.filter(row => row.same !== null);
+  console.log(`average reusable ${Math.round(later.reduce((sum, row) => sum + row.same / (row.instructions + row.input + 1), 0) / later.length * 100)}% of ${Math.round(later.reduce((sum, row) => sum + row.instructions + row.input, 0) / later.length)} chars`);
 }
 writeFileSync(outPath, JSON.stringify(report, null, 2));
 console.log(`\nsaved ${outPath}`);

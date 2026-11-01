@@ -802,14 +802,21 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // In a space the topic exists once someone has chosen one; before that the conversation is free.
     // One to one, the voice is a phone call (the call screen): the two are apart and the member called the character.
     const phoneCall = solo && !chat && !room.space_id;
+    // What the provider can cache comes first (see the order below), and a one-to-one chat keeps its last 16 messages:
+    // with the summary and the long-term memories that is enough, and each message after the cached part is written
+    // to the cache again on every turn (cache writes were the largest cost of a chat on 2026-11-01).
+    const { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow, ...relationshipSteady } = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : ({} as Partial<ReturnType<typeof relationshipPromptContext>>);
+    const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
+    const contextRecent = solo && chat ? recent.slice(-16) : recent;
     const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
       ...(memberPersona ? { member_persona: memberPersona } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
+      // The relationship's stage texts change only with the stage; its scores, mood and memories after them change often.
+      ...(relationship ? { relationship: { ...relationshipSteady, ...relationshipChanging, ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
-      ...(relationship ? { relationship: { ...relationshipPromptContext(relationship.record, relationship.config, relationship.mood), ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
-      recent: recent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(recent[index]) ? message.text.slice(0, 1200)
+      recent: contextRecent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(contextRecent[index]) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
     const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character) : '';
@@ -942,9 +949,10 @@ ${photoRule}`;
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
-        timeAway ? loungeTimeAwayInstruction : '',
-        longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
         messenger ? messengerInstruction : story ? storyInstruction : roleInstruction,
+        // From here on the instructions depend on the turn; everything above is the same for a character and mode.
+        longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
+        timeAway ? loungeTimeAwayInstruction : '',
         story && storyEpisode ? loungeStoryEpisodeInstructions : '',
         phoneCall ? loungePhoneCallRules : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
@@ -954,7 +962,7 @@ ${photoRule}`;
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
-      input: JSON.stringify({ ...context, ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: split
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: split
         ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
           ? writesMemory

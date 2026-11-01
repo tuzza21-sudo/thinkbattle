@@ -2205,6 +2205,22 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
 });
 
+test('a chat prompt puts what stays the same first, so the provider can cache it, and keeps the last 16 messages', async () => {
+  // Cache writes were the largest cost of a chat (2026-11-01): the summary, rewritten after every reply, came before the
+  // relationship's long stage texts, so those were written to the cache again on every turn.
+  const messages = Array.from({ length: 24 }, (_, index) => ({ id: 100 - index, user_id: index % 2 ? null : 'host', nickname: index % 2 ? '한지오' : '지수', kind: index % 2 ? 'host' : 'human', text: `말 ${24 - index}`, created_at: '2026-11-01T00:00:00Z' }));
+  const { input, instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide', messages });
+  const keys = Object.keys(input);
+  assert.ok(keys.indexOf('scenario') < 0 || keys.indexOf('scenario') < keys.indexOf('memory'));
+  assert.equal(keys.at(-1) === 'recent' || keys.indexOf('recent') > keys.indexOf('memory'), true, 'the messages come after the summary');
+  assert.equal(input.recent.length, 16);
+  assert.equal(input.recent.at(-1).text, '말 24');
+  // The character's own instruction (rules, bible) comes before the instructions that depend on the turn.
+  assert.ok(instructions.indexOf('메신저처럼 짧게 주고받는 1:1 대화') >= 0);
+  const timeAwayAt = instructions.indexOf('time_away'), messengerAt = instructions.indexOf('메신저처럼 짧게 주고받는 1:1 대화');
+  assert.ok(timeAwayAt < 0 || timeAwayAt > messengerAt);
+});
+
 test('the director reads the member\'s words before a fast-model chat reply and its direction goes to the reply; without it the reply goes on', async t => {
   const saved = process.env.LOUNGE_DIRECTOR;
   // Neither 'off' (the default of these tests) nor 'on' (every model): it runs for the fast model only.
