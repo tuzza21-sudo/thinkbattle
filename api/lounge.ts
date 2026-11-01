@@ -947,7 +947,7 @@ ${photoRule}`;
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
       // The fast model replies without reasoning (as since the lounge began as a voice service, where the wait before the
       // first word matters most); the "deep" model reasons. Reasoning counts toward the output limit.
-      model: chatModel.model ?? 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (messenger ? 1000 : story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
+      model: chatModel.model ?? 'gpt-6-luna', reasoning: { effort: replyReasoning }, max_output_tokens: (messenger ? 1400 : story ? 2200 : split ? chat ? 1400 : 800 : (relationship ? writesMemory ? 1700 : 1400 : 1000) + (chat ? 700 : 0)) + (replyReasoning === 'none' ? 0 : 2500), store: false,
       // Requests with the same key go to the same cache, so a character's long instructions are found there more often:
       // on 2026-10-21 one turn in the middle of a conversation missed the cache and read about 10,000 tokens anew.
       prompt_cache_key: `lounge-${host.id}`,

@@ -2019,7 +2019,7 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
       });
       assert.equal(geminiBody.generationConfig.responseMimeType, 'application/json');
       assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'text', 'the same JSON shape, text first');
-      assert.match(geminiBody.systemInstruction.parts[0].text, /메신저처럼 짧게 주고받는 1:1 대화/, 'the same instructions');
+      assert.match(geminiBody.systemInstruction.parts[0].text, /정해진 줄거리 없이 주고받는 1:1 대화/, 'the same instructions');
       assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
       if (geminiWorks) {
         assert.equal(openaiCalled, false);
@@ -2144,10 +2144,10 @@ test('a chat reply is text only and the model is told it is a messenger conversa
   const { spoken, input, instructions, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '*잔을 내려놓으며* 그래서, 결론은요?' });
   assert.equal(input.reply_medium, 'chat');
   // Short turns, but the two may be together (a trip, a meal): what they do together goes on a little every reply.
-  assert.match(instructions, /메신저처럼 짧게 주고받는 1:1 대화지만, 둘은 실제로 같은 시간을 보내고 있다/);
+  assert.match(instructions, /정해진 줄거리 없이 주고받는 1:1 대화이고, 둘은 실제로 같은 시간을 보내고 있다/);
   assert.match(instructions, /받아들이면 그 장면으로 옮겨 가 실제로 함께 하는 것처럼 이어 간다/);
   assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
-  assert.match(instructions, /말풍선처럼 1~3덩어리로 쓰고/);
+  assert.match(instructions, /대사는 지문을 빼고 보통 5~7문장, 200~450자다/);
   // Actions and the inner voice: why the member's words moved the character, never props for their own sake.
   assert.match(instructions, /거의 모든 답에 별표로 감싼 지문을 하나 넣고/);
   assert.match(instructions, /지문의 중심은 행동이 아니라 속마음이다/);
@@ -2178,7 +2178,7 @@ test('a chat reply is short and kept within 1200 characters; a voice reply keeps
   const long = '*창가에 기대며* ' + '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long });
   assert.equal(chat.events[0].text.length, 1200);
-  assert.match(chat.instructions, /전체는 보통 80~280자이고 400자를 넘기지 않는다/);
+  assert.match(chat.instructions, /앞선 네 답이 짧았어도 그 길이를 따르지 않는다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long });
   assert.equal(voice.events[0].text.length, 600);
   assert.match(voice.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
@@ -2217,8 +2217,8 @@ test('a chat prompt puts what stays the same first, so the provider can cache it
   assert.equal(input.recent.length, 16);
   assert.equal(input.recent.at(-1).text, '말 24');
   // The character's own instruction (rules, bible) comes before the instructions that depend on the turn.
-  assert.ok(instructions.indexOf('메신저처럼 짧게 주고받는 1:1 대화') >= 0);
-  const timeAwayAt = instructions.indexOf('time_away'), messengerAt = instructions.indexOf('메신저처럼 짧게 주고받는 1:1 대화');
+  assert.ok(instructions.indexOf('정해진 줄거리 없이 주고받는 1:1 대화') >= 0);
+  const timeAwayAt = instructions.indexOf('time_away'), messengerAt = instructions.indexOf('정해진 줄거리 없이 주고받는 1:1 대화');
   assert.ok(timeAwayAt < 0 || timeAwayAt > messengerAt);
 });
 
@@ -3024,13 +3024,6 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.match(chat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
   const plainChat = await turn({ voiceOn: false, memory: '지금 장면: 카페' });
   assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
-});
-
-test('a character who talks a lot says how much in the bible, and the messenger rules let it run longer', () => {
-  const jian = charactersLib.loungeBiblePrompt(charactersLib.getLoungeCharacter('diplomat'));
-  assert.match(jian, /채팅에서의 말수: 말이 많고 빠르다\. 보통 3덩어리/);
-  assert.match(messengerLib.loungeMessengerRules, /채팅에서의 말수가 있으면 덩어리 수와 분량은 그것을 따른다\(그때도 550자를 넘기지 않는다\)/);
-  assert.doesNotMatch(charactersLib.loungeBiblePrompt(charactersLib.getLoungeCharacter('velvet')), /채팅에서의 말수/, 'the others keep the short turns');
 });
 
 test('a call in a room started from a story keeps the case in the background and the summary in the chat\'s form', async () => {
