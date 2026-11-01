@@ -3026,6 +3026,31 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
 });
 
+test('a call in a room started from a story keeps the case in the background and the summary in the chat\'s form', async () => {
+  // On 2026-11-01 선우령 talked of nothing but the story's case on a call: the call had neither rule, and its summary
+  // went back to a case log ("다음: 곧 벌어질 일") that the chat after it read again.
+  const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
+  let reply, after;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '혹평의 밤', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: true, ai_turns: 6, scenario }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, kind: 'human', nickname: '지수', text: '뭐 해요?' }, { id: 1, kind: 'host', nickname: 'AI', text: '여보세요.' }]);
+    if (url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '', events: [], memory_ops: [] }); }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '그림 보고 있었어요.' }); }
+    if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
+    if (url.includes('finish_voice_lounge') || url.includes('save_voice_lounge')) return result(true);
+    throw new Error('Unexpected call ' + url);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+  assert.match(reply.instructions, /phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다/);
+  assert.match(reply.instructions, /대화의 중심은 둘 사이다/);
+  assert.match(reply.instructions, /둘의 말투와 처음 거리는 scenario.relationship과 scenario.prologue에서 시작한다/);
+  assert.match(reply.instructions, /사건이나 일은 사용자가 꺼낼 때만/);
+  assert.match(after.instructions, /memory는 둘의 대화 기록이다/);
+  assert.doesNotMatch(after.instructions, /다음: 곧 벌어질 일/);
+});
+
 
 test('ElevenLabs speaks every character (선우령: her own library voice, no speech instruction); a busy line waits and asks v4 Turbo again (Flash v2.5 only when switched on), and when it fails no other voice speaks', async () => {
   const pcm = Uint8Array.from({ length: 2400 }, (_, index) => (index * 11) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
