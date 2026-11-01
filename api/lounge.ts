@@ -727,7 +727,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
           // A short summary instead of the whole life story: the director's time is mostly its output, but less to read helps.
           instructions: [loungeDirectorInstructions, `인물 요약: ${directorCharacter.name}, ${directorCharacter.age}, ${directorCharacter.role}. ${directorCharacter.tagline}`,
             loungeBiblePrompt(directorCharacter) || `성격: ${directorCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
-          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, speechLevel: state?.speech_level, memory: String(room.memory ?? ''), messages: [...messages].reverse() })),
+          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, speechLevel: state?.speech_level, memory: String(room.memory ?? ''), messages: [...messages].reverse() })),
           text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
         }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
         return readLoungeDirection(JSON.parse(modelOutputText(result) ?? ''));

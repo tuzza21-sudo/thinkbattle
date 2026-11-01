@@ -123,11 +123,35 @@ const dailyScenes = [
 ];
 
 let directorMs;
+// With --room=<id>, the member's last turns in a real room are replayed with what that room really had: the messages
+// before each turn, the summary, the relationship and the long-term memories (2026-11-01, 선우령 had drifted out of
+// character over 205 turns). --turns=N picks how many, --before=<ISO time> where to stop, and --scene="지금 장면: …"
+// replaces the summary's first line, which is from the end of the room. The reply the room really got is printed too.
+async function roomScenes(id) {
+  const base = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL).replace(/\/$/, ''), key = process.env.SUPABASE_SERVICE_ROLE_KEY, headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const read = async path => (await fetch(`${base}/rest/v1/${path}`, { headers })).json();
+  const [room] = await read(`voice_lounge_rooms?id=eq.${id}&select=*`);
+  if (!room) throw new Error(`no room ${id}`);
+  const before = args.find(arg => arg.startsWith('--before='))?.slice(9);
+  const all = await read(`voice_lounge_messages?room_id=eq.${id}${before ? `&created_at=lt.${encodeURIComponent(before)}` : ''}&order=id.desc&limit=80&select=id,user_id,nickname,kind,text,created_at`);
+  const [relationship] = await read(`voice_lounge_relationships?user_id=eq.${room.host_id}&character_id=eq.${room.host_persona}&select=*`);
+  const memories = await read(`voice_lounge_memories?user_id=eq.${room.host_id}&select=*`);
+  const sceneLine = args.find(arg => arg.startsWith('--scene='))?.slice(8);
+  const memory = sceneLine ? [sceneLine, ...String(room.memory ?? '').split('\n').slice(1)].join('\n') : String(room.memory ?? '');
+  const turns = Number(args.find(arg => arg.startsWith('--turns='))?.slice(8) ?? 4);
+  const humans = all.map((message, index) => ({ message, index })).filter(({ message, index }) => message.kind === 'human' && all[index - 1]?.kind === 'host').slice(0, turns).reverse();
+  return humans.map(({ message, index }) => ({
+    name: `${room.host_persona} · ${message.created_at.slice(5, 16)}`, host: room.host_persona, room, memory, memories, row: relationship ?? row, memberName: message.nickname,
+    scenario: room.scenario ?? undefined, original: all[index - 1].text, chat: [['human', message.text]],
+    messages: all.slice(index, index + 24).map(item => ({ ...item, user_id: item.kind === 'human' ? 'user-1' : null })),
+  }));
+}
+
 async function capture(scene) {
   let reply;
   directorMs = undefined;
-  const memberName = scene.host ? '지수' : '나';
-  const messages = scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? memberName : scene.host === 'guide' ? '한지오' : '선우령', kind, text, created_at: new Date().toISOString() }));
+  const memberName = scene.memberName ?? (scene.host ? '지수' : '나');
+  const messages = scene.messages ?? scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? memberName : scene.host === 'guide' ? '한지오' : '선우령', kind, text, created_at: new Date().toISOString() }));
   const saved = { ...process.env }, originalFetch = globalThis.fetch;
   Object.assign(process.env, { OPENAI_API_KEY: 'test-key', SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'test-anon', APP_ORIGIN: 'https://app.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key' });
   globalThis.fetch = async (url, init) => {
@@ -135,10 +159,11 @@ async function capture(scene) {
     if (url.includes('/auth/')) return result({ id: 'user-1' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('lounge_member_personas?')) return result(scene.persona ? [{ id: 'p1', is_default: true, ...scene.persona }] : []);
-    if (url.includes('voice_lounge_memories?')) return result([]);
+    if (url.includes('voice_lounge_memories?')) return result(scene.memories ?? []);
     if (url.includes('voice_lounge_relationships?')) return result([scene.row ?? row]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
+    if (url.includes('voice_lounge_rooms?') && scene.room) return result([{ ...scene.room, memory: scene.memory, voice_on: false, space_id: null }]);
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: (scene.scenario ?? scenario).title, host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: scene.scenario ?? scenario, story_state: scene.state ?? null }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: memberName, last_seen: '' }]);
@@ -181,13 +206,14 @@ const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')),
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
 const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
-for (const scene of withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
+const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7);
+for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   const runs = await Promise.all(targets.map(target => ask(request, target.model, target.effort)));
   const said = scene.chat[0]?.[1] ?? '(첫 인사)';
-  report.push({ scene: scene.name, user: said, runs });
-  console.log(`\n=== ${scene.name}\n나: ${said}`);
+  report.push({ scene: scene.name, user: said, ...(scene.original ? { original: scene.original } : {}), runs });
+  console.log(`\n=== ${scene.name}\n나: ${said}${scene.original ? `\n(원래 답) ${scene.original.replace(/\n+/g, ' ')}` : ''}`);
   const direction = JSON.parse(request.input).direction;
   if (directorMs !== undefined) console.log(`(director ${directorMs}ms) ${direction ? JSON.stringify(direction) : 'no direction'}`);
   for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}${run.read ? `\n(read) ${run.read}` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);

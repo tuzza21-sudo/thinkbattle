@@ -2156,6 +2156,11 @@ test('a chat reply is text only and the model is told it is a messenger conversa
   assert.match(instructions, /별표가 없어도 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
   assert.match(instructions, /곧바로 사과하며 물러서지 않는다/);
+  // How warm the character is follows the stage, not the scores' names; a reply that drifted is not copied; a hard memory
+  // of the member does not turn the character into a counsellor (선우령 after 205 turns at her second stage, 2026-11-01).
+  assert.match(instructions, /metrics의 점수와 이름\(예: 사로잡힘, 눈을 떼지 못함\)은 참고일 뿐이고/);
+  assert.match(instructions, /recent에 있는 네 이전 답이 위 인물 설명이나 캐릭터 바이블의 성격·말투와 어긋났다면/);
+  assert.match(instructions, /그 기억 때문에 말투가 상담하듯 순해지지 않는다/);
   assert.match(instructions, /마지막 문장은 물음표로 끝나지 않는다/);
   // The story layer and the group rules are not in a messenger chat.
   assert.doesNotMatch(instructions, /롤플레이 소설/);
