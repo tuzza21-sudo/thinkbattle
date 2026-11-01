@@ -819,14 +819,17 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       recent: contextRecent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(contextRecent[index]) ? message.text.slice(0, 1200)
         : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
     const modelStarted = performance.now();
-    const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character) : '';
+    // One to one, the bible goes into the prompt (the messenger instruction, or the one-to-one role in a call), except
+    // in the story instruction the story layer still has.
+    const bibleInPrompt = Boolean(solo) && !(process.env.LOUNGE_MESSENGER === 'off' && body.stream === true && !session && chat && Boolean(scenario));
+    const character = getLoungeCharacter(host.id), characterName = character?.name ?? host.name, persona = character ? loungePersonaPrompt(character, { withBible: bibleInPrompt }) : '';
     const spaceInstruction = room.space ? `너는 '${room.space.name}'에서 열린 대화방에 초대받아 대화를 돕는 ${characterName}이다. 방을 연 방장이 주제와 너를 골랐고, 손님은 아무 때나 들어오고 나간다. topic이 있으면 방장이 정한 지금의 주제다. topic이 null이면 장소와 네 캐릭터에 어울리는 가벼운 이야기로 시작하고 주제를 강요하지 않는다.
 ` : '';
     const groupRelationshipInstruction = groupConfig ? `participants_relationship은 네가 각 참가자와 쌓아 온 관계다. 그 사람에게 말할 때의 말투와 온도에만 반영하고 점수나 단계 이름은 말하지 않는다. 다른 사람이 함께 있으므로 누구의 지난 대화, 기억, 사적인 이야기도 먼저 꺼내지 않는다. asker가 있으면 그 사람이 너를 직접 불러 물은 것이다. 질문이 그 사람 자신의 지난 이야기에 관한 것일 때만 asker.memories를 근거로, 다른 사람 앞에서 말해도 되는 범위에서 짧게 답한다. 사적이거나 민감한 내용이면 둘이 있을 때 이야기하자고 한다. 다른 참가자의 지난 이야기는 어떤 경우에도 말하지 않는다.\n` : '';
     const photoRule = `사진은 채팅에서 photos=true일 때만 보낼 수 있다. 상대가 사진이나 지금 모습을 보여 달라고 했을 때, 또는 네가 지금 있는 곳·옷차림·풍경을 이야기하다 사진 한 장을 보내는 게 자연스러운 드문 순간에만 보낸다. 먼저 보내는 사진은 한 대화에 많아야 한 번이고, relationship.stage가 첫 단계면 상대가 부탁하지 않는 한 먼저 보내지 않는다. 사진을 보낼 때는 지문과 대사에 사진을 찍거나 보내는 장면이 분명히 드러나게 한다(예: *휴대폰을 들어 한 장 찍는다*). 보내는 사진에는 언제나 네 모습이 담긴다(셀카, 누가 찍어 준 네 사진). 상대가 사진을 부탁하면("사진 좀 찍어 주세요", "사진 부탁해요") 풍경이 아니라 상대를 찍어 달라는 뜻으로 먼저 받는다. 상대를 찍어 주거나 풍경을 찍어 주는 것은 사진을 보내는 일이 아니라 장면 속 행동이다. 먼저 상대를 잘 나오는 자리에 세우고 포즈와 시선을 잡아 준 뒤(예: 전망이 트인 난간 앞, 빛이 얼굴에 닿는 쪽) 상대의 휴대폰으로 찍어 주고, 찍힌 사진이 어떤지(구도, 빛, 상대의 표정)를 지문과 대사로 보여 주며, 사진을 보낸다고 쓰지 않는다. 사진은 그 장면을 보고 따로 만들어지므로, 보내지 않을 때는 사진을 찍거나 보낸다고 쓰지 않는다. 노출이나 성적인 사진은 보내지 않고 그런 부탁은 캐릭터답게 받아넘긴다. photos=false이면 사진을 보내지 않고, 부탁받으면 지금은 보낼 수 없다고 캐릭터답게 넘긴다.`;
-    const roleInstruction = spaceInstruction + groupRelationshipInstruction + (solo ? `역할: 사람 한 명과 이야기하는 대화 상대다. 진행자나 인터뷰어가 아니다. ${host.companion}
-${loungeBiblePrompt(character) ? `${loungeBiblePrompt(character)}
-` : ''}1:1에서는 자연스러운 대화 상대처럼 이야기한다. ${relationship ? 'relationship.speech_level에 맞는 말투와' : '일상적인 존댓말과'} 짧은 호흡으로 상대가 방금 한 말에 바로 반응한다. 목록·소제목·강의식 해설이나 '정리하면', '핵심은', '함께 살펴보겠습니다' 같은 발표 말투를 쓰지 않는다.
+    const roleInstruction = spaceInstruction + groupRelationshipInstruction + (solo ? `역할: 사람 한 명과 이야기하는 대화 상대다. 진행자나 인터뷰어가 아니다. ${loungeBiblePrompt(character) ? `${loungeBiblePrompt(character)}
+` : `${host.companion}
+`}1:1에서는 자연스러운 대화 상대처럼 이야기한다. ${relationship ? 'relationship.speech_level에 맞는 말투와' : '일상적인 존댓말과'} 짧은 호흡으로 상대가 방금 한 말에 바로 반응한다. 목록·소제목·강의식 해설이나 '정리하면', '핵심은', '함께 살펴보겠습니다' 같은 발표 말투를 쓰지 않는다.
 대화는 주고받는 것이다. 매번 질문하지 않는다. 목소리로 말할 때는 공감 한마디, 내 생각 한 가지, 떠오른 연상이나 가벼운 반응만으로 끝내도 된다. 질문은 이야기가 정말 궁금할 때만 하나 하고, 매번 질문으로 끝내지 않는다. 공감, 분석, 조언, 질문을 한 답변에 모두 넣지 않는다. 같은 형식의 답을 반복하지 않는다.
 상대가 의견을 물으면 확인된 근거와 하나의 관점으로 먼저 솔직하게 답한다. 질문으로 되묻거나 피하지 않는다. 존재하지 않는 다른 참가자를 만들거나 다른 사람의 답을 기다리지 않는다.
 목소리로 말할 때(reply_medium=voice)는 첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내로 말한다. 상대가 자세한 설명을 명시적으로 요청했을 때만 3~4문장, 300자 이내로 답한다. 준비된 자료가 많아도 답변 길이를 늘리지 않는다.
@@ -914,7 +917,7 @@ reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연�
 - 사용자가 맡은 인물의 행동, 대사, 마음은 대신 정하지 않는다. 주변 인물이 사용자에게 말을 걸게 할 수는 있다. 지문의 '나'는 언제나 너 자신(이 캐릭터)이다. 사용자의 행동을 '나는'으로 쓰거나 사용자의 선택(코스를 고르기, 대답하기, 커피를 받기)을 네가 이미 한 것처럼 쓰지 않는다. 프롤로그가 사용자의 대답이나 선택을 기다리며 끝났다면, 첫 장면에서도 그 기다림을 네 쪽에서 이어 간다(재촉하기, 장난, 다른 행동). 사용자 대신 답하지 말고, 사용자가 답할 때까지 기다린다.
 - 캐릭터 설명의 소품과 시그니처 동작(예: 손목시계, 잔)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다.
 ${photoRule}`;
-    const messengerInstruction = [`역할: 사람 한 명과 이야기하는 대화 상대다. 진행자, 인터뷰어, 작가가 아니다. ${host.companion}`, loungeBiblePrompt(character), loungeMessengerRules, photoRule].filter(Boolean).join('\n');
+    const messengerInstruction = [`역할: 사람 한 명과 이야기하는 대화 상대다. 진행자, 인터뷰어, 작가가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), loungeMessengerRules, photoRule].filter(Boolean).join('\n');
     const direction = directorRead ? await directorRead : undefined;
     if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { tone: direction.tone, reaction: direction.reaction, ending: direction.ending, request: Boolean(direction.request), quote: Boolean(direction.quote) } : {}) }));
     // What this adds to a reply is only the wait left after the other context has loaded.

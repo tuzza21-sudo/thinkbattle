@@ -156,7 +156,8 @@ test('solo starts and continues a brief conversation without group introductions
         const payload = JSON.parse(init.body);
         assert.equal(JSON.parse(payload.input).mode, 'solo');
         assert.deepEqual(JSON.parse(payload.input).topic_brief, topicBrief);
-        assert.ok(payload.instructions.includes(host.companion), 'solo uses the conversation-partner style');
+        // A character with a bible speaks from it one to one; its companion text, which said the same, is left out (2026-11-01).
+        assert.ok(charactersLib.getLoungeCharacter(host.id)?.bible ? payload.instructions.includes('캐릭터 바이블(') && !payload.instructions.includes(host.companion) : payload.instructions.includes(host.companion), 'solo uses the conversation-partner style');
         assert.ok(!payload.instructions.includes(host.instruction), 'moderator techniques do not turn a conversation into an interview');
         assert.equal(JSON.parse(payload.input).request_kind, reason === 'requested' ? 'topic' : undefined, 'the solo button asks for a new topic');
         assert.match(payload.instructions, /request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다/);
@@ -815,7 +816,7 @@ test('stored host style controls both text and PCM/MP3 speech, including voice, 
         if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
         if (url.endsWith('/responses')) {
           const body = JSON.parse(init.body);
-          assert.ok(body.instructions.includes(host.companion), 'selected personality reaches the conversation model');
+          assert.ok(charactersLib.getLoungeCharacter(host.id)?.bible ? body.instructions.includes('캐릭터 바이블(') : body.instructions.includes(host.companion), 'selected personality reaches the conversation model');
           assert.doesNotMatch(body.instructions, /유재석|김이나/);
           return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: spoken, memory: '' }) }] }] });
         }
@@ -907,7 +908,7 @@ test('a relationship character reads stored state, classifies events in the same
       assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
       assert.match(body.instructions, /SHARES_FEELING: /); assert.doesNotMatch(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
       assert.match(body.instructions, /사람의 가치나 인격은 평가하지 않는다/);
-      assert.ok(body.instructions.includes(lounge.getLoungeHost('velvet').companion));
+      assert.ok(body.instructions.includes('캐릭터 바이블(') && !body.instructions.includes(lounge.getLoungeHost('velvet').companion));
       assert.deepEqual(body.text.format.schema.required, ['text', 'memory', 'events']);
       assert.equal(body.max_output_tokens, 1400, 'events and a long memory must not truncate the JSON reply');
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '반박이 있네. 근거부터 들어 보지.', memory: '', events: [

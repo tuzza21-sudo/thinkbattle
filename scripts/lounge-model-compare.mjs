@@ -229,6 +229,10 @@ for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [persona
     const prompt = `${request.instructions}\n${request.input}`, last = lastPrompt.get(scene.host ?? 'velvet');
     let same = 0; if (last) while (same < prompt.length && prompt[same] === last[same]) same++;
     lastPrompt.set(scene.host ?? 'velvet', prompt);
+    const dump = args.find(arg => arg.startsWith('--dump='))?.slice(7); if (dump && !dryRows.length) writeFileSync(dump, `${request.instructions}
+
+=== INPUT ===
+${JSON.stringify(JSON.parse(request.input), null, 1)}`);
     dryRows.push({ scene: scene.name, instructions: request.instructions.length, input: request.input.length, same: last ? same : null });
     continue;
   }
