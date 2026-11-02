@@ -68,8 +68,8 @@ test('1. scores stay between 0 and 100 under repeated extreme events', () => {
 
 test('2. the same event produces different deltas for each character', () => {
   const deltas = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('ADMITS_ERROR')]]).logs[0].delta]));
-  assert.deepEqual(deltas.auditor, { trust: 3, respect: 3, epistemicHonesty: 5 });
-  // Off 강무진's own list, an event's gain counts at half (2026-11-02).
+  // Off 서도현's and 강무진's own lists, an event's gain counts at half (2026-11-02).
+  assert.deepEqual(deltas.auditor, { trust: 2, respect: 2, epistemicHonesty: 2 });
   assert.deepEqual(deltas.closer, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.velvet, { trust: 4, respect: 3, poise: 2 });
   assert.deepEqual(deltas.trickster, { trust: 2, comfort: 1 });
@@ -139,7 +139,7 @@ test('5. a severe event downgrades immediately', () => {
   assert.equal(logs[0].stageChange, 'demoted');
   assert.notEqual(record.stage, 'DRAWN_IN');
   assert.ok(record.scores.trust < close.scores.trust - 8);
-  const auditor = withScores(configs.auditor, { trust: 63, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
+  const auditor = withScores(configs.auditor, { trust: 60, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
   assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
 });
 
@@ -192,7 +192,7 @@ test('9. each user and character pair keeps an independent state', () => {
   turn('user-a', 'auditor', [event('ADMITS_ERROR')]);
   turn('user-a', 'velvet', [event('VIOLATES_BOUNDARY')]);
   turn('user-b', 'auditor', [event('DECEIVES_CHARACTER')]);
-  assert.equal(store.get('user-a:auditor').scores.trust, 28);
+  assert.equal(store.get('user-a:auditor').scores.trust, 27);
   assert.equal(store.get('user-a:velvet').scores.trust, 0);
   assert.equal(store.get('user-b:auditor').scores.trust, 11);
   assert.equal(store.size, 3);
@@ -272,30 +272,37 @@ test('the thriller director grows by candour and a shared view; jokes help only 
   assert.equal(record.stage, 'SPARRING');
 });
 
-test('the engineer grows by feelings shared and honesty; a lie or a push costs more than a good turn gives', () => {
+test('the engineer grows on both axes: breaking his manual is the fun, reaching the engineer behind it the depth', () => {
+  // His bible of 2026-11-02: indifference and seeing through his act make him want to win; the real question and care
+  // reach him; flattery and going along with everything only file the member with the others.
   const config = configs.auditor;
   assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_MEETING', 'WARMING_UP', 'KNOWS_YOUR_MIND', 'MUTUAL_TRUST']);
   assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['resonance', 'epistemicHonesty']);
   const delta = type => run(config, [[event(type)]]).logs[0].delta;
-  // A feeling with its reason is the way in; it raises resonance more than anything he is argued into.
-  assert.equal(delta('SHARES_FEELING').resonance, 5);
-  assert.ok(delta('SHARES_FEELING').resonance > delta('ANSWERS_DIRECTLY').epistemicHonesty);
-  assert.equal(delta('SHOWS_CARE').resonance, 4, 'caring for him counts as much as a hard feeling shared');
-  for (const type of ['SHOWS_VULNERABILITY', 'CORRECTS_UNDERSTANDING']) assert.ok(delta(type).resonance >= 4, type);
-  // Candour is still counted, and a lie lowers it; evidence and claims count for nothing now.
-  for (const type of ['ADMITS_ERROR', 'ANSWERS_DIRECTLY', 'CORRECTS_UNDERSTANDING']) assert.ok(delta(type).epistemicHonesty > 0, type);
+  assert.equal(delta('STANDS_GROUND').interest, 5);
+  assert.equal(delta('CALLS_BLUFF').interest, 5);
+  assert.equal(delta('ASKS_GOOD_QUESTION').resonance, 4);
+  assert.equal(delta('SHOWS_CARE').resonance, 4);
+  for (const type of ['ANSWERS_DIRECTLY', 'MAKES_CHARACTER_ADMIT']) assert.ok(delta(type).epistemicHonesty >= 4, type);
+  assert.deepEqual(delta('FOLDS_EASILY'), { interest: -1 });
+  assert.ok(delta('FLATTERS_CHARACTER').interest < 0 && delta('FLATTERS_CHARACTER').trust === undefined, 'flattery bores, it does not cost trust');
+  assert.ok(delta('SHOWS_ENTITLEMENT').trust < 0, 'using him costs trust');
   assert.ok(delta('DECEIVES_CHARACTER').epistemicHonesty < 0);
-  for (const type of ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION']) assert.deepEqual(delta(type), {}, type);
-  // A dodged question is not held against a shy person, and an insecure one is met gently.
-  assert.deepEqual(delta('EVADES_QUESTION'), {});
-  assert.deepEqual(delta('SEEKS_REASSURANCE_REPEATEDLY'), {});
-  assert.ok(delta('VIOLATES_BOUNDARY').trust < 0 && delta('VIOLATES_BOUNDARY').resonance < 0);
-  // A conversation made of feelings reaches the second stage, where he speaks more freely, with no evidence at all.
-  const warm = [['SHARES_FEELING'], ['SHOWS_CURIOSITY'], ['ASKS_GOOD_QUESTION'], ['CORRECTS_UNDERSTANDING'], ['SHOWS_VULNERABILITY'], ['SHARES_FEELING'], ['ACKNOWLEDGES_OTHER_VIEW'], ['SHARES_FEELING'], ['ASKS_GOOD_QUESTION'], ['SHOWS_VULNERABILITY'], ['SHARES_FEELING'], ['KEEPS_PROMISE'], ['SHARES_FEELING'], ['SHOWS_VULNERABILITY']];
-  assert.equal(run(config, warm.map(types => types.map(type => event(type)))).record.stage, 'WARMING_UP');
-  // The same number of turns spent arguing with evidence does not warm him up at all.
-  const cold = Array.from({ length: 14 }, (_, i) => [event(['PROVIDES_EVIDENCE', 'CHALLENGES_CHARACTER_RESPECTFULLY', 'DEFINES_CONCRETE_TERMS'][i % 3])]);
-  assert.equal(run(config, cold).record.stage, 'FIRST_MEETING');
+  for (const type of ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'EVADES_QUESTION', 'SEEKS_REASSURANCE_REPEATEDLY']) assert.deepEqual(delta(type), {}, type);
+  const stages = config.stages.map(stage => stage.id);
+  const pace = sequence => {
+    const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
+    return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
+  };
+  const nerve = ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT'];
+  const heart = ['ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL'];
+  const both = nerve.flatMap((type, i) => [type, heart[i % heart.length]]);
+  assert.deepEqual(pace(nerve), [0, 0, 0], 'breaking his manual alone never reaches him');
+  assert.ok(pace(heart)[0] > 0 && pace(heart)[2] === 0, `reaching him alone stops short: ${pace(heart)}`);
+  const bothPace = pace(both);
+  assert.ok(bothPace[0] <= 12 && bothPace[1] <= 45 && bothPace[2] <= 95, `both: ${bothPace}`);
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'auditor');
+  assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
 
 test('every character may flirt with an adult in a one-to-one room, and what they may not do stays fixed', () => {
@@ -378,8 +385,8 @@ test('the listening and reframing events still leave out the characters not buil
   // date since 2026-10-26) is one of them; she was the interviewer, a listener, before.
   assert.equal(run(configs.ina, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta.flutter, 4, 'ina FLIRTS_PLAYFULLY');
   assert.ok(Object.keys(run(configs.ina, [[event('ANSWERS_DIRECTLY')]]).logs[0].delta).length > 0, 'ina ANSWERS_DIRECTLY');
-  // 서도현 became the groom who plays push and pull (2026-10-25): playful flirting now counts with him.
-  assert.deepEqual(run(configs.auditor, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, { interest: 2, comfort: 1 }, 'auditor FLIRTS_PLAYFULLY');
+  // 서도현 is teased with his own engineer's words (2026-11-02): playful flirting is on his list.
+  assert.deepEqual(run(configs.auditor, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta, { interest: 3, comfort: 1 }, 'auditor FLIRTS_PLAYFULLY');
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
 });
 
