@@ -820,6 +820,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     if (relationship && scenario && loungeScenarioCasualStart.has(scenario.id)) Object.assign(relationshipSteady, { speech_level: 'casual' });
     const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
     const contextRecent = solo && chat ? recent.slice(-16) : recent;
+    // On a call, what the member just said, named apart: the character kept answering the question before it, one turn
+    // late (2026-11-02), as the call rules sent it back to the recent talk first.
+    const replyTo = phoneCall && recent.at(-1)?.kind === 'human' ? recent.at(-1)!.text.slice(0, 600) : undefined;
     const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
       ...(memberPersona ? { member_persona: memberPersona } : {}),
@@ -993,7 +996,7 @@ ${photoRule}`;
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.${messengerCall ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
         ? loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship

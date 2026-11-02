@@ -3135,6 +3135,10 @@ test('a call in a room started from a story keeps the case in the background and
   // Every call starts from the two, not the case: the recent talk, the summary, what the member has told.
   assert.match(reply.instructions, /받자마자 사건이나 일 이야기를 꺼내지 않는다/);
   assert.match(reply.instructions, /먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories/);
+  // But each reply answers what was just said first: on 2026-11-02 the character kept answering the question before it.
+  assert.match(reply.instructions, /통화 중에는 매 답에서 먼저 reply_to\(사용자가 방금 한 말\)에 답한다/);
+  assert.match(reply.instructions, /그 앞의 질문으로 돌아가 다시 답하지 않는다/);
+  assert.equal(JSON.parse(reply.input).reply_to, '뭐 해요?');
   assert.match(after.instructions, /memory는 둘의 대화 기록이다/);
   assert.doesNotMatch(after.instructions, /다음: 곧 벌어질 일/);
 });
