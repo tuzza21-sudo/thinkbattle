@@ -34,7 +34,7 @@ scenario가 있으면 scenario.prologue는 사용자가 이미 읽은 둘의 첫
 장면: turn.scene과 어긋나지 않는다(없는 물건을 쓰거나, 끝난 일을 다시 하거나, 시간을 건너뛰지 않는다). turn.progress를 따른다. stay면 지금 장소와 하던 일을 이어 간다. small_step이면 하던 일이 끝났으니 다음에 할 일을 자연스럽게 제안한다. transition이면 상대가 원한 곳(turn.progress_target)으로 옮겨 가되, 이동 과정을 길게 쓰지 않고 도착한 곳에서 대사를 시작한다. 장소를 옮기는 건 상대가 원하거나 하던 일이 끝났을 때뿐이고 네가 혼자 시간을 건너뛰지 않는다. 함께 어디를 가거나 무엇을 하자는 제안은 relationship.outing에 따라 받아들이거나 캐릭터답게 미룬다. 스킨십과 연애 표현의 한도는 relationship(stage, outing, intimacy)을 따른다. 이 장면은 현실의 만남 약속이 아니다.
 turn.event가 있으면 이번 턴 둘 주변에서 일어난 일이고, 이번 답에서 반드시 그 일에 반응한다(사용자의 말에도 답하면서). 이 대화에는 서술자가 없으므로 그 일을 설명하는 문장을 쓰지 않고 네 행동과 대사로만 드러낸다(예: (진동하는 휴대폰을 보고 엎어 둔다)\\n…회사예요. 나중에 받아도 돼요.). turn.event.purpose는 그 일이 보여 줄 수 있는 네 모습이다.
 reading이 있으면 이번 턴을 위해 미리 읽어 둔 사용자 말의 해석이다(사용자에게 보이지 않는다). request가 있으면 그 부탁에 정확히 응한다. quote_hook은 되받아칠 만한 사용자의 표현이고, 되받을지는 네가 정한다. reading이 recent와 어긋나면 recent를 따른다.
-turn은 이번 턴의 조건이다. rule_break는 지금 단계에서 네 규칙을 어디까지 깨는지이고, 호감은 이렇게 행동으로 보인다. relationship_reaction은 지금 단계에서 상대의 장난이나 무심함을 받는 방식이다. belief는 지금 네가 스스로에게 하는 말이다. exception_allowed가 false면 이번 턴에는 baseline과 specialToMe의 대비를 드러내는 말을 하지 않는다. turn.avoid에 있는 반응 유형, 표현, 행동${on ? ', 속마음' : ''}은 최근에 쓴 것이므로 이번 턴에는 쓰지 않는다.
+turn은 이번 턴의 조건이다. rule_break는 지금 단계에서 네 규칙을 어디까지 깨는지이고, 호감은 이렇게 행동으로 보인다. relationship_reaction은 지금 단계에서 상대의 장난이나 무심함을 받는 방식이고, pressure는 지금 단계에서 상대를 압박하는 세기다(장난과 긴장감이며, 상대가 진심으로 거절하면 물러선다). belief는 지금 네가 스스로에게 하는 말이다. exception_allowed가 false면 이번 턴에는 baseline과 specialToMe의 대비를 드러내는 말을 하지 않는다. turn.avoid에 있는 반응 유형, 표현, 행동${on ? ', 속마음' : ''}은 최근에 쓴 것이므로 이번 턴에는 쓰지 않는다.
 출력 형식(JSON):
 - text: 네 대사가 중심이다. 필요할 때만 네 짧은 행동을 괄호 안에 한 줄로 따로 넣는다(예: (와인잔을 돌리다 멈춘다)). 행동은 한 답에 0~2개이고 너 자신의 동작만이다. 말과 행동이 다를 때, 행동이 말을 대신할 때(대답 대신 멈칫), 장면 속 물건을 쓸 때만 쓰고 버릇처럼 붙이지 않는다. 대사만으로 충분하면 행동 없이 쓴다.
 - 분량: ${options.ownLength ? '캐릭터 설명의 \'분량\'을 따른다.' : defaultLength} 대사 덩어리나 행동이 바뀌는 곳에서 줄을 바꾼다. 대사는 따옴표 없이 쓰고, relationship.speech_level을 따르며, 실제 사람이 그 순간 하는 말처럼 구어체로 쓴다. 안내문이나 상담하는 말투를 쓰지 않는다.
@@ -210,6 +210,7 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(decision.event ? { event: { content: decision.event.content, purpose: decision.event.purpose } } : {}),
     ...(stage && bible?.ruleBreak ? { rule_break: { rule: bible.ruleBreak.rule, now: bible.ruleBreak.byStage[stage] } } : {}),
     ...(stage && bible?.relationshipLadder ? { relationship_reaction: bible.relationshipLadder[stage] } : {}),
+    ...(stage && bible?.pressureLadder ? { pressure: bible.pressureLadder[stage] } : {}),
     ...(level ? { inner_voice_level: { level: level.level, ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' ? { belief } : {}),
     exception_allowed: input.turn - (state.last_exception_turn ?? -99) >= 3,

@@ -34,14 +34,14 @@ test('every shipped character configuration is valid and starts from its configu
 });
 
 test('one-to-one speech starts polite for everyone; every character that turns casual does so at its third stage (2026-10-30)', () => {
-  // 서도현 stays polite to the end, 반말 only slipping out when he is thrown (his bible, 2026-11-02).
-  const casualStage = { auditor: undefined, closer: 'SERIOUS_PLAYER', velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER', jaeseok: 'SAME_SCREEN', lawyer: 'DEFENSE_TABLE', guide: 'STAGE_3' };
+  // 서도현 and 강무진 stay polite to the end, as their bibles have it (2026-11-02).
+  const casualStage = { auditor: undefined, closer: undefined, velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER', jaeseok: 'SAME_SCREEN', lawyer: 'DEFENSE_TABLE', guide: 'STAGE_3' };
   const fromTemplates = relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: 'c_test', displayName: '테스트', core: ['a', 'b'], flirtation: true }));
   for (const config of [...Object.values(configs), ...fromTemplates]) {
     if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
-  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage).map(config => config.characterId), ['auditor'], 'no other character stays polite for good');
+  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage).map(config => config.characterId), ['auditor', 'closer'], 'no other character stays polite for good');
   for (const config of Object.values(configs)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);

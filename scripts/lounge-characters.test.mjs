@@ -106,11 +106,11 @@ test('no character is shipped with the placeholders scripts/new-lounge-character
 });
 
 test('a character with a companion sheet has all of it: the lens, ten actions or more, the inner voice at every stage, and events the engine can use', () => {
-  const { loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const { loungeCompanionSheetPrompt, loungeFewShotTurn } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
   const sheetFields = ['interpretationLens', 'actionAnchors', 'innerVoice', 'ruleBreak', 'relationshipLadder', 'fewShot', 'sceneEvents'];
   const withSheet = loungeCharacters.filter(character => sheetFields.some(field => character.bible?.[field]));
   // 서도현 is the first (2026-11-02); the others follow one by one.
-  assert.ok(withSheet.some(character => character.id === 'auditor'));
+  assert.ok(['auditor', 'closer'].every(id => withSheet.some(character => character.id === id)));
   for (const { id, bible } of withSheet) {
     assert.ok(bible.interpretationLens, `${id}: a lens`);
     assert.ok(bible.actionAnchors?.length >= 10, `${id}: ten actions or more`);
@@ -120,7 +120,11 @@ test('a character with a companion sheet has all of it: the lens, ten actions or
       if (bible.ruleBreak) assert.ok(bible.ruleBreak.byStage[stage], `${id}: the rule broken at stage ${stage}`);
       if (bible.relationshipLadder) assert.ok(bible.relationshipLadder[stage], `${id}: the reaction at stage ${stage}`);
     }
-    for (const shot of bible.fewShot ?? []) assert.ok(shot.on.reply && shot.off.reply && !/\*/.test(shot.on.reply + shot.off.reply), `${id}: an example with both forms and no stars`);
+    // An example has both forms (서도현) or one reply for both (강무진); hidden, it never carries an inner voice.
+    for (const shot of bible.fewShot ?? []) {
+      const shownTurn = loungeFewShotTurn(shot, 'on'), hiddenTurn = loungeFewShotTurn(shot, 'off');
+      assert.ok(shownTurn.text && hiddenTurn.text && hiddenTurn.inner_voice === '' && !/\*/.test(shownTurn.text + hiddenTurn.text), `${id}: an example with a reply and no stars`);
+    }
     const ids = new Set();
     for (const event of bible.sceneEvents ?? []) {
       assert.ok(event.id && !ids.has(event.id) && event.minStage >= 1 && event.minStage <= 4 && event.content, `${id}: event ${event.id}`);
@@ -134,8 +138,8 @@ test('a character with a companion sheet has all of it: the lens, ten actions or
     assert.doesNotMatch(shown, /새어 나온다/);
     if (bible.innerVoice.offModeLeaks?.length) assert.match(hidden, /속마음은 대사와 행동에 이렇게 새어 나온다/);
     if (bible.fewShot?.length) {
-      assert.ok(shown.includes(JSON.stringify(bible.fewShot[0].on.reply)));
-      assert.ok(hidden.includes(JSON.stringify(bible.fewShot[0].off.reply)));
+      assert.ok(shown.includes(JSON.stringify(loungeFewShotTurn(bible.fewShot[0], 'on').text)));
+      assert.ok(hidden.includes(JSON.stringify(loungeFewShotTurn(bible.fewShot[0], 'off').text)));
     }
   }
 });
