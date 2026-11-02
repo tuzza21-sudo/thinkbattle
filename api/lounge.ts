@@ -170,7 +170,7 @@ async function openaiFailure(response: Response): Promise<LoungeUpstreamError> {
   return new LoungeUpstreamError(response.status >= 500 ? 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.' : 'AI 요청 설정을 확인해 주세요.', 502, 'openai_request_failed', response.status >= 500, seconds);
 }
 
-type ModelResult = { status?: string; incomplete_details?: { reason?: string }; usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } }; output?: Array<{ phase?: string; content?: Array<{ type: string; text?: string }> }> };
+type ModelResult = { status?: string; incomplete_details?: { reason?: string }; usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number; cache_write_tokens_details?: { ttl_30m_tokens?: number; ttl_12h_tokens?: number } }; output_tokens_details?: { reasoning_tokens?: number } }; output?: Array<{ phase?: string; content?: Array<{ type: string; text?: string }> }> };
 // The model sometimes writes more than one message: usually a plain 'commentary' sentence and then the JSON answer,
 // but the JSON can also arrive in the commentary message itself. The answer is the message that parses as one,
 // preferring the final answer; joining or skipping messages by phase broke replies both ways.
@@ -184,14 +184,16 @@ const modelOutputText = (result: ModelResult) => pickAnswerText((result.output ?
 
 /**
  * How much of the prompt the provider served from its cache, so the effect of keeping the fixed text first can be seen
- * in the logs: cachedPercent is the share of input tokens that were cached. reasoningTokens (when the model reasoned)
- * is the part of outputTokens spent thinking.
+ * in the logs: cachedPercent is the share of input tokens that were cached. cacheWriteTokens (GPT-5.6 and later, where a
+ * write costs 1.25 times an ordinary input token) is what this request wrote to the cache, and writePercent its share of
+ * the input: a prompt that is mostly written again every turn shows a high one next to a low cachedPercent. reasoningTokens
+ * (when the model reasoned) is the part of outputTokens spent thinking.
  */
 export function modelUsageLog(result: ModelResult | undefined, label: Record<string, unknown>) {
   const usage = result?.usage;
   if (!usage || typeof usage.input_tokens !== 'number') return undefined;
-  const cached = usage.input_tokens_details?.cached_tokens ?? 0, reasoning = usage.output_tokens_details?.reasoning_tokens;
-  return { ...label, inputTokens: usage.input_tokens, cachedTokens: cached, cachedPercent: usage.input_tokens ? Math.round(cached * 100 / usage.input_tokens) : 0, outputTokens: usage.output_tokens, ...(reasoning ? { reasoningTokens: reasoning } : {}) };
+  const cached = usage.input_tokens_details?.cached_tokens ?? 0, written = usage.input_tokens_details?.cache_write_tokens ?? 0, reasoning = usage.output_tokens_details?.reasoning_tokens;
+  return { ...label, inputTokens: usage.input_tokens, cachedTokens: cached, cachedPercent: usage.input_tokens ? Math.round(cached * 100 / usage.input_tokens) : 0, cacheWriteTokens: written, writePercent: usage.input_tokens ? Math.round(written * 100 / usage.input_tokens) : 0, outputTokens: usage.output_tokens, ...(reasoning ? { reasoningTokens: reasoning } : {}) };
 }
 /** The reply's JSON. A split reply (only `text`; see `afterReply`) has no memory, so `withMemory` is false for it. */
 function parseHostAnswer(output: string | undefined, result?: ModelResult, withMemory = true): { text: string; memory: string; events?: unknown } {

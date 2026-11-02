@@ -2537,6 +2537,60 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   }
 });
 
+test('cache: two chat turns in a row share the whole fixed part, and only the turn\'s own parts change after it', async t => {
+  // The provider reuses the longest unchanged start of the prompt (instructions, then the input in key order), so
+  // what matters is where two consecutive turns first differ. Measured here on the real request for every one of
+  // the characters that have a companion sheet.
+  const saved = process.env.LOUNGE_ANALYZER;
+  delete process.env.LOUNGE_ANALYZER;
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ANALYZER; else process.env.LOUNGE_ANALYZER = saved; });
+  const rows = [];
+  for (const host of ['auditor', 'closer', 'diplomat', 'velvet']) {
+    const row = host === 'velvet' ? velvetRow : { ...velvetRow, character_id: host, stage: relationshipLib.relationshipConfigs[host].stages[0].id, scores: relationshipLib.createRelationship(relationshipLib.relationshipConfigs[host]).scores };
+    const scene = { location: '호텔 라운지 바 끝자리', scene_type: '바', activity: '샴페인 한 잔', time_of_day: '밤', season: '', objects: ['샴페인 잔'] };
+    const base = { room_id: roomId, scene, scene_turns: 2, event_turns: {}, used_events: [], reactions: [], phrases: [], anchors: [], inner: [], shared: [], self_facts: [] };
+    const capture = async ({ turns, memory, state, messages, analysis }) => {
+      let reply;
+      await withServiceKey(() => run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+        if (url.includes('voice_lounge_companion_state')) return result([{ character_id: host, state }]);
+        if (url.includes('voice_lounge_relationships?')) return result([row]);
+        if (url.includes('save_voice_lounge_relationship')) return result(null);
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: host, memory, capacity: 1, space_id: null, voice_on: false, ai_turns: turns }]);
+        if (url.includes('voice_lounge_messages?')) return result(messages);
+        if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return modelAnswer(analysis);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory, events: [], scene, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+        if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return modelAnswer({});
+        if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '앉아요.', inner_voice: '' }); }
+        if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+        return result([]);
+      }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+      return { instructions: reply.instructions, input: JSON.parse(reply.input), key: reply.prompt_cache_key };
+    };
+    const calm = { user_tone: '도발', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '티키타카', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
+    const human = (id, text) => ({ id, user_id: 'user-1', nickname: '지수', kind: 'human', text, created_at: '2026-11-02T00:00:00Z' });
+    const hostSaid = (id, text) => ({ id, user_id: null, nickname: '령', kind: 'host', text, created_at: '2026-11-02T00:00:00Z' });
+    const first = await capture({ turns: 9, memory: '지금 장면: 호텔 라운지 바', state: base, messages: [human(2, '오늘 뭐 마셔요?')], analysis: { ...calm, subtext: '가볍게 말을 건다', quote_hook: '뭐 마셔요' } });
+    const second = await capture({ turns: 10, memory: '지금 장면: 호텔 라운지 바\n둘이 샴페인을 시켰다', state: { ...base, scene_turns: 3, reactions: ['받아치기'], phrases: ['앉아요'], anchors: ['잔을 내려놓는다'] },
+      messages: [human(4, '샴페인이요. 같이 마셔요'), hostSaid(3, '앉아요.'), human(2, '오늘 뭐 마셔요?')], analysis: { ...calm, subtext: '같이 마시자고 한다', quote_hook: '같이 마셔요', intimacy_proposal: 'elegant' } });
+    assert.equal(first.key, second.key, 'the same cache key for the same character');
+    const keys = Object.keys(first.input);
+    const same = keys.map(key => JSON.stringify(first.input[key]) === JSON.stringify(second.input[key]));
+    // The input keys before the first one that changed are part of the shared start; none after it can be.
+    const firstChanged = same.indexOf(false);
+    const sharedKeys = firstChanged < 0 ? keys.length : firstChanged;
+    const size = key => JSON.stringify({ [key]: first.input[key] }).length;
+    const instructionsSame = first.instructions === second.instructions;
+    // Common start of the instructions, character by character, when they differ.
+    let common = 0; while (common < first.instructions.length && first.instructions[common] === second.instructions[common]) common++;
+    rows.push({ host, instructions: first.instructions.length, instructionsSame, instructionsShared: common, inputKeys: keys.map((key, i) => `${key}${same[i] ? '=' : '≠'}${size(key)}`).join(' '), sharedInput: keys.slice(0, sharedKeys).reduce((sum, key) => sum + size(key), 0), totalInput: keys.reduce((sum, key) => sum + size(key), 0) });
+    assert.ok(instructionsSame, `${host}: the instructions are the same on consecutive turns (they differ after ${common} characters)`);
+  }
+  if (process.env.LOUNGE_PRINT_CACHE) for (const row of rows) console.info(JSON.stringify(row));
+});
+
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   const calm = { user_tone: '담백', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '관심', scene_change_request: '', activity_finished: false, topic_stale: true, is_emotional_moment: false };
