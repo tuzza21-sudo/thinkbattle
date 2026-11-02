@@ -28,6 +28,8 @@ const messengerLib = compile('../src/lib/loungeMessenger.ts');
 // The analyzer is a call of its own before each one-to-one chat reply (engine v4, 2026-11-02); the tests that fake the
 // model answer one call per turn, so it is off here except in its own tests.
 process.env.LOUNGE_ANALYZER ??= 'off';
+// The same for the director, which a fast-model chat asks beside the analyzer (back on 2026-11-02).
+process.env.LOUNGE_DIRECTOR ??= 'off';
 const handler = compile('../api/lounge.ts', path => path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
@@ -2313,6 +2315,46 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
     assert.deepEqual(written.state.anchors, ['와인잔을 돌린다', '코트 소매를 걷는다']);
     assert.deepEqual(written.state.reactions, ['당황하기', '당황하기', '당황하기'].slice(-3));
     assert.deepEqual(written.state.shared, [{ what: '처음으로 같이 분식집에 감', turn: 7 }]);
+  }
+});
+
+test('the director sets a fast-model chat reply\'s direction beside the analyzer; GPT-6.1 Terra goes without it, and a failed one stops nothing', async t => {
+  const saved = process.env.LOUNGE_DIRECTOR;
+  // Neither 'off' (the default of these tests) nor 'on' (every model): it runs for the fast model only.
+  process.env.LOUNGE_DIRECTOR = 'auto';
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = saved; });
+  const messages = [{ id: 2, user_id: 'host', nickname: '지수', kind: 'human', text: '사진좀 부탁드려요', created_at: '2026-11-01T00:00:00Z' }];
+  const direction = { tone: '장난', request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다', ending: '행동' };
+  for (const [works, aiModel] of [[true, undefined], [false, undefined], [true, 'gpt-terra']]) {
+    let asked, reply;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '여행', host_persona: 'guide', memory: '지금 장면: 광장', capacity: 1, space_id: null, voice_on: false, ai_turns: 2, ai_model: aiModel }]);
+      if (url.includes('voice_lounge_messages?')) return result(messages);
+      if (url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
+        asked = JSON.parse(init.body);
+        return works ? modelAnswer(direction) : result({ error: { message: 'down' } }, 500);
+      }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 광장' });
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '거기 서 봐요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+    if (aiModel === 'gpt-terra') {
+      assert.equal(asked, undefined);
+      assert.equal(JSON.parse(reply.input).direction, undefined);
+      assert.doesNotMatch(reply.instructions, /direction이 있으면/);
+      continue;
+    }
+    assert.equal(asked.model, 'gpt-6-luna');
+    assert.equal(asked.reasoning.effort, 'none');
+    assert.equal(JSON.parse(asked.input).latest, '사진좀 부탁드려요');
+    assert.match(asked.instructions, /너는 1:1 대화의 연출가다/);
+    assert.match(asked.instructions, /장소를 옮기거나 시간을 건너뛰는 일은 사용자가 원할 때만/);
+    assert.deepEqual(JSON.parse(reply.input).direction, works ? direction : undefined);
+    assert.match(reply.instructions, /direction이 있으면 이번 턴을 위해 미리 정한 방향이다/);
   }
 });
 

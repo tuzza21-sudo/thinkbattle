@@ -179,6 +179,8 @@ async function capture(scene) {
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_after_reply') return modelAnswer({ memory: scene.memory, events: [], memory_ops: [], story_checkpoints: [], story_facts: [], story_choice: '' });
     // The analyzer (a one-to-one chat, engine v4) is really asked, so the reply request carries its reading and the turn.
+    // The director (a fast-model chat) is really asked too; its time is counted with the analyzer's, as they run together.
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') {
       if (saved.SAVE_ANALYZER) writeFileSync(`${saved.SAVE_ANALYZER}-${scene.name.replace(/[^\w가-힣]+/g, '_')}.json`, init.body);
       const started = performance.now();
@@ -242,8 +244,9 @@ ${JSON.stringify(JSON.parse(request.input), null, 1)}`);
   const said = scene.chat[0]?.[1] ?? '(첫 인사)';
   report.push({ scene: scene.name, host: scene.host ?? 'velvet', user: said, chat: scene.chat, memory: scene.memory, ...(scene.original ? { original: scene.original } : {}), runs });
   console.log(`\n=== ${scene.name}\n나: ${said}${scene.original ? `\n(원래 답) ${scene.original.replace(/\n+/g, ' ')}` : ''}`);
-  const { reading, turn } = JSON.parse(request.input);
+  const { reading, turn, direction } = JSON.parse(request.input);
   if (analyzerMs !== undefined) console.log(`(analyzer ${analyzerMs}ms) ${reading ? JSON.stringify(reading) : 'no reading'}${turn ? ` turn ${JSON.stringify({ progress: turn.progress, event: turn.event?.content, stage: turn.stage })}` : ''}`);
+  if (direction) console.log(`(director) ${JSON.stringify(direction)}`);
   for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}${run.read ? `\n(read) ${run.read}` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);
 }
 if (dryRows.length) {
