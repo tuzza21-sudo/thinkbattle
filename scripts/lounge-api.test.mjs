@@ -2408,6 +2408,13 @@ test('the scene moves only when the member asks or the activity is over, and an 
   assert.equal(decide(inside, calm).event.id, 'indoor');
   assert.equal(decide({ ...inside, event_turns: { indoor: 5 } }, calm).event, undefined, 'cooling down');
   assert.equal(decide(inside, calm, { stage: 3, random: () => 0.99 }).event.id, 'indoor');
+  // A sincere no (2026-11-02) comes first in the turn; play and teasing are not one.
+  assert.equal(messengerLib.readLoungeAnalysis({ ...calm, is_sincere_refusal: true }).is_sincere_refusal, true);
+  const refused = messengerLib.loungeTurnConditions({ state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', sincereRefusal: true });
+  assert.equal(Object.keys(refused)[0], 'priority');
+  assert.match(refused.priority, /압박을 즉시 멈추고 물러난다/);
+  assert.equal(messengerLib.loungeTurnConditions({ state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' }).priority, undefined);
+  assert.match(messengerLib.loungeAnalyzerInstructions, /is_sincere_refusal: .*장난으로 튕기거나 버티는 말, 캐릭터의 허세에 맞서는 말은 false다/);
   // A new room starts again, except for the events that never repeat.
   const moved = messengerLib.normalizeLoungeCompanionState({ room_id: 'room-0', scene: inside.scene, used_events: ['once'], anchors: ['잔을 든다'] }, 'room-1');
   assert.equal(moved.scene, undefined);

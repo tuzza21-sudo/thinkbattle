@@ -38,6 +38,11 @@ export type RelationshipConfig = {
   initialMood: Mood;
   /** Character-specific reactions. Events not listed fall back to the shared defaults. */
   events: Partial<Record<RelationshipEventType, EventEffect>>;
+  /**
+   * The events on the character's page (its wins and losses, 2026-11-02): they count in full, and any other event's gain
+   * at relationshipSettings.offListWeight. Absent, every event counts in full as before.
+   */
+  mainEvents?: readonly RelationshipEventType[];
   /** Ordered from the first stage to the closest. The first stage has no conditions. */
   stages: readonly StageRule[];
   responseHints: readonly string[];

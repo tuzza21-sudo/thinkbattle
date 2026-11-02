@@ -12,6 +12,10 @@ export const relationshipEventTypes = [
   'SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE',
   'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'ANSWERS_DIRECTLY', 'EVADES_QUESTION', 'CONTRADICTS_SELF',
   'FLIRTS_PLAYFULLY', 'SHOWS_CARE', 'REMEMBERS_DETAIL', 'PLAYS_ALONG', 'APPRECIATES_SINCERELY',
+  // Nerve (2026-11-02): standing up to a character's bluff and pressure in play, for the characters built on it
+  // (강무진 first). Only the characters that list them react; the others stay as they were.
+  'CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT',
+  'FOLDS_EASILY', 'WAFFLES',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
 /**
@@ -68,12 +72,20 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   REMEMBERS_DETAIL: { description: '캐릭터가 전에 한 말·취향·사연을 기억해 다시 꺼냄', severity: 'normal', importance: 0.7 },
   PLAYS_ALONG: { description: '이야기 장면에 적극적으로 들어와 행동과 대사로 장면을 함께 이어 감', severity: 'normal', importance: 0.5 },
   APPRECIATES_SINCERELY: { description: '캐릭터의 구체적인 면(일, 취향, 말, 행동)을 진심으로 알아봐 주거나 칭찬함. 내용 없는 칭찬은 FLATTERS_CHARACTER', severity: 'normal', importance: 0.6 },
+  CALLS_BLUFF: { description: '캐릭터의 허세·블러핑·위장된 의도를 정확히 짚어냄(예: "나가는 척하는 거 다 알아요"). 근거 없는 의심이나 캐릭터를 거짓말쟁이로 비난하는 것은 해당하지 않음', severity: 'normal', importance: 0.55 },
+  COUNTER_THREAT: { description: '직전 캐릭터 발언의 장난 섞인 압박·협박에 같은 결의 장난스러운 역압박으로 맞섬(예: "계속 그러면 디저트 세 개 시켜요"). 진짜 위협, 모욕, 관계를 끊겠다는 진지한 협박은 해당하지 않음', severity: 'normal', importance: 0.55 },
+  STANDS_GROUND: { description: '직전 캐릭터 발언의 압박·마감·도발에 겁먹거나 굴복하지 않고 자기 페이스를 유지함(예: 마감을 웃으며 넘김). 대화를 무시하거나 성의 없는 단답은 해당하지 않음', severity: 'normal', importance: 0.5 },
+  RAISES_STAKES: { description: '캐릭터의 제안에 더 큰 조건을 붙여 역제안함(예: "대신 제가 이기면 주말 하루 제 마음대로"). 대가 없는 단순한 요구는 SHOWS_ENTITLEMENT 쪽', severity: 'normal', importance: 0.5 },
+  CHALLENGES_CHARACTER: { description: '캐릭터에게 내기·승부·도전을 장난스럽게 명시적으로 걺(예: "내기해요"). 싸움을 거는 공격적인 말은 해당하지 않음', severity: 'normal', importance: 0.5 },
+  MAKES_CHARACTER_ADMIT: { description: '캐릭터가 숨기는 패배·감정·실수를 인정하라고 장난스럽게 몰아붙임(예: "방금 진 거죠? 졌다고 해 봐요"). 비난하거나 조롱하며 강요하는 것은 해당하지 않음', severity: 'normal', importance: 0.6 },
+  FOLDS_EASILY: { description: '직전 캐릭터 발언의 장난 섞인 압박에 버티지 않고 바로 굴복함(예: "네네 시키는 대로 할게요"). 진심으로 거절하거나 지쳐서 선을 긋는 말은 해당하지 않음', severity: 'normal', importance: 0.3 },
+  WAFFLES: { description: '선택을 요구받았는데 계속 결정을 미룸(예: "음… 아무거나요… 잘 모르겠어요"). 정말 모르는 것을 물었거나 지쳐 보이면 해당하지 않음', severity: 'normal', importance: 0.3 },
 };
 
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
 export const protectiveEvents: readonly RelationshipEventType[] = ['EXPRESSES_DISTRESS'];
 /** Penalties that must not apply while someone is struggling. */
-export const shieldedEvents: readonly RelationshipEventType[] = ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'SHOWS_VULNERABILITY', 'AVOIDS_DECISION'];
+export const shieldedEvents: readonly RelationshipEventType[] = ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'SHOWS_VULNERABILITY', 'AVOIDS_DECISION', 'FOLDS_EASILY', 'WAFFLES'];
 
 // Shared reactions on the common metrics. Each character overrides the events it cares about.
 export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
@@ -121,6 +133,14 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   REMEMBERS_DETAIL: { deltas: { trust: 2, interest: 2 } },
   PLAYS_ALONG: { deltas: { interest: 3, comfort: 1 }, mood: { excitement: 8 } },
   APPRECIATES_SINCERELY: { deltas: { respect: 1, comfort: 2 } },
+  CALLS_BLUFF: { deltas: {} },
+  COUNTER_THREAT: { deltas: {} },
+  STANDS_GROUND: { deltas: {} },
+  RAISES_STAKES: { deltas: {} },
+  CHALLENGES_CHARACTER: { deltas: {} },
+  MAKES_CHARACTER_ADMIT: { deltas: {} },
+  FOLDS_EASILY: { deltas: {} },
+  WAFFLES: { deltas: {} },
 };
 
 /** The short name a member sees when one of their messages counted for or against the relationship (the chat's status card). */
@@ -137,4 +157,6 @@ export const relationshipEventLabels: Record<RelationshipEventType, string> = {
   ACKNOWLEDGES_OTHER_VIEW: '다른 생각을 인정함', REFRAMES_CONSTRUCTIVELY: '좋은 쪽으로 바꿔 봄', ANSWERS_DIRECTLY: '솔직하게 답함',
   EVADES_QUESTION: '질문을 피함', CONTRADICTS_SELF: '앞뒤가 다름', FLIRTS_PLAYFULLY: '설레는 장난',
   SHOWS_CARE: '챙겨 줌', REMEMBERS_DETAIL: '기억해 줌', PLAYS_ALONG: '이야기에 함께 빠져듦', APPRECIATES_SINCERELY: '진심으로 알아봐 줌',
+  CALLS_BLUFF: '허세를 간파함', COUNTER_THREAT: '역으로 맞받아침', STANDS_GROUND: '겁먹지 않고 버팀', RAISES_STAKES: '판을 키워 역제안함',
+  CHALLENGES_CHARACTER: '내기를 걺', MAKES_CHARACTER_ADMIT: '인정하게 만듦', FOLDS_EASILY: '바로 물러섬', WAFFLES: '결정을 미룸',
 };

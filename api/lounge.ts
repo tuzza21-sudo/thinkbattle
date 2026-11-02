@@ -966,7 +966,7 @@ ${photoRule}`;
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
     const companionTurn = room.ai_turns ?? 0;
     const sceneDecision = companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
-    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode }) : undefined;
+    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, sincereRefusal: analysis?.is_sincere_refusal }) : undefined;
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { tone: analysis.user_tone, need: analysis.emotional_need, emotional: analysis.is_emotional_moment, stale: analysis.topic_stale } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
@@ -1153,7 +1153,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       try {
         const stored = fresh ? await readRelationship(user.id, relationship.config.characterId) : undefined;
         const record = stored?.ok ? applyDecay(relationshipFromRow(relationship.config, stored.row), relationship.config, new Date()) : relationship.record;
-        const turn = processTurn({ record, config: relationship.config, mood: relationship.mood, events: answer?.events, hasUserTurn: recent.at(-1)?.kind === 'human', now: stored?.ok ? new Date() : relationship.now });
+        // A sincere no is never folding or waffling, whatever the call after the reply made of it.
+        const events = analysis?.is_sincere_refusal && Array.isArray(answer?.events) ? answer.events.filter(event => !['FOLDS_EASILY', 'WAFFLES'].includes((event as { type?: unknown })?.type as string)) : answer?.events;
+        const turn = processTurn({ record, config: relationship.config, mood: relationship.mood, events, hasUserTurn: recent.at(-1)?.kind === 'human', now: stored?.ok ? new Date() : relationship.now });
         console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
         const response = await fetchTimed(`${url}/rest/v1/rpc/save_voice_lounge_relationship`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({
           p_user: user.id, p_character: relationship.config.characterId, p_room: roomId, p_expected_version: record.version,

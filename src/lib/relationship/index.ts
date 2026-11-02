@@ -28,7 +28,8 @@ export const getRelationshipConfig = (characterId?: string | null): Relationship
   characterId ? relationshipConfigs[characterId] ?? customConfigs.get(characterId) : undefined;
 
 /** Instructions for classifying the user's latest message in the same model call as the reply. */
-export const relationshipEventInstructions = `events: 사용자의 가장 최근 발언 하나에서 실제로 드러난 행동만 아래 코드로 0~3개 분류한다. 그 이전 발언은 이미 분류됐으므로 다시 분류하지 않는다. 사용자의 새 발언이 없으면 빈 배열이다. 평범한 발언이면 빈 배열이 정상이다. 추측해서 만들지 않는다. confidence는 0~1, note는 무엇을 했는지 25자 이내 한국어로 쓴다.
+export const relationshipEventInstructions = `events: 사용자의 가장 최근 발언 하나에서 실제로 드러난 행동만 아래 코드로 0~2개 분류한다. 여러 개가 겹치면 가장 두드러진 것 2개까지만 고른다. 그 이전 발언은 이미 분류됐으므로 다시 분류하지 않는다. 사용자의 새 발언이 없으면 빈 배열이다. 평범한 발언이면 빈 배열이 정상이다. 추측해서 만들지 않는다. confidence는 0~1, note는 무엇을 했는지 25자 이내 한국어로 쓴다.
+CALLS_BLUFF, COUNTER_THREAT, STANDS_GROUND, RAISES_STAKES, CHALLENGES_CHARACTER, MAKES_CHARACTER_ADMIT은 캐릭터의 허세와 압박에 장난으로 맞서는 일이다. 캐릭터의 외모, 인격, 사람 자체를 깎아내리는 말은 여기에 해당하지 않는다. COUNTER_THREAT, STANDS_GROUND, FOLDS_EASILY는 recent의 직전 캐릭터 발언에 압박, 마감, 도발이 있었을 때만 고른다. 사용자가 진심으로 거절하거나 지쳐서 선을 그은 말("진짜 피곤해요", "그만해요")은 FOLDS_EASILY나 WAFFLES가 아니다.
 ${activeRelationshipEventTypes.map(type => `${type}: ${relationshipEventCatalog[type].description}`).join('\n')}`;
 
 /**

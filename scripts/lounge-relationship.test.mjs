@@ -5,6 +5,7 @@ import { loadTs } from './lounge-ts-loader.mjs';
 
 const relationship = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const { relationshipResponseInstructions, relationshipResponseInstructionsFor, relationshipConfigs: configs, createRelationship, processTurn, initialMood, describeRelationship, validateRelationshipConfig, applyDecay, relationshipPromptContext, parseDetectedEvents } = relationship;
+const charactersLib = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const now = new Date('2026-10-06T12:00:00Z');
 const later = minutes => new Date(now.getTime() + minutes * 60_000);
 const event = (type, confidence = 0.9, note) => ({ type, confidence, ...(note ? { note } : {}) });
@@ -68,12 +69,13 @@ test('1. scores stay between 0 and 100 under repeated extreme events', () => {
 test('2. the same event produces different deltas for each character', () => {
   const deltas = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('ADMITS_ERROR')]]).logs[0].delta]));
   assert.deepEqual(deltas.auditor, { trust: 3, respect: 3, epistemicHonesty: 5 });
-  assert.deepEqual(deltas.closer, { trust: 2, respect: 2 });
+  // Off 강무진's own list, an event's gain counts at half (2026-11-02).
+  assert.deepEqual(deltas.closer, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.velvet, { trust: 4, respect: 3, poise: 2 });
   assert.deepEqual(deltas.trickster, { trust: 2, comfort: 1 });
   const care = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('SHOWS_CARE')]]).logs[0].delta]));
   assert.deepEqual(care.auditor, { resonance: 4, comfort: 3, trust: 2 });
-  assert.deepEqual(care.closer, { comfort: 3, trust: 2, resolve: 2 });
+  assert.deepEqual(care.closer, { comfort: 4, trust: 2, interest: 1 });
   const boundary = run(configs.velvet, [[event('VIOLATES_BOUNDARY')]]).logs[0].delta;
   assert.deepEqual(boundary, { trust: -10, respect: -10, comfort: -10 }, 'severe loss is limited only by the current score');
 });
@@ -442,7 +444,7 @@ test('only confident, real user events count; replies without a new user turn ch
   assert.deepEqual(noUser.log.delta, {}); assert.equal(noUser.record.lastInteractionAt, null);
   assert.deepEqual(parseDetectedEvents([{ type: 'MAKE_UP', confidence: 1 }, { type: 'ADMITS_ERROR', confidence: 3, note: 'x'.repeat(200) }, 'bad']).map(item => [item.type, item.confidence, item.note.length]), [['ADMITS_ERROR', 1, 80]]);
   const many = run(config, [[event('ADMITS_ERROR'), event('ADMITS_ERROR'), event('SHOWS_CARE'), event('ASKS_GOOD_QUESTION'), event('SHOWS_CURIOSITY')]]);
-  assert.equal(many.logs[0].accepted.length, 3, 'at most three events per turn');
+  assert.equal(many.logs[0].accepted.length, 2, 'at most two events per turn (three until 2026-11-02)');
 });
 
 test('important events become memories; the prompt receives a small selection without numbers being required', () => {
@@ -608,11 +610,36 @@ test('pace: a warm conversation reaches the second stage within about 12 turns, 
     for (const [name, sequence] of [['romance', romance], ['mixed', mixed]]) {
       const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
       const reached = index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1;
-      assert.ok(reached(1) > 0 && reached(1) <= 12, `${config.characterId} ${name}: second stage at ${reached(1)}`);
-      assert.ok(reached(2) > 0 && reached(2) <= 45, `${config.characterId} ${name}: third stage at ${reached(2)}`);
-      assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
+      // A character with its own list (강무진) is slower on a warm talk that is not his: half counts, and fun is needed too.
+      assert.ok(reached(1) > 0 && reached(1) <= (config.mainEvents ? 20 : 12), `${config.characterId} ${name}: second stage at ${reached(1)}`);
+      assert.ok(reached(2) > 0 && reached(2) <= (config.mainEvents ? 60 : 45), `${config.characterId} ${name}: third stage at ${reached(2)}`);
+      // His closest stage needs what is on his own list (kept promises for 믿음직함), checked in his own test below.
+      if (!config.mainEvents) assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
     }
   }
+});
+
+test('강무진 needs both nerve and heart to grow close: nerve alone stops at the second stage, heart alone is slow, both are the fastest', () => {
+  const config = configs.closer;
+  const stages = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
+  const pace = sequence => {
+    const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
+    return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
+  };
+  const nerve = ['CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT'];
+  const heart = ['ANSWERS_DIRECTLY', 'SHOWS_CARE', 'KEEPS_PROMISE'];
+  const both = nerve.flatMap((type, i) => [type, heart[i % heart.length]]);
+  const [nerveSecond, nerveThird] = pace(nerve), heartPace = pace(heart), bothPace = pace(both);
+  assert.ok(nerveSecond > 0 && nerveThird === 0, `nerve alone: ${pace(nerve)}`);
+  assert.ok(heartPace.every(turn => turn > 0), `heart alone still gets there: ${heartPace}`);
+  assert.ok(bothPace[0] <= 12 && bothPace[1] <= 45 && bothPace[2] <= 95, `both: ${bothPace}`);
+  assert.ok(bothPace.every((turn, index) => turn < heartPace[index]), `both before heart alone: ${bothPace} / ${heartPace}`);
+  // Folding or waffling only bores him a little; trust is untouched.
+  assert.deepEqual(run(config, [[event('FOLDS_EASILY')]]).logs[0].delta, { interest: -1 });
+  assert.deepEqual(run(config, [[event('WAFFLES')]]).logs[0].delta, { interest: -1 });
+  // Every event on his page is on his list, and the list is his page's.
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'closer');
+  assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
 
 test('a sexual word or a bold touch is answered in character and never ends the conversation; only a repeat after a refusal or force crosses the line', () => {

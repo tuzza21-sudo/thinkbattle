@@ -5,7 +5,10 @@ export const relationshipSettings = {
   minConfidence: 0.6,
   fullConfidence: 0.8,
   lowConfidenceWeight: 0.7,
-  maxEventsPerTurn: 3,
+  /** Two at most, the most marked (2026-11-02; three before). */
+  maxEventsPerTurn: 2,
+  /** With a character's own list of events (mainEvents), the gain of any other event is this share (2026-11-02). */
+  offListWeight: 0.5,
   /** Replies by the member in a row with the next stage's conditions met before it is reached (was 3 meaningful turns until 2026-10-30). */
   promotionStabilityTurns: 2,
   demotionStabilityTurns: 3,
@@ -120,11 +123,13 @@ export function processTurn({ record, config, mood, events, hasUserTurn, now }: 
     const repeats = record.recentEvents.filter(item => item.type === event.type && item.turn > turn - settings.repeatWindowTurns - 1).length;
     const repeatWeight = settings.repeatMultipliers[Math.min(repeats, settings.repeatMultipliers.length - 1)];
     const confidenceWeight = event.confidence >= settings.fullConfidence ? 1 : settings.lowConfidenceWeight;
+    // A character with its own list counts the events on it in full and others at a share; a loss always counts in full.
+    const listWeight = config.mainEvents && !config.mainEvents.includes(event.type) ? settings.offListWeight : 1;
     const deltas: Partial<Record<string, number>> = {};
     for (const [metric, value] of Object.entries(effect.deltas)) {
       if (!value || record.scores[metric] === undefined) continue;
       // Farming is limited by diminishing positive effects; repeated harm keeps its full weight.
-      const applied = value > 0 ? value * repeatWeight * confidenceWeight
+      const applied = value > 0 ? value * repeatWeight * confidenceWeight * listWeight
         : protectedTurn && shieldedEvents.includes(event.type) ? 0 : value * confidenceWeight;
       if (!applied) continue;
       deltas[metric] = applied; raw[metric] = (raw[metric] ?? 0) + applied;
