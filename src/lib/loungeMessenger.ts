@@ -232,7 +232,7 @@ const withoutStars = (text: string) => text.replace(/\*/g, '').trim();
  * sheet), where the two are and what happens there, and what was used lately and is to be avoided. Constraints only;
  * how to react is the reply's own judgement.
  */
-export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal }) {
+export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean }) {
   const { bible, state, decision } = input;
   const stage = input.stage ? Math.min(4, Math.max(1, input.stage)) as 1 | 2 | 3 | 4 : undefined;
   const level = stage && input.innerVoice === 'on' ? bible?.innerVoice?.ladder[stage] : undefined;
@@ -265,6 +265,8 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
       ...(intimacyLevel > stage ? { opened: '상대가 품위 있게 먼저 제안해 이번 장면에 한해 한 단계 열렸다. 스킨십도 이 단계만큼 받아들이되 선은 네가 정한다.' } : {}),
       ...(proposal === 'elegant' && bible?.intimacyProposal ? { proposal: `방금 상대가 품위 있게 먼저 다가왔다. 허락과 받아치기를 함께 한다. 이 단계의 결: ${bible.intimacyProposal.elegant.byStage[stage]}` } : {}),
       ...(proposal === 'crude' && bible?.intimacyProposal ? { proposal: `방금 요구는 무례했다. 아무것도 열지 않는다. ${bible.intimacyProposal.crude.response}` } : {}),
+      // Adult mode (test accounts): told directly only at the closest step, never in a turn the member said no.
+      ...(input.adultMode && bible?.adultMode && intimacyLevel === 4 && !input.sincereRefusal ? { explicit: bible.adultMode.explicit } : {}),
     } } : {}),
     ...(level ? { inner_voice_level: { level: level.level, ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' ? { belief } : {}),

@@ -672,7 +672,8 @@ test('every character is guarded at its first stage, and only there', () => {
   for (const config of Object.values(configs)) {
     const record = createRelationship(config);
     const first = relationshipPromptContext(record, config, initialMood(config));
-    assert.match(first.reserve, /호감이나 설렘을 먼저 드러내지 않/, `${config.characterId} at the first stage`);
+    // 선우령 flirts back from the start (2026-11-02) with her own distance: her heart stays closed.
+    assert.match(first.reserve, config.firstStageReserve ? /마음.*아직 내주지 않/ : /호감이나 설렘을 먼저 드러내지 않/, `${config.characterId} at the first stage`);
     const next = config.stages.filter(stage => stage.enabled !== false)[1];
     assert.equal(relationshipPromptContext({ ...record, stage: next.id }, config, initialMood(config)).reserve, undefined, `${config.characterId} past it`);
     assert.doesNotMatch(config.stageRomance?.[config.stages[0].id] ?? '', /설레게 한다/, `${config.characterId} does not set out to flutter at the first stage`);

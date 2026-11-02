@@ -2483,6 +2483,56 @@ test('선우령 through the handler: a graceful proposal opens the step in the r
   }
 });
 
+test('adult mode (test accounts only): explicit only at 선우령\'s closest step, for a listed account, never after a no; the hard limits stay', async t => {
+  const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
+  const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
+  const turn = (stage, extra = {}) => messengerLib.loungeTurnConditions({ bible, stage, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true, ...extra }).intimacy;
+  assert.equal(turn(4).explicit, bible.adultMode.explicit);
+  assert.equal(turn(3).explicit, undefined, 'not before the closest step');
+  assert.equal(turn(3, { intimacyProposal: 'elegant' }).explicit, bible.adultMode.explicit, 'a graceful proposal at the third stage reaches it');
+  assert.equal(turn(4, { adultMode: false }).explicit, undefined);
+  assert.equal(turn(4, { sincereRefusal: true }).explicit, undefined, 'never in a turn the member said no');
+  const auditor = charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible;
+  assert.equal(messengerLib.loungeTurnConditions({ bible: auditor, stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy, undefined);
+  for (const limit of ['미성년', '강요·비동의', '실존 인물', '그 자리에서 멈추고']) assert.ok(bible.adultMode.explicit.includes(limit), limit);
+  // Every shared ban it lifts is still where the exception expects it, and what stays banned stays.
+  const velvet = relationshipLib.getRelationshipConfig('velvet');
+  const shared = [relationshipLib.relationshipReplyInstructionsFor(velvet), relationshipLib.relationshipIntimacyGuidance(3, true)].join('\n');
+  for (const source of relationshipLib.relationshipAdultModeSources) assert.ok(shared.includes(source), source);
+  const lifted = relationshipLib.relationshipAdultModeText(shared);
+  assert.match(lifted, /turn\.intimacy\.explicit가 있을 때만/);
+  assert.match(lifted, /미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 어떤 경우에도 하지 않는다/);
+  assert.match(lifted, /상대가 멈추자고 하면 바로 멈춘다/);
+  // Through the handler: only a listed account gets the lifted rules, and the turn says when.
+  const saved = process.env.LOUNGE_ADULT_MODE_USERS;
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ADULT_MODE_USERS; else process.env.LOUNGE_ADULT_MODE_USERS = saved; });
+  process.env.LOUNGE_ADULT_MODE_USERS = 'tester@example.com';
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { trust: 60, respect: 70, interest: 80, comfort: 55, openness: 50, intrigue: 80, poise: 70 } };
+  for (const [email, row, explicit] of [['Tester@Example.com', closest, true], ['other@example.com', closest, false], ['tester@example.com', velvetRow, false]]) {
+    let reply;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: { ...base, room_id: roomId } }]);
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return modelAnswer({});
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    const input = JSON.parse(reply.input);
+    assert.equal(Boolean(input.turn.intimacy.explicit), explicit, `${email} at ${row.stage}`);
+    assert.equal(/turn\.intimacy\.explicit가 있을 때만/.test(reply.instructions), email.toLowerCase() === 'tester@example.com', `${email}: the lifted rules`);
+    assert.match(reply.instructions, /어떤 경우에도 하지 않는다|성적 대상화는 하지 않는다/);
+  }
+});
+
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   const calm = { user_tone: '담백', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '관심', scene_change_request: '', activity_finished: false, topic_stale: true, is_emotional_moment: false };

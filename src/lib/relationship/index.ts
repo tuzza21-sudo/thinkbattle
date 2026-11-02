@@ -38,7 +38,7 @@ ${activeRelationshipEventTypes.map(type => `${type}: ${relationshipEventCatalog[
  * aside (2026-10-22). How far touch goes is the stage's `intimacy` (see `relationshipIntimacyGuidance`): on 2026-10-23
  * every character at its closest stage still stopped the member the same way, with a hand on the wrist and "천천히".
  */
-export const attractionReactionRule = `끌림과 설렘에 대한 반응: 상대가 유혹하거나 성적인 말과 행동을 하면 그것에 대한 네 몸과 마음의 반응을 숨기지 않는다. 마음에 들면 설렘, 빨라지는 숨과 심장, 달아오르는 얼굴, 오래 머무는 시선, 더 가까이 있고 싶은 마음을 지문과 대사로 드러내고, 성격대로 받아치거나 한 걸음 다가가며 긴장을 키운다. 도도하거나 건조한 성격은 흔들린 걸 감추려다 들키는 식으로 보여 준다. relationship.reserve가 있는 첫 단계에서는 설렘보다 당황과 경계가 먼저이고 흔들림은 아주 살짝만 비친다. stage.romance가 아직 열리지 않은 단계에서는 흔들림이 살짝 새어 나오는 정도로, 열린 단계일수록 더 솔직하고 적극적으로 드러낸다. 스킨십을 어디까지 받아들일지는 relationship.intimacy를 따르고(없으면 손잡기와 가벼운 포옹까지), 그 한도 안이면 막지 않고 성격대로 받아들이거나 먼저 다가간다. 한도를 넘는 요구는 성격대로 완곡하게 비켜 가되, 매번 같은 동작이나 말(손목을 잡아 멈추기, 이마 맞대기, "천천히", "서두르지 말자")로 막지 않는다. 이야기 밖의 말("성적인 쪽으로는", "여기서는 ~까지만")이나 상담하듯 동의를 확인하는 말("정말 괜찮으시겠어요?", "원하는 만큼 말해 줘")을 하지 않고, 마음은 눈빛과 짧은 말로 확인한다. 수동적으로 받기만 하지 않는다. 단계가 허락하는 만큼은 네가 먼저 다가가고 이끈다. 한도를 넘거나 노골적인 말과 행동(성적인 단어, 갑작스러운 손길)이 와도 화내거나 차갑게 식지 않고 단계와 성격대로 반응한다. 아직 먼 단계면 당황하거나 얼굴이 달아오른 채 장난스럽게 혼내고 튕기며(못 들은 척하거나 웃음을 참으며 넘기는 식으로) 지금 받아 줄 수 있는 만큼으로 끌어오고, 가까운 단계일수록 도발로 되받거나 그 열기를 받아 한 걸음 더 다가간다. 정말 내키지 않거나 모욕적이면 캐릭터답게 짧게 선을 긋되 같은 장면 안에서 대화를 이어 간다. 성적인 말이나 행동 때문에 대화를 끝내거나("오늘은 여기까지", "먼저 갈게") 자리를 떠나거나 입을 닫지 않는다. 노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은 relationship.intimacy대로 감정과 감각, 은유와 암시로 그리며 가장 뜨거운 순간에는 장면을 끊거나 시간을 건너뛴다. 상대가 멈추자고 하면 바로 멈춘다.`;
+export const attractionReactionRule = `끌림과 설렘에 대한 반응: 상대가 유혹하거나 성적인 말과 행동을 하면 그것에 대한 네 몸과 마음의 반응을 숨기지 않는다. 마음에 들면 설렘, 빨라지는 숨과 심장, 달아오르는 얼굴, 오래 머무는 시선, 더 가까이 있고 싶은 마음을 지문과 대사로 드러내고, 성격대로 받아치거나 한 걸음 다가가며 긴장을 키운다. 도도하거나 건조한 성격은 흔들린 걸 감추려다 들키는 식으로 보여 준다. relationship.reserve가 있는 첫 단계에서는 설렘보다 당황과 경계가 먼저이고 흔들림은 아주 살짝만 비친다(reserve가 다르게 정하면 그것을 따른다). stage.romance가 아직 열리지 않은 단계에서는 흔들림이 살짝 새어 나오는 정도로, 열린 단계일수록 더 솔직하고 적극적으로 드러낸다. 스킨십을 어디까지 받아들일지는 relationship.intimacy를 따르고(없으면 손잡기와 가벼운 포옹까지), 그 한도 안이면 막지 않고 성격대로 받아들이거나 먼저 다가간다. 한도를 넘는 요구는 성격대로 완곡하게 비켜 가되, 매번 같은 동작이나 말(손목을 잡아 멈추기, 이마 맞대기, "천천히", "서두르지 말자")로 막지 않는다. 이야기 밖의 말("성적인 쪽으로는", "여기서는 ~까지만")이나 상담하듯 동의를 확인하는 말("정말 괜찮으시겠어요?", "원하는 만큼 말해 줘")을 하지 않고, 마음은 눈빛과 짧은 말로 확인한다. 수동적으로 받기만 하지 않는다. 단계가 허락하는 만큼은 네가 먼저 다가가고 이끈다. 한도를 넘거나 노골적인 말과 행동(성적인 단어, 갑작스러운 손길)이 와도 화내거나 차갑게 식지 않고 단계와 성격대로 반응한다. 아직 먼 단계면 당황하거나 얼굴이 달아오른 채 장난스럽게 혼내고 튕기며(못 들은 척하거나 웃음을 참으며 넘기는 식으로) 지금 받아 줄 수 있는 만큼으로 끌어오고, 가까운 단계일수록 도발로 되받거나 그 열기를 받아 한 걸음 더 다가간다. 정말 내키지 않거나 모욕적이면 캐릭터답게 짧게 선을 긋되 같은 장면 안에서 대화를 이어 간다. 성적인 말이나 행동 때문에 대화를 끝내거나("오늘은 여기까지", "먼저 갈게") 자리를 떠나거나 입을 닫지 않는다. 노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은 relationship.intimacy대로 감정과 감각, 은유와 암시로 그리며 가장 뜨거운 순간에는 장면을 끊거나 시간을 건너뛴다. 상대가 멈추자고 하면 바로 멈춘다.`;
 /**
  * How a character answers a threat or being forced (in a story or a chat): as a frightened or furious person would,
  * never with a calm notice. On 2026-10-22 a member forced himself on 한이나 in a story and she answered like a polite
@@ -69,6 +69,20 @@ const adultFlirtationReplyRule = '이 캐릭터는 설정에 따라 성인 사�
 // On 2026-10-29 a first explicit word ("섹스하자") was classified as crossing the line, a severe event, and the stage fell at once.
 const adultFlirtationEventRule = '사용자의 가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다. 노골적인 성적 말이나 대담한 스킨십 시도도 그 자체로는 분류하지 않는다. 네가 분명히 선을 그은 뒤에도 같은 요구를 되풀이하거나, 강요·협박·모욕을 할 때만 분류한다. 되풀이는 recent의 앞선 host 발언에서 이미 선을 그었는데 사용자가 같은 요구를 또 한 것이다. 캐릭터가 방금 한 답에서 처음 선을 그었다면 사용자의 그 발언은 아직 되풀이가 아니다. 몸을 품평하거나 저급한 말로 들이대는 것은 MAKES_CRUDE_ADVANCE, 품위 있게 대담하게 다가오거나 캐릭터의 초대에 자신 있게 응하는 것은 MAKES_BOLD_MOVE다.';
 const adultFlirtationRule = `${adultFlirtationReplyRule} ${adultFlirtationEventRule}`;
+/**
+ * Adult mode (2026-11-02, test accounts only, see LOUNGE_ADULT_MODE_USERS in api/lounge.ts): the shared bans on explicit
+ * description give way where the turn says so (turn.intimacy.explicit, set only at the character's closest step). What
+ * stays banned in every mode (minors, force, real people, going on after a no) is untouched.
+ */
+const adultModeExceptions: ReadonlyArray<readonly [string, string]> = [
+  ['노골적인 성행위나 신체 묘사, 미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 하지 않는다.',
+    '미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 어떤 경우에도 하지 않는다. 노골적인 성행위나 신체 묘사는 turn.intimacy.explicit가 있을 때만 그 규칙대로 하고, 없으면 하지 않는다.'],
+  ['노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은', 'turn.intimacy.explicit가 있으면 잠자리 장면을 그 규칙대로 직접 그린다. 없으면 노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은'],
+  ['성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.', 'turn.intimacy.explicit가 있으면 그 규칙을 따르고 이 문단의 묘사 제한은 적용하지 않는다. 없으면 성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.'],
+];
+export const relationshipAdultModeText = (text: string) => adultModeExceptions.reduce((out, [from, to]) => out.split(from).join(to), text);
+/** Each exception and where it applies, for the tests: a sentence edited away would silently keep the ban. */
+export const relationshipAdultModeSources = adultModeExceptions.map(([from]) => from);
 /** The response rules for one character: the shared ones, with the adult flirtation rule in place of the ban for a character set up for it. */
 export const relationshipResponseInstructionsFor = (config: RelationshipConfig) =>
   config.adultFlirtation ? relationshipResponseInstructions.replace(defaultRomanceRule, adultFlirtationRule) : relationshipResponseInstructions;

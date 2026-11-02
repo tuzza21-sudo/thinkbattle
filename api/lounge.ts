@@ -12,7 +12,7 @@ import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, lo
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -282,6 +282,15 @@ export function replyTextPartial(output: string): string | undefined {
     text += jsonEscapes[next] ?? next; index++;
   }
   return text;
+}
+
+/**
+ * Adult mode is for testing (2026-11-02): only the accounts in LOUNGE_ADULT_MODE_USERS (emails or user ids) have it, for
+ * a character whose bible sets it, in a one-to-one chat. There is no age verification yet, so no member has it.
+ */
+function hasLoungeAdultMode(user: { id: string; email?: string }) {
+  const allowed = (process.env.LOUNGE_ADULT_MODE_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
+  return allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
 }
 
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
@@ -834,6 +843,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow, ...relationshipSteady } = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : ({} as Partial<ReturnType<typeof relationshipPromptContext>>);
     // A story that starts with the two already speaking 반말 keeps it from the first stage.
     if (relationship && scenario && loungeScenarioCasualStart.has(scenario.id)) Object.assign(relationshipSteady, { speech_level: 'casual' });
+    const adultMode = Boolean(relationship && solo && chat && getLoungeCharacter(host.id)?.bible?.adultMode && hasLoungeAdultMode(user));
+    if (adultMode && typeof relationshipSteady.intimacy === 'string') relationshipSteady.intimacy = relationshipAdultModeText(relationshipSteady.intimacy);
     const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
     const contextRecent = solo && chat ? recent.slice(-16) : recent;
     // On a call, what the member just said, named apart: the character kept answering the question before it, one turn
@@ -966,7 +977,7 @@ ${photoRule}`;
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
     const companionTurn = room.ai_turns ?? 0;
     const sceneDecision = companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
-    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal }) : undefined;
+    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { tone: analysis.user_tone, need: analysis.emotional_need, emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
@@ -999,7 +1010,7 @@ ${photoRule}`;
         ...(story || messenger ? [] : [reactionRules, topicRules]), closingRules,
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
-        relationship ? (split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config) : '',
+        relationship ? (text => adultMode ? relationshipAdultModeText(text) : text)((split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config)) : '',
         messenger ? messengerInstruction : story ? storyInstruction : roleInstruction,
         // From here on the instructions depend on the turn; everything above is the same for a character and mode.
         longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
