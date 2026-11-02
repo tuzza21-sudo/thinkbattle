@@ -69,13 +69,13 @@ test('1. scores stay between 0 and 100 under repeated extreme events', () => {
 test('2. the same event produces different deltas for each character', () => {
   const deltas = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('ADMITS_ERROR')]]).logs[0].delta]));
   // Off 서도현's and 강무진's own lists, an event's gain counts at half (2026-11-02).
-  assert.deepEqual(deltas.auditor, { trust: 2, respect: 2, epistemicHonesty: 2 });
+  assert.deepEqual(deltas.auditor, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.closer, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.velvet, { trust: 4, respect: 3, poise: 2 });
   assert.deepEqual(deltas.trickster, { trust: 2, comfort: 1 });
   const care = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('SHOWS_CARE')]]).logs[0].delta]));
   assert.deepEqual(care.auditor, { resonance: 4, comfort: 3, trust: 2 });
-  assert.deepEqual(care.closer, { comfort: 4, trust: 2, interest: 1 });
+  assert.deepEqual(care.closer, { comfort: 4, trust: 2, resolve: 1, interest: 1 });
   const boundary = run(configs.velvet, [[event('VIOLATES_BOUNDARY')]]).logs[0].delta;
   assert.deepEqual(boundary, { trust: -10, respect: -10, comfort: -10 }, 'severe loss is limited only by the current score');
 });
@@ -139,7 +139,7 @@ test('5. a severe event downgrades immediately', () => {
   assert.equal(logs[0].stageChange, 'demoted');
   assert.notEqual(record.stage, 'DRAWN_IN');
   assert.ok(record.scores.trust < close.scores.trust - 8);
-  const auditor = withScores(configs.auditor, { trust: 60, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
+  const auditor = withScores(configs.auditor, { trust: 52, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
   assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
 });
 
@@ -192,7 +192,7 @@ test('9. each user and character pair keeps an independent state', () => {
   turn('user-a', 'auditor', [event('ADMITS_ERROR')]);
   turn('user-a', 'velvet', [event('VIOLATES_BOUNDARY')]);
   turn('user-b', 'auditor', [event('DECEIVES_CHARACTER')]);
-  assert.equal(store.get('user-a:auditor').scores.trust, 27);
+  assert.equal(store.get('user-a:auditor').scores.trust, 26);
   assert.equal(store.get('user-a:velvet').scores.trust, 0);
   assert.equal(store.get('user-b:auditor').scores.trust, 11);
   assert.equal(store.size, 3);
@@ -297,10 +297,12 @@ test('the engineer grows on both axes: breaking his manual is the fun, reaching 
   const nerve = ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT'];
   const heart = ['ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL'];
   const both = nerve.flatMap((type, i) => [type, heart[i % heart.length]]);
-  assert.deepEqual(pace(nerve), [0, 0, 0], 'breaking his manual alone never reaches him');
-  assert.ok(pace(heart)[0] > 0 && pace(heart)[2] === 0, `reaching him alone stops short: ${pace(heart)}`);
+  const [nerveSecond, nerveThird] = pace(nerve), heartPace = pace(heart);
+  assert.ok(nerveSecond > 0 && nerveThird === 0, 'breaking his manual alone stops at the second stage');
+  assert.ok(heartPace.every(turn => turn > 0), `reaching him alone gets there, slowly: ${heartPace}`);
   const bothPace = pace(both);
   assert.ok(bothPace[0] <= 12 && bothPace[1] <= 45 && bothPace[2] <= 95, `both: ${bothPace}`);
+  assert.ok(bothPace.every((turn, index) => turn < heartPace[index]), `both before reaching him alone: ${bothPace} / ${heartPace}`);
   const page = charactersLib.loungeCharacters.find(character => character.id === 'auditor');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
@@ -374,8 +376,9 @@ test('companion scoring: the debate events count for nothing and are not asked f
 test('the listening and reframing events still leave out the characters not built around them', () => {
   for (const type of ['CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) for (const id of ['closer', 'velvet', 'trickster']) assert.deepEqual(run(configs[id], [[event(type)]]).logs[0].delta, {}, `${id} ${type}`);
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.ina, [[event(type)]]).logs[0].delta, {}, `ina ${type}`);
-  // The engineer is built around feelings and listening: he reacts to them and ignores the humour, reframing and dodging events.
-  for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW', 'ANSWERS_DIRECTLY']) assert.ok(Object.keys(run(configs.auditor, [[event(type)]]).logs[0].delta).length > 0, `auditor ${type}`);
+  // The engineer is scored on his own page's list only (2026-11-02): candour counts, the listening events do not.
+  assert.ok(Object.keys(run(configs.auditor, [[event('ANSWERS_DIRECTLY')]]).logs[0].delta).length > 0, 'auditor ANSWERS_DIRECTLY');
+  for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
   for (const type of ['CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
   // The thriller director reads the rest, but never the reframing events that belong to the lawyer and the diplomat.
   assert.deepEqual(run(configs.jaeseok, [[event('REFRAMES_CONSTRUCTIVELY')]]).logs[0].delta, {});
@@ -612,16 +615,15 @@ test('pace: a warm conversation reaches the second stage within about 12 turns, 
   const romance = ['SHARES_FEELING', 'FLIRTS_PLAYFULLY', 'SHOWS_CARE', 'SHOWS_VULNERABILITY', 'REMEMBERS_DETAIL', 'APPRECIATES_SINCERELY', 'PLAYS_ALONG', 'FLIRTS_PLAYFULLY', 'SHOWS_CURIOSITY', 'SHARES_FEELING', 'KEEPS_PROMISE', 'BUILDS_ON_INSIDE_JOKE'];
   const banter = ['MAKES_WITTY_RESPONSE', 'ASKS_GOOD_QUESTION', 'SHOWS_CURIOSITY', 'TAKES_JOKE_WELL', 'ANSWERS_DIRECTLY', 'MAKES_CREATIVE_JOKE', 'SHARES_FEELING'];
   const mixed = romance.flatMap((type, i) => [type, banter[i % banter.length]]);
-  for (const config of Object.values(configs)) {
+  // A character scored on its own list (mainEvents) is paced on that list in its own test.
+  for (const config of Object.values(configs).filter(item => !item.mainEvents)) {
     const stages = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
     for (const [name, sequence] of [['romance', romance], ['mixed', mixed]]) {
       const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
       const reached = index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1;
-      // A character with its own list (강무진) is slower on a warm talk that is not his: half counts, and fun is needed too.
-      assert.ok(reached(1) > 0 && reached(1) <= (config.mainEvents ? 20 : 12), `${config.characterId} ${name}: second stage at ${reached(1)}`);
-      assert.ok(reached(2) > 0 && reached(2) <= (config.mainEvents ? 60 : 45), `${config.characterId} ${name}: third stage at ${reached(2)}`);
-      // His closest stage needs what is on his own list (kept promises for 믿음직함), checked in his own test below.
-      if (!config.mainEvents) assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
+      assert.ok(reached(1) > 0 && reached(1) <= 12, `${config.characterId} ${name}: second stage at ${reached(1)}`);
+      assert.ok(reached(2) > 0 && reached(2) <= 45, `${config.characterId} ${name}: third stage at ${reached(2)}`);
+      assert.ok(reached(3) > 0 && reached(3) <= 95, `${config.characterId} ${name}: closest stage at ${reached(3)}`);
     }
   }
 });

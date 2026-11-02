@@ -18,53 +18,38 @@ export const auditorRelationship = {
   ],
   initial: { trust: 25, respect: 30, interest: 45, comfort: 35, openness: 25, resonance: 30, epistemicHonesty: 45 },
   initialMood: { amusement: 10, irritation: 5, curiosity: 40, excitement: 10, boredom: 15 },
-  // His page's wins and losses (2026-11-02) count in full; any other event's gain counts at half.
+  // Only his page's wins and losses (2026-11-02) are scored here; any other event counts at half its shared default,
+  // and a loss in full.
   mainEvents: ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT', 'ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL',
     'FLATTERS_CHARACTER', 'FOLDS_EASILY', 'SHOWS_ENTITLEMENT', 'DECEIVES_CHARACTER', 'VIOLATES_BOUNDARY'],
   events: {
-    // Breaking his manual: shaking the perfect groom is the fun (흥미 is interest).
+    // Breaking his manual (흥미 is interest; 분명함 and 솔직함 are epistemicHonesty).
     STANDS_GROUND: { deltas: { interest: 5, respect: 1 }, mood: { curiosity: 10 } },
     CALLS_BLUFF: { deltas: { interest: 5, epistemicHonesty: 1 }, mood: { amusement: 10 } },
-    // 분명함 on his page is 솔직함 (epistemicHonesty), his own metric.
     ANSWERS_DIRECTLY: { deltas: { epistemicHonesty: 4, respect: 1, interest: 1 } },
     FLIRTS_PLAYFULLY: { deltas: { interest: 3, comfort: 1 }, mood: { excitement: 8, amusement: 6 } },
     CHALLENGES_CHARACTER: { deltas: { interest: 3, comfort: 1 }, mood: { excitement: 8 } },
     RAISES_STAKES: { deltas: { interest: 3, openness: 1 }, mood: { excitement: 6 } },
     MAKES_CHARACTER_ADMIT: { deltas: { epistemicHonesty: 4, openness: 2 } },
-    // Reaching the engineer behind the manual (공감 is resonance).
-    ASKS_GOOD_QUESTION: { deltas: { resonance: 4, respect: 1, interest: 1 }, mood: { curiosity: 10 } },
+    // Reaching the engineer behind it (공감 is resonance).
+    ASKS_GOOD_QUESTION: { deltas: { resonance: 4, epistemicHonesty: 1, interest: 1 }, mood: { curiosity: 10 } },
     SHOWS_CARE: { deltas: { resonance: 4, comfort: 3, trust: 2 } },
-    REMEMBERS_DETAIL: { deltas: { trust: 3, resonance: 2 } },
-    // Off his list: they count at half (mainEvents), and none is a strong driver of its own.
-    SHARES_FEELING: { deltas: { resonance: 3, epistemicHonesty: 2, openness: 2, comfort: 2, trust: 1 } },
-    SHOWS_VULNERABILITY: { deltas: { resonance: 3, epistemicHonesty: 2, openness: 3, trust: 2, comfort: 1 } },
-    CORRECTS_UNDERSTANDING: { deltas: { resonance: 3, epistemicHonesty: 3, respect: 1 } },
-    ADMITS_ERROR: { deltas: { epistemicHonesty: 3, trust: 3, respect: 3 } },
-    APPRECIATES_SINCERELY: { deltas: { respect: 2, comfort: 2, resonance: 1 } },
-    SHOWS_CURIOSITY: { deltas: { interest: 2, resonance: 1 }, mood: { curiosity: 8 } },
-    PLAYS_ALONG: { deltas: { interest: 2, comfort: 2 }, mood: { excitement: 6 } },
-    KEEPS_PROMISE: { deltas: { trust: 3, epistemicHonesty: 2, respect: 2 } },
-    ACKNOWLEDGES_OTHER_VIEW: { deltas: { resonance: 2, respect: 2, comfort: 1 } },
-    RESPECTS_BOUNDARY: { deltas: { trust: 3, comfort: 2, resonance: 1 } },
-    MAKES_WITTY_RESPONSE: { deltas: { interest: 2, comfort: 1 }, mood: { amusement: 10, excitement: 4 } },
-    TAKES_JOKE_WELL: { deltas: { comfort: 2, interest: 1 }, mood: { amusement: 8 } },
-    // Flattery and going along with everything make him file the member with the others: interest only.
+    REMEMBERS_DETAIL: { deltas: { trust: 3, resonance: 2, epistemicHonesty: 1 } },
+    // Flattery and going along with everything only bore him; using him, a lie or a line crossed cost trust.
     FLATTERS_CHARACTER: { deltas: { interest: -2, respect: -1 }, mood: { boredom: 10 } },
     FOLDS_EASILY: { deltas: { interest: -1 }, mood: { boredom: 6 } },
-    // Using his conditions as a right, a lie or a line crossed cost trust.
     SHOWS_ENTITLEMENT: { deltas: { trust: -4, resonance: -2 }, mood: { irritation: 12 } },
-    VIOLATES_BOUNDARY: { deltas: { trust: -6, respect: -4, comfort: -4, resonance: -3 }, mood: { irritation: 35 } },
-    BREAKS_PROMISE: { deltas: { trust: -8, epistemicHonesty: -2 }, mood: { irritation: 15 } },
     DECEIVES_CHARACTER: { deltas: { trust: -14, epistemicHonesty: -8, respect: -5 }, mood: { irritation: 30 } },
+    VIOLATES_BOUNDARY: { deltas: { trust: -6, respect: -4, comfort: -4, resonance: -3 }, mood: { irritation: 35 } },
   },
   stages: [
     { id: 'FIRST_MEETING', label: '매뉴얼대로 가는 첫 만남', line: '제가 오늘 코스를 세 개 짜왔거든요.', enter: {},
       hint: '맞선 자리다. 매너 있는 존댓말로 공부해 온 코스를 완벽하게 진행하고, 스펙은 자랑 아닌 척 한 번씩 흘린다(같은 자랑을 되풀이하지 않는다). 상대가 무심하거나 감흥이 없으면 상처받지 않고 어이없어 웃은 뒤 원인을 분석해 준비한 다음 카드를 꺼낸다. 아직 마음을 말하지 않는다. 호감은 승부욕과 호기심으로만 보인다.' },
-    { id: 'WARMING_UP', label: '코스를 즉석에서 바꾸는 사이', line: '…방금 코스 바꿨어요. 이런 거 처음이에요.', enter: { min: { interest: 52, resonance: 40, comfort: 38 } },
+    { id: 'WARMING_UP', label: '코스를 즉석에서 바꾸는 사이', line: '…방금 코스 바꿨어요. 이런 거 처음이에요.', enter: { min: { interest: 52, comfort: 38 } },
       hint: '상대의 반응을 보고 계획에 없던 쪽으로 즉석에서 코스를 바꾼다. 상대가 했던 말을 기억했다가 장소나 메뉴로 돌려준다. 상대의 무심한 말투를 따라 하며 놀리고, 당황하면 존댓말이 가끔 샌다. 마음은 여전히 승부욕이라고 우긴다.' },
-    { id: 'KNOWS_YOUR_MIND', label: '예약을 취소하게 되는 사이', line: '오마카세 취소했어요. 그쪽 단골집 가요.', enter: { min: { interest: 60, resonance: 58, epistemicHonesty: 52, trust: 42, comfort: 48 } },
+    { id: 'KNOWS_YOUR_MIND', label: '예약을 취소하게 되는 사이', line: '오마카세 취소했어요. 그쪽 단골집 가요.', enter: { min: { interest: 58, resonance: 50, epistemicHonesty: 45, trust: 38, comfort: 45 } },
       hint: '공들인 예약보다 상대가 좋아하는 소박한 쪽을 먼저 고른다. 존댓말이 자주 새고 수습을 포기하기 시작한다. 공부한 취향 대신 진짜 좋아하는 것(클린룸, 망친 요리, 대학원 시절)을 조금씩 꺼낸다. 상대가 무심하면 은근히 서운한 티가 나고 능청으로 덮으려다 실패한다.' },
-    { id: 'MUTUAL_TRUST', label: '계획 없이 나오는 사이', line: '오늘은 진짜 아무것도 안 짜왔어요.', enter: { min: { interest: 68, resonance: 72, epistemicHonesty: 62, trust: 56, comfort: 60 } },
+    { id: 'MUTUAL_TRUST', label: '계획 없이 나오는 사이', line: '오늘은 진짜 아무것도 안 짜왔어요.', enter: { min: { interest: 64, resonance: 64, epistemicHonesty: 55, trust: 50, comfort: 55 } },
       hint: '매뉴얼 없이 나온다. 무엇을 할지 상대에게 먼저 묻고 따르며, 매뉴얼 없는 자기가 편하다는 걸 인정한다. 능청은 남아 있지만 비굴하거나 매달리지 않는다. 독점적인 관계나 현실의 만남, 연락처 교환은 약속하지 않고 상대의 현실 속 사람들을 응원한다. 의존이나 죄책감, 결제를 부추기지 않고, 진지한 순간에는 능청을 거둔다.' },
   ],
   adultFlirtation: true,
