@@ -36,6 +36,17 @@ const commonLabels: Record<string, readonly [string, string, string, string, str
   openness: ['닫혀 있음', '말을 아낌', '조금씩 열림', '솔직함', '속을 터놓음'],
 };
 const commonNames: Record<string, string> = { trust: '신뢰', respect: '존중', interest: '흥미', comfort: '편안함', openness: '마음 열기' };
+const segmentNames = { fun: '재미', heart: '마음' } as const;
+const segmentLabels: Record<'fun' | 'heart', readonly [string, string, string, string, string]> = {
+  fun: ['심심함', '슬슬 재밌음', '재밌음', '푹 빠짐', '시간 가는 줄 모름'],
+  heart: ['아직 낯섦', '마음이 가는 중', '가까워짐', '깊어짐', '마음이 닿음'],
+};
+const mean = (scores: Scores, metrics: readonly string[]) => metrics.length ? metrics.reduce((sum, metric) => sum + (scores[metric] ?? 0), 0) / metrics.length : 0;
+/** A character judged on segments: its fun and heart scores (0-100 each, the mean of their metrics). */
+export function relationshipSegments(config: RelationshipConfig, scores: Scores) {
+  return config.segments ? { fun: Math.round(mean(scores, config.segments.fun)), heart: Math.round(mean(scores, config.segments.heart)) } : undefined;
+}
+const segmentTotal = (config: RelationshipConfig, scores: Scores) => config.segments ? mean(scores, config.segments.fun) + mean(scores, config.segments.heart) : 0;
 
 export const clampScore = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 const roundHalfAway = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
@@ -83,14 +94,16 @@ export function applyDecay(record: RelationshipRecord, config: RelationshipConfi
 
 export function initialMood(config: RelationshipConfig): Mood { return { ...config.initialMood }; }
 
-const meets = (scores: Scores, condition: StageCondition) =>
+const meets = (scores: Scores, condition: StageCondition, config: RelationshipConfig) =>
   Object.entries(condition.min ?? {}).every(([metric, value]) => (scores[metric] ?? 0) >= (value ?? 0))
-  && Object.entries(condition.max ?? {}).every(([metric, value]) => (scores[metric] ?? 0) <= (value ?? 100));
+  && Object.entries(condition.max ?? {}).every(([metric, value]) => (scores[metric] ?? 0) <= (value ?? 100))
+  && (condition.total === undefined || segmentTotal(config, scores) >= condition.total);
 function holdCondition(config: RelationshipConfig, index: number): StageCondition {
   const stage = enabledStages(config)[index];
   if (stage.hold) return stage.hold;
   const band = relationshipSettings.hysteresisBand;
-  return { min: Object.fromEntries(Object.entries(stage.enter.min ?? {}).map(([metric, value]) => [metric, (value ?? 0) - band])), max: stage.enter.max };
+  // A total over two segments keeps the stage down to a band and a half below its entry.
+  return { min: Object.fromEntries(Object.entries(stage.enter.min ?? {}).map(([metric, value]) => [metric, (value ?? 0) - band])), max: stage.enter.max, ...(stage.enter.total !== undefined ? { total: stage.enter.total - band * 1.5 } : {}) };
 }
 
 export type TurnInput = { record: RelationshipRecord; config: RelationshipConfig; mood: Mood; events: unknown; hasUserTurn: boolean; now: Date };
@@ -182,16 +195,19 @@ export function evaluateStage(config: RelationshipConfig, record: RelationshipRe
   let index = Math.max(0, stages.findIndex(stage => stage.id === record.stage));
   let pending = { ...record.pending };
   let change: TurnLog['stageChange'] = null;
-  const holds = (i: number) => i === 0 || meets(scores, holdCondition(config, i));
-  if (!holds(index)) {
+  const holds = (i: number) => i === 0 || meets(scores, holdCondition(config, i), config);
+  // Judged on segments, one lie moves the total less than a single bar used to move: a severe event takes the stage down
+  // as soon as the total is below the stage's own line, not only below the hold line.
+  const keeps = (i: number) => holds(i) && !(severe && config.segments && i > 0 && !meets(scores, stages[i].enter, config));
+  if (!keeps(index)) {
     if (severe) {
-      while (index > 0 && !holds(index)) index--;
+      while (index > 0 && !keeps(index)) index--;
       pending = { direction: null, turns: 0 }; change = 'demoted';
     } else if (meaningful) {
       pending = { direction: 'down', turns: pending.direction === 'down' ? pending.turns + 1 : 1 };
       if (pending.turns >= settings.demotionStabilityTurns) { index--; pending = { direction: null, turns: 0 }; change = 'demoted'; }
     }
-  } else if (index + 1 < stages.length && meets(scores, stages[index + 1].enter) && !severe) {
+  } else if (index + 1 < stages.length && meets(scores, stages[index + 1].enter, config) && !severe) {
     if (userTurn) {
       pending = { direction: 'up', turns: pending.direction === 'up' ? pending.turns + 1 : 1 };
       if (pending.turns >= settings.promotionStabilityTurns) { index++; pending = { direction: null, turns: 0 }; change = 'promoted'; }
@@ -239,8 +255,9 @@ export function metricName(config: RelationshipConfig, metric: string) {
   return config.uniqueMetrics.find(item => item.id === metric)?.name ?? commonNames[metric] ?? metric;
 }
 
-/** How close the scores are to a stage's entry: the mean share of each minimum reached (0-1). */
-function stageProgress(scores: Scores, condition: StageCondition) {
+/** How close the scores are to a stage's entry: the mean share of each minimum reached, or of the total (0-1). */
+function stageProgress(scores: Scores, condition: StageCondition, config: RelationshipConfig) {
+  if (condition.total !== undefined) return Math.round(Math.min(1, segmentTotal(config, scores) / condition.total) * 100) / 100;
   const minimums = Object.entries(condition.min ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0);
   if (!minimums.length) return 1;
   const share = minimums.reduce((sum, [metric, value]) => sum + Math.min(1, (scores[metric] ?? 0) / value), 0) / minimums.length;
@@ -271,8 +288,9 @@ export function describeRelationship(record: RelationshipRecord, config: Relatio
   return {
     characterId: config.characterId,
     macroState: { id: stage.id, label: stage.label },
-    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter) : 1 },
-    metrics: Object.fromEntries(relationshipShownMetrics(config).map(metric => [metric, {
+    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter, config) : 1 },
+    // Judged on segments, the card shows the two segments, each with half the next stage's total as its mark.
+    metrics: config.segments ? segmentView(config, record.scores, next?.enter.total) : Object.fromEntries(relationshipShownMetrics(config).map(metric => [metric, {
       name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]), score: record.scores[metric],
       ...(typeof needs[metric] === 'number' && needs[metric]! > 0 ? { need: needs[metric] } : {}),
     }])),
@@ -285,8 +303,25 @@ export function describeRelationship(record: RelationshipRecord, config: Relatio
 }
 
 /** What a saved turn changed, for the chat to show: each accepted event (rising when it raised scores overall), the scores it moved, a stage change. */
+function segmentView(config: RelationshipConfig, scores: Scores, nextTotal?: number) {
+  const segments = relationshipSegments(config, scores)!;
+  return Object.fromEntries((['fun', 'heart'] as const).map(key => [key, {
+    name: segmentNames[key], label: segmentLabels[key][band(segments[key])], score: segments[key],
+    ...(nextTotal ? { need: Math.round(nextTotal / 2) } : {}),
+  }]));
+}
 export function describeTurnChange(log: TurnLog, config: RelationshipConfig): RelationshipChange {
   const metrics = relationshipMetrics(config);
+  // Judged on segments, what a turn changed is shown as the change of each segment.
+  if (config.segments) {
+    const change = (keys: readonly string[]) => Math.round(keys.reduce((sum, metric) => sum + (log.delta[metric] ?? 0), 0) / Math.max(1, keys.length));
+    const delta = Object.fromEntries((['fun', 'heart'] as const).map(key => [key, change(config.segments![key])] as const).filter(([, value]) => value !== 0));
+    return {
+      events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
+        up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
+      delta, stage: log.stageChange,
+    };
+  }
   return {
     events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
       up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
@@ -417,7 +452,10 @@ export function validateRelationshipConfig(config: RelationshipConfig): string[]
   if (new Set(config.stages.map(stage => stage.id)).size !== config.stages.length) problems.push('duplicate stage id');
   for (const stage of config.stages) for (const condition of [stage.enter, stage.hold].filter(Boolean) as StageCondition[]) {
     for (const metric of [...Object.keys(condition.min ?? {}), ...Object.keys(condition.max ?? {})]) if (!metrics.includes(metric)) problems.push(`stages.${stage.id}.${metric}`);
+    if (condition.total !== undefined && !config.segments) problems.push(`stages.${stage.id}.total`);
   }
+  if (config.segments) for (const metric of [...config.segments.fun, ...config.segments.heart]) if (!metrics.includes(metric)) problems.push(`segments.${metric}`);
+  if (config.stages[0]?.enter.total !== undefined) problems.push('first stage must be unconditional');
   if (config.casualFromStage !== undefined && !enabledStages(config).slice(1).some(stage => stage.id === config.casualFromStage)) problems.push('casualFromStage');
   for (const metric of Object.keys(config.decay ?? {})) if (!metrics.includes(metric)) problems.push(`decay.${metric}`);
   for (const id of Object.keys(config.stageRomance ?? {})) if (!config.stages.some(stage => stage.id === id)) problems.push(`stageRomance.${id}`);

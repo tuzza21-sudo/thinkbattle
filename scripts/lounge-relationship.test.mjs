@@ -94,7 +94,8 @@ test('3. stages follow each character\'s own threshold rules, not an average', (
 });
 
 test('3b. once every bar is past its line, the member\'s next replies promote even when they carry no event, and a turn below the line starts over', () => {
-  const config = configs.auditor;
+  // 2026-10-30 it was 서도현; he is judged on segment totals since 2026-11-02, so a character with a line per bar stands in.
+  const config = configs.trickster;
   const entry = config.stages[1].enter.min;
   const ready = withScores(config, Object.fromEntries(Object.entries(entry).map(([metric, value]) => [metric, value])));
   // 2026-10-30: 서도현 at comfort 39/39 and every other bar past its line stayed in the first stage over replies without an event.
@@ -103,7 +104,7 @@ test('3b. once every bar is past its line, the member\'s next replies promote ev
   assert.equal(quiet.record.stage, config.stages[1].id);
   const noReply = processTurn({ record: ready, config, mood: initialMood(config), events: [], hasUserTurn: false, now: later(0) });
   assert.deepEqual(noReply.record.pending, ready.pending, 'a turn without the member (silence, an opening) does not count');
-  const below = run(config, [[], [event('VIOLATES_BOUNDARY')], []], ready);
+  const below = run(config, [[], [event('VIOLATES_BOUNDARY')]], ready);
   assert.equal(below.record.stage, config.stages[0].id, 'dropping below the line starts the count again');
   assert.deepEqual(below.record.pending, { direction: null, turns: 0 });
 });
@@ -140,7 +141,8 @@ test('5. a severe event downgrades immediately', () => {
   assert.equal(logs[0].stageChange, 'demoted');
   assert.notEqual(record.stage, 'DRAWN_IN');
   assert.ok(record.scores.trust < close.scores.trust - 8);
-  const auditor = withScores(configs.auditor, { trust: 52, respect: 60, interest: 70, comfort: 75, openness: 62, resonance: 80, epistemicHonesty: 70 }, 'MUTUAL_TRUST');
+  // Judged on segments, a lie that takes the total below the stage's line takes the stage down at once.
+  const auditor = withScores(configs.auditor, { trust: 60, respect: 70, interest: 70, comfort: 72, openness: 68, resonance: 75, epistemicHonesty: 72 }, 'MUTUAL_TRUST');
   assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
 });
 
@@ -290,20 +292,8 @@ test('the engineer grows on both axes: breaking his manual is the fun, reaching 
   assert.ok(delta('SHOWS_ENTITLEMENT').trust < 0, 'using him costs trust');
   assert.ok(delta('DECEIVES_CHARACTER').epistemicHonesty < 0);
   for (const type of ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'EVADES_QUESTION', 'SEEKS_REASSURANCE_REPEATEDLY']) assert.deepEqual(delta(type), {}, type);
-  const stages = config.stages.map(stage => stage.id);
-  const pace = sequence => {
-    const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
-    return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
-  };
-  const nerve = ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT'];
-  const heart = ['ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL'];
-  const both = nerve.flatMap((type, i) => [type, heart[i % heart.length]]);
-  const [nerveSecond, nerveThird] = pace(nerve), heartPace = pace(heart);
-  assert.ok(nerveSecond > 0 && nerveThird === 0, 'breaking his manual alone stops at the second stage');
-  assert.ok(heartPace.every(turn => turn > 0), `reaching him alone gets there, slowly: ${heartPace}`);
-  const bothPace = pace(both);
-  assert.ok(bothPace[0] <= 12 && bothPace[1] <= 45 && bothPace[2] <= 95, `both: ${bothPace}`);
-  assert.ok(bothPace.every((turn, index) => turn < heartPace[index]), `both before reaching him alone: ${bothPace} / ${heartPace}`);
+  assertSegmentPace(config, ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT'],
+    ['ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
   const page = charactersLib.loungeCharacters.find(character => character.id === 'auditor');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
@@ -413,20 +403,8 @@ test('the reporter is a friend of three years: banter and crossing the friends\'
   // Friends of three years: 반말 at every stage, and trust and ease already up.
   for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'casual', stage.id);
   assert.ok(createRelationship(config).scores.trust >= 50 && createRelationship(config).scores.comfort >= 60);
-  const stages = config.stages.map(stage => stage.id);
-  const pace = sequence => {
-    const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
-    return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
-  };
-  const banter = ['MAKES_WITTY_RESPONSE', 'TAKES_JOKE_WELL', 'CHALLENGES_CHARACTER', 'CALLS_BLUFF', 'MAKES_CHARACTER_ADMIT'];
-  const heart = ['REMEMBERS_DETAIL', 'SHOWS_CARE', 'FLIRTS_PLAYFULLY', 'SHARES_FEELING'];
-  const both = banter.flatMap((type, i) => [type, heart[i % heart.length]]);
-  // Either way gets there (the member asked for it on 2026-11-02); banter alone is the slowest.
-  for (const [name, sequence] of [['banter', banter], ['heart', heart], ['both', both]]) {
-    const turns = pace(sequence);
-    assert.ok(turns.every(turn => turn > 0) && turns[2] <= 95, `${name}: ${turns}`);
-  }
-  assert.ok(pace(both)[0] <= 12 && pace(heart)[0] <= 12, 'the second stage comes quickly once the line is crossed');
+  assertSegmentPace(config, ['MAKES_WITTY_RESPONSE', 'TAKES_JOKE_WELL', 'CHALLENGES_CHARACTER', 'CALLS_BLUFF', 'MAKES_CHARACTER_ADMIT'],
+    ['REMEMBERS_DETAIL', 'SHOWS_CARE', 'FLIRTS_PLAYFULLY', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
   const page = charactersLib.loungeCharacters.find(character => character.id === 'diplomat');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
@@ -642,21 +620,30 @@ test('pace: a warm conversation reaches the second stage within about 12 turns, 
   }
 });
 
-test('강무진 needs both nerve and heart to grow close: nerve alone stops at the second stage, heart alone is slow, both are the fastest', () => {
-  const config = configs.closer;
-  const stages = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
+// A character judged on two segments (2026-11-02): playing for fun alone, for heart alone and both together each reach
+// the closest stage within 95 turns, the second stage comes within about 12, and both together are never slower at the end.
+function assertSegmentPace(config, nerve, heart) {
+  assert.ok(config.segments, `${config.characterId} is judged on segments`);
+  const stages = config.stages.map(stage => stage.id);
   const pace = sequence => {
     const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
     return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
   };
-  const nerve = ['CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT'];
-  const heart = ['ANSWERS_DIRECTLY', 'SHOWS_CARE', 'KEEPS_PROMISE'];
   const both = nerve.flatMap((type, i) => [type, heart[i % heart.length]]);
-  const [nerveSecond, nerveThird] = pace(nerve), heartPace = pace(heart), bothPace = pace(both);
-  assert.ok(nerveSecond > 0 && nerveThird === 0, `nerve alone: ${pace(nerve)}`);
-  assert.ok(heartPace.every(turn => turn > 0), `heart alone still gets there: ${heartPace}`);
-  assert.ok(bothPace[0] <= 12 && bothPace[1] <= 45 && bothPace[2] <= 95, `both: ${bothPace}`);
-  assert.ok(bothPace.every((turn, index) => turn < heartPace[index]), `both before heart alone: ${bothPace} / ${heartPace}`);
+  const [nervePace, heartPace, bothPace] = [pace(nerve), pace(heart), pace(both)];
+  for (const [name, turns] of [['fun', nervePace], ['heart', heartPace], ['both', bothPace]]) assert.ok(turns.every(turn => turn > 0) && turns[0] <= 12 && turns[2] <= 95, `${config.characterId} ${name}: ${turns}`);
+  assert.ok(bothPace[2] <= Math.min(nervePace[2], heartPace[2]), `${config.characterId} both never slower at the end: ${bothPace} / ${nervePace} / ${heartPace}`);
+  // The card shows the two segments, each marked at half the next stage's total.
+  const view = describeRelationship(createRelationship(config), config);
+  assert.deepEqual(Object.keys(view.metrics), ['fun', 'heart']);
+  assert.equal(view.metrics.fun.name, '재미');
+  assert.equal(view.metrics.heart.need, Math.round(config.stages[1].enter.total / 2));
+}
+
+test('강무진 grows close either way, by nerve or by heart, and fastest by both', () => {
+  const config = configs.closer;
+  assertSegmentPace(config, ['CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT'],
+    ['ANSWERS_DIRECTLY', 'SHOWS_CARE', 'KEEPS_PROMISE', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
   // Folding or waffling only bores him a little; trust is untouched.
   assert.deepEqual(run(config, [[event('FOLDS_EASILY')]]).logs[0].delta, { interest: -1 });
   assert.deepEqual(run(config, [[event('WAFFLES')]]).logs[0].delta, { interest: -1 });

@@ -14,7 +14,11 @@ export type EventEffect = {
   deltas: Partial<Record<string, number>>;
   mood?: Partial<Mood>;
 };
-export type StageCondition = { min?: Partial<Record<string, number>>; max?: Partial<Record<string, number>> };
+export type StageCondition = {
+  min?: Partial<Record<string, number>>; max?: Partial<Record<string, number>>;
+  /** With `segments`: the fun and heart scores added together (0-200) are at least this. */
+  total?: number;
+};
 export type StageRule = {
   id: string;
   label: string;
@@ -43,6 +47,12 @@ export type RelationshipConfig = {
    * at relationshipSettings.offListWeight. Absent, every event counts in full as before.
    */
   mainEvents?: readonly RelationshipEventType[];
+  /**
+   * Two segments the stages are judged on (2026-11-02): fun (interest and the character's playful metric) and heart (the
+   * rest). Each is the mean of its metrics (0-100), and a stage asks for their sum (`enter.total`), so either way of
+   * playing gets there and both together get there first. The metrics themselves still move and still reach the reply.
+   */
+  segments?: { fun: readonly string[]; heart: readonly string[] };
   /** Ordered from the first stage to the closest. The first stage has no conditions. */
   stages: readonly StageRule[];
   responseHints: readonly string[];
