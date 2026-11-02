@@ -2492,6 +2492,11 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   assert.equal(turn(3, { intimacyProposal: 'elegant' }).explicit, bible.adultMode.explicit, 'a graceful proposal at the third stage reaches it');
   assert.equal(turn(4, { adultMode: false }).explicit, undefined);
   assert.equal(turn(4, { sincereRefusal: true }).explicit, undefined, 'never in a turn the member said no');
+  // 2026-11-02: at the top step a crude reading of the request used to add "아무것도 열지 않는다" next to the explicit rule, and she refused.
+  assert.equal(turn(4, { intimacyProposal: 'crude' }).explicit, bible.adultMode.explicit);
+  assert.equal(turn(4, { intimacyProposal: 'crude' }).proposal, undefined, 'nothing is left to open, so nothing tells her to refuse');
+  assert.match(turn(2, { intimacyProposal: 'crude' }).proposal, /아무것도 열지 않는다/, 'below the top step a crude request still opens nothing');
+  assert.match(bible.adultMode.explicit, /노골적인 말을 무례한 접근으로 보지 않는다/);
   const auditor = charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible;
   assert.equal(messengerLib.loungeTurnConditions({ bible: auditor, stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy, undefined);
   for (const limit of ['미성년', '강요·비동의', '실존 인물', '그 자리에서 멈추고']) assert.ok(bible.adultMode.explicit.includes(limit), limit);

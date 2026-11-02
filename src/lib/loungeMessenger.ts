@@ -242,6 +242,7 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
   const proposal = input.sincereRefusal ? 'none' : input.intimacyProposal;
   const intimacy = stage && bible?.intimacyLadder ? effectiveIntimacyStage({ state, stage, turn: input.turn, proposal }) : undefined;
   const intimacyLevel = intimacy?.level as 1 | 2 | 3 | 4 | undefined;
+  const adultExplicit = Boolean(input.adultMode && bible?.adultMode && intimacyLevel === 4 && !input.sincereRefusal);
   const [last, before] = [...state.reactions].reverse();
   const avoid = {
     ...(last && last === before ? { reaction: last } : {}),
@@ -264,9 +265,10 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
       now: bible!.intimacyLadder![intimacyLevel],
       ...(intimacyLevel > stage ? { opened: '상대가 품위 있게 먼저 제안해 이번 장면에 한해 한 단계 열렸다. 스킨십도 이 단계만큼 받아들이되 선은 네가 정한다.' } : {}),
       ...(proposal === 'elegant' && bible?.intimacyProposal ? { proposal: `방금 상대가 품위 있게 먼저 다가왔다. 허락과 받아치기를 함께 한다. 이 단계의 결: ${bible.intimacyProposal.elegant.byStage[stage]}` } : {}),
-      ...(proposal === 'crude' && bible?.intimacyProposal ? { proposal: `방금 요구는 무례했다. 아무것도 열지 않는다. ${bible.intimacyProposal.crude.response}` } : {}),
-      // Adult mode (test accounts): told directly only at the closest step, never in a turn the member said no.
-      ...(input.adultMode && bible?.adultMode && intimacyLevel === 4 && !input.sincereRefusal ? { explicit: bible.adultMode.explicit } : {}),
+      // Adult mode (test accounts): told directly only at the closest step, never in a turn the member said no. There is
+      // nothing left to open there, so a crude reading of the request must not tell her to refuse it (2026-11-02: it did).
+      ...(adultExplicit && bible?.adultMode ? { explicit: bible.adultMode.explicit } : {}),
+      ...(proposal === 'crude' && bible?.intimacyProposal && !adultExplicit ? { proposal: `방금 요구는 무례했다. 아무것도 열지 않는다. ${bible.intimacyProposal.crude.response}` } : {}),
     } } : {}),
     ...(level ? { inner_voice_level: { level: level.level, ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' ? { belief } : {}),
