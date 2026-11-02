@@ -43,7 +43,7 @@ test('one-to-one speech starts polite for everyone; every character that turns c
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
   assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer'], 'no other character stays polite for good');
-  // 윤지안 and the member are friends of ten years: 반말 from the start (2026-11-02), checked in her own test.
+  // 윤지안 and the member are friends of three years: 반말 from the start (2026-11-02), checked in her own test.
   for (const config of Object.values(configs).filter(item => !item.casualFromStart)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
@@ -396,8 +396,9 @@ test('the listening and reframing events still leave out the characters not buil
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
 });
 
-test('the reporter is a friend of ten years: banter and crossing the friends\' line both bring her closer, in 반말 from the start', () => {
-  // Her bible of 2026-11-02: the member is her friend of ten years; what grows is the spark she will not check.
+test('the reporter is a friend of three years: banter and crossing the friends\' line each bring her all the way, in 반말 from the start', () => {
+  // Her bible of 2026-11-02: the member is a friend she met through work three years ago; what grows is the spark she
+  // will not check.
   const config = configs.diplomat;
   assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_IMPRESSION', 'GOOD_CHEMISTRY', 'FLUTTERING', 'SOMEONE_SPECIAL']);
   assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['banter', 'spark']);
@@ -409,7 +410,7 @@ test('the reporter is a friend of ten years: banter and crossing the friends\' l
   assert.ok(delta('DECEIVES_CHARACTER').trust < 0 && delta('FLATTERS_CHARACTER').interest < 0 && delta('REPEATS_SELF').interest < 0);
   assert.ok(delta('VIOLATES_BOUNDARY').spark < 0 && delta('VIOLATES_BOUNDARY').trust < 0);
   assert.deepEqual(delta('PROVIDES_EVIDENCE'), {});
-  // Old friends: 반말 at every stage, and trust and ease already up.
+  // Friends of three years: 반말 at every stage, and trust and ease already up.
   for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'casual', stage.id);
   assert.ok(createRelationship(config).scores.trust >= 50 && createRelationship(config).scores.comfort >= 60);
   const stages = config.stages.map(stage => stage.id);
@@ -420,11 +421,12 @@ test('the reporter is a friend of ten years: banter and crossing the friends\' l
   const banter = ['MAKES_WITTY_RESPONSE', 'TAKES_JOKE_WELL', 'CHALLENGES_CHARACTER', 'CALLS_BLUFF', 'MAKES_CHARACTER_ADMIT'];
   const heart = ['REMEMBERS_DETAIL', 'SHOWS_CARE', 'FLIRTS_PLAYFULLY', 'SHARES_FEELING'];
   const both = banter.flatMap((type, i) => [type, heart[i % heart.length]]);
-  assert.ok(pace(banter)[0] > 0 && pace(banter)[2] === 0, `banter alone never reaches the closest: ${pace(banter)}`);
-  for (const [name, sequence] of [['heart', heart], ['both', both]]) {
+  // Either way gets there (the member asked for it on 2026-11-02); banter alone is the slowest.
+  for (const [name, sequence] of [['banter', banter], ['heart', heart], ['both', both]]) {
     const turns = pace(sequence);
-    assert.ok(turns[0] <= 12 && turns[1] <= 45 && turns[2] <= 95, `${name}: ${turns}`);
+    assert.ok(turns.every(turn => turn > 0) && turns[2] <= 95, `${name}: ${turns}`);
   }
+  assert.ok(pace(both)[0] <= 12 && pace(heart)[0] <= 12, 'the second stage comes quickly once the line is crossed');
   const page = charactersLib.loungeCharacters.find(character => character.id === 'diplomat');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
