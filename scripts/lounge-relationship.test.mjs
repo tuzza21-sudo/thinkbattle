@@ -42,8 +42,9 @@ test('one-to-one speech starts polite for everyone; every character that turns c
     if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
-  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage).map(config => config.characterId), ['auditor', 'closer'], 'no other character stays polite for good');
-  for (const config of Object.values(configs)) {
+  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer'], 'no other character stays polite for good');
+  // 윤지안 and the member are friends of ten years: 반말 from the start (2026-11-02), checked in her own test.
+  for (const config of Object.values(configs).filter(item => !item.casualFromStart)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
     stageIds.forEach((id, index) => {
@@ -395,28 +396,37 @@ test('the listening and reframing events still leave out the characters not buil
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.lawyer, [[event(type)]]).logs[0].delta, {}, `lawyer ${type}`);
 });
 
-test('the reporter grows by banter and a spark, and the closeness comes with the stage', () => {
+test('the reporter is a friend of ten years: banter and crossing the friends\' line both bring her closer, in 반말 from the start', () => {
+  // Her bible of 2026-11-02: the member is her friend of ten years; what grows is the spark she will not check.
   const config = configs.diplomat;
   assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_IMPRESSION', 'GOOD_CHEMISTRY', 'FLUTTERING', 'SOMEONE_SPECIAL']);
   assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['banter', 'spark']);
   const delta = type => run(config, [[event(type)]]).logs[0].delta;
-  // A joke answered with a better one builds banter; playful interest in her builds the spark.
-  assert.equal(delta('MAKES_WITTY_RESPONSE').banter, 4);
+  assert.equal(delta('MAKES_WITTY_RESPONSE').interest, 4);
   assert.equal(delta('FLIRTS_PLAYFULLY').spark, 4);
-  assert.ok(delta('SHARES_FEELING').spark > 0 && delta('SHOWS_VULNERABILITY').spark > 0);
-  // A lie or empty praise costs her; a pushed boundary costs the spark and the trust at once.
-  assert.ok(delta('DECEIVES_CHARACTER').trust < 0 && delta('FLATTERS_CHARACTER').respect < 0);
-  assert.ok(delta('REMEMBERS_DETAIL').spark > 0 && delta('APPRECIATES_SINCERELY').spark > 0);
+  assert.equal(delta('MAKES_CHARACTER_ADMIT').openness, 4);
+  assert.equal(delta('REMEMBERS_DETAIL').comfort, 4);
+  assert.ok(delta('DECEIVES_CHARACTER').trust < 0 && delta('FLATTERS_CHARACTER').interest < 0 && delta('REPEATS_SELF').interest < 0);
   assert.ok(delta('VIOLATES_BOUNDARY').spark < 0 && delta('VIOLATES_BOUNDARY').trust < 0);
-  // A lively, playful conversation reaches the second stage (and the casual speech) without any evidence.
-  const lively = [['MAKES_WITTY_RESPONSE'], ['SHOWS_CURIOSITY'], ['MAKES_CREATIVE_JOKE'], ['ASKS_GOOD_QUESTION'], ['TAKES_JOKE_WELL'], ['FLIRTS_PLAYFULLY'], ['MAKES_WITTY_RESPONSE'], ['SHARES_FEELING'], ['PLAYS_ALONG'], ['MAKES_CREATIVE_JOKE'], ['ASKS_GOOD_QUESTION'], ['TAKES_JOKE_WELL'], ['MAKES_WITTY_RESPONSE'], ['KEEPS_PROMISE']];
-  const reached = run(config, lively.map(types => types.map(type => event(type))));
-  assert.ok(['GOOD_CHEMISTRY', 'FLUTTERING'].includes(reached.record.stage), reached.record.stage);
-  // The same turns spent arguing with evidence do not.
-  assert.equal(run(config, Array.from({ length: 14 }, () => [event('PROVIDES_EVIDENCE')])).record.stage, 'FIRST_IMPRESSION');
-  assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: 'FLUTTERING' }, config, initialMood(config)).speech_level, 'casual');
-  assert.ok(config.stages.find(stage => stage.id === 'FLUTTERING').hint.includes('불편해하면 즉시 멈춘다'));
-  assert.ok(config.stages.find(stage => stage.id === 'SOMEONE_SPECIAL').hint.includes('현실에서 만나자는 약속, 독점, 질투는 하지 않고'));
+  assert.deepEqual(delta('PROVIDES_EVIDENCE'), {});
+  // Old friends: 반말 at every stage, and trust and ease already up.
+  for (const stage of config.stages) assert.equal(relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).speech_level, 'casual', stage.id);
+  assert.ok(createRelationship(config).scores.trust >= 50 && createRelationship(config).scores.comfort >= 60);
+  const stages = config.stages.map(stage => stage.id);
+  const pace = sequence => {
+    const { logs } = run(config, Array.from({ length: 95 }, (_, i) => [event(sequence[i % sequence.length])]));
+    return [1, 2, 3].map(index => logs.findIndex(log => stages.indexOf(log.stageAfter) >= index) + 1);
+  };
+  const banter = ['MAKES_WITTY_RESPONSE', 'TAKES_JOKE_WELL', 'CHALLENGES_CHARACTER', 'CALLS_BLUFF', 'MAKES_CHARACTER_ADMIT'];
+  const heart = ['REMEMBERS_DETAIL', 'SHOWS_CARE', 'FLIRTS_PLAYFULLY', 'SHARES_FEELING'];
+  const both = banter.flatMap((type, i) => [type, heart[i % heart.length]]);
+  assert.ok(pace(banter)[0] > 0 && pace(banter)[2] === 0, `banter alone never reaches the closest: ${pace(banter)}`);
+  for (const [name, sequence] of [['heart', heart], ['both', both]]) {
+    const turns = pace(sequence);
+    assert.ok(turns[0] <= 12 && turns[1] <= 45 && turns[2] <= 95, `${name}: ${turns}`);
+  }
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'diplomat');
+  assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
 });
 
 test('the detective grows by candour and steadiness, never by being questioned, and speaks politely until the third stage', () => {

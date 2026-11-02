@@ -297,6 +297,7 @@ export function describeTurnChange(log: TurnLog, config: RelationshipConfig): Re
 
 /** How the character addresses the user in a one-to-one room at this stage. */
 export function speechLevel(config: RelationshipConfig, stageId: string): 'polite' | 'casual' {
+  if (config.casualFromStart) return 'casual';
   if (!config.casualFromStage) return 'polite';
   const stages = enabledStages(config);
   const from = stages.findIndex(item => item.id === config.casualFromStage);
