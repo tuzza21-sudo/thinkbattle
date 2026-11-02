@@ -2503,6 +2503,10 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   assert.match(lifted, /turn\.intimacy\.explicit가 있을 때만/);
   assert.match(lifted, /미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 어떤 경우에도 하지 않는다/);
   assert.match(lifted, /상대가 멈추자고 하면 바로 멈춘다/);
+  // Nothing in the closest step's text may still tell her to cut away or to keep to metaphor, unless the rule is absent.
+  for (const sentence of lifted.split(/(?<=[.。])\s+/)) {
+    if (/장면을 끊|시간을 건너뛰|은유와 암시로|은유와 행동으로 받|묘사하지 않/.test(sentence)) assert.match(sentence, /turn\.intimacy\.explicit가 (있으면|없으면|없을 때|있을 때)|없으면|건너뛰지 않고/, sentence);
+  }
   // Through the handler: only a listed account gets the lifted rules, and the turn says when.
   const saved = process.env.LOUNGE_ADULT_MODE_USERS;
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ADULT_MODE_USERS; else process.env.LOUNGE_ADULT_MODE_USERS = saved; });

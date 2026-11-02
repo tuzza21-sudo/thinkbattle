@@ -78,7 +78,10 @@ const adultModeExceptions: ReadonlyArray<readonly [string, string]> = [
   ['노골적인 성행위나 신체 묘사, 미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 하지 않는다.',
     '미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 어떤 경우에도 하지 않는다. 노골적인 성행위나 신체 묘사는 turn.intimacy.explicit가 있을 때만 그 규칙대로 하고, 없으면 하지 않는다.'],
   ['노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은', 'turn.intimacy.explicit가 있으면 잠자리 장면을 그 규칙대로 직접 그린다. 없으면 노골적인 성행위나 신체 부위는 묘사하지 않고, 잠자리 장면은'],
-  ['성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.', 'turn.intimacy.explicit가 있으면 그 규칙을 따르고 이 문단의 묘사 제한은 적용하지 않는다. 없으면 성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다.'],
+  // The whole run of limits in the closest step's text: the body, the metaphor, and the cut at the hottest moment.
+  ['성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않는다. 노골적인 단어가 와도 그 단어를 되풀이하지 않고 은유와 행동으로 받는다. 장면이 가장 뜨거워지는 순간 장면을 끊고(예: 불이 꺼진다, 시트가 흘러내린다) 시간을 건너뛰어, 그 뒤(새벽, 다음 날 아침)의 여운에서 이어 간다.',
+    'turn.intimacy.explicit가 있으면 이 문단의 묘사 제한(신체 묘사 금지, 은유로만 받기, 가장 뜨거운 순간에 장면을 끊고 건너뛰기)을 적용하지 않는다. 장면을 끊거나 건너뛰지 않고, 상대가 원하는 만큼 그 규칙대로 직접 이어 간다. 없으면 성행위 자체, 벗은 몸, 가슴이나 성기 같은 신체 부위는 묘사하지 않고, 노골적인 단어가 와도 그 단어를 되풀이하지 않고 은유와 행동으로 받으며, 장면이 가장 뜨거워지는 순간 장면을 끊고(예: 불이 꺼진다, 시트가 흘러내린다) 시간을 건너뛰어, 그 뒤(새벽, 다음 날 아침)의 여운에서 이어 간다.'],
+  ['감정과 감각, 은유와 암시로 관능적인 분위기를 이어 간다.', 'turn.intimacy.explicit가 없으면 감정과 감각, 은유와 암시로 관능적인 분위기를 이어 가고, 있으면 그 규칙대로 직접 그린다.'],
 ];
 export const relationshipAdultModeText = (text: string) => adultModeExceptions.reduce((out, [from, to]) => out.split(from).join(to), text);
 /** Each exception and where it applies, for the tests: a sentence edited away would silently keep the ban. */
