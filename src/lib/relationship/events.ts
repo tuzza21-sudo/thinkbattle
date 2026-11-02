@@ -16,6 +16,9 @@ export const relationshipEventTypes = [
   // (강무진 first). Only the characters that list them react; the others stay as they were.
   'CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT',
   'FOLDS_EASILY', 'WAFFLES',
+  // Lead (2026-11-02): following a character who leads, taking up her invitation, and the classless advance she turns away
+  // (선우령 first).
+  'FOLLOWS_LEAD', 'MAKES_BOLD_MOVE', 'MAKES_CRUDE_ADVANCE',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
 /**
@@ -80,6 +83,9 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   MAKES_CHARACTER_ADMIT: { description: '캐릭터가 숨기는 패배·감정·실수를 인정하라고 장난스럽게 몰아붙임(예: "방금 진 거죠? 졌다고 해 봐요"). 비난하거나 조롱하며 강요하는 것은 해당하지 않음', severity: 'normal', importance: 0.6 },
   FOLDS_EASILY: { description: '직전 캐릭터 발언의 장난 섞인 압박에 버티지 않고 바로 굴복함(예: "네네 시키는 대로 할게요"). 진심으로 거절하거나 지쳐서 선을 긋는 말은 해당하지 않음', severity: 'normal', importance: 0.3 },
   WAFFLES: { description: '선택을 요구받았는데 계속 결정을 미룸(예: "음… 아무거나요… 잘 모르겠어요"). 정말 모르는 것을 물었거나 지쳐 보이면 해당하지 않음', severity: 'normal', importance: 0.3 },
+  FOLLOWS_LEAD: { description: '직전 캐릭터 발언의 지시·제안을 여유 있게 기꺼이 따름(예: "알겠어요. 여기 앉으면 되죠? 대신 이유는 나중에 알려 줘요"). 겁먹고 매달리듯 따르는 것은 FOLDS_EASILY', severity: 'normal', importance: 0.5 },
+  MAKES_BOLD_MOVE: { description: '캐릭터의 초대에 망설임 없이 자신 있게 응하거나, 더 가까운 관계나 상대가 이끄는 놀이를 품위 있게 먼저 제안함(예: "있어요. 들어갈게요", "령 씨가 리드하는 거, 한번 겪어 보고 싶은데요"). 저급하거나 몸을 품평하는 말은 MAKES_CRUDE_ADVANCE', severity: 'meaningful', importance: 0.6 },
+  MAKES_CRUDE_ADVANCE: { description: '품위 없이 노골적으로 들이댐: 몸을 품평하거나 저급한 성적인 말로 요구함. 가벼운 플러팅, 성적 농담, 품위 있는 대담한 제안은 해당하지 않음. 캐릭터가 선을 그은 뒤 되풀이하면 VIOLATES_BOUNDARY', severity: 'meaningful', importance: 0.7 },
 };
 
 /**
@@ -147,6 +153,9 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   MAKES_CHARACTER_ADMIT: { deltas: {} },
   FOLDS_EASILY: { deltas: {} },
   WAFFLES: { deltas: {} },
+  FOLLOWS_LEAD: { deltas: {} },
+  MAKES_BOLD_MOVE: { deltas: {} },
+  MAKES_CRUDE_ADVANCE: { deltas: {} },
 };
 
 /** The short name a member sees when one of their messages counted for or against the relationship (the chat's status card). */
@@ -165,4 +174,5 @@ export const relationshipEventLabels: Record<RelationshipEventType, string> = {
   SHOWS_CARE: '챙겨 줌', REMEMBERS_DETAIL: '기억해 줌', PLAYS_ALONG: '이야기에 함께 빠져듦', APPRECIATES_SINCERELY: '진심으로 알아봐 줌',
   CALLS_BLUFF: '허세를 간파함', COUNTER_THREAT: '역으로 맞받아침', STANDS_GROUND: '겁먹지 않고 버팀', RAISES_STAKES: '판을 키워 역제안함',
   CHALLENGES_CHARACTER: '내기를 걺', MAKES_CHARACTER_ADMIT: '인정하게 만듦', FOLDS_EASILY: '바로 물러섬', WAFFLES: '결정을 미룸',
+  FOLLOWS_LEAD: '여유 있게 따름', MAKES_BOLD_MOVE: '자신 있게 다가감', MAKES_CRUDE_ADVANCE: '무례하게 들이댐',
 };

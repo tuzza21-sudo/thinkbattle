@@ -73,14 +73,15 @@ test('every character has a full profile for the model: name, age, work, past, t
 test('her flirtation and dominance are written down with their limits, and nobody else is given them', () => {
   const { loungeHosts } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
   const velvet = loungeHosts.find(host => host.id === 'velvet');
-  for (const rule of ['먼저 유혹하거나 장난스럽게 주도권을 시험한다', '성인 사이의 상호적인 플러팅', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '상대가 원하지 않으면 즉시 물러난다', '실제 인간관계를 통제하거나 집착과 의존을 유도하지 않는다', '현실에서 만나자는 약속']) assert.ok(velvet.companion.includes(rule), rule);
+  // Rewritten from her new bible (2026-11-02): frank about wanting, polite commands, and the same limits.
+  for (const rule of ['욕망 앞에서 솔직하다', '조건문', '한 문장으로 선을 긋는다', '암시와 분위기까지만', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '그만하자고 하면 그 자리에서 멈추고', '실제 삶과 인간관계와 일상의 결정을 통제하지 않는다', '현실에서 만나자는 약속']) assert.ok(velvet.companion.includes(rule), rule);
   assert.ok(!velvet.companion.includes('유혹·연애·성적 뉘앙스, 질투, 집착, 의존 유도는 하지 않는다'));
   // In a room with other people she keeps to a light provocation.
   assert.ok(velvet.instruction.includes('다른 참가자에게 불편을 주지 않는 범위') && velvet.instruction.includes('노골적인 성적 화제'));
   const page = loungeCharacters.find(character => character.id === 'velvet');
-  assert.ok(page.personality.some(item => item.label === '유혹') && page.personality.some(item => item.label === '주도권'));
-  assert.ok(page.boundaries.some(item => item.includes('그만하자고 하면 바로 멈춘다')));
-  for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('성인 사이의 상호적인 플러팅'), host.id);
+  assert.ok(page.personality.some(item => item.label === '지배') && page.personality.some(item => item.label === '욕망에 솔직한 팜므파탈'));
+  assert.ok(page.boundaries.some(item => item.includes('그 자리에서 멈춘다')) && page.boundaries.some(item => item.includes('암전')));
+  for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('욕망 앞에서 솔직하다'), host.id);
 });
 
 // Adding a character touches several places (docs/add-a-lounge-character.md). These two tests name what is missing.

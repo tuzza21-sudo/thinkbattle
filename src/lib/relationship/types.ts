@@ -62,6 +62,8 @@ export type RelationshipConfig = {
   casualFromStage?: string;
   /** One-to-one speech is casual (banmal) from the first stage: the two are old friends (윤지안, 2026-11-02). */
   casualFromStart?: boolean;
+  /** The first stage's distance (relationship.reserve) in this character's own terms, for one who leads from the start (선우령, 2026-11-02). */
+  firstStageReserve?: string;
   /** One-to-one rooms only: the character may flirt with the adult user, with suggestive tension and mild sexual undertones but nothing explicit. Without it the shared rule forbids romantic and sexual play. */
   adultFlirtation?: boolean;
   /** With `adultFlirtation`: how far this character lets romantic tension show at each stage (stage id to guidance). Sent to the response model beside the stage hint, so the same permission looks different at the first stage and the closest. */

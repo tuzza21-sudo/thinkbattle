@@ -421,7 +421,7 @@ export function relationshipPromptContext(record: RelationshipRecord, config: Re
   const stages = enabledStages(config);
   const stage = stages.find(item => item.id === record.stage) ?? config.stages[0];
   return {
-    ...(stages.indexOf(stage) <= 0 ? { reserve: relationshipFirstStageReserve } : {}),
+    ...(stages.indexOf(stage) <= 0 ? { reserve: config.firstStageReserve ?? relationshipFirstStageReserve } : {}),
     outing: relationshipOutingGuidance(Math.max(0, stages.indexOf(stage)), stages.length),
     intimacy: relationshipIntimacyGuidance(Math.max(0, stages.indexOf(stage)), Boolean(config.adultFlirtation)),
     ...(config.stageDisclosure ? { self_disclosure: relationshipDisclosure(config, Math.max(0, stages.indexOf(stage))) } : {}),

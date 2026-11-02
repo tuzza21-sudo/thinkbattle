@@ -35,14 +35,14 @@ test('every shipped character configuration is valid and starts from its configu
 });
 
 test('one-to-one speech starts polite for everyone; every character that turns casual does so at its third stage (2026-10-30)', () => {
-  // 서도현 and 강무진 stay polite to the end, as their bibles have it (2026-11-02).
-  const casualStage = { auditor: undefined, closer: undefined, velvet: 'RESPECTFULLY_ENGAGED', trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER', jaeseok: 'SAME_SCREEN', lawyer: 'DEFENSE_TABLE', guide: 'STAGE_3' };
+  // 서도현, 강무진 and 선우령 stay polite to the end, as their bibles have it (2026-11-02).
+  const casualStage = { auditor: undefined, closer: undefined, velvet: undefined, trickster: 'SPARRING_BUDDY', diplomat: 'FLUTTERING', ina: 'FLUTTER', jaeseok: 'SAME_SCREEN', lawyer: 'DEFENSE_TABLE', guide: 'STAGE_3' };
   const fromTemplates = relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: 'c_test', displayName: '테스트', core: ['a', 'b'], flirtation: true }));
   for (const config of [...Object.values(configs), ...fromTemplates]) {
     if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
-  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer'], 'no other character stays polite for good');
+  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer', 'velvet'], 'no other character stays polite for good');
   // 윤지안 and the member are friends of three years: 반말 from the start (2026-11-02), checked in her own test.
   for (const config of Object.values(configs).filter(item => !item.casualFromStart)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
@@ -72,7 +72,7 @@ test('2. the same event produces different deltas for each character', () => {
   // Off 서도현's and 강무진's own lists, an event's gain counts at half (2026-11-02).
   assert.deepEqual(deltas.auditor, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.closer, { trust: 1, respect: 1 });
-  assert.deepEqual(deltas.velvet, { trust: 4, respect: 3, poise: 2 });
+  assert.deepEqual(deltas.velvet, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.trickster, { trust: 2, comfort: 1 });
   const care = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('SHOWS_CARE')]]).logs[0].delta]));
   assert.deepEqual(care.auditor, { resonance: 4, comfort: 3, trust: 2 });
@@ -82,15 +82,16 @@ test('2. the same event produces different deltas for each character', () => {
 });
 
 test('3. stages follow each character\'s own threshold rules, not an average', () => {
-  const config = configs.velvet;
+  // 선우령 until 2026-11-02; she is judged on segment totals since, so a character with a line per bar stands in.
+  const config = configs.trickster;
   // A high average without the specific metrics does not unlock the stage.
-  const lopsided = withScores(config, { trust: 95, respect: 95, comfort: 95, openness: 95, poise: 95, interest: 40, intrigue: 30 });
-  assert.equal(run(config, [[event('SHOWS_CURIOSITY')], [event('ASKS_GOOD_QUESTION')], [event('SHOWS_CARE')]], lopsided).record.stage, 'DISMISSIVE');
-  const ready = withScores(config, { intrigue: 55, interest: 55 });
+  const lopsided = withScores(config, { trust: 95, respect: 95, comfort: 95, openness: 95, bounceback: 95, interest: 40, playfulness: 30 });
+  assert.equal(run(config, [[event('SHOWS_CURIOSITY')], [event('ASKS_GOOD_QUESTION')], [event('SHOWS_CARE')]], lopsided).record.stage, 'AUDIENCE');
+  const ready = withScores(config, { playfulness: 60, interest: 60 });
   const { record, logs } = run(config, [[event('SHOWS_CARE')], [event('SHOWS_CARE')], [event('ASKS_GOOD_QUESTION')]], ready);
-  assert.deepEqual(logs.map(log => log.stageAfter), ['DISMISSIVE', 'INTRIGUED', 'INTRIGUED'], 'two turns in a row with the conditions met');
+  assert.deepEqual(logs.map(log => log.stageAfter), ['AUDIENCE', 'BANTER_PARTNER', 'BANTER_PARTNER'], 'two turns in a row with the conditions met');
   assert.equal(logs[1].stageChange, 'promoted');
-  assert.equal(record.stage, 'INTRIGUED');
+  assert.equal(record.stage, 'BANTER_PARTNER');
 });
 
 test('3b. once every bar is past its line, the member\'s next replies promote even when they carry no event, and a turn below the line starts over', () => {
@@ -110,37 +111,42 @@ test('3b. once every bar is past its line, the member\'s next replies promote ev
 });
 
 test('4. hysteresis: oscillating around a threshold neither promotes nor flips the stage each turn', () => {
-  const config = configs.velvet;
-  // DISMISSIVE -> INTRIGUED needs intrigue at its entry line (and interest). Intrigue oscillates around it.
-  const line = config.stages[1].enter.min.intrigue;
-  let record = withScores(config, { intrigue: line - 3, interest: 70 });
+  const config = configs.trickster;
+  // AUDIENCE -> BANTER_PARTNER needs interest at its entry line (and playfulness). Interest oscillates around it.
+  const line = config.stages[1].enter.min.interest;
+  let record = withScores(config, { interest: line - 3, playfulness: 70 });
   let mood = initialMood(config);
   const sequence = [['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE']];
   const stages = sequence.map((types, i) => {
     const result = processTurn({ record, config, mood, events: types.map(type => event(type)), hasUserTurn: true, now: later(i) });
-    record = result.record; mood = result.mood; return [record.scores.intrigue, record.stage];
+    record = result.record; mood = result.mood; return [record.scores.interest, record.stage];
   });
-  assert.ok(stages.some(([score]) => score >= line) && stages.some(([score]) => score < line), 'intrigue crosses the entry line in both directions');
-  assert.ok(stages.every(([, stage]) => stage === 'DISMISSIVE'), JSON.stringify(stages));
+  assert.ok(stages.some(([score]) => score >= line) && stages.some(([score]) => score < line), 'interest crosses the entry line in both directions');
+  assert.ok(stages.every(([, stage]) => stage === 'AUDIENCE'), JSON.stringify(stages));
   // Dropping slightly below the entry line keeps the stage until the hold line is lost for several turns.
-  const entry = config.stages[2].enter.min;
-  const engaged = withScores(configs.velvet, { respect: entry.respect + 1, interest: entry.interest + 1, intrigue: entry.intrigue + 1, trust: 30 }, 'RESPECTFULLY_ENGAGED');
-  const dip = run(configs.velvet, [[event('FLATTERS_CHARACTER')]], engaged);
+  const lawyer = configs.lawyer;
+  const entry = lawyer.stages[2].enter.min;
+  const engaged = withScores(lawyer, { trust: entry.trust + 1, respect: entry.respect, directness: entry.directness + 1, consistency: entry.consistency + 1 }, 'DEFENSE_TABLE');
+  const dip = run(lawyer, [[event('FLATTERS_CHARACTER')]], engaged);
   assert.ok(dip.record.scores.respect < entry.respect);
-  assert.equal(dip.record.stage, 'RESPECTFULLY_ENGAGED', 'a small dip below the entry line keeps the stage');
-  const slide = run(configs.velvet, Array.from({ length: 5 }, () => [event('SHOWS_ENTITLEMENT'), event('REPEATS_SELF')]), engaged);
+  assert.equal(dip.record.stage, 'DEFENSE_TABLE', 'a small dip below the entry line keeps the stage');
+  const slide = run(lawyer, Array.from({ length: 5 }, () => [event('BREAKS_PROMISE')]), engaged);
   assert.deepEqual(slide.logs.map(log => log.stageAfter).filter((stage, i, all) => i === 0 || stage !== all[i - 1]).length <= 2, true, 'no flip-flopping');
-  assert.equal(slide.record.stage, 'INTRIGUED', 'a sustained decline eventually steps down one stage');
+  assert.equal(slide.record.stage, 'CREDIBLE_STATEMENT', 'a sustained decline eventually steps down one stage');
 });
 
 test('5. a severe event downgrades immediately', () => {
-  const config = configs.velvet;
-  // Trust a little above the closest stage's line; one pushed boundary takes it below the hold line at once.
-  const close = withScores(config, { intrigue: 75, respect: 68, interest: 74, trust: config.stages.find(stage => stage.id === 'DRAWN_IN').enter.min.trust + 3 }, 'DRAWN_IN');
-  const { record, logs } = run(config, [[event('VIOLATES_BOUNDARY', 0.95)]], close);
+  const config = configs.lawyer;
+  // Trust a little above the closest stage's line; one lie takes it below the hold line at once.
+  const closest = config.stages.find(stage => stage.id === 'CO_COUNSEL').enter.min;
+  const close = withScores(config, { trust: closest.trust + 3, respect: closest.respect + 2, directness: closest.directness + 2, consistency: closest.consistency + 2, comfort: closest.comfort + 2 }, 'CO_COUNSEL');
+  const { record, logs } = run(config, [[event('DECEIVES_CHARACTER', 0.95)]], close);
   assert.equal(logs[0].stageChange, 'demoted');
-  assert.notEqual(record.stage, 'DRAWN_IN');
+  assert.notEqual(record.stage, 'CO_COUNSEL');
   assert.ok(record.scores.trust < close.scores.trust - 8);
+  // 선우령 at her closest stage: one pushed boundary takes the total below its line.
+  const drawn = withScores(configs.velvet, { interest: 75, intrigue: 75, poise: 70, trust: 45, comfort: 40, respect: 50, openness: 35 }, 'DRAWN_IN');
+  assert.notEqual(run(configs.velvet, [[event('VIOLATES_BOUNDARY', 0.95)]], drawn).record.stage, 'DRAWN_IN');
   // Judged on segments, a lie that takes the total below the stage's line takes the stage down at once.
   const auditor = withScores(configs.auditor, { trust: 60, respect: 70, interest: 70, comfort: 72, openness: 68, resonance: 75, epistemicHonesty: 72 }, 'MUTUAL_TRUST');
   assert.notEqual(run(configs.auditor, [[event('DECEIVES_CHARACTER', 0.9)]], auditor).record.stage, 'MUTUAL_TRUST');
@@ -162,8 +168,7 @@ test('7. repeated behaviour has diminishing returns and cannot be farmed', () =>
   assert.deepEqual(answers.logs.map(log => log.delta.epistemicHonesty ?? 0), [4, 2, 1, 0, 0]);
   assert.deepEqual(answers.logs.slice(3).map(log => log.ignored.map(item => item.reason)), [['diminished'], ['diminished']]);
   const praise = run(configs.velvet, Array.from({ length: 6 }, () => [event('FLATTERS_CHARACTER')]));
-  assert.ok(praise.record.scores.intrigue < createRelationship(configs.velvet).scores.intrigue, 'flattery lowers her intrigue');
-  assert.ok(praise.record.scores.respect < createRelationship(configs.velvet).scores.respect);
+  assert.ok(praise.record.scores.interest < createRelationship(configs.velvet).scores.interest, 'flattery cools her interest');
   // After the window passes, the same behaviour counts again.
   const spaced = run(configs.auditor, [[event('ANSWERS_DIRECTLY')], ...Array.from({ length: 8 }, () => [event('SHOWS_CURIOSITY')]), [event('ANSWERS_DIRECTLY')]]);
   assert.equal(spaced.logs.at(-1).delta.epistemicHonesty, 4);
@@ -336,8 +341,9 @@ test('romantic tension opens stage by stage: the first stage never starts it, th
   assert.deepEqual(validateRelationshipConfig(configs.velvet), []);
   const velvetFirst = relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).stage;
   assert.equal(velvetFirst.id, 'DISMISSIVE');
-  assert.ok(velvetFirst.romance.includes('거절한다') && velvetFirst.romance.includes('먼저 유혹하지 않고'));
-  assert.ok(run(configs.velvet, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta.intrigue > 0, 'a flirt she turns down still intrigues her');
+  // 2026-11-02: she lays the table first with words and looks, and keeps her heart; a classless advance gets one line.
+  assert.ok(velvetFirst.romance.includes('마음은 내주지 않는다') && velvetFirst.romance.includes('한 문장으로 선을 긋는다'));
+  assert.ok(run(configs.velvet, [[event('FLIRTS_PLAYFULLY')]]).logs[0].delta.interest > 0, 'a flirt at her own heat interests her');
   assert.ok(validateRelationshipConfig({ ...configs.closer, stageRomance: { NOPE: 'x' } }).includes('stageRomance.NOPE'));
   assert.ok(validateRelationshipConfig({ ...configs.closer, adultFlirtation: false }).includes('stageRomance needs adultFlirtation'));
   // The instruction tells the model to follow it and keeps a group room to light play.
@@ -463,20 +469,21 @@ test('important events become memories; the prompt receives a small selection wi
 });
 
 test('the user-facing view shows the stage and scores for the status card, and history only to a developer', () => {
-  const config = configs.velvet;
-  const record = withScores(config, { trust: 42, intrigue: 85 });
+  // 선우령 until 2026-11-02; a character with a line per bar shows every bar.
+  const config = configs.lawyer;
+  const record = withScores(config, { trust: 42, directness: 85 });
   const view = describeRelationship(record, config);
   assert.equal(view.metrics.trust.label, '믿어 보는 중'); assert.equal(view.metrics.trust.score, 42);
   // Progress is the mean share of each of the next stage's minimums reached (intrigue is past its line here).
   const next = Object.entries(config.stages[1].enter.min);
   const share = next.reduce((sum, [metric, value]) => sum + Math.min(1, record.scores[metric] / value), 0) / next.length;
-  assert.deepEqual({ ...view.stage, line: undefined }, { index: 0, total: 4, line: undefined, next: '흥미를 느낌', progress: Math.round(share * 100) / 100 });
-  assert.equal(describeRelationship(withScores(config, {}, 'DRAWN_IN'), config).stage.progress, 1, 'the last stage is full');
+  assert.deepEqual({ ...view.stage, line: undefined }, { index: 0, total: 4, line: undefined, next: '믿기 시작한 사이', progress: Math.round(share * 100) / 100 });
+  assert.equal(describeRelationship(withScores(config, {}, 'CO_COUNSEL'), config).stage.progress, 1, 'the last stage is full');
   assert.equal(view.stage.line, config.stages[0].line);
-  assert.equal(view.metrics.intrigue.label, '사로잡힘'); assert.equal(view.debug, undefined);
-  assert.equal(view.macroState.id, 'DISMISSIVE');
+  assert.equal(view.metrics.directness.label, '숨김없음'); assert.equal(view.debug, undefined);
+  assert.equal(view.macroState.id, 'WITNESS');
   const debug = describeRelationship(record, config, { debug: true });
-  assert.equal(debug.metrics.trust.score, 42); assert.equal(debug.debug.scores.intrigue, 85);
+  assert.equal(debug.metrics.trust.score, 42); assert.equal(debug.debug.scores.directness, 85);
 });
 
 test('long absences lower interest a little but never trust or respect', () => {
@@ -670,4 +677,22 @@ test('every character is guarded at its first stage, and only there', () => {
     assert.equal(relationshipPromptContext({ ...record, stage: next.id }, config, initialMood(config)).reserve, undefined, `${config.characterId} past it`);
     assert.doesNotMatch(config.stageRomance?.[config.stages[0].id] ?? '', /설레게 한다/, `${config.characterId} does not set out to flutter at the first stage`);
   }
+});
+
+test('선우령 grows close on fun and heart whichever way is played; following with ease is not folding, and a crude advance costs interest and trust', () => {
+  const config = configs.velvet;
+  assertSegmentPace(config, ['FOLLOWS_LEAD', 'SHOWS_COMPOSURE', 'FLIRTS_PLAYFULLY', 'CALLS_BLUFF', 'CHALLENGES_CHARACTER', 'MAKES_BOLD_MOVE'],
+    ['RESPECTS_BOUNDARY', 'APPRECIATES_SINCERELY', 'KEEPS_PROMISE', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'velvet');
+  assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
+  assert.ok(run(config, [[event('FOLLOWS_LEAD')]]).logs[0].delta.intrigue > 0, 'following her with ease');
+  for (const type of ['FOLDS_EASILY', 'WAFFLES']) assert.ok(run(config, [[event(type)]]).logs[0].delta.interest < 0, type);
+  const crude = run(config, [[event('MAKES_CRUDE_ADVANCE')]], withScores(config, { trust: 40, interest: 60 })).logs[0];
+  assert.ok(crude.delta.interest < 0 && crude.delta.trust < 0);
+  assert.notEqual(crude.stageChange, 'demoted', 'a crude advance is not a crossed line');
+  const bold = run(config, [[event('MAKES_BOLD_MOVE')]]).logs[0].delta;
+  assert.ok(bold.intrigue > 0 && bold.interest > 0);
+  // The others do not react to her events.
+  for (const type of ['FOLLOWS_LEAD', 'MAKES_BOLD_MOVE', 'MAKES_CRUDE_ADVANCE']) assert.deepEqual(run(configs.trickster, [[event(type)]]).logs[0].delta, {}, type);
+  assert.match(relationship.relationshipEventInstructionsFor(config), /몸을 품평하거나 저급한 말로 들이대는 것은 MAKES_CRUDE_ADVANCE/);
 });

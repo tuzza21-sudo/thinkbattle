@@ -1191,10 +1191,11 @@ test('the relationship endpoint returns the stage, labels and scores to players,
     }, async () => { body = await (await handler(request({ action: 'relationship', roomId }))).json(); }), developer ? { LOUNGE_RELATIONSHIP_DEBUG_USERS: 'other@x.com, dev@example.com' } : {});
     if (!owner || capacity !== 1) { assert.deepEqual(body, { enabled: false }); continue; }
     assert.equal(body.relationship.macroState.id, 'INTRIGUED');
-    assert.equal(body.relationship.macroState.label, '흥미를 느낌');
-    assert.equal(body.relationship.metrics.trust.label, '조심스러움');
-    assert.equal(body.relationship.metrics.trust.score, 30, 'the status card draws every score as a bar');
-    assert.equal(body.relationship.stage.index, 1); assert.equal(body.relationship.stage.total, 4); assert.equal(body.relationship.stage.next, '인정하는 상대');
+    assert.equal(body.relationship.macroState.label, '규칙을 받은 상대');
+    // 선우령 is judged on two segments since 2026-11-02: the card draws fun and heart.
+    assert.deepEqual(Object.keys(body.relationship.metrics), ['fun', 'heart']);
+    assert.equal(body.relationship.metrics.heart.score, 26, 'the status card draws every score as a bar');
+    assert.equal(body.relationship.stage.index, 1); assert.equal(body.relationship.stage.total, 4); assert.equal(body.relationship.stage.next, '벌을 미루는 상대');
     assert.ok(body.relationship.stage.progress > 0 && body.relationship.stage.progress < 1);
     assert.equal(Boolean(body.relationship.debug), developer);
     if (developer) { assert.equal(body.relationship.debug.mood.amusement, 40); assert.equal(body.relationship.debug.version, 4); }
@@ -2387,6 +2388,35 @@ test('the director sets a fast-model chat reply\'s direction beside the analyzer
     assert.deepEqual(JSON.parse(reply.input).direction, works ? direction : undefined);
     assert.match(reply.instructions, /direction이 있으면 이번 턴을 위해 미리 정한 방향이다/);
   }
+});
+
+test('선우령: a graceful proposal opens her intimacy ladder one step in that place for six turns, and a crude one never does', () => {
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'velvet');
+  const bible = page.bible;
+  const scene = { location: '호텔 라운지 바', scene_type: '바', activity: '', time_of_day: '밤', season: '', objects: [] };
+  const base = { ...messengerLib.normalizeLoungeCompanionState(null, 'room-1'), scene };
+  const conditions = (state, turn) => messengerLib.loungeTurnConditions({ bible, stage: 1, state, turn, decision: { progress: 'stay' }, innerVoice: 'on' });
+  assert.equal(conditions(base, 3).intimacy.now, bible.intimacyLadder[1]);
+  assert.equal(conditions(base, 3).intimacy.opened, undefined);
+  assert.equal(conditions(base, 3).dominance, bible.dominanceLadder[1]);
+  const next = (state, turn, boldMove, location = scene.location) => messengerLib.nextLoungeCompanionState({ state, update: { scene: { ...scene, location } }, decision: { progress: 'stay' }, turn, reply: '앉아요.', inner: '', ...(boldMove ? { boldMove: { stage: 1 } } : {}) });
+  const opened = next(base, 3, true);
+  assert.deepEqual(opened.intimacy_boost, { level: 2, turn: 3, location: scene.location });
+  assert.equal(conditions(opened, 4).intimacy.now, bible.intimacyLadder[2]);
+  assert.ok(conditions(opened, 4).intimacy.opened);
+  assert.deepEqual(next(opened, 5, true).intimacy_boost, opened.intimacy_boost, 'asking again in the same scene opens no more');
+  assert.equal(conditions(opened, 10).intimacy.now, bible.intimacyLadder[1], 'six turns later it closes');
+  assert.equal(next(opened, 4, false, '그녀의 차').intimacy_boost, undefined, 'another place closes it');
+  assert.equal(next(base, 3, false).intimacy_boost, undefined, 'nothing opens without a proposal');
+  assert.deepEqual(messengerLib.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(opened)), 'room-1').intimacy_boost, opened.intimacy_boost, 'kept in storage');
+  // A character without the ladders gets neither line.
+  const auditor = charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible;
+  const plain = messengerLib.loungeTurnConditions({ bible: auditor, stage: 1, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' });
+  assert.equal(plain.intimacy, undefined); assert.equal(plain.dominance, undefined);
+  // Her sheet tells her how to answer a proposal; her places are scene kinds the engine knows.
+  const sheet = charactersLib.loungeCompanionSheetPrompt(page, 'on');
+  assert.match(sheet, /품위 있게 제안하면/); assert.match(sheet, /무례하게 요구하면/);
+  for (const event of bible.sceneEvents) for (const type of event.sceneTypes ?? []) assert.ok(messengerLib.loungeSceneTypes.includes(type), `${event.id}: ${type}`);
 });
 
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {

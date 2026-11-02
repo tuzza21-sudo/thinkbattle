@@ -122,7 +122,7 @@ export const loungeReading = (analysis: LoungeAnalysis) => Object.fromEntries(Ob
 }).filter(([, value]) => value !== ''));
 
 // ── The scene and the turn's record, kept per member and character (voice_lounge_companion_state) ──
-export const loungeSceneTypes = ['식당', '카페', '바', '외출', '이동', '회사', '집', '기타'] as const;
+export const loungeSceneTypes = ['식당', '카페', '바', '외출', '이동', '회사', '집', '갤러리', '수영장', '기타'] as const;
 export type LoungeScene = { location: string; scene_type: string; activity: string; time_of_day: string; season: string; objects: string[] };
 export type LoungeCompanionState = {
   /** The room the per-conversation parts belong to; a new room (처음부터 하기) starts them again. */
@@ -135,6 +135,8 @@ export type LoungeCompanionState = {
   last_exception_turn?: number;
   shared: Array<{ what: string; turn: number }>;
   self_facts: Array<{ fact: string; turn: number }>;
+  /** The step the intimacy ladder was opened to by the member's graceful proposal, in that place, from that turn. */
+  intimacy_boost?: { level: number; turn: number; location: string };
 };
 const strings = (value: unknown, max: number, length = 80) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim().slice(0, length)).slice(-max) : [];
 const turnNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -160,8 +162,20 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     reactions: strings(value.reactions, 3, 20), phrases: strings(value.phrases, 6, 40), anchors: strings(value.anchors, 6, 60), inner: strings(value.inner, 3, 200),
     last_exception_turn: turnNumber(value.last_exception_turn),
     shared: listed<{ what: string; turn: number }>(value.shared, 'what', 12), self_facts: listed<{ fact: string; turn: number }>(value.self_facts, 'fact', 20),
+    ...(readBoost(value.intimacy_boost) ? { intimacy_boost: readBoost(value.intimacy_boost) } : {}),
   };
 }
+function readBoost(value: unknown) {
+  const boost = value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+  const level = turnNumber(boost?.level), turn = turnNumber(boost?.turn);
+  return level !== undefined && turn !== undefined && typeof boost?.location === 'string' ? { level, turn, location: boost.location } : undefined;
+}
+/** A proposal opens the ladder for six turns, in the place it was made. */
+const boostTurns = 6;
+const activeBoost = (state: LoungeCompanionState, turn: number) => {
+  const boost = state.intimacy_boost;
+  return boost && turn - boost.turn <= boostTurns && state.scene?.location === boost.location ? boost : undefined;
+};
 
 export type LoungeSceneDecision = { progress: 'stay' | 'small_step' | 'transition'; target?: string; event?: LoungeSceneEvent };
 /**
@@ -199,6 +213,8 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
   const level = stage && input.innerVoice === 'on' ? bible?.innerVoice?.ladder[stage] : undefined;
   const turning = bible?.innerVoice?.turningPoint;
   const belief = stage === 4 && turning ? `${turning.moment} ${turning.newBelief}` : bible?.innerVoice?.initialBelief;
+  // How near she may come: the stage's step, or one more for a while after a graceful proposal.
+  const intimacyLevel = stage && bible?.intimacyLadder ? Math.min(4, Math.max(stage, activeBoost(state, input.turn)?.level ?? 0)) as 1 | 2 | 3 | 4 : undefined;
   const [last, before] = [...state.reactions].reverse();
   const avoid = {
     ...(last && last === before ? { reaction: last } : {}),
@@ -216,6 +232,8 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(stage && bible?.ruleBreak ? { rule_break: { rule: bible.ruleBreak.rule, now: bible.ruleBreak.byStage[stage] } } : {}),
     ...(stage && bible?.relationshipLadder ? { relationship_reaction: bible.relationshipLadder[stage] } : {}),
     ...(stage && bible?.pressureLadder ? { pressure: bible.pressureLadder[stage] } : {}),
+    ...(stage && bible?.dominanceLadder ? { dominance: bible.dominanceLadder[stage] } : {}),
+    ...(stage && intimacyLevel ? { intimacy: { now: bible!.intimacyLadder![intimacyLevel], ...(intimacyLevel > stage ? { opened: '상대가 품위 있게 먼저 제안해 이번 장면에 한해 한 단계 열렸다. 스킨십도 이 단계만큼 받아들이되 선은 네가 정한다.' } : {}) } } : {}),
     ...(level ? { inner_voice_level: { level: level.level, ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' ? { belief } : {}),
     exception_allowed: input.turn - (state.last_exception_turn ?? -99) >= 3,
@@ -249,9 +267,13 @@ const actionLine = /^[ \t]*\(([^()\n]+)\)[ \t]*$/;
 export const loungeReplyActions = (text: string) => text.split('\n').map(line => actionLine.exec(line)?.[1]?.trim()).filter((action): action is string => Boolean(action));
 const uniqueTail = (items: readonly string[], max: number) => [...new Set([...items].reverse())].reverse().slice(-max);
 /** The state after a turn: the scene the call after the reply wrote, the event that came, what was used. */
-export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string }): LoungeCompanionState {
+export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number } }): LoungeCompanionState {
   const { state, update, decision, turn } = input;
   const scene = readScene(update?.scene);
+  // A graceful proposal opens one step in this place; asking again while it is open opens no more.
+  const place = (scene ?? state.scene)?.location;
+  const held = activeBoost(state, turn) && place === state.intimacy_boost?.location ? state.intimacy_boost : undefined;
+  const boost = held ?? (input.boldMove && place && input.boldMove.stage < 4 ? { level: input.boldMove.stage + 1, turn, location: place } : undefined);
   const moved = scene && (!state.scene || scene.location !== state.scene.location);
   const reaction = loungeReactionKinds.find(kind => kind === update?.reaction_type);
   const facts = strings(update?.self_facts, 2, 40).filter(fact => !state.self_facts.some(item => item.fact === fact));
@@ -269,6 +291,7 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     ...(update?.exception_formula_used === true ? { last_exception_turn: turn } : {}),
     shared: shared ? [...state.shared, { what: shared, turn }].slice(-12) : state.shared,
     self_facts: [...state.self_facts, ...facts.map(fact => ({ fact, turn }))].slice(-20),
+    intimacy_boost: boost,
   };
 }
 

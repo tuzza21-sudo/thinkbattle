@@ -1058,7 +1058,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     const saveCompanion = async (answer: AfterReply | undefined, reply: string) => {
       if (!companionStored || !companionState || !sceneDecision || !serviceHeaders) return;
       const { reply: said, inner } = splitLoungeInnerVoice(reply);
-      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner });
+      // A graceful proposal to a character with a proposal rule opens her intimacy ladder a step in this place.
+      const boldMove = character?.bible?.intimacyProposal && stageNumber && Array.isArray(answer?.events)
+        && answer.events.some(event => (event as { type?: unknown })?.type === 'MAKES_BOLD_MOVE' && Number((event as { confidence?: unknown })?.confidence ?? 1) >= 0.6) ? { stage: stageNumber } : undefined;
+      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, boldMove });
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: user.id, character_id: host.id, state, updated_at: new Date().toISOString() }) });
         console.info('[Lounge companion]', JSON.stringify({ host: host.id, saved: response.ok, scene: state.scene?.location ?? null, sceneTurns: state.scene_turns, ...(sceneDecision.event ? { event: sceneDecision.event.id } : {}), reaction: state.reactions.at(-1) ?? null }));
