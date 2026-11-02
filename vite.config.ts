@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
     'SUPABASE_SERVICE_ROLE_KEY',
     // Lounge switches: the developer panel for relationships and the kill switch for long-term memory.
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
+    // Adult mode for test accounts only (emails or user ids): the closest step of a character that has it is told directly.
+    'LOUNGE_ADULT_MODE_USERS',
     'LOUNGE_LONG_MEMORY',
     'LOUNGE_KNOWLEDGE',
     'LOUNGE_KNOWLEDGE_CACHE_MS',
