@@ -4,8 +4,8 @@
 // it sends to the model is exactly what a member's reply sends: the instructions, the relationship, the story's episode,
 // the memory. That request is then sent again to each model with only `model` and the reasoning effort changed. The
 // replies, the time and the tokens are printed and saved. Needs OPENAI_API_KEY in .env.local; each run costs a few cents.
-//   --florence: 한지오 in Florence (a messenger chat since 2026-11-01); the director is really asked, and its direction and
-//   time are printed. --only=<text> runs only the scenes whose name contains it (e.g. --only=0 for the opening).
+//   --florence: 한지오 in Florence (a messenger chat since 2026-11-01); the analyzer is really asked (engine v4, 2026-11-02),
+//   and its reading and time are printed. --only=<text> runs only the scenes whose name contains it (e.g. --only=0 for the opening).
 import dotenv from 'dotenv';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -131,7 +131,7 @@ const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster
     .map(([said, before], index) => ({ host, name: `${host} ${index + 1}`, memory, row: firstRow, scenario: null, chat: [['human', said], ['host', before]] }));
 });
 
-let directorMs;
+let analyzerMs;
 // With --room=<id>, the member's last turns in a real room are replayed with what that room really had: the messages
 // before each turn, the summary, the relationship and the long-term memories (2026-11-01, 선우령 had drifted out of
 // character over 205 turns). --turns=N picks how many, --before=<ISO time> where to stop, and --scene="지금 장면: …"
@@ -158,7 +158,7 @@ async function roomScenes(id) {
 
 async function capture(scene) {
   let reply;
-  directorMs = undefined;
+  analyzerMs = undefined;
   const memberName = scene.memberName ?? (scene.host ? '지수' : '나');
   const messages = scene.messages ?? scene.chat.map(([kind, text], index) => ({ id: 100 - index, user_id: kind === 'human' ? 'user-1' : null, nickname: kind === 'human' ? memberName : scene.host === 'guide' ? '한지오' : '선우령', kind, text, created_at: new Date().toISOString() }));
   const saved = { ...process.env }, originalFetch = globalThis.fetch;
@@ -178,15 +178,15 @@ async function capture(scene) {
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: memberName, last_seen: '' }]);
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_after_reply') return modelAnswer({ memory: scene.memory, events: [], memory_ops: [], story_checkpoints: [], story_facts: [], story_choice: '' });
-    // The director (a one-to-one chat since 2026-11-01) is really asked, so the reply request carries its direction.
-    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') {
-      if (saved.SAVE_DIRECTOR) writeFileSync(`${saved.SAVE_DIRECTOR}-${scene.name.replace(/[^\w가-힣]+/g, '_')}.json`, init.body);
+    // The analyzer (a one-to-one chat, engine v4) is really asked, so the reply request carries its reading and the turn.
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') {
+      if (saved.SAVE_ANALYZER) writeFileSync(`${saved.SAVE_ANALYZER}-${scene.name.replace(/[^\w가-힣]+/g, '_')}.json`, init.body);
       const started = performance.now();
       const answer = await originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
-      directorMs = Math.round(performance.now() - started);
+      analyzerMs = Math.round(performance.now() - started);
       return answer;
     }
-    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '*고개를 든다* 네.' }); }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '(고개를 든다)\n네.', inner_voice: '' }); }
     return result(true);
   };
   try {
@@ -208,7 +208,9 @@ async function ask(request, model, effort) {
   const ms = Math.round(performance.now() - started);
   if (!response.ok) return { model, effort, error: (json.error?.message ?? response.status).toString().slice(0, 160), ms };
   const out = json.output?.flatMap(item => item.content ?? []).find(part => part.type === 'output_text')?.text;
-  let text = '', read; try { ({ text, read } = JSON.parse(out)); } catch { text = out ?? ''; }
+  let text = '', read, inner; try { ({ text, read, inner_voice: inner } = JSON.parse(out)); } catch { text = out ?? ''; }
+  // A chat's inner voice (engine v4) is shown below the reply, as the page shows it.
+  if (inner) text = `${text}\n[속마음] ${inner}`;
   return { model, effort, ms, text, ...(read ? { read } : {}), inTokens: json.usage?.input_tokens, outTokens: json.usage?.output_tokens, cached: json.usage?.input_tokens_details?.cached_tokens, reasoningTokens: json.usage?.output_tokens_details?.reasoning_tokens };
 }
 
@@ -240,8 +242,8 @@ ${JSON.stringify(JSON.parse(request.input), null, 1)}`);
   const said = scene.chat[0]?.[1] ?? '(첫 인사)';
   report.push({ scene: scene.name, host: scene.host ?? 'velvet', user: said, chat: scene.chat, memory: scene.memory, ...(scene.original ? { original: scene.original } : {}), runs });
   console.log(`\n=== ${scene.name}\n나: ${said}${scene.original ? `\n(원래 답) ${scene.original.replace(/\n+/g, ' ')}` : ''}`);
-  const direction = JSON.parse(request.input).direction;
-  if (directorMs !== undefined) console.log(`(director ${directorMs}ms) ${direction ? JSON.stringify(direction) : 'no direction'}`);
+  const { reading, turn } = JSON.parse(request.input);
+  if (analyzerMs !== undefined) console.log(`(analyzer ${analyzerMs}ms) ${reading ? JSON.stringify(reading) : 'no reading'}${turn ? ` turn ${JSON.stringify({ progress: turn.progress, event: turn.event?.content, stage: turn.stage })}` : ''}`);
   for (const run of runs) console.log(`\n[${run.model}:${run.effort}] ${run.ms}ms in ${run.inTokens ?? '-'} (cached ${run.cached ?? '-'}) out ${run.outTokens ?? '-'}${run.reasoningTokens ? ` (reasoning ${run.reasoningTokens})` : ''}${run.read ? `\n(read) ${run.read}` : ''}\n${run.error ? `ERROR ${run.error}` : run.text}`);
 }
 if (dryRows.length) {

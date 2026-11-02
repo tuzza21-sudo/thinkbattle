@@ -104,3 +104,38 @@ test('no character is shipped with the placeholders scripts/new-lounge-character
     assert.doesNotMatch(readFileSync(path, 'utf8'), /TODO\(새 캐릭터\)/, `${file}: a new character still has TODO(새 캐릭터) to write`);
   }
 });
+
+test('a character with a companion sheet has all of it: the lens, ten actions or more, the inner voice at every stage, and events the engine can use', () => {
+  const { loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const sheetFields = ['interpretationLens', 'actionAnchors', 'innerVoice', 'ruleBreak', 'relationshipLadder', 'fewShot', 'sceneEvents'];
+  const withSheet = loungeCharacters.filter(character => sheetFields.some(field => character.bible?.[field]));
+  // 서도현 is the first (2026-11-02); the others follow one by one.
+  assert.ok(withSheet.some(character => character.id === 'auditor'));
+  for (const { id, bible } of withSheet) {
+    assert.ok(bible.interpretationLens, `${id}: a lens`);
+    assert.ok(bible.actionAnchors?.length >= 10, `${id}: ten actions or more`);
+    assert.ok(bible.innerVoice?.style, `${id}: how the inner voice speaks`);
+    for (const stage of [1, 2, 3, 4]) {
+      assert.ok(bible.innerVoice.ladder[stage]?.level, `${id}: the inner voice at stage ${stage}`);
+      if (bible.ruleBreak) assert.ok(bible.ruleBreak.byStage[stage], `${id}: the rule broken at stage ${stage}`);
+      if (bible.relationshipLadder) assert.ok(bible.relationshipLadder[stage], `${id}: the reaction at stage ${stage}`);
+    }
+    for (const shot of bible.fewShot ?? []) assert.ok(shot.on.reply && shot.off.reply && !/\*/.test(shot.on.reply + shot.off.reply), `${id}: an example with both forms and no stars`);
+    const ids = new Set();
+    for (const event of bible.sceneEvents ?? []) {
+      assert.ok(event.id && !ids.has(event.id) && event.minStage >= 1 && event.minStage <= 4 && event.content, `${id}: event ${event.id}`);
+      ids.add(event.id);
+      if (event.repeatable) assert.ok(event.cooldown >= 6, `${id}: a repeatable event ${event.id} cools down`);
+    }
+    // Shown, the examples carry their inner voices; hidden, the ones written for it and where the thought shows instead.
+    const shown = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'on');
+    const hidden = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'off');
+    assert.match(shown, /속마음의 말투: /);
+    assert.doesNotMatch(shown, /새어 나온다/);
+    if (bible.innerVoice.offModeLeaks?.length) assert.match(hidden, /속마음은 대사와 행동에 이렇게 새어 나온다/);
+    if (bible.fewShot?.length) {
+      assert.ok(shown.includes(JSON.stringify(bible.fewShot[0].on.reply)));
+      assert.ok(hidden.includes(JSON.stringify(bible.fewShot[0].off.reply)));
+    }
+  }
+});

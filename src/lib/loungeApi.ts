@@ -197,7 +197,16 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
-export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine, callStart = false) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}), ...(callStart ? { callStart: true } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine, callStart = false) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}), ...(callStart ? { callStart: true } : {}), ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+/**
+ * Whether a chat shows the character's inner voice below its reply (대화 설정 › 속마음, this browser; shown until hidden).
+ * Hidden, the replies are written without one and the thought shows in what is said and done instead (engine v4).
+ */
+const innerVoiceKey = 'lounge.innerVoice';
+export function loadLoungeInnerVoice(): 'on' | 'off' {
+  try { return localStorage.getItem(innerVoiceKey) === 'off' ? 'off' : 'on'; } catch { return 'on'; }
+}
+export function saveLoungeInnerVoice(value: 'on' | 'off') { try { localStorage.setItem(innerVoiceKey, value); } catch { /* the choice lasts for this page */ } }
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**

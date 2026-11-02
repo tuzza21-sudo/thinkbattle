@@ -1,12 +1,12 @@
 import { loungeMemberPersonaRule, loungeRoomPersona, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
-import { getLoungeCharacter, loungeCharacterRules, loungeBiblePrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
+import { getLoungeCharacter, loungeCharacterRules, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { loungeConversationFocusRule, loungeScenarioDistanceRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeMessengerChat, loungeMessengerRules, readLoungeDirection } from '../src/lib/loungeMessenger';
+import { cleanLoungeCompanionReply, cleanLoungeInnerVoice, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -618,6 +618,12 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       ? fetchTimed(`${url}/rest/v1/lounge_member_personas?user_id=eq.${encodeURIComponent(user.id)}&select=id,title,call_name,job,personality,details,is_default`, { headers: serviceHeaders })
         .then(async response => response.ok ? await readJson<LoungeMemberPersonaRow[]>(response, 'lounge') : []).catch(() => [] as LoungeMemberPersonaRow[])
       : Promise.resolve([] as LoungeMemberPersonaRow[]);
+    // The scene and the turn's record of a one-to-one chat (engine v4), per character; before migration 20261203 there is
+    // none, and every turn starts from the summary's scene line as before.
+    const companionRowsRead = serviceHeaders
+      ? fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?user_id=eq.${encodeURIComponent(user.id)}&select=character_id,state`, { headers: serviceHeaders })
+        .then(async response => response.ok ? await readJson<Array<{ character_id: string; state: unknown }>>(response, 'lounge') : null).catch(() => null)
+      : Promise.resolve(null);
     const previousRoomsRead = serviceHeaders && process.env.LOUNGE_LONG_MEMORY !== 'off'
       ? fetchTimed(`${url}/rest/v1/voice_lounge_rooms?host_id=eq.${encodeURIComponent(user.id)}&or=(capacity.eq.1,space_id.not.is.null)&id=neq.${encodeURIComponent(roomId)}&order=created_at.desc&limit=12&select=host_persona,memory,created_at`, { headers: serviceHeaders })
         .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
@@ -715,26 +721,30 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId)), relationshipConfig, now);
       return { config: relationshipConfig, record, mood: moodFromRoom(relationshipConfig, room.ai_mood), now };
     })() : undefined;
-    // The director (see loungeMessenger.ts) reads the member's latest words while memories and knowledge are looked up,
-    // and sets the turn's direction. It never holds a reply up for long: slow or failed, the reply goes on without it.
-    // Only for the fast model (GPT-6 Luna without reasoning): in a blind comparison of 24 scenes on 2026-11-01 it raised
-    // Luna's replies from 7.46 to 8.29 of 10, and did nothing for GPT-6.1 Terra (8.25 without, 8.17 with), whose
-    // reply would only wait about two seconds longer. LOUNGE_DIRECTOR=on runs it for every model.
-    const directorCharacter = getLoungeCharacter(host.id);
-    const directorStarted = performance.now();
-    const directorModel = getLoungeChatModel(room.ai_model).id === 'gpt' || process.env.LOUNGE_DIRECTOR === 'on';
-    const directorRead = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off'
-      && process.env.LOUNGE_DIRECTOR !== 'off' && directorModel && directorCharacter && messages[0]?.kind === 'human' ? (async () => {
+    // A one-to-one chat (engine v4, see loungeMessenger.ts): the two are together in one place, with a scene kept apart
+    // from the summary and an inner voice apart from what is said.
+    const companionChat = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off';
+    const companionCharacter = getLoungeCharacter(host.id);
+    const companionRows = companionChat ? await companionRowsRead : null;
+    const companionState = companionChat ? normalizeLoungeCompanionState(companionRows?.find(row => row.character_id === host.id)?.state, roomId) : undefined;
+    // Only where it can be kept (the server key and migration 20261203) does the call after the reply write the scene.
+    const companionStored = Boolean(companionState) && Array.isArray(companionRows);
+    // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
+    const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
+    // The analyzer reads the member's latest words and what they do to the scene while memories and knowledge are looked
+    // up, for every model, as the scene and its events depend on it. Slow (3 s) or failed, the scene stays where it is,
+    // nothing happens around the two and the reply reads the member for itself.
+    const analyzerStarted = performance.now();
+    const analyzerRead = companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
         const state = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : undefined;
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
-          model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,
-          // A short summary instead of the whole life story: the director's time is mostly its output, but less to read helps.
-          instructions: [loungeDirectorInstructions, `인물 요약: ${directorCharacter.name}, ${directorCharacter.age}, ${directorCharacter.role}. ${directorCharacter.tagline}`,
-            loungeBiblePrompt(directorCharacter) || `성격: ${directorCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
-          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, speechLevel: state?.speech_level, memory: String(room.memory ?? ''), messages: [...messages].reverse() })),
-          text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
-        }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
-        return readLoungeDirection(JSON.parse(modelOutputText(result) ?? ''));
+          model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: 'lounge-analyzer',
+          instructions: loungeAnalyzerInstructions,
+          input: JSON.stringify(loungeAnalyzerInput({ character: companionCharacter ? `${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}` : host.name, stage: state?.stage.label, scene: companionState.scene, sceneTurns: companionState.scene_turns, memory: String(room.memory ?? ''),
+            messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
+          text: { format: { type: 'json_schema', name: 'lounge_analyzer', strict: true, schema: loungeAnalyzerSchema } },
+        }), undefined, Number(process.env.LOUNGE_ANALYZER_WAIT_MS ?? 3000)), 'openai');
+        return readLoungeAnalysis(JSON.parse(modelOutputText(result) ?? ''));
       })().catch(() => undefined) : undefined;
     // A story is fiction, but the member is a real person playing a role: the character knows what they said about
     // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
@@ -818,8 +828,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       // The relationship's stage texts change only with the stage; its scores, mood and memories after them change often.
       ...(relationship ? { relationship: { ...relationshipSteady, ...relationshipChanging, ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
       first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
-      recent: contextRecent.map(({ created_at: _sent, ...message }, index) => ({ ...message, text: fullHumanMessages.has(contextRecent[index]) ? message.text.slice(0, 1200)
-        : message.text.length > 300 ? `${message.text.slice(0, 150)} … ${message.text.slice(-147)}` : message.text })) };
+      // A character's inner voice, saved with its reply, is read as its own field.
+      recent: contextRecent.map(({ created_at: _sent, ...message }, index) => {
+        const { reply, inner } = message.kind === 'host' ? splitLoungeInnerVoice(message.text) : { reply: message.text, inner: '' };
+        return { ...message, text: fullHumanMessages.has(contextRecent[index]) ? reply.slice(0, 1200) : reply.length > 300 ? `${reply.slice(0, 150)} … ${reply.slice(-147)}` : reply, ...(inner ? { inner_voice: inner } : {}) };
+      }) };
     const modelStarted = performance.now();
     // One to one, the bible goes into the prompt (the messenger instruction, or the one-to-one role in a call), except
     // in the story instruction the story layer still has.
@@ -922,9 +935,19 @@ reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연�
 - 사용자가 맡은 인물의 행동, 대사, 마음은 대신 정하지 않는다. 주변 인물이 사용자에게 말을 걸게 할 수는 있다. 지문의 '나'는 언제나 너 자신(이 캐릭터)이다. 사용자의 행동을 '나는'으로 쓰거나 사용자의 선택(코스를 고르기, 대답하기, 커피를 받기)을 네가 이미 한 것처럼 쓰지 않는다. 프롤로그가 사용자의 대답이나 선택을 기다리며 끝났다면, 첫 장면에서도 그 기다림을 네 쪽에서 이어 간다(재촉하기, 장난, 다른 행동). 사용자 대신 답하지 말고, 사용자가 답할 때까지 기다린다.
 - 캐릭터 설명의 소품과 시그니처 동작(예: 손목시계, 잔)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다.
 ${photoRule}`;
-    const messengerInstruction = [`역할: 사람 한 명과 이야기하는 대화 상대다. 진행자, 인터뷰어, 작가가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), loungeMessengerRules, photoRule].filter(Boolean).join('\n');
-    const direction = directorRead ? await directorRead : undefined;
-    if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { tone: direction.tone, reaction: direction.reaction, ending: direction.ending, request: Boolean(direction.request), quote: Boolean(direction.quote) } : {}) }));
+    // The character's sheet (the length, the actions, the inner voice, the examples) and the chat's rules stay the same
+    // for a character and the member's inner-voice setting, so they are cached; what the turn needs goes in the input.
+    const companionSheet = loungeCompanionSheetPrompt(character, innerVoiceMode);
+    const messengerInstruction = [`역할: 사람 한 명과 같은 곳에 함께 있는 대화 상대다. 진행자, 인터뷰어, 작가, 서술자가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), companionSheet,
+      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
+    const analysis = analyzerRead ? await analyzerRead : undefined;
+    // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
+    const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
+    const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
+    const companionTurn = room.ai_turns ?? 0;
+    const sceneDecision = companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
+    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode }) : undefined;
+    if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { tone: analysis.user_tone, need: analysis.emotional_need, emotional: analysis.is_emotional_moment, stale: analysis.topic_stale } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
     const knowledge = await withinLookupWait(knowledgeRead) ?? [];
@@ -970,8 +993,9 @@ ${photoRule}`;
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.${messengerCall ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: split
-        ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+        ? loungeCompanionReplySchema
+        : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
           ? writesMemory
             ? { type: 'object', properties: { text: { type: 'string' }, memory: { type: 'string' }, events: relationshipEventsSchema, memory_ops: memoryOpsSchema }, required: ['text', 'memory', 'events', 'memory_ops'], additionalProperties: false }
@@ -996,16 +1020,30 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         chatPhotos ? `photo_subject: 방금 답에서 캐릭터가 찍은 사진에 누가 담겼는지다. character는 캐릭터 자신(셀카, 누가 찍어 준 캐릭터의 사진), member는 사용자(캐릭터가 사용자를 찍어 줌), scenery는 사람 없는 풍경이나 물건, none은 사진을 찍는 장면이 없음이다. 사용자가 자기를 찍어 달라고 해서 찍어 준 사진은 member다.
 photo: photo_subject가 character이고 방금 답에서 캐릭터가 자기 모습이 담긴 사진(셀카, 누가 찍어 준 캐릭터의 사진)을 상대에게 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 캐릭터가 사용자를 찍어 주거나 풍경만 찍는 장면, 사용자의 휴대폰으로 찍는 장면은 보내는 사진이 아니므로 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다. 사용자 자신이나 풍경을 찍어 달라는 부탁은 false다.` : '',
+        // A chat's scene and the turn's record (engine v4), which code keeps in voice_lounge_companion_state.
+        companionStored ? loungeCompanionUpdateInstructions : '',
       ].filter(Boolean).join('\n'),
       input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
-        recent: [...context.recent, { kind: 'host', nickname: characterName, text: reply }] }),
+        ...(companionStored && companionState ? { scene: companionState.scene ?? null, self_facts: companionState.self_facts.map(item => item.fact), ...(sceneDecision?.event ? { event: sceneDecision.event.content } : {}) } : {}),
+        recent: [...context.recent, (() => { const { reply: said, inner } = splitLoungeInnerVoice(reply); return { kind: 'host', nickname: characterName, text: said, ...(inner ? { inner_voice: inner } : {}) }; })()] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
-        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo_subject: { type: 'string', enum: ['character', 'member', 'scenery', 'none'] }, photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } }, story_choice: { type: 'string' } } : {}) },
-        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo_subject', 'photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts', 'story_choice'] : [])],
+        properties: { memory: { type: 'string' }, ...(relationship ? { events: relationshipEventsSchema } : {}), ...(relationship && writesMemory ? { memory_ops: memoryOpsSchema } : {}), ...(chatPhotos ? { photo_subject: { type: 'string', enum: ['character', 'member', 'scenery', 'none'] }, photo: { type: 'string' }, photo_asked: { type: 'boolean' } } : {}), ...(storyEpisode ? { story_checkpoints: { type: 'array', items: { type: 'string' } }, story_facts: { type: 'array', items: { type: 'string' } }, story_choice: { type: 'string' } } : {}), ...(companionStored ? loungeCompanionUpdateSchema : {}) },
+        required: ['memory', ...(relationship ? ['events'] : []), ...(relationship && writesMemory ? ['memory_ops'] : []), ...(chatPhotos ? ['photo_subject', 'photo', 'photo_asked'] : []), ...(storyEpisode ? ['story_checkpoints', 'story_facts', 'story_choice'] : []), ...(companionStored ? loungeCompanionUpdateFields : [])],
       } } },
     });
-    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo_subject?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown; story_choice?: unknown };
+    type AfterReply = { memory: string; events?: unknown; memory_ops?: unknown; photo_subject?: unknown; photo?: unknown; photo_asked?: unknown; story_checkpoints?: unknown; story_facts?: unknown; story_choice?: unknown } & LoungeCompanionUpdate;
+    // The scene and the turn's record after a chat reply, written with the server key. Written even when the call after
+    // the reply failed, so an event that came is still counted and the actions used are still avoided next time.
+    const saveCompanion = async (answer: AfterReply | undefined, reply: string) => {
+      if (!companionStored || !companionState || !sceneDecision || !serviceHeaders) return;
+      const { reply: said, inner } = splitLoungeInnerVoice(reply);
+      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner });
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: user.id, character_id: host.id, state, updated_at: new Date().toISOString() }) });
+        console.info('[Lounge companion]', JSON.stringify({ host: host.id, saved: response.ok, scene: state.scene?.location ?? null, sceneTurns: state.scene_turns, ...(sceneDecision.event ? { event: sceneDecision.event.id } : {}), reaction: state.reactions.at(-1) ?? null }));
+      } catch (error) { console.warn('[Lounge companion] not saved', error instanceof Error ? error.name : 'error'); }
+    };
     // The next episode, rewritten to what the two settled that differs from the story as written (a restaurant instead of
     // the cooking studio). Without an answer the episode opens as written, with the facts still told to the character.
     const adaptEpisode = async (state: LoungeStoryState, memory: string | undefined) => {
@@ -1061,6 +1099,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           .catch(error => { console.warn('[Lounge after reply] summary not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); }) : undefined,
         saveRelationship(answer, true),
         saveStory(answer?.story_checkpoints, answer?.story_facts, answer?.story_choice, memory),
+        saveCompanion(answer, reply),
       ]);
       await fillMemoryEmbeddings();
       console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer) }));
@@ -1491,9 +1530,20 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             }
           })();
           reply.then(answer => resolveText(answer.text), () => resolveText(null));
+          // A chat (engine v4) waits for the inner voice written after the text, and saves both as code checked them
+          // (see cleanLoungeCompanionReply): what was shown while it was written is replaced by what is saved.
+          const companionReply = async (early: string) => {
+            const full = await reply.catch(() => undefined) as { text?: string; inner_voice?: unknown } | undefined;
+            const said = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
+            const thought = innerVoiceMode === 'on' && typeof full?.inner_voice === 'string' ? cleanLoungeInnerVoice(full.inner_voice, said.text, companionState?.inner ?? []) : { inner: '', notes: [] as string[] };
+            const notes = [...said.notes, ...thought.notes];
+            if (notes.length) console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes }));
+            return joinLoungeInnerVoice(said.text.slice(0, replyLimit - (thought.inner ? thought.inner.length + 12 : 0)).trimEnd(), thought.inner);
+          };
           let replySaved = false;
           try {
-            const firstText = (await textReady)?.trim().slice(0, replyLimit);
+            const early = (await textReady)?.trim();
+            const firstText = messenger && early ? await companionReply(early) : early?.slice(0, replyLimit);
             if (!firstText) { await reply; throw new LoungeUpstreamError('사회자 답변이 불완전하게 도착했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 60); }
             const textAt = performance.now();
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });

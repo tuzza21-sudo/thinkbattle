@@ -1,14 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LoaderCircle, Send } from 'lucide-react';
-import { splitLoungeActions } from '../lib/lounge';
+import { splitLoungeActions, splitLoungeInnerVoice } from '../lib/lounge';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 // Phones have no Shift key for a new line, so there Enter writes one and the button sends.
 const enterSends = () => typeof window === 'undefined' || !window.matchMedia('(pointer: coarse)').matches;
 
-/** Message text with `*actions*` set apart from what is said. */
-export function LoungeMessageText({ text }: { text: string }) {
-  return <>{splitLoungeActions(text).map((part, index) => part.action ? <em key={index} className="lounge-action-text">{part.text}</em> : <span key={index}>{part.text}</span>)}</>;
+/** A character's inner voice, below its reply (engine v4, 2026-11-02). */
+const LoungeInnerVoice = ({ text }: { text: string }) => <span className="lounge-inner-voice"><b>속마음</b>{text}</span>;
+
+/**
+ * Message text with `*actions*` set apart from what is said. A character's reply (`host`) also has its actions on
+ * bracketed lines, and its inner voice below unless the member hides it (`innerVoice` false).
+ */
+export function LoungeMessageText({ text, host = false, innerVoice = true }: { text: string; host?: boolean; innerVoice?: boolean }) {
+  const { reply, inner } = host ? splitLoungeInnerVoice(text) : { reply: text, inner: '' };
+  return <>
+    {splitLoungeActions(reply, { parens: host }).map((part, index) => part.action ? <em key={index} className="lounge-action-text">{part.text}</em> : <span key={index}>{part.text}</span>)}
+    {inner && innerVoice && <LoungeInnerVoice text={inner} />}
+  </>;
 }
 
 // How far the reply being written has been typed out, so the saved message that replaces the live one goes on from
@@ -21,7 +31,9 @@ const typeStepMs = 28;
  * pop. It speeds up when far behind so it never lags the model by much. `fromStart` types a new reply from its first
  * character; otherwise only text that continues the reply being typed is animated, and older messages show at once.
  */
-export function LoungeTypewriterText({ text, fromStart = false }: { text: string; fromStart?: boolean }) {
+export function LoungeTypewriterText({ text: message, fromStart = false, innerVoice = true }: { text: string; fromStart?: boolean; innerVoice?: boolean }) {
+  // The reply is typed out; its inner voice shows once the reply is all there.
+  const { reply: text, inner } = splitLoungeInnerVoice(message);
   const [shown, setShown] = useState(() => {
     const continues = typing.shown > 0 && text.startsWith(typing.text.slice(0, typing.shown));
     return continues ? Math.min(typing.shown, text.length) : fromStart ? 0 : text.length;
@@ -45,10 +57,11 @@ export function LoungeTypewriterText({ text, fromStart = false }: { text: string
   const open = (settled.match(/\*/g)?.length ?? 0) % 2 === 1;
   const openAt = open ? settled.lastIndexOf('*') : -1;
   return <>
-    <LoungeMessageText text={open ? settled.slice(0, openAt) : settled} />
+    <LoungeMessageText text={open ? settled.slice(0, openAt) : settled} host />
     {open && <em className="lounge-action-text">{settled.slice(openAt + 1)}</em>}
     {tail && <span key={shown} className={`lounge-type-fresh ${open ? 'lounge-action-text' : ''}`}>{tail.replace(/\*/g, '')}</span>}
     {shown < text.length && <span className="lounge-type-caret" aria-hidden="true" />}
+    {shown >= text.length && inner && innerVoice && <LoungeInnerVoice text={inner} />}
   </>;
 }
 
