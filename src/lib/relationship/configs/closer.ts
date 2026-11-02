@@ -19,6 +19,7 @@ export const closerRelationship = {
   // Only his page's wins and losses (2026-11-02) are scored here; any other event counts at half its shared default,
   // and a loss in full.
   mainEvents: ['CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT', 'ANSWERS_DIRECTLY', 'SHOWS_CARE', 'KEEPS_PROMISE',
+    'SHARES_FEELING', 'SHOWS_VULNERABILITY', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'PLAYS_ALONG',
     'FOLDS_EASILY', 'WAFFLES', 'FLATTERS_CHARACTER', 'BREAKS_PROMISE', 'DECEIVES_CHARACTER', 'SHOWS_ENTITLEMENT'],
   events: {
     // Nerve: beating the man who turns tables over (흥미 is interest; 솔직함 is openness).
@@ -32,6 +33,12 @@ export const closerRelationship = {
     ANSWERS_DIRECTLY: { deltas: { leverage: 4, respect: 2, trust: 1, interest: 1 } },
     SHOWS_CARE: { deltas: { comfort: 4, trust: 2, resolve: 1, interest: 1 } },
     KEEPS_PROMISE: { deltas: { trust: 4, resolve: 4, respect: 2 } },
+    // The moments the two connect, which every character answers (sharedConnectionEvents).
+    SHARES_FEELING: { deltas: { leverage: 3, comfort: 2, trust: 1 } },
+    SHOWS_VULNERABILITY: { deltas: { trust: 3, openness: 2, comfort: 1 } },
+    CREATES_RUNNING_JOKE: { deltas: { interest: 3, comfort: 1 }, mood: { amusement: 8 } },
+    BUILDS_ON_INSIDE_JOKE: { deltas: { comfort: 2, interest: 1, trust: 1 }, mood: { amusement: 6 } },
+    PLAYS_ALONG: { deltas: { interest: 2, comfort: 2 }, mood: { excitement: 6 } },
     // Folding, waffling or flattery only bore him; a broken promise, a lie or a demand cost trust.
     FOLDS_EASILY: { deltas: { interest: -1 }, mood: { boredom: 8 } },
     WAFFLES: { deltas: { interest: -1 }, mood: { boredom: 6 } },

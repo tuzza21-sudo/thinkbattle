@@ -378,8 +378,10 @@ test('the listening and reframing events still leave out the characters not buil
   for (const type of ['ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'EVADES_QUESTION', 'CONTRADICTS_SELF']) assert.deepEqual(run(configs.ina, [[event(type)]]).logs[0].delta, {}, `ina ${type}`);
   // The engineer is scored on his own page's list only (2026-11-02): candour counts, the listening events do not.
   assert.ok(Object.keys(run(configs.auditor, [[event('ANSWERS_DIRECTLY')]]).logs[0].delta).length > 0, 'auditor ANSWERS_DIRECTLY');
-  for (const type of ['SHARES_FEELING', 'CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
-  for (const type of ['CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'REFRAMES_CONSTRUCTIVELY']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
+  for (const type of ['CORRECTS_UNDERSTANDING', 'ACKNOWLEDGES_OTHER_VIEW']) assert.deepEqual(run(configs.auditor, [[event(type)]]).logs[0].delta, {}, `auditor ${type}`);
+  // The moments the two connect count with every character, in full, list or not (2026-11-02).
+  for (const type of relationship.sharedConnectionEvents) for (const config of Object.values(configs)) assert.ok(Object.values(run(config, [[event(type)]]).logs[0].delta).some(value => value > 0), `${config.characterId} answers ${type}`);
+  assert.deepEqual(run(configs.auditor, [[event('REFRAMES_CONSTRUCTIVELY')]]).logs[0].delta, {}, 'auditor REFRAMES_CONSTRUCTIVELY');
   // The thriller director reads the rest, but never the reframing events that belong to the lawyer and the diplomat.
   assert.deepEqual(run(configs.jaeseok, [[event('REFRAMES_CONSTRUCTIVELY')]]).logs[0].delta, {});
   // The reporter (id diplomat) ignores the lawyer's habits.

@@ -21,6 +21,7 @@ export const auditorRelationship = {
   // Only his page's wins and losses (2026-11-02) are scored here; any other event counts at half its shared default,
   // and a loss in full.
   mainEvents: ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT', 'ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL',
+    'SHARES_FEELING', 'SHOWS_VULNERABILITY', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'PLAYS_ALONG',
     'FLATTERS_CHARACTER', 'FOLDS_EASILY', 'SHOWS_ENTITLEMENT', 'DECEIVES_CHARACTER', 'VIOLATES_BOUNDARY'],
   events: {
     // Breaking his manual (흥미 is interest; 분명함 and 솔직함 are epistemicHonesty).
@@ -35,6 +36,12 @@ export const auditorRelationship = {
     ASKS_GOOD_QUESTION: { deltas: { resonance: 4, epistemicHonesty: 1, interest: 1 }, mood: { curiosity: 10 } },
     SHOWS_CARE: { deltas: { resonance: 4, comfort: 3, trust: 2 } },
     REMEMBERS_DETAIL: { deltas: { trust: 3, resonance: 2, epistemicHonesty: 1 } },
+    // The moments the two connect, which every character answers (sharedConnectionEvents).
+    SHARES_FEELING: { deltas: { resonance: 4, epistemicHonesty: 1, comfort: 1 } },
+    SHOWS_VULNERABILITY: { deltas: { resonance: 3, epistemicHonesty: 2, openness: 2 } },
+    CREATES_RUNNING_JOKE: { deltas: { interest: 3, comfort: 2 }, mood: { amusement: 8 } },
+    BUILDS_ON_INSIDE_JOKE: { deltas: { resonance: 2, comfort: 2, interest: 1 }, mood: { amusement: 6 } },
+    PLAYS_ALONG: { deltas: { interest: 2, comfort: 2 }, mood: { excitement: 6 } },
     // Flattery and going along with everything only bore him; using him, a lie or a line crossed cost trust.
     FLATTERS_CHARACTER: { deltas: { interest: -2, respect: -1 }, mood: { boredom: 10 } },
     FOLDS_EASILY: { deltas: { interest: -1 }, mood: { boredom: 6 } },

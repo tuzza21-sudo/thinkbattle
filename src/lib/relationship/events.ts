@@ -82,6 +82,11 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   WAFFLES: { description: '선택을 요구받았는데 계속 결정을 미룸(예: "음… 아무거나요… 잘 모르겠어요"). 정말 모르는 것을 물었거나 지쳐 보이면 해당하지 않음', severity: 'normal', importance: 0.3 },
 };
 
+/**
+ * Moments the two connect (2026-11-02): every character answers them, and a character scored on its own list
+ * (mainEvents) counts them in full even when they are not on it.
+ */
+export const sharedConnectionEvents: readonly RelationshipEventType[] = ['SHARES_FEELING', 'SHOWS_VULNERABILITY', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'PLAYS_ALONG'];
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
 export const protectiveEvents: readonly RelationshipEventType[] = ['EXPRESSES_DISTRESS'];
 /** Penalties that must not apply while someone is struggling. */
@@ -113,16 +118,17 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   IDENTIFIES_BATNA: { deltas: {} },
   MAKES_EMPTY_THREAT: { deltas: {} },
   FOLLOWS_THROUGH: { deltas: { trust: 3, respect: 3 } },
-  SHOWS_VULNERABILITY: { deltas: { openness: 3, comfort: 1 } },
+  SHOWS_VULNERABILITY: { deltas: { openness: 3, comfort: 1, trust: 1 } },
   SHOWS_ENTITLEMENT: { deltas: { respect: -2 }, mood: { irritation: 10 } },
   FLATTERS_CHARACTER: { deltas: {}, mood: { boredom: 5 } },
   DECEIVES_CHARACTER: { deltas: { trust: -12, respect: -4 }, mood: { irritation: 30 } },
   EXPRESSES_DISTRESS: { deltas: { openness: 2 } },
-  // Only the characters built around these behaviours react to them; the others stay as they were.
-  SHARES_FEELING: { deltas: {} },
+  // Only the characters built around these behaviours react to them; the others stay as they were. The moments the two
+  // connect (sharedConnectionEvents) are the exception: every character answers them (2026-11-02).
+  SHARES_FEELING: { deltas: { comfort: 2, openness: 2 } },
   CORRECTS_UNDERSTANDING: { deltas: {} },
-  CREATES_RUNNING_JOKE: { deltas: {} },
-  BUILDS_ON_INSIDE_JOKE: { deltas: {} },
+  CREATES_RUNNING_JOKE: { deltas: { interest: 2, comfort: 1 } },
+  BUILDS_ON_INSIDE_JOKE: { deltas: { comfort: 2, interest: 1 } },
   ACKNOWLEDGES_OTHER_VIEW: { deltas: {} },
   REFRAMES_CONSTRUCTIVELY: { deltas: {} },
   ANSWERS_DIRECTLY: { deltas: {} },

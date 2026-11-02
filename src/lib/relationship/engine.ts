@@ -1,4 +1,4 @@
-import { defaultEventEffects, protectiveEvents, relationshipEventCatalog, relationshipEventLabels, relationshipEventTypes, retiredRelationshipEvents, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
+import { defaultEventEffects, protectiveEvents, sharedConnectionEvents, relationshipEventCatalog, relationshipEventLabels, relationshipEventTypes, retiredRelationshipEvents, shieldedEvents, type EventSeverity, type RelationshipEventType } from './events.js';
 import { commonMetrics, moodKeys, type AppliedEvent, type DetectedEvent, type Mood, type RelationshipConfig, type RelationshipMemory, type RelationshipChange, type RelationshipRecord, type RelationshipView, type Scores, type StageCondition, type TurnLog } from './types.js';
 
 export const relationshipSettings = {
@@ -123,8 +123,9 @@ export function processTurn({ record, config, mood, events, hasUserTurn, now }: 
     const repeats = record.recentEvents.filter(item => item.type === event.type && item.turn > turn - settings.repeatWindowTurns - 1).length;
     const repeatWeight = settings.repeatMultipliers[Math.min(repeats, settings.repeatMultipliers.length - 1)];
     const confidenceWeight = event.confidence >= settings.fullConfidence ? 1 : settings.lowConfidenceWeight;
-    // A character with its own list counts the events on it in full and others at a share; a loss always counts in full.
-    const listWeight = config.mainEvents && !config.mainEvents.includes(event.type) ? settings.offListWeight : 1;
+    // A character with its own list counts the events on it, and the moments the two connect, in full and others at a
+    // share; a loss always counts in full.
+    const listWeight = config.mainEvents && !config.mainEvents.includes(event.type) && !sharedConnectionEvents.includes(event.type) ? settings.offListWeight : 1;
     const deltas: Partial<Record<string, number>> = {};
     for (const [metric, value] of Object.entries(effect.deltas)) {
       if (!value || record.scores[metric] === undefined) continue;
