@@ -2193,6 +2193,37 @@ test('what a chat reply broke is fixed before it is saved: star narration, a thi
   assert.equal(hidden.events[0].text, '…아니에요. 드세요.');
 });
 
+test('a chat reply in another language is written once more in Korean before it is saved; an event is to be answered in the reply', async () => {
+  // 2026-11-02: GPT-6 Luna answered one of 서도현's turns whole in Japanese.
+  const asked = [];
+  let events;
+  await run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'host' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '맞선', host_persona: 'auditor', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 3 }]);
+    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+    if (url.endsWith('/responses')) {
+      asked.push(JSON.parse(init.body));
+      return modelAnswer(asked.length === 1 ? { text: '一緒に買い物して夕飯を作ってみたいですね。', inner_voice: 'これはまだ、好みの話だ。' } : { text: '같이 장 보고 저녁 만들어 보고 싶어요.', inner_voice: '아직은 취향 얘기다.' });
+    }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+    throw new Error(`Unexpected ${url}`);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+  });
+  assert.equal(asked.length, 2);
+  assert.match(asked[1].instructions, /이번 답은 반드시 한국어로만 쓴다/);
+  assert.equal(events.find(event => event.type === 'host').text, '같이 장 보고 저녁 만들어 보고 싶어요.\n\n[속마음]\n아직은 취향 얘기다.');
+  assert.match(asked[0].instructions, /대사와 속마음은 언제나 한국어로 쓴다/);
+  assert.match(asked[0].instructions, /turn\.event가 있으면 이번 턴 둘 주변에서 일어난 일이고, 이번 답에서 반드시 그 일에 반응한다/);
+  assert.equal(messengerLib.loungeNotKorean('좋아요. 오늘 와인은 Pinot Noir예요.'), false);
+  assert.equal(messengerLib.loungeNotKorean('さっきと同じ 질문이네요'), true);
+  assert.equal(messengerLib.loungeNotKorean('我们一起去吃饭吧，好不好'), true);
+  assert.equal(messengerLib.loungeNotKorean('순대국(順大)은 반칙이죠.'), false);
+});
+
 test('a character\'s reply shows its bracketed actions as actions and its inner voice apart; a member\'s brackets stay as written', () => {
   assert.deepEqual(lounge.splitLoungeActions('(잔을 돌린다)\n좋아요.', { parens: true }), [{ action: true, text: '잔을 돌린다' }, { action: false, text: '\n좋아요.' }]);
   assert.deepEqual(lounge.splitLoungeActions('(속으로) 좋아요.'), [{ action: false, text: '(속으로) 좋아요.' }]);

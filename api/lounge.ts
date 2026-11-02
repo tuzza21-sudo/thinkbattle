@@ -3,7 +3,7 @@ import { getLoungeCharacter, loungeCharacterRules, loungeBiblePrompt, loungeComp
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { cleanLoungeCompanionReply, cleanLoungeInnerVoice, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
@@ -1553,7 +1553,20 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A chat (engine v4) waits for the inner voice written after the text, and saves both as code checked them
           // (see cleanLoungeCompanionReply): what was shown while it was written is replaced by what is saved.
           const companionReply = async (early: string) => {
-            const full = await reply.catch(() => undefined) as { text?: string; inner_voice?: unknown } | undefined;
+            let full = await reply.catch(() => undefined) as { text?: string; inner_voice?: unknown } | undefined;
+            // A reply in another language (Luna once answered whole in Japanese) is written once more, asked for Korean,
+            // and replaces what was shown; if that fails too, the first is kept.
+            if (loungeNotKorean(`${full?.text ?? early}\n${typeof full?.inner_voice === 'string' ? full.inner_voice : ''}`)) {
+              const openaiModel = chatModel.provider !== 'gemini';
+              const again = await (async () => {
+                const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({ ...modelRequest, ...(openaiModel ? {} : { model: 'gpt-6-luna', reasoning: { effort: 'none' } }),
+                  instructions: `${modelRequest.instructions}\n이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.` }), undefined, 30_000), 'openai');
+                return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown };
+              })().catch(() => undefined);
+              const fixed = Boolean(again?.text && !loungeNotKorean(`${again.text}\n${typeof again.inner_voice === 'string' ? again.inner_voice : ''}`));
+              console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes: ['not_korean'], rewritten: fixed }));
+              if (fixed) full = again;
+            }
             const said = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
             const thought = innerVoiceMode === 'on' && typeof full?.inner_voice === 'string' ? cleanLoungeInnerVoice(full.inner_voice, said.text, companionState?.inner ?? []) : { inner: '', notes: [] as string[] };
             const notes = [...said.notes, ...thought.notes];
