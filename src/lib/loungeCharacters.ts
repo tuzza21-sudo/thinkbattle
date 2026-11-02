@@ -1919,7 +1919,7 @@ export function loungeCompanionSheetPrompt(character: LoungeCharacter | undefine
     ...(bible.exceptionFormula ? [`예외 공식(baseline과 specialToMe의 대비를 드러내는 말): ${bible.exceptionFormula.rule} turn.exception_allowed가 false인 턴에는 쓰지 않는다.${bible.exceptionFormula.example ? ` 예: ${bible.exceptionFormula.example}(결만 참고하고 그대로 쓰지 않는다)` : ''}`] : []),
     ...(bible.negotiationTactics?.length ? [`압박의 도구(남에게는 진지하게, 상대에게는 장난으로 쓴다. 한 답에 많아야 하나이고, 최근 답에서 쓴 것은 다시 쓰지 않는다): ${bible.negotiationTactics.join(' / ')}`] : []),
     ...(bible.forbidden?.length ? [`하지 않는 것: ${bible.forbidden.join(' / ')}`] : []),
-    ...(bible.intimacyProposal ? [`상대가 더 가까운 관계나 네가 이끄는 놀이를 먼저 제안할 때: 품위 있게 제안하면 ${bible.intimacyProposal.elegant.response} 단계별 결(대사를 옮기지 않는다): ${([1, 2, 3, 4] as const).map(stage => `${stage}단계 ${bible.intimacyProposal!.elegant.byStage[stage]}`).join(' / ')}. 무례하게 요구하면 ${bible.intimacyProposal.crude.response} 제안을 받아들인 다음 턴부터 turn.intimacy가 한 단계 열려 있을 수 있다.`] : []),
+    ...(bible.intimacyProposal ? [`상대가 더 가까운 관계나 네가 이끄는 놀이를 먼저 제안할 때: 품위 있게 제안하면 ${bible.intimacyProposal.elegant.response} 단계별 결(대사를 옮기지 않는다): ${([1, 2, 3, 4] as const).map(stage => `${stage}단계 ${bible.intimacyProposal!.elegant.byStage[stage]}`).join(' / ')}. 무례하게 요구하면 ${bible.intimacyProposal.crude.response} 이번 턴에 제안이 있으면 turn.intimacy.proposal에 있고, 열린 단계는 turn.intimacy.now다.`] : []),
     ...(bible.hookStyle ? [`끝맺음 방식: ${bible.hookStyle} 매 답에 쓰지 않고, 담백하게 할 말을 하고 끝내는 답이 더 많다.`] : []),
     ...(bible.engineNote ? [`상대의 반응 읽기: ${bible.engineNote}`] : []),
     ...(bible.reservedMoments?.length ? [`아껴 둔 순간(둘이 충분히 가까워진 뒤 맞는 순간에 한 번씩만 쓴다):${newline}${bible.reservedMoments.map(line => `- ${line}`).join(newline)}`] : []),

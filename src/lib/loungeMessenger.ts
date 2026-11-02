@@ -63,21 +63,25 @@ export const loungeCompanionReplySchema = { type: 'object', properties: { text: 
 // ── The analyzer: the member's words and what they do to the scene ──
 const tones = ['장난', '도발', '무심', '애교', '진지', '지침', '불안', '기쁨', '서운함', '담백'] as const;
 const needs = ['웃음', '위로', '인정', '티키타카', '함께하기', '정보', '관심'] as const;
+const proposals = ['none', 'elegant', 'crude'] as const;
+export type LoungeIntimacyProposal = typeof proposals[number];
 export type LoungeAnalysis = {
   user_tone: typeof tones[number]; subtext: string; quote_hook: string; user_action: string; request: string;
   references_memory: string; emotional_need: typeof needs[number];
   scene_change_request: string; activity_finished: boolean; topic_stale: boolean; is_emotional_moment: boolean;
   /** The member really said no or drew a line, tired or uncomfortable (2026-11-02): the reply backs off at once. */
   is_sincere_refusal: boolean;
+  /** The member asking first to be closer, or answering an invitation (2026-11-02): with grace, crudely, or not at all. */
+  intimacy_proposal: LoungeIntimacyProposal;
 };
 const analysisText = ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request'] as const;
 export const loungeAnalyzerSchema = {
   type: 'object', additionalProperties: false,
-  required: ['user_tone', 'subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'emotional_need', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_sincere_refusal'],
+  required: ['user_tone', 'subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'emotional_need', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_sincere_refusal', 'intimacy_proposal'],
   properties: {
     user_tone: { type: 'string', enum: [...tones] }, subtext: { type: 'string' }, quote_hook: { type: 'string' }, user_action: { type: 'string' }, request: { type: 'string' },
     references_memory: { type: 'string' }, emotional_need: { type: 'string', enum: [...needs] },
-    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' },
+    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' }, intimacy_proposal: { type: 'string', enum: [...proposals] },
   },
 } as const;
 /** The same for every character, so one cache serves them all; who the character is goes in the input. */
@@ -95,6 +99,7 @@ export const loungeAnalyzerInstructions = `너는 1:1 대화를 읽는 분석가
 - topic_stale: recent의 마지막 4~5번 주고받기가 같은 화제나 같은 주고받기를 되풀이하면 true.
 - is_emotional_moment: 사용자가 힘들거나 진지한 이야기를 하는 중이면 true.
 - is_sincere_refusal: 사용자가 캐릭터의 제안이나 압박을 진심으로 거절하거나, 지치거나 불편해서 선을 그었으면 true(예: "진짜 피곤해요", "그만해요", "오늘은 싫어요"). 장난으로 튕기거나 버티는 말, 캐릭터의 허세에 맞서는 말은 false다.
+- intimacy_proposal: 사용자가 더 가까운 관계, 스킨십, 캐릭터가 이끄는 놀이를 먼저 제안하거나 캐릭터의 초대에 응한 방식. 정중하고 자신 있게 제안하거나 응하면 elegant다(캐릭터의 초대가 없었어도 사용자가 먼저 품위 있게 제안하면 elegant). 몸을 품평하거나 저급한 말로 요구하면 crude다. 가벼운 플러팅, 농담, 칭찬, 제안이 없는 말이면 none이다.
 칸에 없는 설명은 쓰지 않는다.`;
 const clip = (value: unknown, max = 120) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 /** The analyzer's answer, or nothing when it is not usable (the reply then reads the member for itself). */
@@ -104,7 +109,7 @@ export function readLoungeAnalysis(raw: unknown): LoungeAnalysis | undefined {
   const user_tone = tones.find(item => item === value.user_tone), emotional_need = needs.find(item => item === value.emotional_need);
   if (!user_tone || !emotional_need) return undefined;
   const text = Object.fromEntries(analysisText.map(key => [key, clip(value[key], key === 'quote_hook' ? 40 : 80)])) as Record<typeof analysisText[number], string>;
-  return { user_tone, emotional_need, ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_sincere_refusal: value.is_sincere_refusal === true };
+  return { user_tone, emotional_need, ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_sincere_refusal: value.is_sincere_refusal === true, intimacy_proposal: proposals.find(item => item === value.intimacy_proposal) ?? 'none' };
 }
 type AnalyzerMessage = { kind: string; text: string };
 /** What the analyzer reads: who the character is, the last few turns (oldest first) and where the two are. */
@@ -176,6 +181,26 @@ const activeBoost = (state: LoungeCompanionState, turn: number) => {
   const boost = state.intimacy_boost;
   return boost && turn - boost.turn <= boostTurns && state.scene?.location === boost.location ? boost : undefined;
 };
+/**
+ * The step of the intimacy ladder this turn (common events 4-3, 2026-11-02): the stage's, or one more (at most 4) for six
+ * turns in the place where the member asked with grace, from the turn they asked. Asking again while it is open opens no
+ * more, and a crude request opens nothing.
+ */
+export function effectiveIntimacyStage(input: { state: LoungeCompanionState; stage: number; turn: number; proposal?: LoungeIntimacyProposal }) {
+  const stage = Math.min(4, Math.max(1, input.stage));
+  const open = activeBoost(input.state, input.turn);
+  if (open) return { level: Math.min(4, Math.max(stage, open.level)), opensNow: false };
+  const opensNow = input.proposal === 'elegant' && stage < 4;
+  return { level: opensNow ? stage + 1 : stage, opensNow };
+}
+/** The events scored for a proposal follow the analyzer's reading of it, so the card and the reply agree. */
+export function alignLoungeProposalEvents(events: unknown, proposal: LoungeIntimacyProposal | undefined) {
+  if (!proposal || proposal === 'none' || !Array.isArray(events)) return events;
+  const [keep, drop] = proposal === 'elegant' ? ['MAKES_BOLD_MOVE', 'MAKES_CRUDE_ADVANCE'] : ['MAKES_CRUDE_ADVANCE', 'MAKES_BOLD_MOVE'];
+  const type = (event: unknown) => (event as { type?: unknown })?.type;
+  const rest = events.filter(event => type(event) !== drop);
+  return rest.some(event => type(event) === keep) ? rest : [{ type: keep, confidence: 0.8, note: proposal === 'elegant' ? '품위 있게 먼저 다가옴' : '무례하게 요구함' }, ...rest];
+}
 
 export type LoungeSceneDecision = { progress: 'stay' | 'small_step' | 'transition'; target?: string; event?: LoungeSceneEvent };
 /**
@@ -207,14 +232,16 @@ const withoutStars = (text: string) => text.replace(/\*/g, '').trim();
  * sheet), where the two are and what happens there, and what was used lately and is to be avoided. Constraints only;
  * how to react is the reply's own judgement.
  */
-export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; sincereRefusal?: boolean }) {
+export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal }) {
   const { bible, state, decision } = input;
   const stage = input.stage ? Math.min(4, Math.max(1, input.stage)) as 1 | 2 | 3 | 4 : undefined;
   const level = stage && input.innerVoice === 'on' ? bible?.innerVoice?.ladder[stage] : undefined;
   const turning = bible?.innerVoice?.turningPoint;
   const belief = stage === 4 && turning ? `${turning.moment} ${turning.newBelief}` : bible?.innerVoice?.initialBelief;
   // How near she may come: the stage's step, or one more for a while after a graceful proposal.
-  const intimacyLevel = stage && bible?.intimacyLadder ? Math.min(4, Math.max(stage, activeBoost(state, input.turn)?.level ?? 0)) as 1 | 2 | 3 | 4 : undefined;
+  const proposal = input.sincereRefusal ? 'none' : input.intimacyProposal;
+  const intimacy = stage && bible?.intimacyLadder ? effectiveIntimacyStage({ state, stage, turn: input.turn, proposal }) : undefined;
+  const intimacyLevel = intimacy?.level as 1 | 2 | 3 | 4 | undefined;
   const [last, before] = [...state.reactions].reverse();
   const avoid = {
     ...(last && last === before ? { reaction: last } : {}),
@@ -233,7 +260,12 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(stage && bible?.relationshipLadder ? { relationship_reaction: bible.relationshipLadder[stage] } : {}),
     ...(stage && bible?.pressureLadder ? { pressure: bible.pressureLadder[stage] } : {}),
     ...(stage && bible?.dominanceLadder ? { dominance: bible.dominanceLadder[stage] } : {}),
-    ...(stage && intimacyLevel ? { intimacy: { now: bible!.intimacyLadder![intimacyLevel], ...(intimacyLevel > stage ? { opened: '상대가 품위 있게 먼저 제안해 이번 장면에 한해 한 단계 열렸다. 스킨십도 이 단계만큼 받아들이되 선은 네가 정한다.' } : {}) } } : {}),
+    ...(stage && intimacyLevel ? { intimacy: {
+      now: bible!.intimacyLadder![intimacyLevel],
+      ...(intimacyLevel > stage ? { opened: '상대가 품위 있게 먼저 제안해 이번 장면에 한해 한 단계 열렸다. 스킨십도 이 단계만큼 받아들이되 선은 네가 정한다.' } : {}),
+      ...(proposal === 'elegant' && bible?.intimacyProposal ? { proposal: `방금 상대가 품위 있게 먼저 다가왔다. 허락과 받아치기를 함께 한다. 이 단계의 결: ${bible.intimacyProposal.elegant.byStage[stage]}` } : {}),
+      ...(proposal === 'crude' && bible?.intimacyProposal ? { proposal: `방금 요구는 무례했다. 아무것도 열지 않는다. ${bible.intimacyProposal.crude.response}` } : {}),
+    } } : {}),
     ...(level ? { inner_voice_level: { level: level.level, ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' ? { belief } : {}),
     exception_allowed: input.turn - (state.last_exception_turn ?? -99) >= 3,

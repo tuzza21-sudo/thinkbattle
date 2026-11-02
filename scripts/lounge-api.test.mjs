@@ -2399,6 +2399,23 @@ test('선우령: a graceful proposal opens her intimacy ladder one step in that 
   assert.equal(conditions(base, 3).intimacy.now, bible.intimacyLadder[1]);
   assert.equal(conditions(base, 3).intimacy.opened, undefined);
   assert.equal(conditions(base, 3).dominance, bible.dominanceLadder[1]);
+  // Common events 4-3: the analyzer reads the proposal before the reply, so the step opens in that very turn.
+  const asked = (state, turn, proposal, extra = {}) => messengerLib.loungeTurnConditions({ bible, stage: 1, state, turn, decision: { progress: 'stay' }, innerVoice: 'on', intimacyProposal: proposal, ...extra });
+  assert.equal(asked(base, 3, 'elegant').intimacy.now, bible.intimacyLadder[2]);
+  assert.match(asked(base, 3, 'elegant').intimacy.proposal, /품위 있게 먼저 다가왔다/);
+  assert.equal(asked(base, 3, 'crude').intimacy.now, bible.intimacyLadder[1], 'a crude request opens nothing');
+  assert.match(asked(base, 3, 'crude').intimacy.proposal, /그렇게 묻는 사람한테는 안 열어요/);
+  assert.equal(asked(base, 3, 'elegant', { sincereRefusal: true }).intimacy.now, bible.intimacyLadder[1], 'a sincere no comes first');
+  assert.deepEqual(messengerLib.effectiveIntimacyStage({ state: base, stage: 4, turn: 3, proposal: 'elegant' }), { level: 4, opensNow: false }, 'four is the top');
+  assert.equal(messengerLib.readLoungeAnalysis({ user_tone: '도발', emotional_need: '티키타카' }).intimacy_proposal, 'none');
+  assert.match(messengerLib.loungeAnalyzerInstructions, /캐릭터의 초대가 없었어도 사용자가 먼저 품위 있게 제안하면 elegant/);
+  assert.match(relationshipLib.relationshipEventCatalog.MAKES_BOLD_MOVE.description, /초대가 없었더라도/);
+  // The scored event follows the analyzer's reading.
+  const types = events => events.map(event => event.type);
+  assert.deepEqual(types(messengerLib.alignLoungeProposalEvents([{ type: 'FLIRTS_PLAYFULLY', confidence: 0.9 }], 'elegant')), ['MAKES_BOLD_MOVE', 'FLIRTS_PLAYFULLY']);
+  assert.deepEqual(types(messengerLib.alignLoungeProposalEvents([{ type: 'MAKES_BOLD_MOVE', confidence: 0.9 }], 'crude')), ['MAKES_CRUDE_ADVANCE']);
+  assert.deepEqual(types(messengerLib.alignLoungeProposalEvents([{ type: 'MAKES_BOLD_MOVE', confidence: 0.9 }], 'elegant')), ['MAKES_BOLD_MOVE']);
+  assert.deepEqual(messengerLib.alignLoungeProposalEvents([{ type: 'SHARES_FEELING' }], 'none'), [{ type: 'SHARES_FEELING' }]);
   const next = (state, turn, boldMove, location = scene.location) => messengerLib.nextLoungeCompanionState({ state, update: { scene: { ...scene, location } }, decision: { progress: 'stay' }, turn, reply: '앉아요.', inner: '', ...(boldMove ? { boldMove: { stage: 1 } } : {}) });
   const opened = next(base, 3, true);
   assert.deepEqual(opened.intimacy_boost, { level: 2, turn: 3, location: scene.location });
@@ -2417,6 +2434,53 @@ test('선우령: a graceful proposal opens her intimacy ladder one step in that 
   const sheet = charactersLib.loungeCompanionSheetPrompt(page, 'on');
   assert.match(sheet, /품위 있게 제안하면/); assert.match(sheet, /무례하게 요구하면/);
   for (const event of bible.sceneEvents) for (const type of event.sceneTypes ?? []) assert.ok(messengerLib.loungeSceneTypes.includes(type), `${event.id}: ${type}`);
+});
+
+test('선우령 through the handler: a graceful proposal opens the step in the reply to it, is scored as a bold move and kept for six turns; a crude one opens nothing', async t => {
+  const saved = process.env.LOUNGE_ANALYZER;
+  delete process.env.LOUNGE_ANALYZER;
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ANALYZER; else process.env.LOUNGE_ANALYZER = saved; });
+  const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
+  const scene = { location: '호텔 라운지 바 끝자리', scene_type: '바', activity: '샴페인 한 잔', time_of_day: '밤', season: '', objects: ['샴페인 잔'] };
+  const stored = { room_id: roomId, scene, scene_turns: 2, event_turns: {}, used_events: [], reactions: [], phrases: [], anchors: [], inner: [], shared: [], self_facts: [] };
+  const calm = { user_tone: '도발', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '티키타카', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false };
+  // The call after the reply gets it wrong on purpose: the analyzer's reading wins.
+  for (const [proposal, updaterEvents, text] of [['elegant', [], '령 씨가 리드하는 거, 한번 겪어 보고 싶은데요'], ['crude', [{ type: 'MAKES_BOLD_MOVE', confidence: 0.9, note: '' }], '몸매 좋네요. 오늘 밤 어때요']]) {
+    let reply, written, relationshipSaved;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') { written = JSON.parse(init.body); return result(null, 201); }
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: stored }]);
+      if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+      if (url.includes('save_voice_lounge_relationship')) { relationshipSaved = JSON.parse(init.body); return result(null); }
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '지금 장면: 호텔 라운지 바', capacity: 1, space_id: null, voice_on: false, ai_turns: 9 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text, created_at: '2026-11-02T00:00:00Z' }]);
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return modelAnswer({ ...calm, intimacy_proposal: proposal });
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 호텔 라운지 바', events: updaterEvents, scene, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return modelAnswer({});
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '제안은 접수했어요.\n(옆자리를 손끝으로 가리킨다)\n여기 앉아요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    const turn = JSON.parse(reply.input).turn;
+    // velvetRow is at her second stage.
+    assert.equal(turn.stage, 2);
+    assert.equal(turn.dominance, bible.dominanceLadder[2]);
+    const scored = relationshipSaved.p_state.recentEvents.map(event => event.type);
+    if (proposal === 'elegant') {
+      assert.equal(turn.intimacy.now, bible.intimacyLadder[3], 'the reply to the proposal already has the opened step');
+      assert.ok(turn.intimacy.opened && /품위 있게 먼저 다가왔다/.test(turn.intimacy.proposal));
+      assert.deepEqual(written.state.intimacy_boost, { level: 3, turn: 9, location: scene.location }, 'kept for the turns after');
+      assert.ok(scored.includes('MAKES_BOLD_MOVE') && !scored.includes('MAKES_CRUDE_ADVANCE'), scored.join());
+    } else {
+      assert.equal(turn.intimacy.now, bible.intimacyLadder[2]);
+      assert.equal(turn.intimacy.opened, undefined);
+      assert.match(turn.intimacy.proposal, /아무것도 열지 않는다/);
+      assert.equal(written.state.intimacy_boost, undefined);
+      assert.ok(scored.includes('MAKES_CRUDE_ADVANCE') && !scored.includes('MAKES_BOLD_MOVE'), scored.join());
+    }
+  }
 });
 
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {

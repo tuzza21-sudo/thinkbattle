@@ -84,7 +84,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   FOLDS_EASILY: { description: '직전 캐릭터 발언의 장난 섞인 압박에 버티지 않고 바로 굴복함(예: "네네 시키는 대로 할게요"). 진심으로 거절하거나 지쳐서 선을 긋는 말은 해당하지 않음', severity: 'normal', importance: 0.3 },
   WAFFLES: { description: '선택을 요구받았는데 계속 결정을 미룸(예: "음… 아무거나요… 잘 모르겠어요"). 정말 모르는 것을 물었거나 지쳐 보이면 해당하지 않음', severity: 'normal', importance: 0.3 },
   FOLLOWS_LEAD: { description: '직전 캐릭터 발언의 지시·제안을 여유 있게 기꺼이 따름(예: "알겠어요. 여기 앉으면 되죠? 대신 이유는 나중에 알려 줘요"). 겁먹고 매달리듯 따르는 것은 FOLDS_EASILY', severity: 'normal', importance: 0.5 },
-  MAKES_BOLD_MOVE: { description: '캐릭터의 초대에 망설임 없이 자신 있게 응하거나, 더 가까운 관계나 상대가 이끄는 놀이를 품위 있게 먼저 제안함(예: "있어요. 들어갈게요", "령 씨가 리드하는 거, 한번 겪어 보고 싶은데요"). 저급하거나 몸을 품평하는 말은 MAKES_CRUDE_ADVANCE', severity: 'meaningful', importance: 0.6 },
+  MAKES_BOLD_MOVE: { description: '캐릭터의 초대에 망설임 없이 자신 있게 응하거나, 초대가 없었더라도 더 가까운 관계나 상대가 이끄는 놀이를 정중하고 자신 있게 먼저 제안함(예: "있어요. 들어갈게요", "령 씨가 리드하는 거, 한번 겪어 보고 싶은데요"). 저급하거나 몸을 품평하는 말은 MAKES_CRUDE_ADVANCE', severity: 'meaningful', importance: 0.6 },
   MAKES_CRUDE_ADVANCE: { description: '품위 없이 노골적으로 들이댐: 몸을 품평하거나 저급한 성적인 말로 요구함. 가벼운 플러팅, 성적 농담, 품위 있는 대담한 제안은 해당하지 않음. 캐릭터가 선을 그은 뒤 되풀이하면 VIOLATES_BOUNDARY', severity: 'meaningful', importance: 0.7 },
 };
 
