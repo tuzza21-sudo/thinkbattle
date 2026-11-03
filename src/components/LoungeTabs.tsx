@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, FileText, Heart, House, Info, LogIn, LogOut, MessageCircle, Plus, RefreshCw, Settings, Shield, UserRound } from 'lucide-react';
+import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, Plus, RefreshCw, Settings, Shield, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeSpokenText, type LoungeHostId } from '../lib/lounge';
@@ -80,8 +80,8 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
   </main>;
 }
 
-/** Settings: the member's profile, friends and notes, their characters, the service's pages, and signing out. */
-export function LoungeSettingsPage({ user, unread, onProfileRequest, onLoginRequest, onSignupRequest, onLogout, loggingOut }: { user: AppUser | null; unread: number; onProfileRequest: () => void; onLoginRequest: () => void; onSignupRequest?: () => void; onLogout?: () => void; loggingOut: boolean }) {
+/** Settings: the member's profile, the service's pages, and signing out (friends and making a character are off, 2026-11-03). */
+export function LoungeSettingsPage({ user, onProfileRequest, onLoginRequest, onSignupRequest, onLogout, loggingOut }: { user: AppUser | null; onProfileRequest: () => void; onLoginRequest: () => void; onSignupRequest?: () => void; onLogout?: () => void; loggingOut: boolean }) {
   const member = Boolean(user && !user.isAnonymous);
   const row = (to: string, icon: ReactNode, label: string, extra?: ReactNode) => <li><Link to={to}>{icon}<span>{label}</span>{extra}<ChevronRight size={17} className="lounge-settings-chevron" /></Link></li>;
   return <main className="lounge-lobby lounge-tab-page">
@@ -92,13 +92,11 @@ export function LoungeSettingsPage({ user, unread, onProfileRequest, onLoginRequ
         <span><strong>{user!.nickname}</strong><small>프로필 수정</small></span><ChevronRight size={18} className="lounge-settings-chevron" />
       </button> : <div className="lounge-settings-guest">
         <span className="lounge-settings-avatar"><UserRound size={26} /></span>
-        <span><strong>{user?.isAnonymous ? '게스트로 이용 중' : '로그인하지 않았어요'}</strong><small>회원이 되면 대화와 친구가 계정에 남아요.</small></span>
+        <span><strong>{user?.isAnonymous ? '게스트로 이용 중' : '로그인하지 않았어요'}</strong><small>회원이 되면 대화와 캐릭터와의 관계가 계정에 남아요.</small></span>
         <div><button type="button" className="lounge-primary" onClick={onLoginRequest}>로그인</button>{onSignupRequest && <button type="button" className="lounge-settings-signup" onClick={onSignupRequest}>회원가입</button>}</div>
       </div>}
     </section>
     <ul className="lounge-settings-list">
-      {member && row('/lounge/friends', <Heart size={18} />, '친구 · 쪽지', unread ? <em>{unread > 99 ? '99+' : unread}</em> : null)}
-      {member && row('/lounge/create', <Plus size={18} />, '내 캐릭터 만들기')}
       {row('/lounge/about', <Info size={18} />, '서비스 소개')}
       {row('/terms', <FileText size={18} />, '이용약관')}
       {row('/privacy', <Shield size={18} />, '개인정보 처리방침')}
