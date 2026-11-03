@@ -16,13 +16,18 @@
  * 5-6 s; GPT-6.1 Sol writes the fullest scenes but takes 11-17 s and cannot run without reasoning, so it is chat only,
  * and answers with Sol when it stalls. `model` is the OpenAI model, `stallModel` the one answering when a reasoning
  * model has not begun in time (the same model, without reasoning, when none is named).
+ *
+ * 2026-11-03: DeepSeek Flash can be picked as well (chat only; a voice reply is OpenAI's). Its API takes the same
+ * instructions and input as the others but not a JSON schema, so the schema goes into the instructions (see
+ * deepseekReply in api/lounge.ts). It is also what answers the turns adult mode opens, whichever model is picked.
  */
 export const loungeChatModels = [
   { id: 'gpt', label: '빠른 대화', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gpt-reasoning', label: '깊은 대화', description: '한 번 더 생각해서 더 풍성하게 답해요 (조금 느림, 채팅 전용)', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'medium', listed: true, voiceFallback: 'gpt' },
   { id: 'gpt-sol', label: '섬세한 대화 · Sol', description: 'GPT-6 Sol · 말투와 캐릭터의 결을 더 안정적으로 지켜요 (빠른 대화와 비슷한 속도)', provider: 'openai', model: 'gpt-6-sol', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
-  { id: 'gpt-terra', label: '균형 대화 · Terra 6.1', description: 'GPT-6.1 Terra · Sol의 절반 가격에 말투와 장면을 잘 지켜요 (조금 느림, 채팅 전용)', provider: 'openai', model: 'gpt-6.1-terra', stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
+  { id: 'gpt-terra', label: '균형 대화 · Terra 6.1', description: 'GPT-6.1 Terra · Sol의 절반 가격에 말투와 장면을 잘 지켜요 (조금 느림)', provider: 'openai', model: 'gpt-6.1-terra', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gpt-sol-next', label: '가장 섬세한 대화 · Sol 6.1', description: 'GPT-6.1 Sol · 장면과 감정을 가장 풍성하게 써요 (답이 느림, 채팅 전용)', provider: 'openai', model: 'gpt-6.1-sol', stallModel: 'gpt-6-sol', reasoning: 'low', listed: true, voiceFallback: 'gpt-sol' },
+  { id: 'deepseek-flash', label: 'DeepSeek Flash', description: 'DeepSeek V4.1 Flash · 빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
   { id: 'gemini-flash', label: 'Gemini Flash', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: null },
   { id: 'gemini-pro', label: 'Gemini Pro', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
 ] as const;

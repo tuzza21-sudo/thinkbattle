@@ -197,7 +197,16 @@ export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
   return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
 }
-export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine, callStart = false) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}), ...(callStart ? { callStart: true } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine, callStart = false) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}), ...(callStart ? { callStart: true } : {}), ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
+/**
+ * Whether a chat shows the character's inner voice below its reply (대화 설정 › 속마음, this browser; shown until hidden).
+ * Hidden, the replies are written without one and the thought shows in what is said and done instead (engine v4).
+ */
+const innerVoiceKey = 'lounge.innerVoice';
+export function loadLoungeInnerVoice(): 'on' | 'off' {
+  try { return localStorage.getItem(innerVoiceKey) === 'off' ? 'off' : 'on'; } catch { return 'on'; }
+}
+export function saveLoungeInnerVoice(value: 'on' | 'off') { try { localStorage.setItem(innerVoiceKey, value); } catch { /* the choice lasts for this page */ } }
 /** Three replies the member could say next in a one-to-one conversation. */
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**
@@ -281,7 +290,8 @@ export async function listLoungeStoryTopics(): Promise<Record<string, string[]>>
   return topics;
 }
 /** Opens (or continues) a one-to-one chat in a scenario; returns the room id. */
-export const startLoungeScenario = (id: string, nickname: string, note?: string) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname, ...(note?.trim() ? { p_note: note.trim() } : {}) });
+/** `fresh` starts the story again from its prologue in a new room (migration 20261201); otherwise the last room of it goes on. */
+export const startLoungeScenario = (id: string, nickname: string, note?: string, fresh = false) => loungeRpc<string>('start_lounge_scenario', { p_scenario: id, p_nickname: nickname, ...(note?.trim() ? { p_note: note.trim() } : {}), ...(fresh ? { p_fresh: true } : {}) });
 /** Opens (or continues) a one-to-one chat with a member's character; returns the room id. */
 /** A member's one-to-one conversation in their chat list: the latest with each character they have talked with. */
 export type LoungeChatSummary = { room_id: string; character_id: string; story: string | null; last_text: string; last_kind: string; last_at: string; open: boolean; character_name: string | null; character_portrait: string | null };

@@ -1,6 +1,6 @@
 import { isLoungeCustomCharacterId, loungeThemes } from '../src/lib/lounge.js';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios.js';
-import { loungeStoryEpisodeAt, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
+import { loungeStoryEpisodeAt, loungeStoryEpisodesOn, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
 import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
@@ -245,7 +245,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string)
   const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown }> : [];
   if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
   const scenario = normalizeLoungeRoomScenario(room.scenario);
-  const episodes = scenario?.episodes ?? [];
+  const episodes = loungeStoryEpisodesOn ? scenario?.episodes ?? [] : [];
   const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
   const episode = state ? loungeStoryEpisodeAt(episodes, state) : undefined;
   const scene = episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;

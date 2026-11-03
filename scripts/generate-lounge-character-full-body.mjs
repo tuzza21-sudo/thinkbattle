@@ -30,8 +30,6 @@ const workScenes = {
   diplomat: { portrait: 'host-reporter-v1.webp', file: 'host-reporter-work-v1.webp',
     prompt: `${workCommon} She is a social-affairs newspaper reporter working late in a newsroom. She wears the same ivory blouse and tailored soft-grey blazer with slim dark trousers and low heels, a plain blank press ID badge on a lanyard at her chest, and a slim leather shoulder bag. She leans over a desk reading a printed document with a pen in one hand, a notebook, an open laptop and a paper coffee cup beside her, with an amused, curious expression as if she just spotted something odd in the story. Rows of desks, warm desk lamps and city lights through a tall window softly blurred behind her at night.`,
   },
-  lawyer: { portrait: 'host-lawyer-v2.webp', file: 'host-lawyer-work-v1.webp',
-    prompt: `${workCommon} He is a private detective investigating a case. He wears the same dark grey wool overcoat over a white open-collar shirt, dark trousers and worn black leather shoes. He stands at a cluttered desk in his office at night, holding a photograph in one hand and a magnifying glass in the other, studying it intently. Behind him a corkboard of photographs connected with red string and no readable text, a green desk lamp, and rain on a window with half-closed blinds.` },
 };
 const characters = {
   jaeseok: { portrait: 'host-witty-v2.webp', file: 'host-witty-full-v1.webp',
@@ -44,8 +42,6 @@ const characters = {
     prompt: `${common} He wears the same dark navy suit and white open-collar shirt with no tie, a slim steel watch and dark leather shoes. He stands beside a floor-to-ceiling window of a rooftop lounge at dusk with city lights and an amber sky behind him, hands loosely clasped in front, calm and quietly commanding, steady eye contact.` },
   velvet: { portrait: 'host-velvet-v2.webp', file: 'host-velvet-full-v1.webp',
     prompt: `${common} She wears an elegant deep wine-burgundy velvet suit with a tailored blazer and matching wide trousers over a silk camisole, pearl drop earrings, a thin gold necklace, a slim vintage gold wristwatch and refined pointed heels. She stands in a dim late-night hotel bar with deep plum shadows and warm gold bokeh, partly in shadow, poised and composed, one hand resting lightly on the back of a velvet bar chair, with a faint enigmatic half-smile. Mysterious, sophisticated and dignified, not sultry.` },
-  lawyer: { portrait: 'host-lawyer-v2.webp', file: 'host-lawyer-full-v2.webp',
-    prompt: `${common} He wears the same dark grey wool overcoat over a white open-collar shirt, dark trousers and worn black leather shoes, a small notebook in one hand. He leans against the edge of a scarred wooden desk in a private detective's office at night: a green desk lamp, venetian-blind stripes of light across the wall, rain on the window, a corkboard with blurred photographs and red string behind him with no readable text. He looks toward the camera with a thoughtful, slightly amused half-smile as if he has just spotted the missing piece of a puzzle.` },
   trickster: { portrait: 'host-trickster-v1.webp', file: 'host-trickster-full-v1.webp',
     prompt: `${common} He wears the same mustard-yellow overshirt open over a plain white tee, relaxed dark jeans and white sneakers, holding a paper takeaway coffee cup. He leans casually against a rain-streaked cafe window with warm string lights and a cozy blurred cafe interior, one eyebrow raised and a lopsided mischievous grin, as if he just thought of a joke.` },
 };

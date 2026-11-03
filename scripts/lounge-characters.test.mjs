@@ -73,14 +73,15 @@ test('every character has a full profile for the model: name, age, work, past, t
 test('her flirtation and dominance are written down with their limits, and nobody else is given them', () => {
   const { loungeHosts } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
   const velvet = loungeHosts.find(host => host.id === 'velvet');
-  for (const rule of ['먼저 유혹하거나 장난스럽게 주도권을 시험한다', '성인 사이의 상호적인 플러팅', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '상대가 원하지 않으면 즉시 물러난다', '실제 인간관계를 통제하거나 집착과 의존을 유도하지 않는다', '현실에서 만나자는 약속']) assert.ok(velvet.companion.includes(rule), rule);
+  // Rewritten from her new bible (2026-11-02): frank about wanting, polite commands, and the same limits.
+  for (const rule of ['욕망 앞에서 솔직하다', '조건문', '한 문장으로 선을 긋는다', '암시와 분위기까지만', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '그만하자고 하면 그 자리에서 멈추고', '실제 삶과 인간관계와 일상의 결정을 통제하지 않는다', '현실에서 만나자는 약속']) assert.ok(velvet.companion.includes(rule), rule);
   assert.ok(!velvet.companion.includes('유혹·연애·성적 뉘앙스, 질투, 집착, 의존 유도는 하지 않는다'));
   // In a room with other people she keeps to a light provocation.
   assert.ok(velvet.instruction.includes('다른 참가자에게 불편을 주지 않는 범위') && velvet.instruction.includes('노골적인 성적 화제'));
   const page = loungeCharacters.find(character => character.id === 'velvet');
-  assert.ok(page.personality.some(item => item.label === '유혹') && page.personality.some(item => item.label === '주도권'));
-  assert.ok(page.boundaries.some(item => item.includes('그만하자고 하면 바로 멈춘다')));
-  for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('성인 사이의 상호적인 플러팅'), host.id);
+  assert.ok(page.personality.some(item => item.label === '지배') && page.personality.some(item => item.label === '욕망에 솔직한 팜므파탈'));
+  assert.ok(page.boundaries.some(item => item.includes('그 자리에서 멈춘다')) && page.boundaries.some(item => item.includes('암전')));
+  for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('욕망 앞에서 솔직하다'), host.id);
 });
 
 // Adding a character touches several places (docs/add-a-lounge-character.md). These two tests name what is missing.
@@ -103,4 +104,85 @@ test('no character is shipped with the placeholders scripts/new-lounge-character
     if (!existsSync(path)) continue;
     assert.doesNotMatch(readFileSync(path, 'utf8'), /TODO\(새 캐릭터\)/, `${file}: a new character still has TODO(새 캐릭터) to write`);
   }
+});
+
+test('a character with a companion sheet has all of it: the lens, ten actions or more, the inner voice at every stage, and events the engine can use', () => {
+  const { loungeCompanionSheetPrompt, loungeFewShotTurn } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const sheetFields = ['interpretationLens', 'actionAnchors', 'innerVoice', 'ruleBreak', 'relationshipLadder', 'fewShot', 'sceneEvents'];
+  const withSheet = loungeCharacters.filter(character => sheetFields.some(field => character.bible?.[field]));
+  // 서도현 is the first (2026-11-02); the others follow one by one.
+  assert.ok(['auditor', 'closer'].every(id => withSheet.some(character => character.id === id)));
+  for (const { id, bible } of withSheet) {
+    assert.ok(bible.interpretationLens, `${id}: a lens`);
+    assert.ok(bible.actionAnchors?.length >= 10, `${id}: ten actions or more`);
+    assert.ok(bible.innerVoice?.style, `${id}: how the inner voice speaks`);
+    for (const stage of [1, 2, 3, 4]) {
+      assert.ok(bible.innerVoice.ladder[stage]?.level, `${id}: the inner voice at stage ${stage}`);
+      if (bible.ruleBreak) assert.ok(bible.ruleBreak.byStage[stage], `${id}: the rule broken at stage ${stage}`);
+      if (bible.relationshipLadder) assert.ok(bible.relationshipLadder[stage], `${id}: the reaction at stage ${stage}`);
+    }
+    // An example has both forms (서도현) or one reply for both (강무진); hidden, it never carries an inner voice.
+    for (const shot of bible.fewShot ?? []) {
+      const shownTurn = loungeFewShotTurn(shot, 'on'), hiddenTurn = loungeFewShotTurn(shot, 'off');
+      assert.ok(shownTurn.text && hiddenTurn.text && hiddenTurn.inner_voice === '' && !/\*/.test(shownTurn.text + hiddenTurn.text), `${id}: an example with a reply and no stars`);
+    }
+    const ids = new Set();
+    for (const event of bible.sceneEvents ?? []) {
+      assert.ok(event.id && !ids.has(event.id) && event.minStage >= 1 && event.minStage <= 4 && event.content, `${id}: event ${event.id}`);
+      ids.add(event.id);
+      if (event.repeatable) assert.ok(event.cooldown >= 6, `${id}: a repeatable event ${event.id} cools down`);
+    }
+    // Shown, the examples carry their inner voices; hidden, the ones written for it and where the thought shows instead.
+    const shown = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'on');
+    const hidden = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'off');
+    assert.match(shown, /속마음의 말투: /);
+    assert.doesNotMatch(shown, /새어 나온다/);
+    if (bible.innerVoice.offModeLeaks?.length) assert.match(hidden, /속마음은 대사와 행동에 이렇게 새어 나온다/);
+    if (bible.fewShot?.length) {
+      assert.ok(shown.includes(JSON.stringify(loungeFewShotTurn(bible.fewShot[0], 'on').text)));
+      assert.ok(hidden.includes(JSON.stringify(loungeFewShotTurn(bible.fewShot[0], 'off').text)));
+    }
+  }
+});
+
+test('윤서연: no number of years, what she keeps back until she is asked, and a story card in which she is the divorced one (2026-11-03)', () => {
+  const seoyeon = loungeCharacters.find(c => c.id === 'ina');
+  const text = JSON.stringify(seoyeon);
+  assert.doesNotMatch(text, /3년|삼 년|서른셋/, 'the time since the divorce is told as "꽤 오래", never as a number');
+  assert.match(seoyeon.tagline, /^이혼 후 첫 소개팅/);
+  const rules = [...seoyeon.bible.invariants, ...seoyeon.bible.forbidden].join('\n');
+  assert.match(rules, /구체적으로 묻기 전에는 먼저 말하지 않는다/);
+  assert.match(rules, /상대가 한 말과 자기가 한 말을 섞지 않는다/);
+  // Her story card: the title says it, and the member is not given her past (the prologue once made the member the divorced
+  // one, so the two had the same story and what each had said was mixed up).
+  const card = JSON.parse(readFileSync(new URL('../docs/stories/ina-first-blind-date.json', import.meta.url), 'utf8'));
+  assert.equal(card.title, '이혼 후 첫 소개팅');
+  assert.doesNotMatch(JSON.stringify(card), /3년|삼 년/);
+  assert.doesNotMatch(card.user_role, /이혼/);
+  assert.doesNotMatch(card.prologue, /이혼|3년/, 'the prologue does not tell the member\'s past as hers');
+  assert.match(card.relationship, /구체적으로 물을 때/);
+  assert.match(card.prologue, /당신/);
+});
+
+test('임시우: his story card is the reunion his sheet tells, and the reason he was late is on his sheet but not in the prologue (2026-11-03)', () => {
+  const siwoo = loungeCharacters.find(c => c.id === 'jaeseok');
+  const card = JSON.parse(readFileSync(new URL('../docs/stories/jaeseok-ending-without-you.json', import.meta.url), 'utf8'));
+  assert.equal(card.id, 'jaeseok-ending-without-you', 'the card keeps its id: a story has one card');
+  assert.equal(card.title, '막차까지 이십 분');
+  // The sheet's night and its two people, told from the member's side.
+  for (const part of ['막차', '사십 분', '손을 흔들지 않았다', '결혼식', '같은 방향이었네요', '…오랜만이네요']) assert.ok(card.prologue.includes(part), part);
+  assert.match(card.prologue, /당신/);
+  assert.ok(card.prologue.trimEnd().endsWith('“…오랜만이네요.”'), 'it ends where his first reply starts');
+  assert.doesNotMatch(JSON.stringify(card), /시사회|세계적|현관문|현실/, 'the earlier card told another past: a poor start, a quarrel, a famous director');
+  // What is his to tell stays his: not the film behind it, not why he was late, not why she did not wave.
+  assert.doesNotMatch(card.prologue, /마지막 버스|한 컷|믿었|영화표/);
+  assert.match(card.user_role, /손을 흔들지 않고/);
+  assert.match(card.relationship, /직접 꺼낸다/);
+  // The reason is written only where it opens, the third stage's disclosure: in a line told every turn (the sheet, the example
+  // turns, the moment kept for it) he told it to a member who asked at the first stage (2026-11-03).
+  const disclosure = relationshipConfigs.jaeseok.stageDisclosure;
+  assert.match(disclosure.SAME_SCREEN, /마지막 한 컷을 고치느라 시계를 안 봤고, 당신이 늘 그랬듯 기다려 줄 거라고 믿었다는 것/);
+  assert.doesNotMatch(disclosure.FIRST_SCREENING + disclosure.SPARRING, /한 컷|믿었/, 'not before the third stage');
+  assert.doesNotMatch(JSON.stringify(siwoo.bible), /한 컷|기다려 줄 거라고 믿었/, 'not in anything the model reads at every stage');
+  assert.match(siwoo.bible.reservedMoments[0], /self_disclosure에 열려 있는 만큼만/);
 });

@@ -58,7 +58,7 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
         })}</ul>
         {asked.length > 0 && <p className="lounge-relationship-legend">막대의 세로선은 다음 단계에 필요한 만큼이에요.</p>}
         {/* The memories moved to the chat's settings (기억), where they can also be corrected (2026-10-29). */}
-        <p className="lounge-relationship-memory-note">기억하는 이야기와 둘의 흐름은 오른쪽 <b>대화 설정 › 기억</b>에서 보고 고칠 수 있어요{view.remembered?.length ? ` · 지금 ${view.remembered.length}개` : ''}.</p>
+        <p className="lounge-relationship-memory-note">기억하는 이야기와 둘의 흐름은 위쪽 <b>대화 설정 › 기억</b>에서 보고 고칠 수 있어요{view.remembered?.length ? ` · 지금 ${view.remembered.length}개` : ''}.</p>
         {debug && <div className="lounge-relationship-debug" aria-label="개발자용 관계 상태">
           <p>{view.macroState.id} · {debug.turnCount}턴(의미 {debug.meaningfulTurns}) · v{debug.version}{debug.pending.direction ? ` · ${debug.pending.direction === 'up' ? '승급' : '강등'} 대기 ${debug.pending.turns}` : ''}</p>
           <p>점수 {Object.entries(debug.scores).map(([key, value]) => `${key} ${value}`).join(' · ')}</p>

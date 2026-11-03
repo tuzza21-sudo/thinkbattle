@@ -14,7 +14,11 @@ export type EventEffect = {
   deltas: Partial<Record<string, number>>;
   mood?: Partial<Mood>;
 };
-export type StageCondition = { min?: Partial<Record<string, number>>; max?: Partial<Record<string, number>> };
+export type StageCondition = {
+  min?: Partial<Record<string, number>>; max?: Partial<Record<string, number>>;
+  /** With `segments`: the fun and heart scores added together (0-200) are at least this. */
+  total?: number;
+};
 export type StageRule = {
   id: string;
   label: string;
@@ -38,6 +42,17 @@ export type RelationshipConfig = {
   initialMood: Mood;
   /** Character-specific reactions. Events not listed fall back to the shared defaults. */
   events: Partial<Record<RelationshipEventType, EventEffect>>;
+  /**
+   * The events on the character's page (its wins and losses, 2026-11-02): they count in full, and any other event's gain
+   * at relationshipSettings.offListWeight. Absent, every event counts in full as before.
+   */
+  mainEvents?: readonly RelationshipEventType[];
+  /**
+   * Two segments the stages are judged on (2026-11-02): fun (interest and the character's playful metric) and heart (the
+   * rest). Each is the mean of its metrics (0-100), and a stage asks for their sum (`enter.total`), so either way of
+   * playing gets there and both together get there first. The metrics themselves still move and still reach the reply.
+   */
+  segments?: { fun: readonly string[]; heart: readonly string[] };
   /** Ordered from the first stage to the closest. The first stage has no conditions. */
   stages: readonly StageRule[];
   responseHints: readonly string[];
@@ -45,6 +60,10 @@ export type RelationshipConfig = {
   memoryStyle?: string;
   /** One-to-one speech level: polite until this stage id, casual (banmal) from it on. Absent means polite throughout. Group rooms are always polite. */
   casualFromStage?: string;
+  /** One-to-one speech is casual (banmal) from the first stage: the two are old friends (윤지안, 2026-11-02). */
+  casualFromStart?: boolean;
+  /** The first stage's distance (relationship.reserve) in this character's own terms, for one who leads from the start (선우령, 2026-11-02). */
+  firstStageReserve?: string;
   /** One-to-one rooms only: the character may flirt with the adult user, with suggestive tension and mild sexual undertones but nothing explicit. Without it the shared rule forbids romantic and sexual play. */
   adultFlirtation?: boolean;
   /** With `adultFlirtation`: how far this character lets romantic tension show at each stage (stage id to guidance). Sent to the response model beside the stage hint, so the same permission looks different at the first stage and the closest. */

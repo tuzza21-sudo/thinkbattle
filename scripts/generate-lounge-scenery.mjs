@@ -30,10 +30,11 @@ const scenes = {
     file: 'jazz-lp-bar-v1.webp',
     prompt: `${common} An old LP jazz bar after midnight: a warm wood-panelled room with floor-to-ceiling shelves of vinyl records, a vintage turntable with a spinning record on the bar counter in the foreground softly out of focus beside a lowball glass of amber whisky and a small candle, a pair of large vintage speakers, brass pendant lamps with a warm glow, a small low stage with an upright bass and a saxophone on a stand, leather stools along a long wooden bar, framed black-and-white photographs with no readable text, a rain-streaked window with blurred neon lights outside, a calm intimate late-night mood, the centre of the frame open and uncluttered.`,
   },
-  // The 'lawlibrary' theme id is kept for existing rooms; the place is now the private detective's office.
+  // The 'lawlibrary' theme id is kept for existing rooms; the place is now 이한결's shrine (홍실당) on a high floor in Cheongdam (2026-11-03;
+  // before, the private detective's office, detective-office-v1.webp).
   lawlibrary: {
-    file: 'detective-office-v1.webp',
-    prompt: `${common} A private detective's office late at night: a scarred dark-wood desk with a green banker's lamp glowing, an open notebook, a magnifying glass and a coffee mug, a corkboard on the wall with blurred photographs, pinned notes and red string with no readable text, venetian blinds with stripes of amber and blue city light across the room, a tall rain-streaked window with a neon-lit street beyond, a coat on a wooden hat stand, a worn leather chair and filing cabinets. Warm amber light with deep teal shadows. Quiet, atmospheric and full of mystery.`,
+    file: 'shrine-v1.webp',
+    prompt: `${common} A modern Korean shaman's shrine room on the top floor of a luxury apartment tower in Seoul at night: a low dark wooden altar table in the foreground, softly out of focus, with lit white candles, a small brass hand bell, a bowl of rice and a thin curl of incense smoke, two flat cushions facing each other across a low consultation table, an indigo traditional hanbok hanging on a wooden rack, hundreds of thin red threads hanging from the ceiling like soft curtains and catching the candlelight, paper lanterns with a warm glow, and floor-to-ceiling windows showing the blurred glittering night skyline of a wealthy Seoul district. Warm candlelight against deep blue city light, calm, intimate and slightly mysterious, never frightening or horror-like. No people. No readable signs, characters or text anywhere.`,
   },
   boardroom: {
     file: 'boardroom-v1.webp',

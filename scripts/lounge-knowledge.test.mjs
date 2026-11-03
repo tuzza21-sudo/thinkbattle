@@ -13,14 +13,14 @@ const knowledge = compile('../src/lib/loungeKnowledge.ts');
 const lounge = compile('../src/lib/lounge.ts');
 const handler = compile('../api/lounge-knowledge.ts', path => path.endsWith('loungeKnowledge') ? knowledge : lounge).default;
 const { readLoungeKnowledgeInput, loungeKnowledgeSensitive, normalizeLoungeEmbedding, loungeKnowledgeQuery, loungeKnowledgePrompt, loungeKnowledgeEmbeddingText } = knowledge;
-const characters = ['lawyer', 'diplomat'];
-const entry = { character: 'lawyer', kind: 'knowledge', title: '증거능력과 증명력', content: '증거능력은 법정에서 쓸 수 있는 자격이다.', active: true };
+const characters = ['shaman', 'diplomat'];
+const entry = { character: 'shaman', kind: 'knowledge', title: '증거능력과 증명력', content: '증거능력은 법정에서 쓸 수 있는 자격이다.', active: true };
 
 test('an entry from the form is cleaned and every problem is explained in Korean', () => {
   const clean = { tags: [], lesson: '', category: '', sourceNote: '', asOf: '', timeSensitive: false };
-  assert.deepEqual(readLoungeKnowledgeInput({ ...entry, title: '  증거능력  ', content: ' 내용 ' }, characters), { ok: true, input: { character: 'lawyer', kind: 'knowledge', title: '증거능력', content: '내용', active: true, ...clean } });
+  assert.deepEqual(readLoungeKnowledgeInput({ ...entry, title: '  증거능력  ', content: ' 내용 ' }, characters), { ok: true, input: { character: 'shaman', kind: 'knowledge', title: '증거능력', content: '내용', active: true, ...clean } });
   const id = '11111111-1111-4111-8111-111111111111';
-  assert.deepEqual(readLoungeKnowledgeInput({ ...entry, id, active: false }, characters).input, { id, character: 'lawyer', kind: 'knowledge', title: entry.title, content: entry.content, active: false, ...clean });
+  assert.deepEqual(readLoungeKnowledgeInput({ ...entry, id, active: false }, characters).input, { id, character: 'shaman', kind: 'knowledge', title: entry.title, content: entry.content, active: false, ...clean });
   for (const [bad, message] of [[{ ...entry, character: 'nobody' }, /캐릭터/], [{ ...entry, kind: 'rumour' }, /지식인지 경험인지/], [{ ...entry, title: '  ' }, /제목/], [{ ...entry, title: 'x'.repeat(81) }, /제목/],
     [{ ...entry, content: '' }, /내용/], [{ ...entry, content: 'x'.repeat(2001) }, /내용/], [{ ...entry, id: 'not-a-uuid' }, /번호/], [null, /형식/], [[], /형식/]]) {
     const result = readLoungeKnowledgeInput(bad, characters);
@@ -147,7 +147,7 @@ test('the administrator saves an entry: permission first, then the embedding, th
     if (url.endsWith('/v1/embeddings')) { const body = JSON.parse(init.body); assert.equal(body.dimensions, 256); assert.equal(body.model, 'text-embedding-3-small'); assert.ok(body.input.startsWith('증거능력과 증명력\n') && body.input.includes('증거 재판'), 'the tags are part of what is embedded'); assert.equal(init.headers.Authorization, 'Bearer key'); return ok({ data: [{ embedding: unit }] }); }
     if (url.endsWith('admin_save_lounge_knowledge')) {
       const body = JSON.parse(init.body);
-      assert.deepEqual([body.p_id, body.p_character, body.p_kind, body.p_title, body.p_active], [null, 'lawyer', 'knowledge', '증거능력과 증명력', true]);
+      assert.deepEqual([body.p_id, body.p_character, body.p_kind, body.p_title, body.p_active], [null, 'shaman', 'knowledge', '증거능력과 증명력', true]);
       assert.deepEqual([body.p_tags, body.p_lesson, body.p_category, body.p_source_note, body.p_as_of, body.p_time_sensitive], [['증거', '재판'], null, null, null, null, false], 'the tags are saved and empty fields are saved as nothing');
       assert.equal(body.p_embedding.length, 256); assert.equal(body.p_embedding[0], 1, 'the stored vector has length one');
       return ok('22222222-2222-4222-8222-222222222222');
@@ -202,8 +202,8 @@ test('a file of entries is read as jsonl or csv and every problem is reported wi
   const { parseCsv, checkEntries } = await import('./import-lounge-knowledge.mjs');
   assert.deepEqual(parseCsv('\uFEFFa,"b,1","say ""hi"""\r\nx,"two\nlines",\n\n'), [['a', 'b,1', 'say "hi"'], ['x', 'two\nlines', '']]);
   const csv = ['character,kind,title,content,tags,lesson,category,source_note,as_of,time_sensitive',
-    'lawyer,experience,"첫 사건","사건 이야기, 쉼표 포함","#증거, 질문",교훈,case,,,',
-    'lawyer,knowledge,증거능력,내용,,,,"출처 메모",2025-01-01,true'].join('\n');
+    'shaman,experience,"첫 사건","사건 이야기, 쉼표 포함","#증거, 질문",교훈,case,,,',
+    'shaman,knowledge,증거능력,내용,,,,"출처 메모",2025-01-01,true'].join('\n');
   const good = checkEntries('x.csv', csv, characters);
   assert.deepEqual(good.problems, []);
   assert.deepEqual(good.entries.map(item => [item.title, item.kind, item.tags, item.timeSensitive, item.asOf]), [['첫 사건', 'experience', ['증거', '질문'], false, ''], ['증거능력', 'knowledge', [], true, '2025-01-01']]);
@@ -240,13 +240,13 @@ test('윤서연\'s knowledge file is valid, tells her stories as her own and ano
 test('an upload on a character\'s page is limited to that character, and a file is refused whole when too big or empty', async () => {
   const { loadTs } = await import('./lounge-ts-loader.mjs');
   const { checkKnowledgeFile, loungeKnowledgeFileLimits } = loadTs(fileURLToPath(new URL('../src/lib/loungeKnowledgeImport.ts', import.meta.url)));
-  const all = ['ina', 'lawyer'];
+  const all = ['ina', 'shaman'];
   const line = extra => JSON.stringify({ kind: 'knowledge', title: `제목 ${Math.random()}`, content: '내용', ...extra });
   // No character in the file: the page's character is used. A different one is refused with its line.
-  const mixed = [line({}), line({ character: 'ina' }), line({ character: 'lawyer' })].join('\n');
+  const mixed = [line({}), line({ character: 'ina' }), line({ character: 'shaman' })].join('\n');
   const result = checkKnowledgeFile('a.jsonl', mixed, all, 'ina');
   assert.equal(result.entries.length, 2); assert.ok(result.entries.every(item => item.character === 'ina'));
-  assert.deepEqual(result.problems, ['3번째 줄: 캐릭터(lawyer)가 선택한 캐릭터와 달라요.']);
+  assert.deepEqual(result.problems, ['3번째 줄: 캐릭터(shaman)가 선택한 캐릭터와 달라요.']);
   assert.match(checkKnowledgeFile('a.jsonl', line({}), all).problems[0], /캐릭터를 선택/, 'without a page character each entry must name one');
   assert.match(checkKnowledgeFile('a.jsonl', '\n\n', all, 'ina').problems[0], /항목이 없어요/);
   assert.match(checkKnowledgeFile('a.jsonl', '[1]', all, 'ina').problems[0], /^1번째 줄: 한 줄에 항목 하나/);
