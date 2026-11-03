@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, UserCog, UserRound, Users, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, UserCog, Users, X, Image as ImageIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
@@ -48,13 +48,13 @@ import './LoungeRoom.css';
 
 type Props = { user: AppUser | null; onGuestRequest: () => Promise<void>; onLoginRequest: () => void; onSignupRequest?: () => void; onUserUpdate?: (user: AppUser) => void; onLogout?: () => Promise<void> };
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
-function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onProfileRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; onProfileRequest: () => void; loggingOut: boolean; unread: number }) {
+// The profile is edited from the 설정 tab, so the header has no profile button (2026-11-03).
+function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; loggingOut: boolean; unread: number }) {
   return <header className="lounge-header">
     {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 사석</Link>}
-    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>사석<span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
-    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}<span className="lounge-beta">EARLY ACCESS</span>{!inRoom && <nav className="lounge-account" aria-label="내 계정">
+    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>사석<b className="lounge-beta">Beta 테스트</b><span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
+    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
-        <button type="button" className="lounge-profile-button" onClick={onProfileRequest} aria-label={`${user.nickname}님 프로필 수정`}><span className="lounge-account-avatar">{user.loungeAvatarUrl ? <img src={user.loungeAvatarUrl} alt="" /> : <UserRound size={18} />}</span><span className="lounge-account-name"><strong>{user.nickname}</strong><small>프로필 수정</small></span></button>
         <Link to="/lounge/personas" className="lounge-persona-link" title="대화 속 나(페르소나)를 만들고 고쳐요"><UserCog size={15} aria-hidden="true" />페르소나</Link>
         {onLogout && <button type="button" className="lounge-account-logout" disabled={loggingOut} onClick={() => void onLogout()} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>}
       </> : <>
@@ -64,6 +64,44 @@ function LoungeHeader({ user, inRoom, introduction, onLoginRequest, onSignupRequ
     </nav>}</div>
   </header>;
 }
+const portraitWidthKey = 'lounge-portrait-width';
+const portraitLimits = { min: 150, max: 440 };
+const readPortraitWidth = () => { try { const saved = Number(localStorage.getItem(portraitWidthKey)); return saved >= portraitLimits.min && saved <= portraitLimits.max ? saved : undefined; } catch { return undefined; } };
+/**
+ * One to one on a computer (2026-11-03): the line between the character's photo and the conversation can be dragged
+ * left or right, or moved with the arrow keys, and the photo grows and shrinks with its column. A double click puts it
+ * back. The width is kept in this browser; the column is only resizable where it sits beside the conversation.
+ */
+function LoungePortraitResizer({ room }: { room: { readonly current: HTMLElement | null } }) {
+  const [width, setWidth] = useState(readPortraitWidth);
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const element = room.current;
+    if (!element) return;
+    if (width === undefined) { element.style.removeProperty('--lounge-portrait-drag'); element.removeAttribute('data-portrait-width'); }
+    else { element.style.setProperty('--lounge-portrait-drag', `${width}px`); element.setAttribute('data-portrait-width', ''); }
+    try { if (width === undefined) localStorage.removeItem(portraitWidthKey); else localStorage.setItem(portraitWidthKey, String(width)); } catch { /* kept for this visit only */ }
+  }, [width, room]);
+  // Never wider than about half the space, so the conversation keeps room.
+  const clamp = (value: number, column: HTMLElement | null) => {
+    const space = column?.closest<HTMLElement>('.lounge-conversation-space')?.getBoundingClientRect().width ?? 1000;
+    return Math.round(Math.min(portraitLimits.max, space * 0.5, Math.max(portraitLimits.min, value)));
+  };
+  const current = (handle: HTMLElement) => width ?? handle.parentElement?.getBoundingClientRect().width ?? 210;
+  return <div className="lounge-portrait-resizer" role="separator" aria-orientation="vertical" aria-label="캐릭터 사진 칸 너비" title="끌어서 사진 칸 너비를 바꿔요 · 두 번 누르면 처음대로" tabIndex={0}
+    aria-valuemin={portraitLimits.min} aria-valuemax={portraitLimits.max} aria-valuenow={width}
+    onPointerDown={event => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, width: current(event.currentTarget) }; }}
+    onPointerMove={event => { if (drag.current) setWidth(clamp(drag.current.width + event.clientX - drag.current.x, event.currentTarget.parentElement)); }}
+    onPointerUp={event => { drag.current = null; event.currentTarget.releasePointerCapture(event.pointerId); }}
+    onPointerCancel={() => { drag.current = null; }}
+    onDoubleClick={() => setWidth(undefined)}
+    onKeyDown={event => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      setWidth(clamp(current(event.currentTarget) + (event.key === 'ArrowRight' ? 20 : -20), event.currentTarget.parentElement));
+    }} />;
+}
+
 export function LoungePage(props: Props) {
   const { roomId, characterId, spaceId, entry, editId } = useParams();
   const location = useLocation();
@@ -85,7 +123,7 @@ export function LoungePage(props: Props) {
     setLoggingOut(true); setAccountError('');
     try { await props.onLogout(); setShowProfile(false); } catch (error) { setAccountError(errorText(error)); } finally { setLoggingOut(false); }
   };
-  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''} ${inRoom ? '' : 'has-tabs'}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onProfileRequest={() => setShowProfile(true)} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{creating ? <LoungeCharacterCreator key={editId ?? 'new'} user={props.user} editId={editId} onLoginRequest={props.onLoginRequest} /> : characterId ? <LoungeCharacterPage key={characterId} id={characterId} user={props.user} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : chatsPage ? <LoungeChatsPage user={props.user} onLoginRequest={props.onLoginRequest} /> : settingsPage ? <LoungeSettingsPage user={props.user} unread={social.unread} onProfileRequest={() => setShowProfile(true)} onLoginRequest={props.onLoginRequest} onSignupRequest={props.onSignupRequest} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}{!inRoom && <LoungeTabBar unread={social.unread} />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
+  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''} ${inRoom ? '' : 'has-tabs'}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{creating ? <LoungeCharacterCreator key={editId ?? 'new'} user={props.user} editId={editId} onLoginRequest={props.onLoginRequest} /> : characterId ? <LoungeCharacterPage key={characterId} id={characterId} user={props.user} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : chatsPage ? <LoungeChatsPage user={props.user} onLoginRequest={props.onLoginRequest} /> : settingsPage ? <LoungeSettingsPage user={props.user} onProfileRequest={() => setShowProfile(true)} onLoginRequest={props.onLoginRequest} onSignupRequest={props.onSignupRequest} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}{!inRoom && <LoungeTabBar unread={social.unread} />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
 }
 
 // The preview shows the picker with an example month: ElevenLabs partly used, Typecast not open yet.
@@ -318,6 +356,7 @@ function RoomView(props: RoomViewProps) {
             <div className={`lounge-moderator ${hostSpeaking ? 'speaking' : ''}`}><span className="lounge-moderator-avatar"><LoungeHostPortrait hostId={props.hostId} /><b>AI</b></span><div className="lounge-moderator-info"><h2>{hostTitle}</h2><span className="lounge-moderator-caption">{hostSpeaking ? solo ? '대화 상대 · 이야기하는 중' : 'AI 도우미 · 이야기하는 중' : replyDelayed ? solo ? '대화 상대 · 답변이 늦어지고 있어요' : 'AI 도우미 · 답변이 늦어지고 있어요' : props.pending ? solo ? '대화 상대 · 생각하는 중…' : 'AI 도우미 · 생각하는 중…' : solo ? '대화 상대 · 편하게 이야기해요' : 'AI 도우미 · 필요할 때 불러 주세요'}</span>{!solo && props.relationship && <LoungeRelationship view={props.relationship} change={props.relationshipChange} />}</div><VoiceWave active={hostSpeaking} /></div>
 
             {replyDelayed && <p className="lounge-slow-note" role="status"><LoaderCircle size={14} className="lounge-spin" />응답이 평소보다 늦어지고 있어요. 곧 이어갈게요. 계속 멈춰 있으면 한 번 더 말씀해 주세요.</p>}
+            {solo && !space && <LoungePortraitResizer room={roomElement} />}
           </div>
           <div className="lounge-place-view" aria-hidden="true"><div className="lounge-scene-intro"><span>{theme.tag}</span><p>{theme.caption}</p><div className="lounge-stage-label"><Headphones size={15} /> 함께 머무는 대화석 <span>{solo ? 'AI와 1:1' : `${props.members.length} / ${props.capacity}명`}</span></div></div></div>
           <aside className="lounge-participant-panel" aria-label="함께하는 참가자">

@@ -20,15 +20,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [fields, setFields] = useState<LoungeProfileFieldsValue>({ ageGroup: user.ageGroup ?? '', region: user.region ?? '', bio: user.bio ?? '' });
-  const [showPresence, setShowPresence] = useState(user.showPresence !== false);
   const [introState, setIntroState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [introError, setIntroError] = useState('');
 
   const saveIntroduction = async () => {
     if (introState === 'saving') return;
-    if (!fields.ageGroup || !fields.region.trim() || !fields.bio.trim()) { setIntroError('나이대, 지역, 자기소개는 비워 둘 수 없어요.'); return; }
+    if (!fields.ageGroup) { setIntroError('나이대를 골라 주세요.'); return; }
     setIntroState('saving'); setIntroError('');
-    try { onProfileUpdated(await saveLoungeProfile(user, { ...fields, showPresence })); setIntroState('saved'); }
+    try { onProfileUpdated(await saveLoungeProfile(user, fields)); setIntroState('saved'); }
     catch (err) { setIntroError(err instanceof Error ? err.message : '프로필을 저장하지 못했어요.'); setIntroState('idle'); }
   };
 
@@ -92,7 +91,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
     }
   };
 
-  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '대화 라운지' ? '편한 이름과 소개, 대화 속 나의 모습을 정해요.' : serviceName + '에서 사용할 이름과 소개, 페르소나를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
+  return <LoungeAccountDialog title="대화 속 나를 소개해요" description={serviceName === '대화 라운지' ? '편한 이름과 나이대, 대화 속 나의 모습을 정해요.' : serviceName + '에서 사용할 이름과 나이대, 페르소나를 관리해요.'} eyebrow="YOUR PLACE IN THE LOUNGE" onClose={onClose} displayName={nickname.trim() || user.nickname} avatarUrl={user.loungeAvatarUrl}>
     <div className="lounge-account-identity"><Mail size={17} /><div><small>로그인 계정</small><span>{user.email || '소셜 계정 · 이메일 정보 없음'}</span></div></div>
     <span className="lounge-account-section-label">01 · 대화에서 불릴 이름</span>
     <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void handleSave(); }} aria-busy={loading}>
@@ -102,13 +101,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
       <button type="submit" className="btn btn-primary lounge-account-submit" disabled={loading || success}>{loading ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{loading ? '저장 중…' : success ? '저장했어요' : '변경 사항 저장'}</button>
     </form>
     {!user.isAnonymous && <>
-      <span className="lounge-account-section-label">02 · 다른 분께 보이는 소개</span>
+      <span className="lounge-account-section-label">02 · 나이대</span>
       <form className="lounge-account-form" onSubmit={event => { event.preventDefault(); void saveIntroduction(); }} aria-busy={introState === 'saving'}>
         <LoungeProfileFields value={fields} onChange={next => { setFields(next); setIntroState('idle'); }} disabled={introState === 'saving'} required />
-        <label className="lounge-presence-check"><input type="checkbox" checked={showPresence} onChange={event => { setShowPresence(event.target.checked); setIntroState('idle'); }} /><span>친구에게 내 접속 상태와 대화 중인 방 보여주기<small>끄면 친구 목록에 접속 중인지, 어느 방에 있는지 보이지 않아요.</small></span></label>
         {introError && <div className="form-error" role="alert">{introError}</div>}
-        {introState === 'saved' && <p className="lounge-account-success" role="status"><Check size={16} />소개를 저장했어요.</p>}
-        <button type="submit" className="btn btn-primary lounge-account-submit" disabled={introState !== 'idle'}>{introState === 'saving' ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{introState === 'saving' ? '저장 중…' : introState === 'saved' ? '저장했어요' : '소개 저장'}</button>
+        {introState === 'saved' && <p className="lounge-account-success" role="status"><Check size={16} />나이대를 저장했어요.</p>}
+        <button type="submit" className="btn btn-primary lounge-account-submit" disabled={introState !== 'idle'}>{introState === 'saving' ? <LoaderCircle size={17} className="lounge-spin" /> : <Save size={16} />}{introState === 'saving' ? '저장 중…' : introState === 'saved' ? '저장했어요' : '나이대 저장'}</button>
       </form>
       <span className="lounge-account-section-label">03 · 대화 속 나 (페르소나)</span>
       <p className="lounge-persona-note">캐릭터와 1:1로 대화할 때의 나(이름, 직업, 성격)는 전용 페이지에서 대화 전에 만들고 고쳐요. 기본 페르소나는 새 대화마다 자동으로 쓰여요.</p>

@@ -33,8 +33,8 @@ const signupFields = (metadata: Record<string, unknown> | undefined): LoungeProf
   return ageGroup || region || bio ? { ageGroup, region, bio } : null;
 };
 
-/** Gender, age group, region and introduction are required of every member (guests are exempt). */
-export const isLoungeProfileComplete = (user: AppUser) => Boolean(user.gender && user.ageGroup && user.region?.trim() && user.bio?.trim());
+/** Gender and age group are required of every member (guests are exempt); region and introduction no longer are (2026-11-03). */
+export const isLoungeProfileComplete = (user: AppUser) => Boolean(user.gender && user.ageGroup);
 
 /** Saves the gender shown on lounge rooms to the user's own profile. */
 export const saveUserGender = async (user: AppUser, gender: AppUserGender): Promise<AppUser> => {

@@ -128,14 +128,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
         setError(isEnglish ? 'Please choose your age group.' : '나이대를 선택해 주세요.');
         return;
       }
-      if (!intro.region.trim()) {
-        setError(isEnglish ? 'Please enter your region.' : '지역을 입력해 주세요.');
-        return;
-      }
-      if (!intro.bio.trim()) {
-        setError(isEnglish ? 'Please write a short introduction.' : '자기소개를 적어 주세요.');
-        return;
-      }
       if (password !== confirmPassword) {
         setError(isEnglish ? 'The passwords do not match.' : '비밀번호가 일치하지 않습니다.');
         return;
@@ -167,7 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
   };
 
   const finish = (user: AppUser) => { onAuthenticated(user); onClose(); };
-  if (createdUser) return <LoungeAccountDialog title={isEnglish ? 'Add a profile photo' : '프로필 사진을 올려요'} description={isEnglish ? 'Your account is ready. Add a photo for your seat, or start without one.' : '가입이 완료됐어요. 내 자리에 보일 사진을 올리거나, 지금은 가볍게 시작해도 좋아요.'} eyebrow="YOUR FIRST HELLO" onClose={() => finish(createdUser)} language={language} displayName={createdUser.nickname} avatarUrl={createdUser.loungeAvatarUrl}>
+  if (createdUser) return <LoungeAccountDialog title={isEnglish ? 'Add a profile photo' : '프로필 사진을 올려요'} description={isEnglish ? 'Your account is ready. Add a profile photo, or start without one.' : '가입이 완료됐어요. 프로필 사진을 올리거나, 지금은 가볍게 시작해도 좋아요.'} eyebrow="YOUR FIRST HELLO" onClose={() => finish(createdUser)} language={language} displayName={createdUser.nickname} avatarUrl={createdUser.loungeAvatarUrl}>
     <LoungeAvatarEditor user={createdUser} initialFile={photo} language={language} onSaved={finish} />
     <button type="button" className="avatar-text-button avatar-onboarding-skip" onClick={() => finish(createdUser)}>{isEnglish ? 'Add it later in my profile' : '나중에 프로필에서 올리기'}</button>
   </LoungeAccountDialog>;
@@ -204,7 +196,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onAuthenticated, 
         {isSignup && <label className="form-field"><span>{isEnglish ? 'Confirm password' : '비밀번호 확인'}</span><input value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} autoComplete="new-password" placeholder={isEnglish ? 'Once more' : '한 번 더 입력'} type="password" required disabled={loading} /></label>}
       </div>
       {isSignup && <>
-        <div className="lounge-account-intro"><p className="avatar-signup-intro">{isEnglish ? 'Age group, region and a short introduction are required. They appear on your profile card in rooms, and you can change them later in your profile.' : '나이대·지역·자기소개는 꼭 입력해 주세요. 대화방에서 내 프로필을 눌렀을 때 보이고, 나중에 프로필에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} required /></div>
+        <div className="lounge-account-intro"><p className="avatar-signup-intro">{isEnglish ? 'Please choose your age group. You can change it later in Settings.' : '나이대만 골라 주시면 돼요. 나중에 설정에서 바꿀 수 있어요.'}</p><LoungeProfileFields value={intro} onChange={setIntro} disabled={loading} required /></div>
         <label className="legal-consent-check"><input type="checkbox" checked={acceptedTerms} disabled={loading} onChange={event => setAcceptedTerms(event.target.checked)} /><span>{isEnglish ? <>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy notice</a>.</> : <><a href="/terms" target="_blank" rel="noreferrer">이용약관</a>과 <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리 안내</a>에 동의합니다.</>}</span></label>
       </>}
       {error && <div className="form-error" role="alert">{error}</div>}

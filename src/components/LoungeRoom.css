@@ -1055,8 +1055,15 @@
 .has-room .lounge-one-to-one .lounge-moderator-avatar { box-shadow:none; border:0; background:none; }
 @media (min-width:761px) and (min-height:501px) {
   .has-room .lounge-room-main.lounge-one-to-one,.has-room .lounge-room-main.lounge-one-to-one:has(.lounge-seats.seats-1) { --lounge-profile-size:170px; }
-  .has-room .lounge-one-to-one .lounge-conversation-space { grid-template-columns:minmax(150px,210px) minmax(0,1fr); }
+  .has-room .lounge-one-to-one .lounge-conversation-space { grid-template-columns:var(--lounge-portrait-drag,minmax(150px,210px)) minmax(0,1fr); }
+  /* The dragged width (LoungePortraitResizer, 2026-11-03): the photo follows its column. */
+  .has-room .lounge-room-main.lounge-one-to-one[data-portrait-width] { --lounge-profile-size:calc(var(--lounge-portrait-drag) - 40px); }
+  .has-room .lounge-one-to-one .lounge-host-column { position:relative; align-self:stretch; }
+  .has-room .lounge-one-to-one .lounge-portrait-resizer { display:block; position:absolute; top:0; bottom:0; right:-14px; width:8px; border-radius:4px; cursor:col-resize; touch-action:none; z-index:2; }
+  .has-room .lounge-one-to-one .lounge-portrait-resizer::after { content:''; position:absolute; top:40px; bottom:40px; left:3px; width:2px; border-radius:1px; background:currentColor; opacity:0; transition:opacity .15s; }
+  .has-room .lounge-one-to-one .lounge-portrait-resizer:hover::after,.has-room .lounge-one-to-one .lounge-portrait-resizer:focus-visible::after { opacity:.35; }
 }
+.lounge-portrait-resizer { display:none; }
 @media (max-width:760px) {
   .has-room .lounge-room-main.lounge-one-to-one .lounge-stage .lounge-moderator-avatar { width:84px; }
   .has-room .lounge-one-to-one .lounge-moderator-info h2 { font-size:15px; }
