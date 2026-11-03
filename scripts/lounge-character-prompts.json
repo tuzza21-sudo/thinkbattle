@@ -14,5 +14,21 @@
       "file": "host-guide-work-v1.webp",
       "prompt": "{{common}} He is at work as a mountain trekking guide in the Italian Dolomites: well groomed and clean-shaven, wearing a sleek fitted technical hiking jacket in slate blue over a t-shirt, tailored trekking trousers, clean hiking boots and a small backpack, he stands on a high alpine trail on a clear morning, one arm pointing toward jagged pale limestone peaks with a confident smirk, a small group of hikers seen from behind, green meadows and a small wooden mountain hut far below. Natural bright mountain light. Nothing readable on any sign."
     }
+  },
+  "shaman": {
+    "portrait": {
+      "file": "host-shaman-v1.webp",
+      "prompt": "{{common}} A fictional Korean man aged thirty-one with a gentle, clean-cut, almost innocent face and sharp narrow eyes that look as if they have just seen straight through you: smooth healthy skin, neat dark hair with a soft natural fringe, thin silver-rimmed round glasses, one eyebrow slightly raised and the corner of his mouth lifted in a dry, teasing half-smile, as if he is about to click his tongue and give you a blunt verdict. He wears a crisp, simple white shirt with the top button open. A fine red silk thread is looped once around his collar. Background: a softly blurred modern shrine room on the top floor of a luxury apartment tower in Seoul, warm candlelight, a low dark wooden altar table, paper lanterns, many thin red threads hanging like curtains catching the light, a pale hanbok fabric folded in the corner, no readable signs or characters anywhere. Soft flattering warm candle light with a gentle rim light on the hair. Elegant magazine-portrait quality, calm and slightly mysterious, never frightening or horror-like, tasteful and not provocative."
+    },
+    "full": {
+      "portrait": "host-shaman-v1.webp",
+      "file": "host-shaman-full-v1.webp",
+      "prompt": "{{common}} He wears the same crisp white shirt as in the portrait with slim dark charcoal trousers and clean black leather shoes, thin silver-rimmed round glasses, and a bracelet of thin red thread wound several times around his left wrist. He stands relaxed and a little arrogant in a modern shrine room on the top floor of a Seoul apartment tower at night, a low dark wooden altar table with candles and a small brass bell beside him, many thin red threads hanging from the ceiling like curtains, floor-to-ceiling windows behind him with the blurred glittering lights of the Cheongdam district, one hand slightly lifted as if about to point at someone and scold them, his head turned toward the camera with a dry half-smile. Clean and well groomed. No readable signs or characters."
+    },
+    "work": {
+      "portrait": "host-shaman-v1.webp",
+      "file": "host-shaman-work-v1.webp",
+      "prompt": "{{common}} He is at work as a young Korean shaman (a male fortune-teller who reads love fates), wearing a deep indigo-blue traditional hanbok jacket and trousers with a wide sash worn only for rituals, thin silver-rimmed round glasses and a bracelet of thin red thread on his wrist. He sits cross-legged on a cushion in his modern shrine room on a high floor at night, a small brass hand bell held in one hand and the other hand scattering a pinch of rice over a low dark wooden altar table with lit candles, incense smoke and a bowl of rice, many thin red threads hanging behind him catching the candlelight, his sharp eyes fixed on the viewer with a confident, scolding look that is just about to soften. Respectful, atmospheric, warm candlelight, never frightening or horror-like. Nothing readable on any sign, paper or object."
+    }
   }
 }

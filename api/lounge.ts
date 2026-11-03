@@ -1,9 +1,9 @@
 import { loungeMemberPersonaRule, loungeRoomPersona, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
-import { getLoungeCharacter, loungeCharacterRules, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
+import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { alignLoungeProposalEvents, cleanLoungeCompanionReply, effectiveIntimacyStage, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
@@ -288,7 +288,8 @@ export function replyTextPartial(output: string): string | undefined {
 
 /**
  * Adult mode is for testing (2026-11-02): only the accounts in LOUNGE_ADULT_MODE_USERS (emails or user ids) have it, for
- * a character whose bible sets it, in a one-to-one chat. There is no age verification yet, so no member has it.
+ * every built-in character with adult flirtation (2026-11-03; not a character a member made), in a one-to-one chat. There
+ * is no age verification yet, so no member has it.
  */
 function hasLoungeAdultMode(user: { id: string; email?: string }) {
   const allowed = (process.env.LOUNGE_ADULT_MODE_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
@@ -742,6 +743,13 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const companionStored = Boolean(companionState) && Array.isArray(companionRows);
     // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
     const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
+    // Every built-in character with adult flirtation has it; a character a member made does not (nobody can check its age).
+    // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
+    const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && !isLoungeCustomCharacterId(host.id) && hasLoungeAdultMode(user));
+    // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
+    const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
+    const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
+    const companionTurn = room.ai_turns ?? 0;
     // The analyzer reads the member's latest words and what they do to the scene while memories and knowledge are looked
     // up, for every model, as the scene and its events depend on it. Slow (3 s) or failed, the scene stays where it is,
     // nothing happens around the two and the reply reads the member for itself.
@@ -759,15 +767,19 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       })().catch(() => undefined) : undefined;
     // The director, beside the analyzer and at the same time, for the fast model only (see loungeMessenger.ts): it sets
     // the reaction, what the reply does and how it ends. LOUNGE_DIRECTOR=off turns it off, =on runs it for every model.
-    const directorModel = companionChat && process.env.LOUNGE_DIRECTOR !== 'off' && (getLoungeChatModel(room.ai_model).id === 'gpt' || process.env.LOUNGE_DIRECTOR === 'on');
+    const directorModel = companionChat && process.env.LOUNGE_DIRECTOR !== 'off' && (['gpt', 'deepseek-flash'].includes(getLoungeChatModel(room.ai_model).id) || process.env.LOUNGE_DIRECTOR === 'on');
     const directorStarted = performance.now();
     const directorRead = directorModel && companionCharacter && messages[0]?.kind === 'human' ? (async () => {
         const state = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : undefined;
+        // The touch the stage takes, as the reply is told it: without it the director read "she sets the line" in the
+        // bible and told her to stop the member's hand at her closest step, in adult mode too (2026-11-03).
+        const intimacy = typeof state?.intimacy === 'string' ? (adultMode ? relationshipAdultModeText(state.intimacy) : state.intimacy) : undefined;
+        const explicit = adultMode && Boolean(stageNumber) && (companionCharacter.bible?.intimacyLadder && companionState ? effectiveIntimacyStage({ state: companionState, stage: stageNumber!, turn: companionTurn }).level : stageNumber) === 4;
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
           model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,
           instructions: [loungeDirectorInstructions, `인물 요약: ${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}. ${companionCharacter.tagline}`,
             loungeBiblePrompt(companionCharacter) || `성격: ${companionCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
-          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''),
+          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, intimacy, explicit, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''),
             messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
           text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
         }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
@@ -845,7 +857,6 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow, ...relationshipSteady } = relationship ? relationshipPromptContext(relationship.record, relationship.config, relationship.mood) : ({} as Partial<ReturnType<typeof relationshipPromptContext>>);
     // A story that starts with the two already speaking 반말 keeps it from the first stage.
     if (relationship && scenario && loungeScenarioCasualStart.has(scenario.id)) Object.assign(relationshipSteady, { speech_level: 'casual' });
-    const adultMode = Boolean(relationship && solo && chat && getLoungeCharacter(host.id)?.bible?.adultMode && hasLoungeAdultMode(user));
     if (adultMode && typeof relationshipSteady.intimacy === 'string') relationshipSteady.intimacy = relationshipAdultModeText(relationshipSteady.intimacy);
     const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
     const contextRecent = solo && chat ? recent.slice(-16) : recent;
@@ -974,13 +985,14 @@ ${photoRule}`;
       loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), directorModel ? loungeDirectionRule : '', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
     const [analysis, direction] = await Promise.all([analyzerRead, directorRead]);
     if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { reaction: direction.reaction, ending: direction.ending } : {}) }));
-    // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
-    const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
-    const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
-    const companionTurn = room.ai_turns ?? 0;
     const sceneDecision = companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
-    if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { tone: analysis.user_tone, need: analysis.emotional_need, emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
+    // The turns adult mode opens are answered by DeepSeek when its key is set (see deepseekReply).
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
+    const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultVoiceNote}` : undefined;
+    const adultReply = Boolean(deepseekKey && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
+    if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { tone: analysis.user_tone, need: analysis.emotional_need, emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
     const knowledge = await withinLookupWait(knowledgeRead) ?? [];
@@ -1026,7 +1038,7 @@ ${photoRule}`;
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.${messengerCall ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : {}), ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction ? { direction } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
         ? loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
@@ -1173,8 +1185,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         const record = stored?.ok ? applyDecay(relationshipFromRow(relationship.config, stored.row), relationship.config, new Date()) : relationship.record;
         // A sincere no is never folding or waffling, whatever the call after the reply made of it.
         const refused = analysis?.is_sincere_refusal && Array.isArray(answer?.events) ? answer.events.filter(event => !['FOLDS_EASILY', 'WAFFLES'].includes((event as { type?: unknown })?.type as string)) : answer?.events;
-        // For a character with a proposal rule, a proposal is scored as the analyzer read it (common events 4-2).
-        const events = character?.bible?.intimacyProposal && !analysis?.is_sincere_refusal ? alignLoungeProposalEvents(refused, analysis?.intimacy_proposal) : refused;
+        // For a character with a proposal rule, a proposal is scored as the analyzer read it (common events 4-2). At the
+        // closest step (the stage's, or adult mode's) explicit words are not crude, whoever read them so (2026-11-03:
+        // four such turns took 선우령's interest and trust down with her stage).
+        const closestTurn = Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship.config.adultFlirtation && stageNumber && stageNumber >= 4);
+        const events = closestTurn && Array.isArray(refused) ? refused.filter(event => (event as { type?: unknown })?.type !== 'MAKES_CRUDE_ADVANCE')
+          : character?.bible?.intimacyProposal && !analysis?.is_sincere_refusal ? alignLoungeProposalEvents(refused, analysis?.intimacy_proposal) : refused;
         const turn = processTurn({ record, config: relationship.config, mood: relationship.mood, events, hasUserTurn: recent.at(-1)?.kind === 'human', now: stored?.ok ? new Date() : relationship.now });
         console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));
         const response = await fetchTimed(`${url}/rest/v1/rpc/save_voice_lounge_relationship`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({
@@ -1493,11 +1509,53 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
             return parseHostAnswer(output, final, false);
           };
+          // Adult mode at the closest step (test accounts, 2026-11-03): OpenAI's models stop short of an explicit scene, so
+          // that turn's reply goes to DeepSeek (DEEPSEEK_API_KEY, LOUNGE_ADULT_MODEL) with the same instructions, input and
+          // JSON shape. Its JSON mode takes no schema, so the instructions carry it; a failed or blank answer falls back to OpenAI.
+          // `quiet` is a rewrite that shows nothing while it is written (a reply that came back in another language).
+          const deepseekReply = async (note = '', quiet = false) => {
+            if (!quiet) partialLength = 0;
+            const model = process.env.LOUNGE_ADULT_MODEL || 'deepseek-flash';
+            const response = await fetchTimed('https://api.deepseek.com/chat/completions', {
+              method: 'POST', headers: { Authorization: `Bearer ${deepseekKey}`, 'Content-Type': 'application/json' }, signal: replyStop,
+              body: JSON.stringify({
+                model, stream: true, stream_options: { include_usage: true }, thinking: { type: 'disabled' },
+                response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
+                messages: [
+                  { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
+                  { role: 'user', content: modelRequest.input },
+                ],
+              }),
+            }, 30_000);
+            if (!response.ok || !response.body) {
+              console.warn('[Lounge model] deepseek failed', JSON.stringify({ model, status: response.status }));
+              throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'deepseek_rate_limit' : 'deepseek_request_failed', true, 5);
+            }
+            type DeepSeekChunk = { choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number } };
+            let output = '', finish = '', usage: DeepSeekChunk['usage'];
+            for await (const raw of readModelEvents(response.body)) {
+              const chunk = raw as unknown as DeepSeekChunk, choice = chunk.choices?.[0];
+              output += choice?.delta?.content ?? '';
+              if (!quiet) {
+                sendPartial(output);
+                if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
+              }
+              if (choice?.finish_reason) finish = choice.finish_reason;
+              if (chunk.usage) usage = chunk.usage;
+            }
+            if (finish === 'content_filter') throw new LoungeUpstreamError('이 모델이 이번 답을 건너뛰었어요. 다시 말을 걸어 주세요.', 502, 'deepseek_blocked', true, 5);
+            const final: ModelResult = { status: finish === 'length' ? 'incomplete' : 'completed', ...(finish === 'length' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
+              usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: usage?.prompt_cache_hit_tokens ?? 0 } } };
+            const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
+            // A reply its JSON mode could not read comes back as spaces.
+            return parseHostAnswer(output.trim() || undefined, final, false);
+          };
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReply = async (provider: 'openai' | 'gemini' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
+            if (provider === 'deepseek') return deepseekReply();
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -1535,7 +1593,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
-          const provider = chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
+          const provider = deepseekKey && (adultReply || chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
             try {
@@ -1543,9 +1601,15 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               catch (error) {
                 // Once the first sentence is being spoken a new attempt would say something else after it.
                 if (found || earlySpeech || replyStop.aborted) throw error;
-                // A chosen Gemini model that fails before any text: GPT answers this turn, so the conversation goes on.
-                if (provider === 'gemini') {
-                  console.warn('[Lounge API] gemini reply failed, answering with openai', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: GPT answers this turn, so
+                // the conversation goes on.
+                if (provider === 'gemini' || provider === 'deepseek') {
+                  // DeepSeek's JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
+                  if (provider === 'deepseek') {
+                    console.warn('[Lounge API] deepseek reply failed, asking again', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                    try { return await attemptReply('deepseek'); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                  }
+                  console.warn(`[Lounge API] ${provider} reply failed, answering with openai`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                   return await attemptReply('openai');
                 }
                 // Nothing written yet: the fast model answers this turn instead of a longer silence.
@@ -1579,8 +1643,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // A reply in another language (Luna once answered whole in Japanese) is written once more, asked for Korean,
             // and replaces what was shown; if that fails too, the first is kept.
             if (loungeNotKorean(`${full?.text ?? early}\n${typeof full?.inner_voice === 'string' ? full.inner_voice : ''}`)) {
-              const openaiModel = chatModel.provider !== 'gemini';
+              const openaiModel = chatModel.provider === 'openai';
               const again = await (async () => {
+                if (provider === 'deepseek') return await deepseekReply('이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.', true) as { text?: string; inner_voice?: unknown };
                 const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({ ...modelRequest, ...(openaiModel ? {} : { model: 'gpt-6-luna', reasoning: { effort: 'none' } }),
                   instructions: `${modelRequest.instructions}\n이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.` }), undefined, 30_000), 'openai');
                 return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown };

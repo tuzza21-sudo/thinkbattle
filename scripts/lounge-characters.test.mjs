@@ -144,3 +144,45 @@ test('a character with a companion sheet has all of it: the lens, ten actions or
     }
   }
 });
+
+test('윤서연: no number of years, what she keeps back until she is asked, and a story card in which she is the divorced one (2026-11-03)', () => {
+  const seoyeon = loungeCharacters.find(c => c.id === 'ina');
+  const text = JSON.stringify(seoyeon);
+  assert.doesNotMatch(text, /3년|삼 년|서른셋/, 'the time since the divorce is told as "꽤 오래", never as a number');
+  assert.match(seoyeon.tagline, /^이혼 후 첫 소개팅/);
+  const rules = [...seoyeon.bible.invariants, ...seoyeon.bible.forbidden].join('\n');
+  assert.match(rules, /구체적으로 묻기 전에는 먼저 말하지 않는다/);
+  assert.match(rules, /상대가 한 말과 자기가 한 말을 섞지 않는다/);
+  // Her story card: the title says it, and the member is not given her past (the prologue once made the member the divorced
+  // one, so the two had the same story and what each had said was mixed up).
+  const card = JSON.parse(readFileSync(new URL('../docs/stories/ina-first-blind-date.json', import.meta.url), 'utf8'));
+  assert.equal(card.title, '이혼 후 첫 소개팅');
+  assert.doesNotMatch(JSON.stringify(card), /3년|삼 년/);
+  assert.doesNotMatch(card.user_role, /이혼/);
+  assert.doesNotMatch(card.prologue, /이혼|3년/, 'the prologue does not tell the member\'s past as hers');
+  assert.match(card.relationship, /구체적으로 물을 때/);
+  assert.match(card.prologue, /당신/);
+});
+
+test('임시우: his story card is the reunion his sheet tells, and the reason he was late is on his sheet but not in the prologue (2026-11-03)', () => {
+  const siwoo = loungeCharacters.find(c => c.id === 'jaeseok');
+  const card = JSON.parse(readFileSync(new URL('../docs/stories/jaeseok-ending-without-you.json', import.meta.url), 'utf8'));
+  assert.equal(card.id, 'jaeseok-ending-without-you', 'the card keeps its id: a story has one card');
+  assert.equal(card.title, '막차까지 이십 분');
+  // The sheet's night and its two people, told from the member's side.
+  for (const part of ['막차', '사십 분', '손을 흔들지 않았다', '결혼식', '같은 방향이었네요', '…오랜만이네요']) assert.ok(card.prologue.includes(part), part);
+  assert.match(card.prologue, /당신/);
+  assert.ok(card.prologue.trimEnd().endsWith('“…오랜만이네요.”'), 'it ends where his first reply starts');
+  assert.doesNotMatch(JSON.stringify(card), /시사회|세계적|현관문|현실/, 'the earlier card told another past: a poor start, a quarrel, a famous director');
+  // What is his to tell stays his: not the film behind it, not why he was late, not why she did not wave.
+  assert.doesNotMatch(card.prologue, /마지막 버스|한 컷|믿었|영화표/);
+  assert.match(card.user_role, /손을 흔들지 않고/);
+  assert.match(card.relationship, /직접 꺼낸다/);
+  // The reason is written only where it opens, the third stage's disclosure: in a line told every turn (the sheet, the example
+  // turns, the moment kept for it) he told it to a member who asked at the first stage (2026-11-03).
+  const disclosure = relationshipConfigs.jaeseok.stageDisclosure;
+  assert.match(disclosure.SAME_SCREEN, /마지막 한 컷을 고치느라 시계를 안 봤고, 당신이 늘 그랬듯 기다려 줄 거라고 믿었다는 것/);
+  assert.doesNotMatch(disclosure.FIRST_SCREENING + disclosure.SPARRING, /한 컷|믿었/, 'not before the third stage');
+  assert.doesNotMatch(JSON.stringify(siwoo.bible), /한 컷|기다려 줄 거라고 믿었/, 'not in anything the model reads at every stage');
+  assert.match(siwoo.bible.reservedMoments[0], /self_disclosure에 열려 있는 만큼만/);
+});

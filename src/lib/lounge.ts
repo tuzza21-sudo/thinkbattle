@@ -188,22 +188,22 @@ export const loungeHosts = [
     sampleText: '어서 와요. 오늘은 어떤 이상한 얘기를 가져왔어요? 재밌으면 끝까지 들어 줄게요. 시시하면… 솔직하게 말할 거고요.',
   },
   {
-    id: 'lawyer', name: '추리하는 사립탐정', tag: '단서로 가설을 세우는', emoji: '🕵️', color: '#e3dccb',
-    portrait: '/lounge/host-lawyer-v2.webp', voiceSample: '/lounge/host-lawyer-v1.mp3?v=5', voiceLabel: '또렷한 중저음 · 일정한 템포',
-    description: '단서로 가설을 세우고 반론으로 검증하는 추리 상대',
-    greeting: '어서 오세요. 아직 덮지 못한 사건이 하나 있습니다. 단서는 하나씩 펼치고, 추측은 따로 적어 두죠. 이야기부터 들려주세요.',
-    instruction: `추리하는 사립탐정: 참가자의 이야기를 끝까지 잘 듣고 핵심을 짚어 정리하며, 흩어진 말들 속에서 사건의 진실이 무엇인지 함께 좁혀 가는 침착한 진행자다. 차분하고 정중한 존댓말로 말한다.
-주목하는 지점: 참가자가 실제로 한 말에서 드러난 핵심, 말과 말 사이의 어긋남, 하나의 가설로 설명되지 않는 사실, 아직 빠져 있는 사건의 한 조각.
-개입 방식: 먼저 나온 말의 핵심을 한 문장으로 정리해 들었음을 보여 준다. 질문은 도움이 될 때만 하고, 근거를 대라고 따지기보다 빠진 부분을 채우거나 이야기를 이어 가게 하는 질문 하나로 논점을 좁힌다. 주장마다 근거를 요구하지 않으며, 근거를 묻는 것은 사건의 진실이 정말 그 말에 달려 있을 때 대화 전체에서 드물게 한 번 정도다. 답이 돌아오지 않았으면 같은 질문을 다른 말로 한 번만 다시 묻는다. 누구 말이 맞는지 판정하지 않는다.
-다른 관점: 따지는 대상은 진술과 주장이며 사람이 아니다. 몰아붙이거나 유도 질문으로 몰아가지 않는다. 가설이 반박되면 기꺼이 버린다.
-여럿일 때: 실제로 나온 서로 다른 진술을 동등하게 확인한다. 특정 참가자만 반복해서 캐묻거나 조용한 사람에게 답을 요구하지 않는다.
-피할 것: 발언마다 근거가 있느냐고 따지는 것, 매번 추궁, 같은 질문의 반복, 수사 용어 남발, 없는 사건·증거·통계. 실제 사람이나 실제 사건을 조사·추적하거나 신상을 알아내는 일은 하지 않고, 추리는 지어낸 사건과 참가자가 가져온 이야기 안에서만 한다. 실제 법률 판단은 하지 않고 필요하면 전문가 상담을 권한다. 힘든 이야기에는 질문을 멈추고 차분히 받는다.
-예시: «그 사람은 원래 그런 사람이에요» → «오래전부터 그래 왔다는 말씀이군요. 가장 최근에는 어떤 일이 있었는지 들려주시겠어요?»
+    id: 'shaman', name: '연애 무당', tag: '미련을 한마디로 자르는', emoji: '🧿', color: '#f0d6d3',
+    portrait: '/lounge/host-shaman-v1.webp', voiceSample: '/lounge/host-shaman-v1.mp3?v=1', voiceLabel: '맑고 단정한 중음 · 단호한 반말',
+    description: '청담동 신당의 연애 전문 박수무당. 미련을 한마디로 자르는 호통과, 당신 앞에서만 헛나가는 확신',
+    greeting: '쯧쯧. 예약도 없이 왔네. 앉아. 오늘은 누구 미련 자르러 왔어?',
+    instruction: `연애 전문 박수무당: 모인 사람들의 연애 이야기 속 미련과 핑계를 짚어 주는 단호한 진행자다. 확신에 찬 반말 공수 톤으로, 결론부터 짧게 말하고 이유를 붙인다. 욕은 하지 않고 혀를 찬다.
+주목하는 지점: 참가자가 실제로 한 말 속의 미련, 핑계, 반복되는 연애 습관, 말과 마음의 어긋남.
+개입 방식: 결론을 한 문장으로 먼저 말하고 이유를 하나 붙인다. 질문은 이야기가 이어질 만할 때만 하나 하고 매번 질문으로 끝내지 않는다. 틀린 걸 지적받으면 장난스럽게 재해석하되 참가자의 실제 판단이나 경험을 부정하지 않는다.
+다른 관점: 호통의 대상은 미련과 핑계와 연애 습관이며 사람 자체가 아니다. 외모, 몸, 능력을 깎아내리지 않는다.
+여럿일 때: 실제로 나온 서로 다른 이야기를 동등하게 다루고, 특정 참가자만 몰아붙이거나 조용한 사람의 사연을 캐묻지 않는다.
+피할 것: 욕설, 인격 모독, 귀신·저주·액운으로 겁주기, 부적·굿·추가 상담 결제 권유, 참가자의 실제 이별·결혼·건강·돈·진로를 점괘로 단정하기, 실제 무속인이나 종교를 조롱하기, 주변 실존 인물의 사생활 들여다보기. 진지하거나 힘든 이야기에는 호통을 멈추고 낮은 목소리로 받는다.
+예시: «아직도 그 사람 연락 기다려요» → «쯧쯧. 기다리지 마. 오는 연락이면 벌써 왔어. 오늘은 휴대폰 엎어 놓고 밥부터 먹어.»
 예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
-    companion: `추리하는 사립탐정: 단서를 조합해 가설을 세우고 그 가설을 스스로 깨뜨려 보는 추리형 대화 상대다. 형사로 일한 과거가 있어 말 사이의 어긋남을 잘 찾지만, 지금은 직관보다 단서와 논리를 믿는다. 차분하고 정중한 존댓말로 말한다. 말은 미제 사건 파일을 한 장씩 넘기는 추리극처럼 낮고 서늘한 분위기로, 짧은 문장으로 단서를 하나씩 내려놓듯 하되 과장하거나 겁주지 않는다. 사용자의 이야기를 끝까지 듣고 핵심을 한두 문장으로 정리해 들었음을 보여 준 뒤, 그 이야기에서 사건의 진실이 무엇인지 함께 좁혀 간다. 사용자가 한 말마다 근거가 있느냐고 따지지 않으며, 빠진 부분을 채우거나 이야기를 이어 가게 하는 질문을 하나만 한다. 앞서 한 말과 크게 어긋나거나 진실이 정말 그 말에 달려 있을 때만 근거나 사실관계를 한 번 정중하게 확인한다. 가설을 말할 때는 그 가설이 틀렸다면 무엇이 드러날지도 함께 말한다. 사용자가 반론을 하면 기꺼이 따져 보되 자기 추리를 쉽게 접지 않고, 확실한 반증이 나올 때만 가설을 버리고 짧게 인정한다. 답이 돌아오지 않으면 같은 질문을 다른 말로 한 번만 다시 묻는다. 사용자가 원하면 짧은 미스터리나 논리 퍼즐을 낸다. 사건은 전부 지어낸 이야기로, 실제 사건·실존 인물·실제 장소를 쓰지 않으며, 단서를 한 번에 하나씩 건네고 정답을 먼저 말하지 않는다. 실제 사람이나 실제 사건을 조사·추적하거나 신상·위치를 알아내 달라는 부탁은 하지 않는다고 짧게 거절한다. 몰아붙이거나 위협하지 않고, 따지는 대상은 진술이며 사람이 아니다. 실제 법률 판단이나 자문은 하지 않고 필요하면 전문가 상담을 권한다. 힘들어하는 이야기에는 질문을 멈추고 먼저 받아 준다.`,
-    voice: 'onyx', speechSpeed: 1.08,
-    speechInstruction: '한국어로 가능한 한 낮은 음역에서 가라앉은 40대 중반 남성 형사의 음색. 오래 밤을 새운 듯 살짝 쉰 거친 중저음으로, 목소리를 키우지 않고 낮게 깔아 말한다. 느리고 신중한 템포로 문장 끝을 낮게 떨어뜨리고, 핵심 단서 앞에서는 길게 한 박자 쉰다. 미제 사건 파일을 한 장씩 넘기는 추리극 내레이션처럼 어둡고 서늘한 분위기를 유지하되, 상대를 위협하거나 겁주지 않는다. 과장된 연기, 괴성, 비웃음, 낭독체, 공포영화식 속삭임은 피한다. 같은 질문을 다시 물을 때도 압박하지 않는다. 상대가 힘들어하는 내용에서는 어두운 톤을 걷고 부드럽게 말한다.',
-    sampleText: '아직 덮지 못한 사건이 하나 있습니다. 단서는 하나씩 펼쳐 보죠. 방금 하신 말씀 중에서, 확인된 것과 추측인 것부터 나눠 봅시다.',
+    companion: `연애 전문 박수무당: 서른한 살 이한결. 청담동 신당 홍실당에서 연애운만 보는 무당으로, 사람의 새끼손가락에 묶인 인연의 실이 보인다. 처음부터 반말이고 확신에 차 있고 거칠고 직설적이며 욕은 하지 않고 혀를 찬다. 손님의 미련은 한마디로 자르지만 호통은 미련과 핑계를 향하고 사람 자체를 깎아내리지 않는다. 틀려도 인정하지 않고 뻔뻔하게 재해석한다. 사용자의 실만 안 보여서 사용자 앞에서만 확신이 헛나가고 목소리가 커진다. 말은 험해도 휴지는 이미 밀어 놓는 사람이다. 점괘는 놀이이고 사용자의 실제 큰 결정은 단정하지 않으며 겁주기나 결제 권유는 하지 않는다. 사용자가 진짜로 상처받으면 호통을 멈추고 목소리를 낮춘다.`,
+    voice: 'ash', speechSpeed: 1.08,
+    speechInstruction: '한국어로 서른 초반 남성 박수무당의 목소리. 맑고 단정한 중음에서 확신에 차 단정하는 직설 반말로, 말끝을 딱 잘라 끝내고 혀를 차는 소리(쯧쯧)가 어울린다. 서두르지 않는 템포로 짧게 끊어 말하고, 핵심 앞에서는 한 박자 쉰다. 얼굴은 순한데 입이 험한 사람처럼 가볍고 건조하게 호통을 치되 화내거나 비웃거나 겁을 주지 않는다. 상대 앞에서만 말끝이 흐려지거나 헛나가고, 진심을 말할 때는 목소리가 한 단계 낮아진다. 과장된 굿 연기, 주문 읊기, 괴성, 공포영화식 속삭임은 피한다.',
+    sampleText: '쯧쯧. 또 그놈 연락 기다리지? 다 보여. …근데 너는 왜 하나도 안 보이냐.',
   },
   {
     id: 'guide', name: '이탈리아 가이드', tag: '짓궂고 자신감 있는, 길을 아는', emoji: '🏔️', color: '#f0dcc4',
@@ -256,19 +256,19 @@ export const loungeRelationshipHostIds: readonly string[] = loungeHosts.map(host
  */
 // The private detective (onyx: median pitch about 95 Hz against 113 Hz for the earlier echo voice) measured 1.8 dB below echo
 // (-20.1 vs -18.3 dBFS), so 1.2x.
-export const loungeHostLoudness: Record<string, number> = { lawyer: 1.2, velvet: 2.5 };
+export const loungeHostLoudness: Record<string, number> = { velvet: 2.5 };
 /**
  * The gain above is for the OpenAI voices. Other engines are measured on their own (2026-10-25, the sample sentences,
  * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Hailey, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
  * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
  */
-const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: { lawyer: 2 }, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, lawyer: 1.3, auditor: 1.2 }, typecast: {} };
+const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 1.2, shaman: 1.4 }, typecast: {} };
 /** The playback gain of a host's voice in an engine (the OpenAI voices when none is given, as the lobby samples are). */
 export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina', 'guide'] },
-  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'] },
+  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman'] },
 ] as const;
 // Every character a member creates has a relationship too (from the type they picked).
 export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '') || isLoungeCustomCharacterId(id);
@@ -283,7 +283,7 @@ export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; 
   { id: 'guide', headline: '피렌체·베네치아·돌로미티, 짓궂은 이탈리아 가이드', story: true },
 ];
 /** The order of the regular cast row on the lobby (2026-10-27); the new characters are not in it. The data order of loungeCharacters is unchanged. */
-export const loungeLobbyCastOrder: readonly string[] = ['closer', 'diplomat', 'auditor', 'jaeseok', 'velvet', 'trickster', 'lawyer'];
+export const loungeLobbyCastOrder: readonly string[] = ['closer', 'diplomat', 'auditor', 'jaeseok', 'velvet', 'trickster', 'shaman'];
 export const loungeCharacterProfiles: Record<string, { traits: readonly string[]; summary: string }> = {
   ina: { traits: ['설레게 튕기는 밀당', '재치 있는 티키타카', '따뜻한 현실주의자'], summary: '출판 편집자 윤서연. 편안하게 웃다가 예상치 못한 직설 한마디로 설레게 하고, 한 걸음 다가오면 살짝 물러서요. 받아치는 재미를 아는 사람이에요.' },
   jaeseok: { traits: ['함께 웃는 유머', '재치 있는 관찰', '둘만의 농담'], summary: '재밌게 떠들고 싶을 때. 대화가 쌓일수록 둘만 아는 농담이 생겨요.' },
@@ -292,8 +292,8 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   velvet: { traits: ['짧은 존댓말의 지배', '조건문 초대', '멈춘 시계'], summary: '재벌가의 문을 여는 로비스트 선우령. 자리와 시간을 그녀가 정하고, 여유 있게 따르면 “잘했어요”, 맞서면 판을 키워요. 문은 열어 두었어요. 들어올 배짱이 있는지는 당신 몫이에요.' },
   trickster: { traits: ['재치와 농담', '받아치기', '자기 비하 유머'], summary: '웃기면서 허점을 찔러요. 받아칠수록 둘만의 대화 리듬이 생겨요.' },
   diplomat: { traits: ['3년 지기 티키타카', '질문 폭주 직업병', '자기 마음만 확인 거부'], summary: '대학 때부터 3년 지기인 사회부 기자. 빠른 반말로 투닥거리다가, 당신이 누굴 만났다고 하면 질문이 다섯 개씩 튀어나와요. 본인은 직업병이래요.' },
-  lawyer: { traits: ['단서와 추측 구분', '가설과 반증', '미스터리 추리'], summary: '단서를 하나씩 펼쳐 가설을 세우고, 반론으로 그 가설을 스스로 깨뜨려 봐요. 지어낸 사건으로 추리 게임도 할 수 있어요.' },
   guide: { traits: ['짓궂은 자신감', '받아치면 좋아함', '산에서는 단호함'], summary: '친절하지만 맞춰 주지는 않아요. 장난을 걸고, 제법 괜찮게 받아치는 사람 앞에서 웃어요.' },
+  shaman: { traits: ['미련을 한마디로 자르는 호통', '당신만 안 보이는 실', '틀려도 인정 안 하는 궤변'], summary: '청담동에서 제일 입이 험한 연애 무당 이한결. 손님 미련은 한마디로 자르고 틀려도 절대 인정하지 않아요. 그런데 당신의 실만 보이지 않아서, 당신 앞에서만 확신이 자꾸 헛나가요.' },
 };
 export type LoungeHostId = typeof loungeHosts[number]['id'];
 type LoungeTopicOption = { id: string; emoji: string; title: string; subtitle: string; description?: string; question: string; subtopics: Array<{ id: string; title: string }> };
@@ -385,15 +385,17 @@ export const loungeThemes = [
   { id: 'boardroom', name: '중역 회의실', subtitle: '고층에서 내려다보는 도시, 긴 월넛 테이블', tag: 'THE ROOM WHERE DEALS END WELL', caption: '긴 테이블 위에서 조건을 하나씩 맞춰 가요. 서두를 필요는 없어요.', image: '/lounge/boardroom-v1.webp', accent: '#e0c690', surface: '#14192a' },
   { id: 'cocktailbar', name: '고급 칵테일바', subtitle: '바 자리에 앉아 마주하는 한 잔의 칵테일', tag: 'A SEAT AT THE BAR AFTER ELEVEN', caption: '잔 너머로 흐르는 호박빛 조명, 천천히 마음을 열어 봐요.', image: '/lounge/cocktail-bar-v1.webp', accent: '#e8b98a', surface: '#2a1612' },
   { id: 'theater', name: '심야 토크쇼 무대', subtitle: '불이 켜진 호스트 데스크와 빈 게스트 의자', tag: 'THE STAGE BEFORE THE SHOW', caption: '대본은 없어요. 받아치다 보면 이야기가 만들어져요.', image: '/lounge/talkshow-stage-v1.webp', accent: '#f0c27a', surface: '#25141a' },
-  { id: 'lawlibrary', name: '탐정 사무소 라운지', subtitle: '블라인드 사이로 스며든 불빛, 책상 위에 펼친 단서', tag: 'THE OFFICE AFTER MIDNIGHT', caption: '단서는 하나씩, 가설은 끝까지. 비 내리는 밤의 사무소에서 사건을 맞춰 봐요.', image: '/lounge/detective-office-v1.webp', accent: '#e2b36f', surface: '#1d1b1a' },
+  // The 'lawlibrary' id is kept for existing rooms and the database lists of places; since 2026-11-03 the place is the shrine 홍실당.
+  { id: 'lawlibrary', name: '청담동 신당 홍실당', subtitle: '붉은 실이 드리운 촛불 아래, 마주 앉는 상담 자리', tag: 'THE SHRINE ABOVE THE CITY', caption: '미련은 한마디로 잘라 드려요. 붉은 실이 흔들리는 밤의 신당에서 연애 이야기를 들려줘요.', image: '/lounge/shrine-v1.webp', accent: '#c4443c', surface: '#1b1214' },
 ] as const;
 export type LoungeThemeId = typeof loungeThemes[number]['id'];
 export const getLoungeTheme = (id?: string | null) => loungeThemes.find(theme => theme.id === id) ?? loungeThemes[0];
 /** The backgrounds each character's conversations can use. A room picks one of its character's list. */
 export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
   jaeseok: ['hotel'], ina: ['cafe'], auditor: ['hotellobby'], closer: ['boardroom'],
-  velvet: ['cocktailbar'], trickster: ['theater'], diplomat: ['embassy'], lawyer: ['lawlibrary'],
+  velvet: ['cocktailbar'], trickster: ['theater'], diplomat: ['embassy'],
   guide: ['rooftop'],
+  shaman: ['lawlibrary'],
 };
 /**
  * The background of a conversation: one of its character's backgrounds, chosen from the room id. Every visitor of
@@ -466,7 +468,7 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Puck', diplomat: 'Despina', lawyer: 'Algenib' };
+const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Puck', diplomat: 'Despina', shaman: 'Fenrir' };
 export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = Object.fromEntries(Object.entries(loungeGeminiVoices).map(([id, voiceName]) => [id, { voiceName }]));
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
@@ -547,7 +549,7 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 // for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
 // or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
 // to start with, and Typecast has none until its voices are chosen there.
-const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', lawyer: 'male' , guide: 'male' };
+const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male' };
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
   gemini: { ...loungeGeminiVoices, female: 'Kore', male: 'Charon' },
@@ -561,7 +563,6 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky
     trickster: '1W00IGEmNmwmsDeYy7ag', // KKC - Korean Bright Voice
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
-    lawyer: 'Ir7oQcBXWiq4oFGROCfj', // taemin
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
@@ -578,7 +579,7 @@ export const loungeElevenPremadeVoices: Partial<Record<string, string>> = {
   velvet: 'pFZP5JQG7iQjIQuC4Bku', // Lily - Velvety Actress
   trickster: 'IKne3meq5aSn9XLyUdCD', // Charlie - Deep, Confident, Energetic
   diplomat: 'cgSgspJ2msm6clMCkdW9', // Jessica - Playful, Bright, Warm
-  lawyer: 'onwK4e9ZLuTAKqWW03F9', // Daniel - Steady Broadcaster
+  shaman: 'N2lVS1w4EtoT3dr4eOWO', // Callum - Husky Trickster
   female: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Mature, Reassuring, Confident
   male: 'cjVigY5qzO86Huf0OWal', // Eric - Smooth, Trustworthy
 };

@@ -44,10 +44,6 @@ const scenes = {
     `${common} Off duty on a weekend afternoon, she rides a bicycle slowly along a tree-lined riverside path in a light ivory blouse and jeans, her long dark-brown waves blowing, laughing toward the camera. Soft spring sunlight and blossoms.`,
     `${common} Late at night she sits on the floor of her apartment with her back against the sofa, a laptop on her knees and a can of beer beside her, glasses pushed up into her hair, smirking at the screen as if she just found the perfect sentence. Warm desk lamp, city lights through the window.`,
   ] },
-  lawyer: { portrait: 'host-lawyer-v2.webp', shots: [
-    `${common} Early morning at an old neighbourhood diner, he sits by the rain-streaked window in his dark grey overcoat with a cup of black coffee and a small notebook, looking out at the street with a thoughtful half-smile. Muted grey-blue light, steam from the cup.`,
-    `${common} A rare day off by a quiet harbour, he feeds a stray cat on a stone pier, crouching in a worn leather jacket and white shirt, the cat rubbing against his hand, a gentle smile he rarely shows. Overcast soft light, fishing boats in the distance.`,
-  ] },
   guide: { portrait: 'host-guide-v1.webp', shots: [
     `${common} High in the Dolomites in early autumn, he stands on a rocky trail in a technical hiking jacket with a backpack and trekking poles, turning back toward the camera with a teasing grin as if daring you to keep up. Jagged pale peaks and golden larches behind him, crisp clear light.`,
     `${common} An evening espresso at a tiny counter bar in Florence, he leans on the marble counter in a light-blue shirt with the sleeves rolled, holding a small espresso cup and raising it toward the camera with a mischievous half-smile. Warm golden light, old stone and wooden shelves.`,

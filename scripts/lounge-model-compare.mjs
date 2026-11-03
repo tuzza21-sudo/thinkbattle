@@ -24,7 +24,7 @@ const lounge = load('../src/lib/lounge.ts'), customLib = load('../src/lib/lounge
 const study = compile('../src/lib/loungeStudy.ts'), filmStudy = compile('../src/lib/loungeFilmStudy.ts'), sessionLib = compile('../src/lib/loungeSession.ts'), knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const repliesLib = compile('../src/lib/loungeReplies.ts'), modelsLib = compile('../src/lib/loungeModels.ts'), storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
-const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = compile('../src/lib/loungeMessenger.ts');
+const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : undefined);
 const handler = compile('../api/lounge.ts', path => path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 
 const story = JSON.parse(readFileSync(here('../docs/stories/velvet-black-rose.json'), 'utf8'));
@@ -123,7 +123,7 @@ const dailyScenes = [
 ];
 // With --bibles, the seven characters whose bibles were written on 2026-11-01 get the same three lines at their first
 // stage, texting in the evening: an everyday question, a light jab and an invitation.
-const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer', 'guide'].flatMap(host => {
+const bibleScenes = ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman', 'guide'].flatMap(host => {
   const config = relationshipLib.getRelationshipConfig(host);
   const firstRow = { ...row, character_id: host, stage: config.stages[0].id, scores: { ...config.initial } };
   const memory = '지금 장면: 저녁, 각자 있는 곳에서 메시지를 주고받는 중\n둘 사이: 며칠 전 처음 이야기를 나눴다.';

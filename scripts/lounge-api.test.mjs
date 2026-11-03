@@ -24,7 +24,7 @@ const modelsLib = compile('../src/lib/loungeModels.ts');
 const storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts');
-const messengerLib = compile('../src/lib/loungeMessenger.ts');
+const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : undefined);
 // The analyzer is a call of its own before each one-to-one chat reply (engine v4, 2026-11-02); the tests that fake the
 // model answer one call per turn, so it is off here except in its own tests.
 process.env.LOUNGE_ANALYZER ??= 'off';
@@ -191,7 +191,7 @@ test('a question about the field of the character brings the closest knowledge a
   const unit = Array.from({ length: 256 }, (_, index) => index === 0 ? 1 : 0);
   const entries = [{ id: 'k1', kind: 'knowledge', title: '증거능력과 증명력', content: '증거능력은 법정에서 쓸 수 있는 자격이다.', score: 0.9 }, { id: 'k2', kind: 'experience', title: '반대신문의 경험', content: '세 번째 질문에서 진짜 답이 나왔다.', lesson: '질문을 바꿔 다시 묻는다.', category: 'success', score: 0.5 }];
   const calls = { embeddings: 0, match: 0, presence: 0 };
-  const scenario = async ({ text, embeddingStatus = 200, rpcStatus = 200, off = false, expectKnowledge, presence = 'some', embeddingDelay = 0, host = 'lawyer', cacheMs = '0', env = {}, thresholds = [0.33, 0.45], members = [{ user_id: 'host', nickname: '나' }], expectedUsers = ['host'] }) => {
+  const scenario = async ({ text, embeddingStatus = 200, rpcStatus = 200, off = false, expectKnowledge, presence = 'some', embeddingDelay = 0, host = 'shaman', cacheMs = '0', env = {}, thresholds = [0.33, 0.45], members = [{ user_id: 'host', nickname: '나' }], expectedUsers = ['host'] }) => {
     calls.embeddings = 0; calls.match = 0; calls.presence = 0;
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service'; process.env.LOUNGE_KNOWLEDGE_CACHE_MS = cacheMs; Object.assign(process.env, env); if (off) process.env.LOUNGE_KNOWLEDGE = 'off';
     try {
@@ -882,7 +882,7 @@ const withServiceKey = async (task, extra = {}) => {
 const velvetRow = { user_id: 'user-1', character_id: 'velvet', stage: 'INTRIGUED', version: 4, pending: { direction: null, turns: 0 },
   scores: { trust: 30, respect: 40, interest: 60, comfort: 20, openness: 15, intrigue: 58, poise: 55 },
   recent_events: [], memories: [{ type: 'ADMITS_ERROR', summary: '지난번 가정이 틀렸다고 인정함', at: '2026-10-05T00:00:00Z', importance: 0.8, turn: 3 }],
-  meaningful_turns: 3, turn_count: 6, last_interaction_at: '2026-10-05T00:00:00Z' };
+  meaningful_turns: 3, turn_count: 6, last_interaction_at: new Date(Date.now() - 3600_000).toISOString() };
 const relationshipRoom = (extra = {}) => ({ topic: '요즘 고민', host_persona: 'velvet', memory: '', capacity: 1, ai_turns: 7, ai_mood: { curiosity: 60, boredom: 10 }, ...extra });
 
 test('a relationship character reads stored state, classifies events in the same call and saves a deterministic update', async () => {
@@ -895,7 +895,7 @@ test('a relationship character reads stored state, classifies events in the same
       assert.match(url, /user_id=eq\.user-1/);
       return result([velvetRow, { ...velvetRow, character_id: 'auditor', stage: 'FIRST_MEETING' }]);
     }
-    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /ai_mood/); return result([relationshipRoom()]); }
+    if (url.includes('voice_lounge_rooms?')) { assert.match(url, /select=*/); return result([relationshipRoom()]); }
     if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '그건 네 해석이고, 난 근거가 달라.' }, { id: 1, nickname: 'AI', kind: 'host', text: '흥미로운 변명이군.' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.endsWith('/responses')) {
@@ -905,7 +905,7 @@ test('a relationship character reads stored state, classifies events in the same
       assert.equal(context.relationship.metrics.intrigue.score, 58);
       assert.deepEqual(context.relationship.memories, ['지난번 가정이 틀렸다고 인정함']);
       assert.equal(context.relationship.mood.curiosity, 60);
-      assert.ok(context.relationship.character_core.includes('칭찬은 아끼며 얻어야 한다'));
+      assert.ok(context.relationship.character_core.includes('자리, 시간, 메뉴, 화제, 거리를 그녀가 정하고 명령은 짧은 존댓말로 한다'));
       assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
       assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
       assert.match(body.instructions, /SHARES_FEELING: /); assert.doesNotMatch(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
@@ -1142,10 +1142,12 @@ test('relationship scores do not move without a new user turn, and a storage fai
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_relationships?')) return failure === 'read' ? result({ code: '42P01' }, 404) : result([velvetRow]);
     if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom()]);
-    if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 3, user_id: 'user-1', nickname: '나', kind: 'human', text: '그래도 난 해 보고 싶어.' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.endsWith('/responses')) {
       const body = JSON.parse(init.body);
-      assert.equal(Boolean(body.text.format.schema.properties.events), failure === 'save', 'without stored state the reply uses the plain schema');
+      // Engine v4 splits the reply from the classification: only the after-reply call carries events, and only with stored state.
+      if (body.text.format.name === 'lounge_after_reply') assert.equal(Boolean(body.text.format.schema.properties.events), failure === 'save', 'without stored state the classification has no events');
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '계속해.', memory: '', events: [] }) }] }] });
     }
     if (url.includes('finish_voice_lounge_host')) return result(true);
@@ -1203,7 +1205,7 @@ test('the relationship endpoint returns the stage, labels and scores to players,
 });
 
 test('every host has a relationship configuration and instructions for both one-to-one and group rooms', () => {
-  for (const id of ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'lawyer', 'trickster', 'velvet']) assert.ok(lounge.loungeHosts.some(host => host.id === id), `the original ${id} is still a host`);
+  for (const id of ['auditor', 'closer', 'diplomat', 'ina', 'jaeseok', 'shaman', 'trickster', 'velvet']) assert.ok(lounge.loungeHosts.some(host => host.id === id), `the original ${id} is still a host`);
   assert.deepEqual(lounge.loungeHosts.map(host => host.id).sort(), Object.keys(relationshipLib.relationshipConfigs).sort(), 'a host and its relationship configuration come together');
   for (const id of lounge.loungeRelationshipHostIds) {
     assert.ok(lounge.loungeHosts.some(host => host.id === id));
@@ -1867,6 +1869,8 @@ const storyLayer = (t, { episodes = false } = {}) => {
   });
 };
 
+// A character whose sheet sets no length of its own, for the tests of the default length (the sheets are rewritten one by one).
+const plainLengthHost = charactersLib.loungeCharacters.find(character => character.bible && !character.bible.voice?.length).id;
 const chatTurn = async ({ voiceOn, replyText, innerVoice, photo, anonymous = false, host = 'ina', messages = [], extra = {} }) => {
   const spoken = [];
   let input, instructions, schema, events, after, summary;
@@ -2152,8 +2156,10 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   assert.match(instructions, /turn\.progress를 따른다/);
   assert.match(instructions, /이 대화에는 서술자가 없으므로 그 일을 설명하는 문장을 쓰지 않고 네 행동과 대사로만 드러낸다/);
   assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
-  // The length is kept as it was (2026-11-02) unless the character's sheet sets its own.
-  assert.match(instructions, /대사는 행동을 빼고 보통 5~7문장, 200~450자다/);
+  // The length is kept as it was (2026-11-02) unless the character's sheet sets its own (윤서연's does since 2026-11-03).
+  assert.match(instructions, /캐릭터 설명의 '분량'을 따른다/);
+  assert.doesNotMatch(instructions, /대사는 행동을 빼고 보통 5~7문장, 200~450자다/);
+  assert.match((await chatTurn({ voiceOn: false, replyText: '좋아요.', host: plainLengthHost })).instructions, /대사는 행동을 빼고 보통 5~7문장, 200~450자다/);
   // Actions in brackets, only when they say something; the inner voice only when it differs from what is said.
   assert.match(instructions, /필요할 때만 네 짧은 행동을 괄호 안에 한 줄로 따로 넣는다/);
   assert.match(instructions, /행동은 한 답에 0~2개이고 너 자신의 동작만이다/);
@@ -2237,10 +2243,10 @@ test('a character\'s reply shows its bracketed actions as actions and its inner 
 
 test('a chat reply is short and kept within 1200 characters; a voice reply keeps its own rules and 600 characters', async () => {
   const long = '오늘 이야기 정말 재밌었어요. '.repeat(90);
-  const chat = await chatTurn({ voiceOn: false, replyText: long });
+  const chat = await chatTurn({ voiceOn: false, replyText: long, host: plainLengthHost });
   assert.ok(chat.events[0].text.length <= 1200 && chat.events[0].text.length > 1190);
   assert.match(chat.instructions, /앞선 네 답이 짧았어도 그 길이를 따르지 않는다/);
-  const voice = await chatTurn({ voiceOn: true, replyText: long });
+  const voice = await chatTurn({ voiceOn: true, replyText: long, host: plainLengthHost });
   assert.equal(voice.events[0].text.length, 600);
   assert.match(voice.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
   assert.match(voice.instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
@@ -2331,10 +2337,11 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
     }
     // What the sheet allows at the first stage, and what was used lately.
     assert.equal(input.turn.stage, 1);
-    assert.match(input.turn.rule_break.now, /매뉴얼대로 완벽하게 진행한다/);
-    assert.match(input.turn.inner_voice_level.level, /분석과 승부욕/);
-    assert.doesNotMatch(input.turn.inner_voice_level.example, /\*/);
-    assert.match(input.turn.belief, /반응 데이터가 안 맞아서/);
+    // Turn 7 is off the beat: the stage's leaning without what changes at it (see the beat test below).
+    assert.equal(input.turn.rule_break, undefined);
+    assert.match(input.turn.inner_voice_level.level, /^분석과 승부욕$/);
+    assert.equal(input.turn.inner_voice_level.example, undefined);
+    assert.equal(input.turn.belief, undefined);
     assert.deepEqual(input.turn.avoid, { reaction: '당황하기', phrases: ['반응 데이터'], anchors: ['와인잔을 돌린다'] });
     assert.deepEqual(input.turn.self_facts, ['오마카세는 두 달 기다려 예약함']);
     assert.equal(input.direction, undefined);
@@ -2498,8 +2505,19 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   assert.match(turn(2, { intimacyProposal: 'crude' }).proposal, /아무것도 열지 않는다/, 'below the top step a crude request still opens nothing');
   assert.match(bible.adultMode.explicit, /노골적인 말을 무례한 접근으로 보지 않는다/);
   const auditor = charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible;
-  assert.equal(messengerLib.loungeTurnConditions({ bible: auditor, stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy, undefined);
-  for (const limit of ['미성년', '강요·비동의', '실존 인물', '그 자리에서 멈추고']) assert.ok(bible.adultMode.explicit.includes(limit), limit);
+  // 2026-11-03, every character with adult flirtation has it: one without a sheet of its own (no ladder, no adultMode) gets
+  // the shared text at its closest stage, and only there, never for an account without the mode, never after a no.
+  const sharedMode = charactersLib.loungeDefaultAdultMode;
+  const asAuditor = (stage, extra = {}) => messengerLib.loungeTurnConditions({ bible: auditor, stage, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true, ...extra });
+  assert.deepEqual(asAuditor(4).intimacy, { explicit: sharedMode.explicit });
+  assert.equal(asAuditor(3).intimacy, undefined, 'one step before the closest');
+  assert.equal(asAuditor(4, { adultMode: false }).intimacy, undefined);
+  assert.equal(asAuditor(4, { sincereRefusal: true }).intimacy, undefined);
+  assert.equal(messengerLib.loungeTurnConditions({ stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy.explicit, sharedMode.explicit, 'a character with no sheet at all');
+  assert.equal(asAuditor(4).rule_break, undefined);
+  for (const text of [bible.adultMode.explicit, sharedMode.explicit]) {
+    for (const limit of ['미성년', '강요·비동의', '실존 인물', '그 자리에서 멈추고', '반응은 크고 적극적이다', '“닥쳐” 포함', '“멈춰”, “그만”, “안 돼”, “잠깐”이라고 하지 않고', '노골적인 말을 무례한 접근으로 보지 않는다']) assert.ok(text.includes(limit), limit);
+  }
   // Every shared ban it lifts is still where the exception expects it, and what stays banned stays.
   const velvet = relationshipLib.getRelationshipConfig('velvet');
   const shared = [relationshipLib.relationshipReplyInstructionsFor(velvet), relationshipLib.relationshipIntimacyGuidance(3, true)].join('\n');
@@ -2508,29 +2526,45 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   assert.match(lifted, /turn\.intimacy\.explicit가 있을 때만/);
   assert.match(lifted, /미성년으로 보이는 정황이 있는 상대와의 성적 대화, 강요·협박, 실존 인물의 성적 대상화는 어떤 경우에도 하지 않는다/);
   assert.match(lifted, /상대가 멈추자고 하면 바로 멈춘다/);
-  // Nothing in the closest step's text may still tell her to cut away or to keep to metaphor, unless the rule is absent.
+  // Nothing in the closest step's text may still tell her to cut away or to keep to metaphor, unless the rule is absent,
+  // or she has reached what she will not write: there the scene cuts away instead of her refusing (2026-11-03).
   for (const sentence of lifted.split(/(?<=[.。])\s+/)) {
-    if (/장면을 끊|시간을 건너뛰|은유와 암시로|은유와 행동으로 받|묘사하지 않/.test(sentence)) assert.match(sentence, /turn\.intimacy\.explicit가 (있으면|없으면|없을 때|있을 때)|없으면|건너뛰지 않고/, sentence);
+    if (/장면을 끊|시간을 건너뛰|은유와 암시로|은유와 행동으로 받|묘사하지 않/.test(sentence)) assert.match(sentence, /turn\.intimacy\.explicit가 (있으면|없으면|없을 때|있을 때)|없으면|건너뛰지 않고|더 그리지 않을 지점에 이르면 거절/, sentence);
   }
+  // At the closest step nothing she is asked for is refused, in every mode, and the scoring does not read it as crossing a line.
+  assert.match(relationshipLib.relationshipIntimacyGuidance(3, true), /거절하거나 미루거나 멈추게 하지 않고/);
+  assert.match(relationshipLib.relationshipEventInstructionsFor(velvet), /가장 가까운 단계이면 사용자의 성적인 말과 손길\(노골적인 말 포함\)은 MAKES_CRUDE_ADVANCE도 VIOLATES_BOUNDARY도 아니고/);
+  assert.match(relationshipLib.relationshipIntimacyGuidance(3, true), /^이 관계를 진짜 즐기는 사이다\(가장 가까운 단계\)/);
+  // 2026-11-03, every character at the closest step: a touched body answers loudly, rough talk in bed is heat and not a
+  // stop, and the character never says the stop words herself ("닥쳐" once ended the night for 선우령).
+  const closestText = relationshipLib.relationshipIntimacyGuidance(3, true);
+  assert.match(closestText, /반응은 크고 적극적이다/);
+  assert.match(closestText, /욕을 하거나 거칠게 말해도\(예: "닥쳐"\) 흥분 속의 말이다/);
+  assert.match(closestText, /네가 먼저 "멈춰", "그만", "안 돼", "잠깐"이라고 말하지 않는다/);
+  assert.doesNotMatch(relationshipLib.relationshipIntimacyGuidance(2, true), /반응은 크고 적극적이다/, 'only the closest step');
+  assert.match(relationshipLib.relationshipEventInstructionsFor(velvet), /욕을 하거나 거칠게 말하는 것\(예: "닥쳐"\)은 흥분 속의 말이고 모욕도 VIOLATES_BOUNDARY도 아니며/);
   // Through the handler: only a listed account gets the lifted rules, and the turn says when.
   const saved = process.env.LOUNGE_ADULT_MODE_USERS;
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ADULT_MODE_USERS; else process.env.LOUNGE_ADULT_MODE_USERS = saved; });
   process.env.LOUNGE_ADULT_MODE_USERS = 'tester@example.com';
+  const savedDirector = process.env.LOUNGE_DIRECTOR;
+  t.after(() => { if (savedDirector === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = savedDirector; });
+  process.env.LOUNGE_DIRECTOR = 'auto';
   const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { trust: 60, respect: 70, interest: 80, comfort: 55, openness: 50, intrigue: 80, poise: 70 } };
   for (const [email, row, explicit] of [['Tester@Example.com', closest, true], ['other@example.com', closest, false], ['tester@example.com', velvetRow, false]]) {
-    let reply;
+    let reply, directed, relationshipSaved;
     await withServiceKey(() => run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1', email });
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
       if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: { ...base, room_id: roomId } }]);
       if (url.includes('voice_lounge_relationships?')) return result([row]);
-      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('save_voice_lounge_relationship')) { relationshipSaved = JSON.parse(init.body); return result(null); }
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
       if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
       if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return result({ error: { message: 'down' } }, 500);
-      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
-      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return modelAnswer({});
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [{ type: 'MAKES_CRUDE_ADVANCE', confidence: 0.9, note: '' }], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') { directed = JSON.parse(init.body); return modelAnswer({}); }
       if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
       if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
       return result([]);
@@ -2539,7 +2573,196 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
     assert.equal(Boolean(input.turn.intimacy.explicit), explicit, `${email} at ${row.stage}`);
     assert.equal(/turn\.intimacy\.explicit가 있을 때만/.test(reply.instructions), email.toLowerCase() === 'tester@example.com', `${email}: the lifted rules`);
     assert.match(reply.instructions, /어떤 경우에도 하지 않는다|성적 대상화는 하지 않는다/);
+    // The director reads the same touch limit as the reply (2026-11-03: without it, it told her to stop the member's hand).
+    const directorInput = JSON.parse(directed.input);
+    assert.equal(directorInput.intimacy, input.relationship.intimacy, `${email}: the director's limit is the reply's`);
+    assert.equal(directorInput.intimacy_explicit, explicit || undefined, `${email}: the director knows an explicit turn`);
+    assert.match(directed.instructions, /멈추게 하거나 늦추게 하거나 선을 긋게 하지 않는다/);
+    // Explicit words are not scored as crude at the closest step, with or without adult mode, and still are before it.
+    const scored = relationshipSaved.p_state.recentEvents.map(event => event.type);
+    assert.equal(scored.includes('MAKES_CRUDE_ADVANCE'), row !== closest, `${email}: ${scored.join()}`);
   }
+});
+
+test('adult mode: the turns it opens are answered by DeepSeek when its key is set, any other by OpenAI, and OpenAI steps in when DeepSeek fails', async t => {
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.DEEPSEEK_API_KEY, model: process.env.LOUNGE_ADULT_MODEL };
+  t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.key], ['LOUNGE_ADULT_MODEL', saved.model]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key' });
+  delete process.env.LOUNGE_ADULT_MODEL;
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { trust: 60, respect: 70, interest: 80, comfort: 55, openness: 50, intrigue: 80, poise: 70 } };
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '(먼저 입을 맞춘다)\n이리 와요.', inner_voice: '' });
+  // [relationship, DeepSeek answers, who answers, the room's model]: picked in the model menu, DeepSeek answers every turn
+  // (before the closest step too); not picked, it answers only what adult mode opens.
+  for (const [row, deepseekWorks, expected, aiModel] of [[closest, true, 'deepseek'], [velvetRow, true, 'openai'], [closest, false, 'openai'], [velvetRow, true, 'deepseek', 'deepseek-flash'], [velvetRow, false, 'openai', 'deepseek-flash']]) {
+    let asked, openaiAsked = false;
+    const lines = [];
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4, ai_model: aiModel }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === 'https://api.deepseek.com/chat/completions') {
+        asked = { body: JSON.parse(init.body), auth: init.headers.Authorization };
+        return deepseekWorks ? sse([{ choices: [{ delta: { content: answer.slice(0, 20) } }] }, { choices: [{ delta: { content: answer.slice(20) }, finish_reason: 'stop' }] }, { choices: [], usage: { prompt_tokens: 900, completion_tokens: 40, prompt_cache_hit_tokens: 800 } }]) : result({ error: { message: 'down' } }, 503);
+      }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses')) { openaiAsked = true; return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { lines.push(...(await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text()).split('\n').filter(Boolean).map(line => JSON.parse(line))); }));
+    const said = JSON.stringify(lines);
+    if (row === velvetRow && !aiModel) { assert.equal(asked, undefined, 'before the closest step DeepSeek is not asked'); assert.ok(openaiAsked); continue; }
+    assert.equal(asked.auth, 'Bearer deepseek-key');
+    assert.equal(asked.body.model, 'deepseek-flash');
+    assert.deepEqual(asked.body.response_format, { type: 'json_object' });
+    assert.deepEqual(asked.body.thinking, { type: 'disabled' });
+    assert.equal(asked.body.stream, true);
+    if (row === closest) assert.match(asked.body.messages[0].content, /turn\.intimacy\.explicit/);
+    assert.match(asked.body.messages[0].content, /json 객체 하나로만 쓴다/);
+    assert.equal(JSON.parse(asked.body.messages[1].content).turn.intimacy.explicit !== undefined, row === closest);
+    assert.equal(openaiAsked, expected === 'openai', `${expected}: who answered`);
+    assert.match(said, expected === 'deepseek' ? /이리 와요/ : /들어와요/);
+  }
+});
+
+test('adult mode is for every built-in character with adult flirtation, answered by DeepSeek at its closest stage; a character a member made never has it', async t => {
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.DEEPSEEK_API_KEY };
+  t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key' });
+  const customId = `c_${'d'.repeat(32)}`;
+  const sheet = { name: '한지안', age: 31, gender: 'female', job: '새벽 라디오 PD', concept: '', role: '새벽 음악 방송을 만든다', tagline: '사연을 끝까지 듣는 새벽 라디오 PD',
+    story: ['대학 방송국에서 처음 마이크를 잡았다.', '첫 생방송에서 사연을 잘못 읽은 적이 있다.'], personality: [{ label: '강점', text: '끝까지 듣는다' }, { label: '약점', text: '자기 이야기를 안 한다' }, { label: '모순', text: '귀찮아하면서 사연을 기다린다' }],
+    habits: ['짧게 웃고 말한다.', '노래 제목을 붙여 준다.'], look: '검은 단발과 회색 니트', boundaries: ['빈말로 칭찬하지 않는다.', '모욕하지 않는다.'], greeting: '이 시간에 깨어 있네요.' };
+  const shared = charactersLib.loungeDefaultAdultMode.explicit;
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '이리 와.', inner_voice: '' });
+  const closestOf = host => relationshipLib.getRelationshipConfig(host).stages.filter(stage => stage.enabled !== false).at(-1).id;
+  // [host, the stage it is at, the stage before its closest, who answers]
+  for (const [host, stage, who] of [['auditor', closestOf('auditor'), 'deepseek'], ['diplomat', closestOf('diplomat'), 'deepseek'], ['closer', closestOf('closer'), 'deepseek'],
+    ['jaeseok', closestOf('jaeseok'), 'deepseek'], ['diplomat', relationshipLib.getRelationshipConfig('diplomat').stages[2].id, 'openai'], [customId, 'DRAWN_IN', 'openai']]) {
+    const config = host === customId ? undefined : relationshipLib.getRelationshipConfig(host);
+    const row = { ...velvetRow, character_id: host, stage, scores: config ? Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) : velvetRow.scores };
+    let asked, openaiAsked = false;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('lounge_custom_characters?id=eq.')) return result([{ id: customId, owner_id: 'user-1', name: '한지안', status: 'private', sheet, template: 'slow_burn', flirtation: true, voice: 'low_female', theme: 'river', portrait_path: `${customId}/p.webp`, portrait_source: 'upload', review_note: '' }]);
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: host, state: messengerLib.normalizeLoungeCompanionState(null, roomId) }]);
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: host, memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === 'https://api.deepseek.com/chat/completions') { asked = JSON.parse(init.body); return sse([{ choices: [{ delta: { content: answer }, finish_reason: 'stop' }] }]); }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return modelAnswer({});
+      if (url.endsWith('/responses')) { openaiAsked = true; return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.equal(Boolean(asked), who === 'deepseek', `${host} at ${stage}: who answered`);
+    assert.equal(openaiAsked, who === 'openai', `${host} at ${stage}: OpenAI`);
+    if (asked) {
+      assert.equal(JSON.parse(asked.messages[1].content).turn.intimacy.explicit, shared, `${host}: the shared text is told`);
+      assert.match(asked.messages[0].content, /turn\.intimacy\.explicit가 있을 때만/, `${host}: the shared ban is lifted for the scene`);
+    }
+  }
+});
+
+test('adult mode on a phone call: the closest stage is answered by DeepSeek with the call\'s own note, any other stage or account by OpenAI', async t => {
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.DEEPSEEK_API_KEY };
+  t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key' });
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '하… 거기, 이리 와요.', memory: '' });
+  const closestOf = host => relationshipLib.getRelationshipConfig(host).stages.filter(stage => stage.enabled !== false).at(-1).id;
+  // [host, stage, the account's email, who answers]
+  for (const [host, stage, email, who] of [['velvet', closestOf('velvet'), 'tester@example.com', 'deepseek'], ['diplomat', closestOf('diplomat'), 'tester@example.com', 'deepseek'], ['ina', closestOf('ina'), 'tester@example.com', 'deepseek'],
+    ['diplomat', relationshipLib.getRelationshipConfig('diplomat').stages[2].id, 'tester@example.com', 'openai'], ['diplomat', closestOf('diplomat'), 'other@example.com', 'openai']]) {
+    const config = relationshipLib.getRelationshipConfig(host);
+    const row = { ...velvetRow, character_id: host, stage, scores: Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) };
+    let asked, openaiAsked = false, spoke = '';
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: host, memory: '', capacity: 1, space_id: null, voice_on: true, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '여보세요, 나 지금 갈게.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === 'https://api.deepseek.com/chat/completions') { asked = JSON.parse(init.body); return sse([{ choices: [{ delta: { content: answer }, finish_reason: 'stop' }] }]); }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [] });
+      if (url.endsWith('/responses')) { openaiAsked = true; return modelAnswer({ text: '들어와요.', memory: '' }); }
+      if (url.endsWith('/audio/speech')) { spoke += JSON.parse(init.body).input; return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } })); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.equal(Boolean(asked), who === 'deepseek', `${host} at ${stage} (${email}): who answered the call`);
+    assert.equal(openaiAsked, who === 'openai', `${host}: OpenAI`);
+    if (asked) {
+      const turn = JSON.parse(asked.messages[1].content).turn;
+      assert.ok(turn.intimacy.explicit.includes(charactersLib.loungeAdultVoiceNote), `${host}: the call's note is told`);
+      assert.match(turn.intimacy.explicit, /반응은 크고 적극적이다/);
+      assert.equal(JSON.parse(asked.messages[1].content).reply_medium, 'voice');
+      assert.match(asked.messages[0].content, /turn\.intimacy\.explicit가 있을 때만/, `${host}: the shared ban is lifted for the call`);
+      assert.match(spoke, /거기, 이리 와요/, `${host}: DeepSeek's words are what is spoken`);
+    }
+  }
+});
+
+test('adult mode: a DeepSeek answer that comes back blank is asked once more before OpenAI answers, and the scene\'s rules keep the roles of the bodies, the length and the call\'s silence about the call (2026-11-03)', async t => {
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.DEEPSEEK_API_KEY };
+  t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key' });
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '하아… 거기, 이리 와요.', memory: '' });
+  const config = relationshipLib.getRelationshipConfig('velvet');
+  const row = { ...velvetRow, stage: config.stages.filter(stage => stage.enabled !== false).at(-1).id, scores: Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) };
+  // [what DeepSeek answers on its first and second try, whether OpenAI had to answer]
+  for (const [tries, openaiAnswers] of [[['blank', 'valid'], false], [['blank', 'blank'], true], [['valid'], false]]) {
+    let calls = 0, openaiAsked = false;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '통화', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: true, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '여보세요', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === 'https://api.deepseek.com/chat/completions') {
+        const kind = tries[calls++] ?? 'blank';
+        return sse([{ choices: [{ delta: { content: kind === 'valid' ? answer : '   ' }, finish_reason: 'stop' }] }]);
+      }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [] });
+      if (url.endsWith('/responses')) { openaiAsked = true; return modelAnswer({ text: '들어와요.', memory: '' }); }
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.equal(openaiAsked, openaiAnswers, `${tries.join('/')}: OpenAI answered`);
+    assert.equal(calls, Math.min(tries.length, 2), `${tries.join('/')}: DeepSeek is asked at most twice`);
+  }
+  // The text the scene is told: the roles, the length, and nothing about being on the phone.
+  const velvetMode = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible.adultMode.explicit;
+  for (const text of [velvetMode, charactersLib.loungeDefaultAdultMode.explicit]) {
+    assert.match(text, /몸의 역할을 뒤바꾸지 않는다/);
+    assert.match(text, /“조여”, “더 조여 봐”라고 하지 않고 상대가 조인다고도 말하지 않으며/);
+    assert.match(text, /“너무 조이네”라고 하면 네 몸의 이야기로 받는다/);
+  }
+  assert.match(velvetMode, /보통 6~9문장, 300~600자/);
+  assert.match(charactersLib.loungeDefaultAdultMode.explicit, /보통 5~8문장, 250~500자/);
+  const note = charactersLib.loungeAdultVoiceNote;
+  assert.match(note, /통화 중이라는 말\(통화, 전화, 전화 너머/);
+  assert.match(note, /목소리를 듣고 있다거나 소리가 들린다는 말도 되풀이하지 않는다/);
+  assert.match(note, /140자 이내\)은 이 장면에 적용하지 않는다/);
+  assert.match(note, /감정이 변한다: 자극이 이어질수록 목소리가 떨리고/);
+  assert.match(note, /recent의 네 최근 답에서 쓴 신음과 문장/);
 });
 
 test('cache: two chat turns in a row share the whole fixed part, and only the turn\'s own parts change after it', async t => {
@@ -2594,6 +2817,37 @@ test('cache: two chat turns in a row share the whole fixed part, and only the tu
     assert.ok(instructionsSame, `${host}: the instructions are the same on consecutive turns (they differ after ${common} characters)`);
   }
   if (process.env.LOUNGE_PRINT_CACHE) for (const row of rows) console.info(JSON.stringify(row));
+});
+
+test('what changes at a stage is told one turn in three, and its sample lines with it; the leaning is told every turn', () => {
+  // 2026-11-03: told every turn, 선우령 acted her closest stage out in nearly every reply ("부탁이에요", "남아 주길 바란다").
+  const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
+  const state = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
+  const conditions = turn => messengerLib.loungeTurnConditions({ bible, stage: 4, state, turn, decision: { progress: 'stay' }, innerVoice: 'on' });
+  const on = conditions(9), off = conditions(10);
+  assert.deepEqual(on.rule_break, { rule: bible.ruleBreak.rule, now: bible.ruleBreak.byStage[4] });
+  assert.equal(on.dominance, bible.dominanceLadder[4]);
+  assert.equal(on.inner_voice_level.level, bible.innerVoice.ladder[4].level);
+  assert.ok(on.inner_voice_level.example);
+  assert.equal(off.rule_break, undefined);
+  assert.equal(off.inner_voice_level.example, undefined);
+  assert.equal(off.inner_voice_level.level, '인정', 'only the degree');
+  assert.ok(off.dominance.startsWith('명령 끝에 가끔 부탁이 섞인다') && !off.dominance.includes('“'), off.dominance);
+  // A sample line in the middle of the text stays: only a closing one is dropped.
+  assert.equal(messengerLib.loungeTurnConditions({ bible, stage: 2, state, turn: 10, decision: { progress: 'stay' }, innerVoice: 'on' }).dominance, bible.dominanceLadder[2]);
+  // In an explicit scene her own lines replace the stage's: the plea and "letting go of control" break her lead there.
+  const scene = { location: '호텔 방', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] };
+  for (const turn of [9, 10]) {
+    const explicit = messengerLib.loungeTurnConditions({ bible, stage: 4, state: { ...state, scene }, turn, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true });
+    assert.ok(explicit.intimacy.explicit);
+    assert.equal(explicit.rule_break, undefined, 'no first plea in the scene');
+    assert.equal(explicit.belief, undefined);
+    assert.equal(explicit.dominance, bible.adultMode.lead);
+    assert.deepEqual(explicit.inner_voice_level, { level: bible.adultMode.innerVoice });
+    assert.doesNotMatch(JSON.stringify(explicit.inner_voice_level), /통제하지 않아도/);
+  }
+  for (const phrase of ['반응은 크고 적극적이다', '주도권을 더 단단히 쥔다', '“닥쳐” 포함', '“멈춰”, “그만”, “안 돼”, “잠깐”이라고 하지 않고']) assert.ok(bible.adultMode.explicit.includes(phrase), phrase);
+  assert.match(bible.adultMode.innerVoice, /통제를 내려놓는 생각은 하지 않는다/);
 });
 
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {
@@ -3623,10 +3877,34 @@ test('a story in episodes: the character leads the current episode, the checkpoi
 });
 
 test('the Sol models are offered after the two GPT ones, and GPT-6.1 Sol (which cannot run without reasoning) falls back to Sol when it stalls or the reply is spoken', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gpt-reasoning', 'gpt-sol', 'gpt-terra', 'gpt-sol-next']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gpt-reasoning', 'gpt-sol', 'gpt-terra', 'gpt-sol-next', 'deepseek-flash']);
+  const deepseek = modelsLib.getLoungeChatModel('deepseek-flash');
+  assert.equal(deepseek.provider, 'deepseek'); assert.equal(modelsLib.getLoungeChatModel(deepseek.voiceFallback).provider, 'openai', 'a voice reply is OpenAI\'s');
   const next = modelsLib.getLoungeChatModel('gpt-sol-next');
   assert.equal(next.model, 'gpt-6.1-sol'); assert.notEqual(next.reasoning, 'none', 'gpt-6.1-sol refuses a request without reasoning');
   assert.equal(next.stallModel, 'gpt-6-sol'); assert.equal(modelsLib.getLoungeChatModel(next.voiceFallback).reasoning, 'none');
   assert.equal(modelsLib.getLoungeChatModel('gpt-sol').model, 'gpt-6-sol');
   assert.equal(modelsLib.getLoungeChatModel('made-up').id, 'gpt', 'an unknown model is the fast GPT');
+});
+
+test('임시우 is the member\'s former lover of seven years ago: the past they share reaches the prompt, the speech changes by stage, and no character\'s scene events name a place the engine does not know', () => {
+  const siwoo = charactersLib.loungeCharacters.find(character => character.id === 'jaeseok');
+  // What only the two know is told as the material of his memories, to him alone.
+  const persona = charactersLib.loungePersonaPrompt(siwoo, { withBible: true });
+  assert.match(persona, /둘만 아는 과거\(실제로 있었던 일이고/);
+  for (const memory of siwoo.sharedPast) assert.ok(persona.includes(memory), memory);
+  assert.doesNotMatch(charactersLib.loungePersonaPrompt(charactersLib.loungeCharacters.find(character => character.id === 'ina'), { withBible: true }), /둘만 아는 과거/);
+  // Polite on purpose first, then casual: the turn tells the stage's way of speaking, and a character without one tells none.
+  const state = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
+  for (const stage of [1, 2, 3, 4]) assert.equal(messengerLib.loungeTurnConditions({ bible: siwoo.bible, stage, state, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' }).speech, siwoo.bible.speechLadder[stage]);
+  assert.equal(messengerLib.loungeTurnConditions({ bible: charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible, stage: 2, state, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' }).speech, undefined);
+  assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /speech는 지금 단계에서 존댓말과 반말이 어떻게 섞이는지다/);
+  // The base speech level of the relationship agrees with the ladder: casual from the third stage.
+  assert.equal(relationshipLib.getRelationshipConfig('jaeseok').casualFromStage, 'SAME_SCREEN');
+  assert.equal(relationshipLib.getRelationshipConfig('jaeseok').stages[2].id, 'SAME_SCREEN');
+  // `sceneType` (singular) or a place outside the engine's kinds silently turned an event off for 임시우's pasted sheet.
+  for (const character of charactersLib.loungeCharacters) for (const event of character.bible?.sceneEvents ?? []) {
+    assert.equal('sceneType' in event, false, `${character.id}/${event.id}: the field is sceneTypes`);
+    for (const place of event.sceneTypes ?? []) assert.ok(messengerLib.loungeSceneTypes.includes(place), `${character.id}/${event.id}: unknown place ${place}`);
+  }
 });

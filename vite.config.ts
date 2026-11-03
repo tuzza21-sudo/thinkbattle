@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => {
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
     // Adult mode for test accounts only (emails or user ids): the closest step of a character that has it is told directly.
     'LOUNGE_ADULT_MODE_USERS',
+    // The model that answers the turns adult mode opens (DeepSeek; without the key OpenAI answers them).
+    'DEEPSEEK_API_KEY',
+    'LOUNGE_ADULT_MODEL',
     'LOUNGE_LONG_MEMORY',
     'LOUNGE_KNOWLEDGE',
     'LOUNGE_KNOWLEDGE_CACHE_MS',

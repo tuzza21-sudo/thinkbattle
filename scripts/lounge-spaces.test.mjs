@@ -15,7 +15,7 @@ test('a conversation uses one of its character\'s backgrounds, the same one for 
     assert.equal(loungeRoomTheme(host.id, 'lounge-abc'), loungeRoomTheme(host.id, 'lounge-abc'), 'the same room always gets the same background');
     assert.ok(choices.includes(loungeRoomTheme(host.id, 'lounge-abc')));
   }
-  assert.equal(loungeRoomTheme('lawyer', 'lounge-1'), 'lawlibrary');
+  assert.equal(loungeRoomTheme('shaman', 'lounge-1'), 'lawlibrary');
   assert.equal(loungeRoomTheme('unknown', 'lounge-1'), loungeThemes[0].id, 'an unknown character falls back to the first background');
   // With several backgrounds, different rooms spread across them.
   const original = loungeHostThemes.jaeseok;
@@ -31,7 +31,7 @@ test('a recorded clip always fits the 1.5 MB upload limit once encoded as base64
 });
 
 test('every home card has a name and a short job title', () => {
-  assert.deepEqual(loungeCharacters.slice(0, 8).map(character => character.id), ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'lawyer'], 'the first eight keep their order; a new character goes after them');
+  assert.deepEqual(loungeCharacters.slice(0, 8).map(character => character.id), ['jaeseok', 'ina', 'auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman'], 'the first eight keep their order; a new character goes after them');
   for (const character of loungeCharacters) assert.ok(character.job && character.job.length <= 12, `${character.id}: job "${character.job}"`);
 });
 const { readLoungeTopicSuggestions, loungeTopicSuggestionInstructions, loungeTopicLimit } = loadTs(fileURLToPath(new URL('../src/lib/loungeTopics.ts', import.meta.url)));
