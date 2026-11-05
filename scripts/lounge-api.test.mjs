@@ -2347,7 +2347,7 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
     assert.equal(input.turn.stage, 1);
     // Turn 7 is off the beat: the stage's leaning without what changes at it (see the beat test below).
     assert.equal(input.turn.rule_break, undefined);
-    assert.match(input.turn.inner_voice_level.level, /^호기심과 자신감$/);
+    assert.match(input.turn.inner_voice_level.level, /^승부욕$/);
     assert.equal(input.turn.inner_voice_level.example, undefined);
     assert.equal(input.turn.belief, undefined);
     assert.deepEqual(input.turn.avoid, { reaction: '당황하기', phrases: ['반응 데이터'], anchors: ['와인잔을 돌린다'] });
