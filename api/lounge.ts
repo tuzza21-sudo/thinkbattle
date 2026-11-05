@@ -1037,7 +1037,7 @@ ${photoRule}`;
           return readLoungeReading(JSON.parse(modelOutputText(result) ?? ''));
         } catch (error) { console.warn('[Lounge consult] reading not made', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
       })();
-      consult = withLoungeReading(consult.state, reading, asked.draw);
+      consult = withLoungeReading(consult.state, reading, asked.draw, chart?.display);
       console.info('[Lounge consult]', JSON.stringify({ module: consult.state.module, ms: Math.round(performance.now() - readingStarted), made: Boolean(reading), cards: asked.draw?.map(card => `${card.ko}${card.reversed ? ' 역' : ''}`), pillars: chart?.pillars, safety: reading?.safety }));
     }
     // The model the member chose for a one-to-one room (the fast GPT unless they picked another). A slow model (GPT with

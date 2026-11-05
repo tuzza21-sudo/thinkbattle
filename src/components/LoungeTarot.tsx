@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import {
-  loungeSajuCalendars, loungeSajuFocuses, loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix,
-  type LoungeSajuInput,
+  loungeCounselCategories, loungeCounselFormText, loungeSajuCalendars, loungeSajuFocuses, loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix,
+  type LoungeCounselCategory, type LoungeCounselField, type LoungeSajuDisplay, type LoungeSajuInput,
 } from '../lib/loungeConsult';
 import type { LoungeTarotDrawn, LoungeTarotSpread } from '../lib/loungeTarot';
 import './LoungeTarot.css';
@@ -16,16 +16,18 @@ const errorText = (err: unknown) => err instanceof Error ? err.message : '보내
  * guest, or tarot or 사주 just mentioned).
  */
 export function LoungeHongsilBar({ hint, send, disabled }: { hint: boolean; send: Send; disabled: boolean }) {
-  const [view, setView] = useState<'closed' | 'menu' | 'tarot' | 'saju'>('closed');
+  const [view, setView] = useState<'closed' | 'menu' | 'tarot' | 'saju' | 'counsel'>('closed');
   const [seen, setSeen] = useState(false);
   const close = () => setView('closed');
   return <div className="lounge-hongsil-bar">
     {view === 'menu' && <div className="lounge-hongsil-menu" role="menu" aria-label="홍실당 상담">
       <button type="button" role="menuitem" onClick={() => setView('tarot')}>🃏 타로 보기<small>궁금한 걸 적고 카드를 직접 골라요</small></button>
       <button type="button" role="menuitem" onClick={() => setView('saju')}>🔮 사주 보기<small>생년월일로 타고난 기질과 올해 흐름</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('counsel')}>📝 기타 상담<small>꿈해몽 · 연애 · 금전 · 인간관계 · 진로</small></button>
     </div>}
     {view === 'tarot' && <LoungeTarotForm send={send} disabled={disabled} onDone={close} />}
     {view === 'saju' && <LoungeSajuForm send={send} disabled={disabled} onDone={close} />}
+    {view === 'counsel' && <LoungeCounselForm send={send} disabled={disabled} onDone={close} />}
     <button type="button" className={`lounge-hongsil-button${hint && !seen ? ' blinking' : ''}`} aria-expanded={view !== 'closed'}
       onClick={() => { setView(current => current === 'closed' ? 'menu' : 'closed'); setSeen(true); }}><Sparkles size={15} /> 홍실당</button>
   </div>;
@@ -102,6 +104,61 @@ function LoungeSajuForm({ send, disabled, onDone }: { send: Send; disabled: bool
     <button type="submit" className="lounge-tarot-confirm" disabled={disabled || sending}>{sending ? <LoaderCircle size={15} className="lounge-spin" /> : null} 사주 보기</button>
     {error && <p className="lounge-tarot-error" role="alert">{error}</p>}
   </form>;
+}
+
+/** 기타 상담: the kind of worry first, then what it asks (a dream and the question about it, or what happened and what to know). */
+function LoungeCounselForm({ send, disabled, onDone }: { send: Send; disabled: boolean; onDone: () => void }) {
+  const [category, setCategory] = useState<LoungeCounselCategory>('dream');
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const fields = loungeCounselCategories[category].fields as readonly LoungeCounselField[];
+  const missing = fields.some(field => field.required && !values[field.id]?.trim());
+  const set = (id: string, value: string) => setValues(current => ({ ...current, [id]: value }));
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (missing || sending) return;
+    setSending(true); setError('');
+    try { await send(loungeCounselFormText(category, values)); onDone(); } catch (err) { setError(errorText(err)); } finally { setSending(false); }
+  };
+  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event)} aria-label="기타 상담">
+    <FormHead title="📝 기타 상담" onClose={onDone} />
+    <div className="lounge-tarot-count" role="radiogroup" aria-label="상담 종류">
+      {(Object.keys(loungeCounselCategories) as LoungeCounselCategory[]).map(key => <button key={key} type="button" role="radio" aria-checked={category === key} className={category === key ? 'on' : ''}
+        onClick={() => { setCategory(key); setValues({}); }}>{loungeCounselCategories[key].icon} {loungeCounselCategories[key].name}</button>)}
+    </div>
+    {fields.map(field => field.kind === 'chips'
+      ? <div key={field.id} className="lounge-hongsil-field"><span>{field.label}</span><div className="lounge-tarot-count" role="radiogroup" aria-label={field.label}>
+        {(field.options ?? []).map(option => <button key={option} type="button" role="radio" aria-checked={values[field.id] === option} className={values[field.id] === option ? 'on' : ''}
+          onClick={() => set(field.id, values[field.id] === option ? '' : option)}>{option}</button>)}
+      </div></div>
+      : <label key={field.id}>{field.label}{field.required ? '' : ' (선택)'}{field.kind === 'text'
+        ? <textarea value={values[field.id] ?? ''} onChange={event => set(field.id, event.target.value)} maxLength={600} rows={3} placeholder={field.placeholder} />
+        : <input value={values[field.id] ?? ''} onChange={event => set(field.id, event.target.value)} maxLength={200} placeholder={field.placeholder} />}</label>)}
+    <p className="lounge-hongsil-note">풀이는 재미로 보는 콘텐츠예요. 중요한 결정은 스스로, 필요하면 전문가와 함께 내려 주세요.</p>
+    <button type="submit" className="lounge-tarot-confirm" disabled={disabled || sending || missing}>{sending ? <LoaderCircle size={15} className="lounge-spin" /> : null} 한결에게 보여 주기</button>
+    {error && <p className="lounge-tarot-error" role="alert">{error}</p>}
+  </form>;
+}
+
+const elementOrder = ['목', '화', '토', '금', '수'] as const;
+const elementLabel: Record<string, string> = { 목: '목(木) 나무', 화: '화(火) 불', 토: '토(土) 흙', 금: '금(金) 쇠', 수: '수(水) 물' };
+/** The 사주 chart under its reading: the four pillars in Hanja and Hangul, coloured by element, and the count of each element. */
+export function LoungeSajuChart({ chart }: { chart: LoungeSajuDisplay }) {
+  const most = Math.max(1, ...Object.values(chart.elements));
+  return <section className="lounge-saju-chart" aria-label="사주 원국">
+    <div className="lounge-tarot-head"><b>사주 원국</b><small>일간 {chart.dayMaster} · {chart.thisYear}</small></div>
+    <div className="lounge-saju-pillars">
+      {chart.pillars.map(pillar => <div key={pillar.label} className="lounge-saju-pillar">
+        <span className="lounge-saju-label">{pillar.label}</span>
+        {pillar.hanja ? [0, 1].map(index => <b key={index} className={`lounge-saju-char el-${pillar.elements[index]}`}>{pillar.hanja[index]}<small>{pillar.hangul[index]} · {pillar.elements[index]}</small></b>)
+          : <><b className="lounge-saju-char unknown">?<small>시간 모름</small></b><b className="lounge-saju-char unknown">?<small>&nbsp;</small></b></>}
+      </div>)}
+    </div>
+    <ul className="lounge-saju-elements">
+      {elementOrder.map(name => <li key={name}><span className={`el-${name}`}>{elementLabel[name]}</span><i style={{ '--w': `${(chart.elements[name] / most) * 100}%` } as CSSProperties} className={`el-${name}`} /><b>{chart.elements[name]}</b></li>)}
+    </ul>
+  </section>;
 }
 
 /** How many face-down cards are laid out to pick from (the server deck is shuffled in full; these are its first places). */

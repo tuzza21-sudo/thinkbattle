@@ -11,7 +11,7 @@ const consult = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', impo
 const tarot = loadTs(fileURLToPath(new URL('../src/lib/loungeTarot.ts', import.meta.url)));
 const dreams = loadTs(fileURLToPath(new URL('../src/lib/loungeDreams.ts', import.meta.url)));
 const saju = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
-const { advanceLoungeConsult, withLoungeReading, readLoungeConsultState, readLoungeReading, loungeInterpreterRequest, loungeConsultRules, loungeTarotPickPrefix, loungeTarotDrawForMe, loungeConsultPickCount, loungeConsultShownCards, loungeTarotFormText, loungeSajuFormText, readLoungeSajuForm, readLoungeTarotForm, loungeConsultSajuInput } = consult;
+const { advanceLoungeConsult, withLoungeReading, readLoungeConsultState, readLoungeReading, loungeInterpreterRequest, loungeConsultRules, loungeTarotPickPrefix, loungeTarotDrawForMe, loungeConsultPickCount, loungeConsultShownCards, loungeTarotFormText, loungeSajuFormText, readLoungeSajuForm, readLoungeTarotForm, loungeConsultSajuInput, loungeCounselFormText, readLoungeCounselForm, loungeConsultShownChart } = consult;
 
 const reading = { headline: '먼저 말하면 풀린다', core: ['서로 기다리는 중이다'], detail: ['오해가 쌓였다'], advice: ['짧게 먼저 연락한다'], homework: '오늘 한 줄만 보내기', tone_hint: '미루는 건 짚고 마음은 다독인다', evidence: ['컵 2 정방향'], safety: [], memory_note: '타로: 친구와 서운함' };
 const step = (state, said, opening = false, randomInt) => advanceLoungeConsult(state, { opening, said }, randomInt);
@@ -102,6 +102,24 @@ test('사주 from the form: the birth read back, refused when it is not a real d
   const request = JSON.parse(loungeInterpreterRequest(asked.state, undefined, chart).input);
   assert.deepEqual([request.module, request.focus, request.question, request.chart.pillars.day], ['saju', '올해 흐름', '이직해도 될까?', '무진']);
   assert.match(loungeInterpreterRequest(asked.state, undefined, chart).instructions, /학파마다 판단이 갈리는 것은 단정하지 않는다/);
+  // The original letters stay, each with its meaning, and all five elements are told (2026-11-05, the owner's call).
+  const explained = request.chart.explained;
+  assert.match(explained.day_master, /^일간 무토\(戊土\), 양의 흙 — 큰 산 같은 사람/);
+  assert.deepEqual(explained.five_elements.map(line => line.split(' — ')[0]), ['목(木) 0개, 없음', '화(火) 1개', '토(土) 5개, 많은 편', '금(金) 2개', '수(水) 0개, 없음']);
+  assert.match(explained.pillars[2], /^일주: 나 자신과 배우자 자리 — 무진\(戊辰\): 무\(戊\) 흙·양 위에 진\(辰\) 흙·용$/);
+  assert.match(explained.this_year, /^올해 병오\(丙午\) — 불 기운이 아주 센 해, 붉은 말의 해$/);
+  assert.ok(explained.ten_gods.every(line => / — /.test(line)), 'every ten god comes with its meaning');
+  const instructions = loungeInterpreterRequest(asked.state, undefined, chart).instructions;
+  assert.match(instructions, /원래 글자\(간지, 한자, 일간, 목·화·토·금·수, 십성 이름\)는 그대로 쓰되 반드시 바로 옆에 뜻을 붙인다/);
+  assert.match(instructions, /목·화·토·금·수 다섯 가지 모두의 개수/);
+  assert.match(loungeConsultRules, /사주면 원래 글자를 그대로 말하되 반드시 바로 뜻을 붙인다/);
+  // The page draws the chart under the reading: the pillars from 시주 to 년주 and the count of each element.
+  assert.deepEqual(chart.display.pillars.map(pillar => `${pillar.label}:${pillar.hanja}`), ['시주:己未', '일주:戊辰', '월주:庚辰', '년주:庚午']);
+  assert.deepEqual(chart.display.elements, { 목: 0, 화: 1, 토: 5, 금: 2, 수: 0 });
+  const told = withLoungeReading(asked.state, reading, undefined, chart.display);
+  assert.deepEqual(loungeConsultShownChart(told.state), chart.display);
+  assert.equal(loungeConsultShownChart(step(told.state, '고마워').state), undefined, 'the table goes once the talk moves on');
+  assert.deepEqual(readLoungeConsultState(JSON.parse(JSON.stringify(told.state))).chart, chart.display);
   assert.equal(step(opened(), '🔮 사주 · 아무거나').turn.do, 'retry', 'a form that does not read is asked again');
 });
 
@@ -127,6 +145,29 @@ test('the 사주 chart: pillars from the solar terms and the sun at Seoul, the z
   assert.deepEqual([vague.pillars.hour, vague.solar_date, vague.daewoon], [null, '1990-05-03', undefined]);
   assert.equal(vague.notes.length, 3);
   assert.equal(Object.values(vague.five_elements).reduce((a, b) => a + b), 6);
+});
+
+test('기타 상담: a dream with its question goes to the dream reading, love, money, people and work to a counsel reading', () => {
+  const dream = loungeCounselFormText('dream', { dream: '하늘을   날다가 바다에 빠지는 꿈', question: '좋은 꿈이에요?' });
+  assert.equal(dream, '📝 기타 상담 · 🌙 꿈해몽\n꿈: 하늘을 날다가 바다에 빠지는 꿈\n궁금한 것: 좋은 꿈이에요?');
+  const dreamt = step(opened(), dream);
+  assert.equal(dreamt.interpret, true);
+  const dreamInput = JSON.parse(loungeInterpreterRequest(dreamt.state).input);
+  assert.deepEqual([dreamInput.module, dreamInput.question], ['dream', '좋은 꿈이에요?']);
+  assert.deepEqual(dreamInput.symbols.map(item => item.symbol), ['물', '하늘을 나는 꿈']);
+  const love = loungeCounselFormText('love', { who: '썸', story: '연락이 뜸해졌어요', question: '그 사람 마음' });
+  assert.deepEqual(readLoungeCounselForm(love), { category: 'love', answers: { who: '썸', story: '연락이 뜸해졌어요', question: '그 사람 마음' } });
+  const counselled = step(opened(), love);
+  assert.equal(counselled.interpret, true);
+  const counselRequest = loungeInterpreterRequest(counselled.state);
+  assert.deepEqual(JSON.parse(counselRequest.input), { module: 'counsel', category: 'love', answers: { category: 'love', who: '썸', story: '연락이 뜸해졌어요', question: '그 사람 마음' } });
+  assert.match(counselRequest.instructions, /카드나 사주가 나온 것처럼 꾸미지 않는다/);
+  assert.match(counselRequest.instructions, /종목, 수익, 시점은 말하지 않는다/);
+  assert.equal(withLoungeReading(counselled.state, reading).turn.module, 'counsel');
+  // A required answer left out is asked again.
+  assert.equal(readLoungeCounselForm('📝 기타 상담 · 💰 금전\n고민: 투자 고민'), undefined);
+  assert.equal(step(opened(), '📝 기타 상담 · 💰 금전\n고민: 투자 고민').turn.do, 'retry');
+  assert.match(loungeConsultRules, /기타 상담\(꿈해몽, 연애, 금전, 인간관계, 진로를 적는다\)/);
 });
 
 test('a dream told in the conversation is read at once, with the symbols code found', () => {
