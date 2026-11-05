@@ -38,8 +38,8 @@ import { LoungeIntroduction } from './LoungeIntroduction';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import { trackMetaOnce } from '../lib/metaPixel';
 import { LoungeReplyButton, LoungeReplyPanel, LoungeStoryChoicePanel, useLoungeReplies } from './LoungeReplySuggestions';
-import { isLoungeConsultRoom, loungeConsultPickCount, loungeConsultShownCards, loungeConsultShownChart, loungeConsultShownExtras, readLoungeConsultState, type LoungeConsultState } from '../lib/loungeConsult';
-import { LoungeHongsilBar, LoungeSajuChart, LoungeTarotPicker, LoungeTarotSpread, LoungeZodiacCard } from './LoungeTarot';
+import { isLoungeConsultRoom, loungeConsultPickCount, readLoungeConsultState, type LoungeConsultState } from '../lib/loungeConsult';
+import { LoungeConsultShown, LoungeHongsilBar, LoungeTarotPicker } from './LoungeTarot';
 import { LoungeAfterTalk, LoungeFriendsPage, LoungeProfileCard } from './LoungeSocial';
 import { useLoungeSocialStatus } from '../lib/useLoungeSocialStatus';
 import { LoungeCharacterPage } from './LoungeCharacterPage';
@@ -403,10 +403,7 @@ function RoomView(props: RoomViewProps) {
             </section>
         <div className="lounge-participant-controls">
           {solo && !ended && !props.preview && props.replySuggest && <LoungeReplyPanel state={reply} logRef={participantLog} followRef={followParticipantLog} />}
-          {solo && !ended && !props.preview && props.consult && loungeConsultShownChart(props.consult) && props.messages.at(-1)?.kind === 'host' && <LoungeSajuChart chart={loungeConsultShownChart(props.consult)!} />}
-          {solo && !ended && !props.preview && props.consult && loungeConsultShownExtras(props.consult).partnerChart && props.messages.at(-1)?.kind === 'host' && <LoungeSajuChart chart={loungeConsultShownExtras(props.consult).partnerChart!} />}
-          {solo && !ended && !props.preview && props.consult && loungeConsultShownExtras(props.consult).zodiac && props.messages.at(-1)?.kind === 'host' && <LoungeZodiacCard card={loungeConsultShownExtras(props.consult).zodiac!} />}
-          {solo && !ended && !props.preview && props.consult && loungeConsultShownCards(props.consult).length > 0 && props.messages.at(-1)?.kind === 'host' && <LoungeTarotSpread key={loungeConsultShownCards(props.consult).map(card => card.id).join()} cards={loungeConsultShownCards(props.consult)} />}
+          {solo && !ended && !props.preview && props.consult && props.messages.at(-1)?.kind === 'host' && <LoungeConsultShown consult={props.consult} />}
           {solo && !ended && !props.preview && props.replySuggest && props.consult && loungeConsultPickCount(props.consult) > 0 && props.messages.at(-1)?.kind === 'host' && <LoungeTarotPicker dealKey={`${props.consult.turn}-${props.consult.deck?.[0]}`} count={loungeConsultPickCount(props.consult)} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
           {solo && !ended && !props.preview && props.replySuggest && props.storyChoice && !reply.replies && props.messages.at(-1)?.kind === 'host' && <LoungeStoryChoicePanel choice={props.storyChoice} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} logRef={participantLog} followRef={followParticipantLog} />}
           {solo && !ended && !props.preview && props.replySuggest && props.consult && <LoungeHongsilBar key={props.consult.turn} birth={props.consult.birth} hint={Boolean(props.consult.hint) && props.messages.at(-1)?.kind === 'host'} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}

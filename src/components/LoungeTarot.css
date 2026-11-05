@@ -19,16 +19,19 @@
 @keyframes lounge-tarot-riffle-left { from { transform:translateX(0) rotate(0); } to { transform:translateX(-34px) rotate(-9deg); } }
 
 /* Dealt face down: the cards fly in one by one; a picked card rises and glows. */
-.lounge-tarot-table { display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); gap:7px; }
-.lounge-tarot-table .lounge-tarot-back { width:100%; padding:0; cursor:pointer; animation:lounge-tarot-deal .42s cubic-bezier(.2,.8,.3,1) both; animation-delay:calc(var(--i) * 28ms); transition:transform .18s, box-shadow .18s, opacity .18s; }
-.lounge-tarot-table .lounge-tarot-back:hover:not(:disabled) { transform:translateY(-3px); }
-.lounge-tarot-table .lounge-tarot-back.picked { transform:translateY(-7px); box-shadow:0 0 0 2px #ffd88a, 0 8px 18px #ffb44d66; }
+/* All 78 in four overlapping rows: each card shows a slice (--step) of its width, sized to fit a phone; if it still cannot, the table scrolls sideways. */
+.lounge-tarot-table { --card:clamp(40px, calc(100cqw / 7), 50px); --step:max(12px, min(26px, calc((100cqw - var(--card)) / 19))); container-type:inline-size; display:grid; grid-template-columns:minmax(0, 1fr); gap:4px; padding:12px 2px 2px; overflow-x:auto; overscroll-behavior-x:contain; }
+.lounge-tarot-row { display:flex; width:max-content; margin:0 auto; }
+.lounge-tarot-table .lounge-tarot-back { flex:0 0 auto; width:var(--card); padding:0; cursor:pointer; animation:lounge-tarot-deal .42s cubic-bezier(.2,.8,.3,1) both; animation-delay:calc(var(--i) * 9ms); transition:transform .18s, box-shadow .18s, opacity .18s; }
+.lounge-tarot-table .lounge-tarot-back + .lounge-tarot-back { margin-left:calc(var(--step) - var(--card)); }
+.lounge-tarot-table .lounge-tarot-back:hover:not(:disabled), .lounge-tarot-table .lounge-tarot-back:focus-visible { transform:translateY(-8px); z-index:2; }
+.lounge-tarot-table .lounge-tarot-back.picked { transform:translateY(-12px); z-index:3; box-shadow:0 0 0 2px #ffd88a, 0 8px 18px #ffb44d66; }
 .lounge-tarot-table .lounge-tarot-back:disabled:not(.picked) { opacity:.45; cursor:default; }
 .lounge-tarot-order { position:absolute; z-index:1; top:4px; right:4px; display:grid; place-items:center; width:18px; height:18px; border-radius:50%; background:#ffd88a; color:#4b0b14; font-size:11px; font-weight:700; }
 @keyframes lounge-tarot-deal { from { opacity:0; transform:translate(0, -40px) rotate(-14deg) scale(.7); } to { opacity:1; transform:none; } }
 
-.lounge-tarot-actions { display:flex; justify-content:space-between; gap:8px; margin-top:12px; }
-.lounge-tarot-actions button { display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:0 14px; border-radius:999px; font:inherit; font-size:14px; cursor:pointer; }
+.lounge-tarot-actions { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-top:12px; }
+.lounge-tarot-actions button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:0 12px; white-space:nowrap; border-radius:999px; font:inherit; font-size:14px; cursor:pointer; }
 .lounge-tarot-reshuffle { border:1px solid #ffffff40; background:transparent; color:#fff5e9; }
 .lounge-tarot-confirm { border:0; background:#d8b36a; color:#3a0a10; font-weight:700; }
 .lounge-tarot-actions button:disabled { opacity:.5; cursor:default; }
@@ -128,3 +131,11 @@
 .lounge-zodiac-card dl div.wide { grid-column:1 / -1; }
 .lounge-zodiac-card dt { font-size:11px; color:#f3c9a8; }
 .lounge-zodiac-card dd { margin:2px 0 0; font-size:14px; }
+
+/* The board of what a reading shows, with its 닫기 button; folded, it is one small button. */
+.lounge-reading-board { width:100%; max-height:46vh; overflow-y:auto; overscroll-behavior:contain; margin-bottom:10px; border-radius:16px; }
+.lounge-reading-board > section:last-child { margin-bottom:0; }
+.lounge-reading-bar { position:sticky; top:0; z-index:4; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; margin-bottom:6px; border-radius:12px; background:#2a1418f2; color:#f3c9a8; font-size:13px; }
+.lounge-reading-bar button, .lounge-reading-reopen { display:inline-flex; align-items:center; gap:4px; min-height:32px; padding:0 12px; border-radius:999px; border:1px solid #ffffff40; background:#1b0f12e6; color:#fff5e9; font:inherit; font-size:13px; cursor:pointer; }
+.lounge-reading-reopen { align-self:flex-start; margin-bottom:8px; }
+.lounge-tarot-actions .lounge-tarot-confirm { margin-left:auto; }

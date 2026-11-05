@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
-import { LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
+import { ChevronUp, LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import {
-  loungeCompatFormText, loungeCompatRelations, loungeCounselCategories, loungeCounselFormText, loungeFortuneFormText, loungeFortunePeriods, loungeSajuCalendars, loungeSajuFocuses,
+  loungeCompatFormText, loungeCompatRelations, loungeConsultShownCards, loungeConsultShownChart, loungeConsultShownExtras, loungeCounselCategories, loungeCounselFormText, loungeFortuneFormText, loungeFortunePeriods, loungeSajuCalendars, loungeSajuFocuses,
   loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix, loungeZodiacFormText,
-  type LoungeBirth, type LoungeCounselCategory, type LoungeCounselField, type LoungeFortunePeriod, type LoungeSajuDisplay, type LoungeSajuInput, type LoungeZodiacDisplay,
+  type LoungeBirth, type LoungeConsultState, type LoungeCounselCategory, type LoungeCounselField, type LoungeFortunePeriod, type LoungeSajuDisplay, type LoungeSajuInput, type LoungeZodiacDisplay,
 } from '../lib/loungeConsult';
 import type { LoungeTarotDrawn, LoungeTarotSpread } from '../lib/loungeTarot';
 import './LoungeTarot.css';
@@ -260,8 +260,40 @@ export function LoungeZodiacCard({ card }: { card: LoungeZodiacDisplay }) {
   </section>;
 }
 
-/** How many face-down cards are laid out to pick from (the server deck is shuffled in full; these are its first places). */
-const laidOut = 24;
+const readingLabels: Record<string, string> = { saju: '사주 원국', compat: '궁합 원국', fortune: '운세 원국', zodiac: '별자리', tarot: '뽑힌 카드' };
+// Boards the member folded, kept outside the component so a redraw of the room page does not open them again.
+const folded = new Set<string>();
+/**
+ * What the reading just told is drawn from — the 사주 chart (two for 궁합), the 별자리 card or the cards — under the
+ * conversation. It can be folded into a small button (2026-11-05: a big chart covered the conversation) and opened again.
+ */
+export function LoungeConsultShown({ consult }: { consult: LoungeConsultState }) {
+  const chart = loungeConsultShownChart(consult);
+  const { partnerChart, zodiac } = loungeConsultShownExtras(consult);
+  const cards = loungeConsultShownCards(consult);
+  const id = `${consult.turn}-${consult.module}`;
+  const [open, setOpen] = useState(() => !folded.has(id));
+  if (!chart && !zodiac && !cards.length) return null;
+  const label = readingLabels[consult.module ?? ''] ?? '풀이';
+  if (!open) return <button type="button" className="lounge-reading-reopen" onClick={() => { folded.delete(id); setOpen(true); }}><ChevronUp size={14} /> {label} 다시 보기</button>;
+  return <div className="lounge-reading-board">
+    <div className="lounge-reading-bar"><span>{label}</span>
+      <button type="button" onClick={() => { folded.add(id); setOpen(false); }} aria-label={`${label} 닫기`}>닫기 <X size={14} /></button>
+    </div>
+    {chart && <LoungeSajuChart chart={chart} />}
+    {partnerChart && <LoungeSajuChart chart={partnerChart} />}
+    {zodiac && <LoungeZodiacCard card={zodiac} />}
+    {cards.length > 0 && <LoungeTarotSpread key={cards.map(card => card.id).join()} cards={cards} />}
+  </div>;
+}
+
+/**
+ * The whole shuffled deck is laid out face down (2026-11-05, the owner's call: pick from all 78, not the first 24), in
+ * four overlapping rows like cards spread on a table; each card shows a slice and rises when touched or picked.
+ */
+const laidOut = 78;
+const perRow = 20;
+const rows = Array.from({ length: Math.ceil(laidOut / perRow) }, (_, row) => Array.from({ length: Math.min(perRow, laidOut - row * perRow) }, (_, col) => row * perRow + col));
 const shuffleMs = 1100;
 // The last card picked sends the cards after this long, so a slip can still be taken back (2026-11-05: a member picked
 // three cards and waited, not seeing the button).
@@ -319,19 +351,21 @@ export function LoungeTarotPicker({ dealKey, count, send, disabled }: { dealKey:
   </section>;
   return <section className="lounge-tarot-picker" aria-label="타로 카드 고르기">
     <div className="lounge-tarot-head">
-      <b>{dealt ? picked.length === count ? '이 카드로 볼게요…' : `끌리는 카드를 ${count}장 골라 주세요` : '카드를 섞는 중…'}</b>
+      <b>{dealt ? picked.length === count ? '이 카드로 볼게요…' : `78장 중에서 끌리는 카드를 ${count}장 골라 주세요` : '카드를 섞는 중…'}</b>
       {dealt && <small>{picked.length} / {count}</small>}
     </div>
     {!dealt ? <div className="lounge-tarot-shuffle" aria-hidden="true">
       {Array.from({ length: 6 }, (_, i) => <span key={`${round}-${i}`} className="lounge-tarot-back" style={{ '--i': i } as CSSProperties} />)}
     </div> : <div className="lounge-tarot-table">
-      {Array.from({ length: laidOut }, (_, place) => {
-        const order = picked.indexOf(place);
-        return <button key={`${round}-${place}`} type="button" className={`lounge-tarot-back${order >= 0 ? ' picked' : ''}`} style={{ '--i': place } as CSSProperties}
-          disabled={disabled || sending || (order < 0 && picked.length >= count)} aria-pressed={order >= 0} aria-label={`${place + 1}번째 카드`} onClick={() => toggle(place)}>
-          {order >= 0 && count > 1 && <span className="lounge-tarot-order">{order + 1}</span>}
-        </button>;
-      })}
+      {rows.map((places, row) => <div key={row} className="lounge-tarot-row">
+        {places.map(place => {
+          const order = picked.indexOf(place);
+          return <button key={`${round}-${place}`} type="button" className={`lounge-tarot-back${order >= 0 ? ' picked' : ''}`} style={{ '--i': place } as CSSProperties}
+            disabled={disabled || sending || (order < 0 && picked.length >= count)} aria-pressed={order >= 0} aria-label={`${place + 1}번째 카드`} onClick={() => toggle(place)}>
+            {order >= 0 && count > 1 && <span className="lounge-tarot-order">{order + 1}</span>}
+          </button>;
+        })}
+      </div>)}
     </div>}
     <div className="lounge-tarot-actions">
       <button type="button" className="lounge-tarot-reshuffle" onClick={reshuffle} disabled={sending || !dealt}><RotateCcw size={14} /> 다시 섞기</button>
