@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import {
   loungeSajuCalendars, loungeSajuFocuses, loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix,
@@ -107,9 +107,12 @@ function LoungeSajuForm({ send, disabled, onDone }: { send: Send; disabled: bool
 /** How many face-down cards are laid out to pick from (the server deck is shuffled in full; these are its first places). */
 const laidOut = 24;
 const shuffleMs = 1100;
+// The last card picked sends the cards after this long, so a slip can still be taken back (2026-11-05: a member picked
+// three cards and waited, not seeing the button).
+const autoSendMs = 700;
 // What a laid-out deck has been through, kept outside the component: the room page refreshes every second, and a picker
 // that is drawn again must not shuffle again or forget the cards picked (2026-11-05: the shuffle never ended for a member).
-const deals = new Map<string, { started: number; picked: number[] }>();
+const deals = new Map<string, { started: number; picked: number[]; sent?: boolean }>();
 
 /**
  * 홍실당 타로: the deck is shuffled, then dealt face down, and the member picks `count` cards. What a place holds is the
@@ -120,14 +123,19 @@ export function LoungeTarotPicker({ dealKey, count, send, disabled }: { dealKey:
   const [kept] = useState(() => {
     const existing = deals.get(dealKey) ?? { started: Date.now(), picked: [] };
     deals.set(dealKey, existing);
-    return { started: existing.started, picked: existing.picked, dealt: Date.now() - existing.started >= shuffleMs };
+    return { started: existing.started, picked: existing.picked, sent: Boolean(existing.sent), dealt: Date.now() - existing.started >= shuffleMs };
   });
   const [round, setRound] = useState(0);
   const [dealt, setDealt] = useState(kept.dealt);
   const [picked, setPicked] = useState<number[]>(kept.picked);
   const [sending, setSending] = useState(false);
+  // Sent once: the cards are with 한결 and nothing can be sent again (2026-11-05: 그냥 뽑아 줘 went three times).
+  const [sent, setSent] = useState(kept.sent);
   const [error, setError] = useState('');
+  const autoSend = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(autoSend.current), []);
   const remember = (next: number[]) => { setPicked(next); deals.set(dealKey, { started: deals.get(dealKey)?.started ?? 0, picked: next }); };
+  const pickText = (places: number[]) => `${loungeTarotPickPrefix}${places.map(place => place + 1).join(', ')}`;
   // The shuffle plays (only what is left of it after a redraw), then the cards are dealt; shuffling again plays it again.
   useEffect(() => {
     const left = Math.max(0, shuffleMs - (Date.now() - (deals.get(dealKey)?.started ?? 0)));
@@ -135,15 +143,27 @@ export function LoungeTarotPicker({ dealKey, count, send, disabled }: { dealKey:
     return () => window.clearTimeout(timer);
   }, [round, dealKey]);
   const reshuffle = () => { deals.set(dealKey, { started: Date.now(), picked: [] }); setPicked([]); setDealt(false); setRound(value => value + 1); };
-  const toggle = (place: number) => remember(picked.includes(place) ? picked.filter(item => item !== place) : picked.length < count ? [...picked, place] : picked);
-  const submit = async (text: string) => {
-    if (sending) return;
-    setSending(true); setError('');
-    try { await send(text); } catch (err) { setError(errorText(err)); } finally { setSending(false); }
+  const toggle = (place: number) => {
+    const next = picked.includes(place) ? picked.filter(item => item !== place) : picked.length < count ? [...picked, place] : picked;
+    remember(next);
+    window.clearTimeout(autoSend.current);
+    if (next.length === count) autoSend.current = window.setTimeout(() => void submit(pickText(next)), autoSendMs);
   };
+  const submit = async (text: string) => {
+    if (sending || sent) return;
+    window.clearTimeout(autoSend.current);
+    setSending(true); setSent(true); setError('');
+    deals.set(dealKey, { ...(deals.get(dealKey) ?? { started: 0, picked }), sent: true });
+    try { await send(text); }
+    catch (err) { setSent(false); deals.set(dealKey, { ...(deals.get(dealKey) ?? { started: 0, picked }), sent: false }); setError(errorText(err)); }
+    finally { setSending(false); }
+  };
+  if (sent) return <section className="lounge-tarot-picker sent" aria-label="타로 카드 고르기" role="status">
+    <div className="lounge-tarot-head"><b><LoaderCircle size={15} className="lounge-spin" /> 고른 카드를 한결에게 건넸어요</b></div>
+  </section>;
   return <section className="lounge-tarot-picker" aria-label="타로 카드 고르기">
     <div className="lounge-tarot-head">
-      <b>{dealt ? `끌리는 카드를 ${count}장 골라 주세요` : '카드를 섞는 중…'}</b>
+      <b>{dealt ? picked.length === count ? '이 카드로 볼게요…' : `끌리는 카드를 ${count}장 골라 주세요` : '카드를 섞는 중…'}</b>
       {dealt && <small>{picked.length} / {count}</small>}
     </div>
     {!dealt ? <div className="lounge-tarot-shuffle" aria-hidden="true">
@@ -160,7 +180,7 @@ export function LoungeTarotPicker({ dealKey, count, send, disabled }: { dealKey:
     <div className="lounge-tarot-actions">
       <button type="button" className="lounge-tarot-reshuffle" onClick={reshuffle} disabled={sending || !dealt}><RotateCcw size={14} /> 다시 섞기</button>
       <button type="button" className="lounge-tarot-reshuffle" onClick={() => void submit(loungeTarotDrawForMe)} disabled={disabled || sending}>그냥 뽑아 줘</button>
-      <button type="button" className="lounge-tarot-confirm" onClick={() => void submit(`${loungeTarotPickPrefix}${picked.map(place => place + 1).join(', ')}`)} disabled={disabled || sending || picked.length !== count}>
+      <button type="button" className="lounge-tarot-confirm" onClick={() => void submit(pickText(picked))} disabled={disabled || sending || picked.length !== count}>
         {sending ? <LoaderCircle size={15} className="lounge-spin" /> : null} 이 카드로 볼게요
       </button>
     </div>
