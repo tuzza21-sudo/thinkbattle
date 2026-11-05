@@ -162,7 +162,8 @@ test('a companion sheet has a lens, distinct actions, stage limits and usable ev
     const shown = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'on');
     const hidden = loungeCompanionSheetPrompt(loungeCharacters.find(character => character.id === id), 'off');
     assert.match(shown, /속마음의 말투: /);
-    assert.doesNotMatch(shown, /새어 나온다/);
+    // The heading of the hidden-voice leaks (an example line may say "웃음이 새어 나온다").
+    assert.doesNotMatch(shown, /속마음은 대사와 행동에 이렇게 새어 나온다/);
     if (bible.innerVoice.offModeLeaks?.length) assert.match(hidden, /속마음은 대사와 행동에 이렇게 새어 나온다/);
     if (bible.fewShot?.length) {
       assert.ok(shown.includes(JSON.stringify(loungeFewShotTurn(bible.fewShot[0], 'on').text)));
@@ -242,4 +243,27 @@ test('every part of a companion sheet meant for the model reaches it', () => {
       assert.deepEqual(turn.event, { content: event.content, purpose: event.purpose }, `${character.id}: ${event.id}`);
     }
   }
+});
+
+test('서도현\'s turn engine, hooks, weak spots, material, hobby answer and rematch ledger reach the model (2026-11-05)', () => {
+  const { loungeCompanionRules, loungeTurnEngineDirectorNote } = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
+  const doHyun = loungeCharacters.find(character => character.id === 'auditor');
+  const bible = doHyun.bible;
+  const prompt = [loungeBiblePrompt(doHyun), loungeCompanionSheetPrompt(doHyun, 'on')].join('\n');
+  const parts = [...bible.turnEngine.beats, ...bible.turnEngine.rules, ...bible.hooks.flatMap(hook => [hook.type, hook.example]), ...bible.weakSpots,
+    ...bible.materialBank.studied, ...bible.materialBank.real, ...bible.materialBank.brags, bible.hobbyAnswer.rehearsed, bible.hobbyAnswer.real, bible.hobbyAnswer.rule,
+    bible.relationshipDevice.name, bible.relationshipDevice.rule];
+  for (const text of parts) assert.ok(prompt.includes(text), `not sent: ${text.slice(0, 40)}`);
+  // The engine ends every reply on a hook, so neither the sheet nor the chat's rules tell it to end flat more often.
+  assert.doesNotMatch(loungeCompanionSheetPrompt(doHyun, 'on'), /담백하게 할 말을 하고 끝내는 답이 더 많다/);
+  const own = loungeCompanionRules({ ownLength: true, innerVoice: 'on', ownEnding: true });
+  assert.match(own, /턴 엔진\(turnEngine\)대로 매 답을 사용자가 한두 마디로 받아칠 수 있는 미끼로 끝낸다/);
+  assert.doesNotMatch(own, /매 답을 질문으로 끝내지 않는다/);
+  assert.match(loungeCompanionRules({ ownLength: true, innerVoice: 'on' }), /매 답을 질문으로 끝내지 않는다/, 'the others keep the shared rule');
+  assert.match(loungeTurnEngineDirectorNote, /담백을 고르지 않고/);
+  // One reply per example with its inner voice; none of them puts off the rematch to another day.
+  assert.equal(bible.fewShot.length, 8);
+  for (const shot of bible.fewShot) assert.ok('reply' in shot && shot.inner_voice && !/다음에 다시/.test(shot.reply), shot.user);
+  // The others are untouched.
+  for (const character of loungeCharacters.filter(item => item.id !== 'auditor')) assert.equal(character.bible?.turnEngine, undefined, character.id);
 });
