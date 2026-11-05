@@ -11,7 +11,7 @@ const consult = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', impo
 const tarot = loadTs(fileURLToPath(new URL('../src/lib/loungeTarot.ts', import.meta.url)));
 const dreams = loadTs(fileURLToPath(new URL('../src/lib/loungeDreams.ts', import.meta.url)));
 const saju = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
-const { advanceLoungeConsult, withLoungeReading, readLoungeConsultState, readLoungeReading, loungeInterpreterRequest, loungeConsultRules, loungeTarotPickPrefix, loungeTarotDrawForMe, loungeConsultPickCount, loungeConsultShownCards, loungeTarotFormText, loungeSajuFormText, readLoungeSajuForm, readLoungeTarotForm, loungeConsultSajuInput, loungeCounselFormText, readLoungeCounselForm, loungeConsultShownChart } = consult;
+const { advanceLoungeConsult, withLoungeReading, readLoungeConsultState, readLoungeReading, loungeInterpreterRequest, loungeConsultRules, loungeTarotPickPrefix, loungeTarotDrawForMe, loungeConsultPickCount, loungeConsultShownCards, loungeTarotFormText, loungeSajuFormText, readLoungeSajuForm, readLoungeTarotForm, loungeConsultSajuInput, loungeCounselFormText, readLoungeCounselForm, loungeConsultShownChart, loungeConsultShownExtras, loungeCompatFormText, readLoungeCompatForm, loungeFortuneFormText, readLoungeFortuneForm, loungeZodiacFormText, readLoungeZodiacForm } = consult;
 
 const reading = { headline: '먼저 말하면 풀린다', core: ['서로 기다리는 중이다'], detail: ['오해가 쌓였다'], advice: ['짧게 먼저 연락한다'], homework: '오늘 한 줄만 보내기', tone_hint: '미루는 건 짚고 마음은 다독인다', evidence: ['컵 2 정방향'], safety: [], memory_note: '타로: 친구와 서운함' };
 const step = (state, said, opening = false, randomInt) => advanceLoungeConsult(state, { opening, said }, randomInt);
@@ -168,6 +168,77 @@ test('기타 상담: a dream with its question goes to the dream reading, love, 
   assert.equal(readLoungeCounselForm('📝 기타 상담 · 💰 금전\n고민: 투자 고민'), undefined);
   assert.equal(step(opened(), '📝 기타 상담 · 💰 금전\n고민: 투자 고민').turn.do, 'retry');
   assert.match(loungeConsultRules, /기타 상담\(꿈해몽, 연애, 금전, 인간관계, 진로를 적는다\)/);
+});
+
+test('궁합, 운세 and 별자리 from their forms: the births read back, a bad one asked again, and the member\'s birth kept for the next form', () => {
+  const me = { date: '1990-05-03', calendar: 'solar', time: '14:30', gender: 'female' };
+  const partner = { date: '1988-11-20', calendar: 'lunar', gender: 'male' };
+  const compat = loungeCompatFormText({ me, partner, relation: '썸', question: '우리 · 잘 맞아요?' });
+  assert.equal(compat, '💞 궁합 · 나: 1990-05-03 양력 14:30 여성 · 상대: 1988-11-20 음력 시간 모름 남성 · 사이: 썸 · 질문: 우리 · 잘 맞아요?');
+  assert.deepEqual(readLoungeCompatForm(compat), { me, partner, relation: '썸', question: '우리 · 잘 맞아요?' });
+  const asked = step(opened(), compat);
+  assert.equal(asked.interpret, true);
+  assert.deepEqual([asked.state.module, asked.state.birth], ['compat', me]);
+  assert.equal(step(opened(), compat.replace('1988-11-20 음력', '1988-02-30 양력')).turn.do, 'retry', 'a date that does not exist');
+  const fortune = loungeFortuneFormText({ me, period: 'today' });
+  assert.equal(fortune, '🗓️ 운세 · 오늘 · 나: 1990-05-03 양력 14:30 여성');
+  assert.deepEqual(readLoungeFortuneForm(fortune), { me, period: 'today' });
+  assert.equal(readLoungeFortuneForm('🗓️ 운세 · 내일 · 나: 1990-05-03 양력 14:30 여성'), undefined);
+  const zodiac = loungeZodiacFormText({ me: { ...me, gender: 'none' }, question: '이번 달 연애운' });
+  assert.equal(zodiac, '⭐ 별자리 · 나: 1990-05-03 양력 14:30 · 질문: 이번 달 연애운');
+  // 별자리 asks no gender: the one already remembered stays for the next 사주 or 궁합.
+  const starred = step(asked.state, zodiac);
+  assert.deepEqual([starred.state.module, starred.state.birth.gender], ['zodiac', 'female']);
+  assert.deepEqual(readLoungeConsultState(JSON.parse(JSON.stringify(starred.state))).birth, me);
+  const request = loungeInterpreterRequest(starred.state, undefined, { sign: '♉ 황소자리' });
+  assert.deepEqual(JSON.parse(request.input), { module: 'zodiac', chart: { sign: '♉ 황소자리' }, question: '이번 달 연애운' });
+  assert.match(request.instructions, /달 별자리, 상승궁, 다른 행성의 배치\(역행 등\)는 지어내지 않는다/);
+  assert.match(loungeInterpreterRequest(asked.state, undefined, {}).instructions, /점수, 천생연분·최악 같은 단정/);
+  assert.equal(JSON.parse(loungeInterpreterRequest(step(opened(), fortune).state, undefined, {}).input).period, '오늘');
+  assert.match(loungeConsultRules, /궁합\(두 사람의 생년월일\), 운세\(오늘·이번 달·올해\), 별자리/);
+});
+
+test('궁합, 운세 and 별자리 computed: 합 and 충 between two charts, today\'s 일진, the sign by the solar terms, and what the page shows', () => {
+  const now = new Date('2026-11-05T03:00:00Z');
+  const born = (date, gender = 'female') => ({ date, calendar: 'solar', time: '12:00', gender });
+  // 2024-01-01 is a 갑자(甲子) day, 01-02 을축, 01-06 기사, 01-07 경오.
+  const clash = saju.computeLoungeCompat(born('2024-01-01'), born('2024-01-07', 'male'), now);
+  assert.equal(clash.reading.between[1], '일간끼리: 쇠가 나무를 누르는 관계 — 상대가 이끄는 쪽이고, 나는 눌릴 수 있다');
+  assert.match(clash.reading.between[2], /^상대가 나에게: 편관\(偏官\) — /);
+  assert.match(clash.reading.between[3], /^내가 상대에게: 편재\(偏財\) — /);
+  assert.match(clash.reading.between[4], /^일지\(배우자 자리\)끼리: 자\(子\)와 오\(午\) — 충\(沖\)/);
+  assert.match(saju.computeLoungeCompat(born('2024-01-01'), born('2024-01-06'), now).reading.between[1], /천간합\(天干合\) — 갑기합, .*흙\(토\) 기운/);
+  assert.match(saju.computeLoungeCompat(born('2024-01-01'), born('2024-01-02'), now).reading.between[4], /자\(子\)와 축\(丑\) — 육합\(六合\)/);
+  assert.deepEqual([clash.display.title, clash.partnerDisplay.title, clash.partnerDisplay.pillars[1].hanja], ['나', '상대', '庚午']);
+  // The ten god worked out by hand agrees with the library's.
+  const library = { 비견: '比肩', 겁재: '劫财', 식신: '食神', 상관: '伤官', 편재: '偏财', 정재: '正财', 편관: '七杀', 정관: '正官', 편인: '偏印', 정인: '正印' };
+  for (let day = 0; day < 60; day += 7) {
+    const chart = saju.computeLoungeSaju({ ...born(`2000-0${1 + (day % 9)}-${String(1 + (day % 28)).padStart(2, '0')}`), focus: '전부' }, now);
+    const [dayStem, yearStem] = [chart.display.pillars[1].hanja[0], chart.display.pillars[3].hanja[0]];
+    assert.equal(saju.loungeTenGod(dayStem, yearStem), library[chart.ten_gods.year], `${dayStem} ${yearStem}`);
+  }
+  const me = { date: '1990-05-03', calendar: 'solar', time: '14:30', gender: 'female' };
+  const today = saju.computeLoungeFortune(me, 'today', now);
+  assert.equal(today.reading.explained[0], '오늘의 일진: 계미(癸未) — 계(癸) 물·음 위에 미(未) 흙·양');
+  assert.match(today.reading.explained[2], /^이 기운이 나에게: 정재\(正財\) — /);
+  assert.deepEqual(today.display.extra, { label: '오늘', hanja: '癸未', hangul: '계미', elements: ['수', '토'] });
+  assert.equal(saju.computeLoungeFortune(me, 'year', now).reading.pillar, '병오(丙午)');
+  assert.equal(saju.computeLoungeFortune(me, 'month', now).reading.pillar, '무술(戊戌)');
+  // The 1990 spring equinox was at 06:19 in Seoul: the sign turns there, not on a fixed date.
+  assert.equal(saju.computeLoungeZodiac({ date: '1990-03-21', calendar: 'solar', time: '06:00' }, now).display.sign, '물고기자리');
+  assert.equal(saju.computeLoungeZodiac({ date: '1990-03-21', calendar: 'solar', time: '07:00' }, now).display.sign, '양자리');
+  const taurus = saju.computeLoungeZodiac({ date: '1990-05-03', calendar: 'solar', time: '14:30' }, now);
+  assert.deepEqual([taurus.display.sign, taurus.display.now, taurus.display.house], ['황소자리', '♏ 전갈자리', 7]);
+  assert.equal(saju.computeLoungeZodiac({ date: '1990-04-09', calendar: 'lunar' }, now).display.sign, '황소자리', 'a lunar birth is converted first');
+  // The page shows both charts of a 궁합 and the 별자리 card, once, under the reading.
+  const asked = step(opened(), loungeCompatFormText({ me, partner: born('2024-01-07', 'male'), relation: '연인' }));
+  const told = withLoungeReading(asked.state, reading, undefined, clash.display, { partnerChart: clash.partnerDisplay, zodiac: taurus.display });
+  assert.deepEqual(loungeConsultShownChart(told.state), clash.display);
+  assert.deepEqual(loungeConsultShownExtras(told.state), { partnerChart: clash.partnerDisplay });
+  const starred = withLoungeReading(step(told.state, loungeZodiacFormText({ me })).state, reading, undefined, undefined, { zodiac: taurus.display });
+  assert.deepEqual([loungeConsultShownChart(starred.state), loungeConsultShownExtras(starred.state)], [undefined, { zodiac: taurus.display }]);
+  assert.deepEqual(readLoungeConsultState(JSON.parse(JSON.stringify(starred.state))).zodiac, taurus.display);
+  assert.deepEqual(loungeConsultShownExtras(step(starred.state, '고마워').state), {});
 });
 
 test('a dream told in the conversation is read at once, with the symbols code found', () => {

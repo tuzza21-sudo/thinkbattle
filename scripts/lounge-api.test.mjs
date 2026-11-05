@@ -4179,3 +4179,28 @@ test('홍실당 상담: the picked cards are read by their own call, 한결 tell
   assert.ok(storyAt >= 0 && storyAt < hostAt, `story ${storyAt}, host ${hostAt}`);
   assert.equal(scored, 0, 'a consulting room scores no relationship');
 });
+
+test('홍실당 운세: the form is computed on the server, the interpreter gets today\'s pillar against the chart, and the chart reaches the page', async () => {
+  const scenario = { id: 'shaman-hongsil', title: '홍실당 상담', prologue: '청담동 오피스텔 꼭대기 층, 붉은 실이 걸린 신당.', user_role: '상담받으러 온 손님', relationship: '처음 온 손님', place: '홍실당 상담 테이블' };
+  const before = { kind: 'consult', phase: 'chat', answers: {}, since: 6, turn: 2, last: 'greet' };
+  const reading = { headline: '오늘은 지갑을 챙겨라', core: ['정재가 들어온다'], detail: ['계미 일진'], advice: ['작게 모은다'], homework: '영수증 정리', tone_hint: '다독인다', evidence: ['계미(癸未)'], safety: [], memory_note: '운세: 오늘 정재', thread_state: 'none' };
+  let asked, patch;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { patch = JSON.parse(init.body); return new Response(null, { status: 204 }); }
+    if (url.includes('voice_lounge_rooms?') && !url.includes('host_id=')) return result([{ topic: '상담', host_persona: 'shaman', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 3, scenario, story_state: before }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 4, user_id: 'user-1', nickname: '나', kind: 'human', text: '🗓️ 운세 · 오늘 · 나: 1990-05-03 양력 14:30 여성 · 질문: 돈 쓸 일이 있는데', created_at: '2026-11-05T00:00:00Z' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_reading') { asked = JSON.parse(init.body); return modelAnswer(reading); }
+    if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 홍실당', events: [], memory_ops: [] });
+    if (url.endsWith('/responses')) return modelAnswer({ text: '오늘 일진이 계미야.', inner_voice: '' });
+    if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+    return result([]);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  const input = JSON.parse(asked.input);
+  assert.deepEqual([input.module, input.period, input.question], ['fortune', '오늘', '돈 쓸 일이 있는데']);
+  assert.match(input.chart.explained[0], /^오늘의 일진: [가-힣]{2}\([^)]{2}\) — /);
+  assert.match(input.chart.me.explained.day_master, /^일간 무토\(戊土\)/);
+  assert.deepEqual([patch.story_state.module, patch.story_state.last, patch.story_state.chart.extra.label, patch.story_state.birth.date], ['fortune', 'reading', '오늘', '1990-05-03']);
+});

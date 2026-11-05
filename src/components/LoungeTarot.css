@@ -72,7 +72,7 @@
 .lounge-hongsil-button:disabled { opacity:.6; cursor:default; }
 .lounge-hongsil-button.blinking { animation:lounge-hongsil-blink 1.1s ease-in-out infinite; }
 @keyframes lounge-hongsil-blink { 0%, 100% { background:#8e1b24; box-shadow:0 0 0 0 #ff3b3b00; } 50% { background:#d4252f; box-shadow:0 0 0 6px #ff3b3b55, 0 0 18px #ff3b3b88; } }
-.lounge-hongsil-menu { position:absolute; bottom:calc(100% + 8px); left:0; z-index:5; display:grid; gap:6px; min-width:220px; padding:8px; border-radius:14px; border:1px solid #ffffff2e; background:#1b0f12f5; box-shadow:0 10px 24px #000a; }
+.lounge-hongsil-menu { position:absolute; bottom:calc(100% + 8px); left:0; z-index:5; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; width:min(340px, calc(100vw - 32px)); padding:8px; border-radius:14px; border:1px solid #ffffff2e; background:#1b0f12f5; box-shadow:0 10px 24px #000a; }
 .lounge-hongsil-menu button { display:grid; gap:2px; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid #ffffff1f; background:#ffffff0d; color:#fff5e9; font:inherit; font-size:14px; cursor:pointer; }
 .lounge-hongsil-menu button small { color:#f3c9a8; font-size:12px; }
 .lounge-hongsil-menu button:disabled { opacity:.55; cursor:default; }
@@ -118,3 +118,13 @@
 .lounge-saju-elements li span { padding:2px 8px; border-radius:999px; text-align:center; }
 .lounge-saju-elements li i { display:block; height:8px; width:var(--w); min-width:2px; border-radius:999px; }
 .lounge-saju-elements li b { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* 운세: the pillar of the day, month or year beside the chart. */
+.lounge-saju-extra { display:grid; grid-template-columns:auto 1fr 1fr; align-items:center; gap:8px; margin-bottom:10px; padding:8px; border-radius:12px; border:1px dashed #f3c9a880; }
+.lounge-saju-extra > span { font-size:12px; color:#f3c9a8; padding:0 4px; }
+/* 별자리 card. */
+.lounge-zodiac-card dl { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin:0; }
+.lounge-zodiac-card dl div { padding:8px 10px; border-radius:10px; background:#ffffff0d; border:1px solid #ffffff1f; }
+.lounge-zodiac-card dl div.wide { grid-column:1 / -1; }
+.lounge-zodiac-card dt { font-size:11px; color:#f3c9a8; }
+.lounge-zodiac-card dd { margin:2px 0 0; font-size:14px; }

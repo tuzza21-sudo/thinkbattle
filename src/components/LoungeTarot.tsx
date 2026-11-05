@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { LoaderCircle, RotateCcw, Sparkles, X } from 'lucide-react';
 import {
-  loungeCounselCategories, loungeCounselFormText, loungeSajuCalendars, loungeSajuFocuses, loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix,
-  type LoungeCounselCategory, type LoungeCounselField, type LoungeSajuDisplay, type LoungeSajuInput,
+  loungeCompatFormText, loungeCompatRelations, loungeCounselCategories, loungeCounselFormText, loungeFortuneFormText, loungeFortunePeriods, loungeSajuCalendars, loungeSajuFocuses,
+  loungeSajuFormText, loungeSajuGenders, loungeTarotDrawForMe, loungeTarotFormText, loungeTarotPickPrefix, loungeZodiacFormText,
+  type LoungeBirth, type LoungeCounselCategory, type LoungeCounselField, type LoungeFortunePeriod, type LoungeSajuDisplay, type LoungeSajuInput, type LoungeZodiacDisplay,
 } from '../lib/loungeConsult';
 import type { LoungeTarotDrawn, LoungeTarotSpread } from '../lib/loungeTarot';
 import './LoungeTarot.css';
@@ -12,21 +13,28 @@ const errorText = (err: unknown) => err instanceof Error ? err.message : '보내
 
 /**
  * The 홍실당 button under the conversation (2026-11-05): the consulting room is a conversation, and what needs a form starts
- * here — tarot (the question and how many cards) and 사주 (the birth). It blinks red when it is the moment to use it (a new
- * guest, or tarot or 사주 just mentioned).
+ * here — tarot, 사주, 궁합, 운세, 별자리 and 기타 상담. It blinks red when it is the moment to use it (a new guest, or a
+ * reading just mentioned). `birth` is the member's birth from the last form, so the next one starts filled in.
  */
-export function LoungeHongsilBar({ hint, send, disabled }: { hint: boolean; send: Send; disabled: boolean }) {
-  const [view, setView] = useState<'closed' | 'menu' | 'tarot' | 'saju' | 'counsel'>('closed');
+export function LoungeHongsilBar({ hint, send, disabled, birth }: { hint: boolean; send: Send; disabled: boolean; birth?: LoungeBirth }) {
+  const [view, setView] = useState<'closed' | 'menu' | 'tarot' | 'saju' | 'compat' | 'fortune' | 'zodiac' | 'counsel'>('closed');
   const [seen, setSeen] = useState(false);
   const close = () => setView('closed');
+  const props = { send, disabled, onDone: close, birth };
   return <div className="lounge-hongsil-bar">
     {view === 'menu' && <div className="lounge-hongsil-menu" role="menu" aria-label="홍실당 상담">
-      <button type="button" role="menuitem" onClick={() => setView('tarot')}>🃏 타로 보기<small>궁금한 걸 적고 카드를 직접 골라요</small></button>
-      <button type="button" role="menuitem" onClick={() => setView('saju')}>🔮 사주 보기<small>생년월일로 타고난 기질과 올해 흐름</small></button>
-      <button type="button" role="menuitem" onClick={() => setView('counsel')}>📝 기타 상담<small>꿈해몽 · 연애 · 금전 · 인간관계 · 진로</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('tarot')}>🃏 타로<small>궁금한 걸 적고 카드를 직접 골라요</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('saju')}>🔮 사주<small>타고난 기질과 올해 흐름</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('compat')}>💞 궁합<small>두 사람의 생년월일로</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('fortune')}>🗓️ 운세<small>오늘 · 이번 달 · 올해</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('zodiac')}>⭐ 별자리<small>내 별자리와 이달 흐름</small></button>
+      <button type="button" role="menuitem" onClick={() => setView('counsel')}>📝 기타 상담<small>꿈해몽 · 연애 · 금전 · 관계 · 진로</small></button>
     </div>}
     {view === 'tarot' && <LoungeTarotForm send={send} disabled={disabled} onDone={close} />}
-    {view === 'saju' && <LoungeSajuForm send={send} disabled={disabled} onDone={close} />}
+    {view === 'saju' && <LoungeSajuForm {...props} />}
+    {view === 'compat' && <LoungeCompatForm {...props} />}
+    {view === 'fortune' && <LoungeFortuneForm {...props} />}
+    {view === 'zodiac' && <LoungeZodiacForm {...props} />}
     {view === 'counsel' && <LoungeCounselForm send={send} disabled={disabled} onDone={close} />}
     <button type="button" className={`lounge-hongsil-button${hint && !seen ? ' blinking' : ''}`} aria-expanded={view !== 'closed'}
       onClick={() => { setView(current => current === 'closed' ? 'menu' : 'closed'); setSeen(true); }}><Sparkles size={15} /> 홍실당</button>
@@ -62,47 +70,123 @@ function LoungeTarotForm({ send, disabled, onDone }: { send: Send; disabled: boo
   </form>;
 }
 
+const chips = <T extends string>(options: Record<T, string> | readonly T[], value: T, set: (value: T) => void, label: string) =>
+  <div className="lounge-tarot-count" role="radiogroup" aria-label={label}>{(Array.isArray(options) ? options.map(item => [item, item]) : Object.entries(options)).map(([key, text]) =>
+    <button key={key} type="button" role="radio" aria-checked={value === key} className={value === key ? 'on' : ''} onClick={() => set(key as T)}>{text as string}</button>)}</div>;
+
 const years = Array.from({ length: 2049 - 1900 + 1 }, (_, i) => 2049 - i);
-/** 사주: the birth (solar or lunar date, the time or not, the gender for the luck pillars) and what to look at. */
-function LoungeSajuForm({ send, disabled, onDone }: { send: Send; disabled: boolean; onDone: () => void }) {
-  const [year, setYear] = useState(1995), [month, setMonth] = useState(1), [day, setDay] = useState(1);
-  const [calendar, setCalendar] = useState<LoungeSajuInput['calendar']>('solar');
-  const [time, setTime] = useState(''), [noTime, setNoTime] = useState(false);
-  const [gender, setGender] = useState<LoungeSajuInput['gender']>('female');
-  const [focus, setFocus] = useState<string>('전부');
-  const [question, setQuestion] = useState('');
+type BirthDraft = { year: number; month: number; day: number; calendar: LoungeSajuInput['calendar']; time: string; noTime: boolean; gender: LoungeSajuInput['gender'] };
+const birthDraft = (birth?: LoungeBirth): BirthDraft => {
+  const [year, month, day] = birth ? birth.date.split('-').map(Number) : [1995, 1, 1];
+  return { year, month, day, calendar: birth?.calendar ?? 'solar', time: birth?.time ?? '', noTime: Boolean(birth && !birth.time), gender: birth?.gender ?? 'female' };
+};
+const birthDays = (draft: BirthDraft) => draft.calendar === 'solar' ? new Date(Date.UTC(draft.year, draft.month, 0)).getUTCDate() : 30;
+/** The birth the member filled in, or the reason it cannot be sent yet. */
+const birthOf = (draft: BirthDraft, who = ''): LoungeBirth | string => {
+  if (!draft.noTime && !/^\d{2}:\d{2}$/.test(draft.time)) return `${who}태어난 시간을 적거나 "시간 몰라요"를 눌러 주세요.`;
+  const date = `${draft.year}-${String(draft.month).padStart(2, '0')}-${String(Math.min(draft.day, birthDays(draft))).padStart(2, '0')}`;
+  return { date, calendar: draft.calendar, ...(draft.noTime ? {} : { time: draft.time }), gender: draft.gender };
+};
+/** The birth fields every chart form shares: the date in either calendar, the time (or not), and the gender when it is used. */
+function BirthFields({ draft, set, title = '생년월일', gender }: { draft: BirthDraft; set: (draft: BirthDraft) => void; title?: string; gender?: string }) {
+  const days = birthDays(draft);
+  const change = (patch: Partial<BirthDraft>) => set({ ...draft, ...patch });
+  return <>
+    <div className="lounge-hongsil-field"><span>{title}</span><div className="lounge-hongsil-date">
+      <select value={draft.year} onChange={event => change({ year: Number(event.target.value) })} aria-label={`${title} 해`}>{years.map(item => <option key={item} value={item}>{item}년</option>)}</select>
+      <select value={draft.month} onChange={event => change({ month: Number(event.target.value) })} aria-label={`${title} 달`}>{Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}월</option>)}</select>
+      <select value={Math.min(draft.day, days)} onChange={event => change({ day: Number(event.target.value) })} aria-label={`${title} 날`}>{Array.from({ length: days }, (_, i) => <option key={i} value={i + 1}>{i + 1}일</option>)}</select>
+    </div>{chips(loungeSajuCalendars, draft.calendar, calendar => change({ calendar }), `${title} 양력 음력`)}</div>
+    <div className="lounge-hongsil-field"><span>태어난 시간</span><div className="lounge-hongsil-time">
+      <input type="time" value={draft.time} onChange={event => change({ time: event.target.value })} disabled={draft.noTime} aria-label={`${title} 시간`} />
+      <label className="lounge-hongsil-check"><input type="checkbox" checked={draft.noTime} onChange={event => change({ noTime: event.target.checked })} /> 시간 몰라요</label>
+    </div></div>
+    {gender && <div className="lounge-hongsil-field"><span>{gender}</span>{chips(loungeSajuGenders, draft.gender, value => change({ gender: value }), `${title} 성별`)}</div>}
+  </>;
+}
+
+type ChartFormProps = { send: Send; disabled: boolean; onDone: () => void; birth?: LoungeBirth };
+/** Sends a form's text once its births are in; shows why not otherwise. */
+function useFormSend(send: Send, onDone: () => void) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const days = calendar === 'solar' ? new Date(Date.UTC(year, month, 0)).getUTCDate() : 30;
-  const submit = async (event: FormEvent) => {
+  const submit = async (event: FormEvent, make: () => string) => {
     event.preventDefault();
     if (sending) return;
-    if (!noTime && !/^\d{2}:\d{2}$/.test(time)) { setError('태어난 시간을 적거나 "시간 몰라요"를 눌러 주세요.'); return; }
+    let text: string;
+    try { text = make(); } catch (err) { setError(errorText(err)); return; }
     setSending(true); setError('');
-    const date = `${year}-${String(month).padStart(2, '0')}-${String(Math.min(day, days)).padStart(2, '0')}`;
-    try { await send(loungeSajuFormText({ date, calendar, ...(noTime ? {} : { time }), gender, focus, ...(question.trim() ? { question } : {}) })); onDone(); }
-    catch (err) { setError(errorText(err)); } finally { setSending(false); }
+    try { await send(text); onDone(); } catch (err) { setError(errorText(err)); } finally { setSending(false); }
   };
-  const chips = <T extends string>(options: Record<T, string> | readonly T[], value: T, set: (value: T) => void, label: string) =>
-    <div className="lounge-tarot-count" role="radiogroup" aria-label={label}>{(Array.isArray(options) ? options.map(item => [item, item]) : Object.entries(options)).map(([key, text]) =>
-      <button key={key} type="button" role="radio" aria-checked={value === key} className={value === key ? 'on' : ''} onClick={() => set(key as T)}>{text as string}</button>)}</div>;
-  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event)} aria-label="사주 보기">
+  return { sending, error, submit };
+}
+const must = (birth: LoungeBirth | string) => { if (typeof birth === 'string') throw new Error(birth); return birth; };
+const SubmitRow = ({ label, sending, disabled, error }: { label: string; sending: boolean; disabled: boolean; error: string }) => <>
+  <button type="submit" className="lounge-tarot-confirm" disabled={disabled || sending}>{sending ? <LoaderCircle size={15} className="lounge-spin" /> : null} {label}</button>
+  {error && <p className="lounge-tarot-error" role="alert">{error}</p>}
+</>;
+
+/** 사주: the birth (solar or lunar date, the time or not, the gender for the luck pillars) and what to look at. */
+function LoungeSajuForm({ send, disabled, onDone, birth }: ChartFormProps) {
+  const [draft, setDraft] = useState(() => birthDraft(birth));
+  const [focus, setFocus] = useState<string>('전부');
+  const [question, setQuestion] = useState('');
+  const { sending, error, submit } = useFormSend(send, onDone);
+  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event, () => loungeSajuFormText({ ...must(birthOf(draft)), focus, ...(question.trim() ? { question } : {}) }))} aria-label="사주 보기">
     <FormHead title="🔮 사주 보기" onClose={onDone} />
-    <div className="lounge-hongsil-field"><span>생년월일</span><div className="lounge-hongsil-date">
-      <select value={year} onChange={event => setYear(Number(event.target.value))} aria-label="태어난 해">{years.map(item => <option key={item} value={item}>{item}년</option>)}</select>
-      <select value={month} onChange={event => setMonth(Number(event.target.value))} aria-label="태어난 달">{Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}월</option>)}</select>
-      <select value={Math.min(day, days)} onChange={event => setDay(Number(event.target.value))} aria-label="태어난 날">{Array.from({ length: days }, (_, i) => <option key={i} value={i + 1}>{i + 1}일</option>)}</select>
-    </div>{chips(loungeSajuCalendars, calendar, setCalendar, '양력 음력')}</div>
-    <div className="lounge-hongsil-field"><span>태어난 시간</span><div className="lounge-hongsil-time">
-      <input type="time" value={time} onChange={event => setTime(event.target.value)} disabled={noTime} aria-label="태어난 시간" />
-      <label className="lounge-hongsil-check"><input type="checkbox" checked={noTime} onChange={event => setNoTime(event.target.checked)} /> 시간 몰라요</label>
-    </div></div>
-    <div className="lounge-hongsil-field"><span>성별 (대운 계산에 써요)</span>{chips(loungeSajuGenders, gender, setGender, '성별')}</div>
+    <BirthFields draft={draft} set={setDraft} gender="성별 (대운 계산에 써요)" />
     <div className="lounge-hongsil-field"><span>무엇을 볼까요?</span>{chips(loungeSajuFocuses, focus, setFocus, '볼 것')}</div>
     <label>더 궁금한 것 (선택)<input value={question} onChange={event => setQuestion(event.target.value)} maxLength={200} placeholder="예: 올해 이직해도 괜찮을까?" /></label>
     <p className="lounge-hongsil-note">입력한 생년월일은 이 상담 대화에만 남아요. 풀이는 재미로 보는 콘텐츠예요.</p>
-    <button type="submit" className="lounge-tarot-confirm" disabled={disabled || sending}>{sending ? <LoaderCircle size={15} className="lounge-spin" /> : null} 사주 보기</button>
-    {error && <p className="lounge-tarot-error" role="alert">{error}</p>}
+    <SubmitRow label="사주 보기" sending={sending} disabled={disabled} error={error} />
+  </form>;
+}
+
+/** 궁합: the member's birth and the other person's, what they are to each other, and what to know. */
+function LoungeCompatForm({ send, disabled, onDone, birth }: ChartFormProps) {
+  const [me, setMe] = useState(() => birthDraft(birth));
+  const [partner, setPartner] = useState<BirthDraft>(() => ({ ...birthDraft(), gender: 'male' }));
+  const [relation, setRelation] = useState<string>('연인');
+  const [question, setQuestion] = useState('');
+  const { sending, error, submit } = useFormSend(send, onDone);
+  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event, () => loungeCompatFormText({ me: must(birthOf(me, '내 ')), partner: must(birthOf(partner, '상대의 ')), relation, ...(question.trim() ? { question } : {}) }))} aria-label="궁합 보기">
+    <FormHead title="💞 궁합 보기" onClose={onDone} />
+    <BirthFields draft={me} set={setMe} title="내 생년월일" gender="내 성별" />
+    <BirthFields draft={partner} set={setPartner} title="상대 생년월일" gender="상대 성별" />
+    <div className="lounge-hongsil-field"><span>어떤 사이예요?</span>{chips(loungeCompatRelations, relation, setRelation, '사이')}</div>
+    <label>더 궁금한 것 (선택)<input value={question} onChange={event => setQuestion(event.target.value)} maxLength={200} placeholder="예: 우리 자주 싸우는 이유가 뭘까?" /></label>
+    <p className="lounge-hongsil-note">상대의 생년월일도 이 상담 대화에만 남아요. 궁합은 맞춰 가는 힌트로 봐 주세요.</p>
+    <SubmitRow label="궁합 보기" sending={sending} disabled={disabled} error={error} />
+  </form>;
+}
+
+/** 운세: today, this month or this year, against the member's chart. */
+function LoungeFortuneForm({ send, disabled, onDone, birth }: ChartFormProps) {
+  const [draft, setDraft] = useState(() => birthDraft(birth));
+  const [period, setPeriod] = useState<LoungeFortunePeriod>('today');
+  const [question, setQuestion] = useState('');
+  const { sending, error, submit } = useFormSend(send, onDone);
+  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event, () => loungeFortuneFormText({ me: must(birthOf(draft)), period, ...(question.trim() ? { question } : {}) }))} aria-label="운세 보기">
+    <FormHead title="🗓️ 운세 보기" onClose={onDone} />
+    <div className="lounge-hongsil-field"><span>언제의 운세를 볼까요?</span>{chips(loungeFortunePeriods, period, setPeriod, '기간')}</div>
+    <BirthFields draft={draft} set={setDraft} />
+    <label>더 궁금한 것 (선택)<input value={question} onChange={event => setQuestion(event.target.value)} maxLength={200} placeholder="예: 오늘 고백해도 될까?" /></label>
+    <p className="lounge-hongsil-note">입력한 생년월일은 이 상담 대화에만 남아요. 풀이는 재미로 보는 콘텐츠예요.</p>
+    <SubmitRow label="운세 보기" sending={sending} disabled={disabled} error={error} />
+  </form>;
+}
+
+/** 별자리: the birth date (the time only matters on a boundary day) and what to know. */
+function LoungeZodiacForm({ send, disabled, onDone, birth }: ChartFormProps) {
+  const [draft, setDraft] = useState(() => ({ ...birthDraft(birth), noTime: birth ? !birth.time : true }));
+  const [question, setQuestion] = useState('');
+  const { sending, error, submit } = useFormSend(send, onDone);
+  return <form className="lounge-hongsil-form" onSubmit={event => void submit(event, () => loungeZodiacFormText({ me: must(birthOf(draft)), ...(question.trim() ? { question } : {}) }))} aria-label="별자리 운세">
+    <FormHead title="⭐ 별자리 운세" onClose={onDone} />
+    <BirthFields draft={draft} set={setDraft} />
+    <label>더 궁금한 것 (선택)<input value={question} onChange={event => setQuestion(event.target.value)} maxLength={200} placeholder="예: 이번 달 연애운은?" /></label>
+    <p className="lounge-hongsil-note">태어난 시간은 별자리가 바뀌는 날에만 필요해요. 풀이는 재미로 보는 콘텐츠예요.</p>
+    <SubmitRow label="별자리 보기" sending={sending} disabled={disabled} error={error} />
   </form>;
 }
 
@@ -147,7 +231,10 @@ const elementLabel: Record<string, string> = { 목: '목(木) 나무', 화: '화
 export function LoungeSajuChart({ chart }: { chart: LoungeSajuDisplay }) {
   const most = Math.max(1, ...Object.values(chart.elements));
   return <section className="lounge-saju-chart" aria-label="사주 원국">
-    <div className="lounge-tarot-head"><b>사주 원국</b><small>일간 {chart.dayMaster} · {chart.thisYear}</small></div>
+    <div className="lounge-tarot-head"><b>{chart.title ? `${chart.title}의 사주 원국` : '사주 원국'}</b><small>일간 {chart.dayMaster} · {chart.thisYear}</small></div>
+    {chart.extra && <div className="lounge-saju-extra"><span>{chart.extra.label}</span>
+      {[0, 1].map(index => <b key={index} className={`lounge-saju-char el-${chart.extra!.elements[index]}`}>{chart.extra!.hanja[index]}<small>{chart.extra!.hangul[index]} · {chart.extra!.elements[index]}</small></b>)}
+    </div>}
     <div className="lounge-saju-pillars">
       {chart.pillars.map(pillar => <div key={pillar.label} className="lounge-saju-pillar">
         <span className="lounge-saju-label">{pillar.label}</span>
@@ -158,6 +245,18 @@ export function LoungeSajuChart({ chart }: { chart: LoungeSajuDisplay }) {
     <ul className="lounge-saju-elements">
       {elementOrder.map(name => <li key={name}><span className={`el-${name}`}>{elementLabel[name]}</span><i style={{ '--w': `${(chart.elements[name] / most) * 100}%` } as CSSProperties} className={`el-${name}`} /><b>{chart.elements[name]}</b></li>)}
     </ul>
+  </section>;
+}
+
+/** The 별자리 card under its reading: the sign, its element, mode and ruler, and the house the sun walks through now. */
+export function LoungeZodiacCard({ card }: { card: LoungeZodiacDisplay }) {
+  return <section className="lounge-saju-chart lounge-zodiac-card" aria-label="별자리">
+    <div className="lounge-tarot-head"><b>{card.symbol} {card.sign}</b><small>지금 태양 {card.now}</small></div>
+    <dl>
+      <div><dt>원소</dt><dd>{card.element}</dd></div><div><dt>성질</dt><dd>{card.mode}</dd></div><div><dt>지배 행성</dt><dd>{card.ruler}</dd></div>
+      <div className="wide"><dt>키워드</dt><dd>{card.keywords}</dd></div>
+      <div className="wide"><dt>이달 {card.house}하우스</dt><dd>{card.houseMeaning}</dd></div>
+    </dl>
   </section>;
 }
 
