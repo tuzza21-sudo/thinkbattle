@@ -76,8 +76,9 @@ test('character-specific prompt choices preserve autonomy without compulsory com
     const character = loungeCharacters.find(item => item.id === id);
     const config = relationshipConfigs[id];
     const prompt = [loungePersonaPrompt(character, { withBible: true }), loungeBiblePrompt(character), loungeCompanionSheetPrompt(character, 'on')].join('\n');
-    // The user's bible of 2026-11-05 brought back banter and examples for every stage; it stays among the shortest sheets.
-    if (id === 'diplomat') assert.ok(prompt.length < 5000, id + ': keep the character prompt concise');
+    // The user's bible of 2026-11-05 brought back banter and examples for every stage (more volley examples since the
+    // same day); it stays among the shortest sheets.
+    if (id === 'diplomat') assert.ok(prompt.length < 7000, id + ': keep the character prompt concise');
     if (character.bible.voice.rhythm) assert.ok(loungeCompanionSheetPrompt(character, 'on').includes(character.bible.voice.rhythm), id + ': rhythm is actually used');
     const allStages = JSON.stringify(config);
     assert.doesNotMatch(prompt + allStages, /이 사람 앞에서는 매번 진다|지면 바로 승리|일부러 질 판|질문이 다섯 개|질문이 쏟아지다/);
@@ -226,7 +227,7 @@ test('every part of a companion sheet meant for the model reaches it', () => {
     const bible = character.bible;
     const prompt = [loungePersonaPrompt(character, { withBible: true }), loungeBiblePrompt(character), loungeCompanionSheetPrompt(character, 'on')].join(' ');
     const parts = [character.tagline, ...character.story, ...character.personality.map(item => item.text), ...character.habits, bible.desire, bible.fear, bible.outward, bible.hidden, bible.humor,
-      bible.interpretationLens, bible.voice?.tone, bible.voice?.length, ...(bible.actionAnchors ?? []), bible.innerVoice.style,
+      bible.interpretationLens, bible.voice?.tone, bible.voice?.length, bible.voice?.rhythm, ...(bible.humorExamples?.good ?? []), ...(bible.humorExamples?.bad ?? []), ...(bible.forbidden ?? []), ...(bible.actionAnchors ?? []), bible.innerVoice.style,
       ...bible.reactions.flatMap(item => [item.when, item.then]), ...bible.invariants, bible.growth,
       ...(bible.fewShot ?? []).flatMap(shot => [shot.user, 'on' in shot ? shot.on.reply : shot.reply])].filter(Boolean);
     for (const text of parts) assert.ok(sent(prompt, text), `${character.id}: not sent: ${text.slice(0, 40)}`);

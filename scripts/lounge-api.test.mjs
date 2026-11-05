@@ -3801,7 +3801,7 @@ test('a call in a story room preserves work and consequences with the chat summa
     throw new Error('Unexpected call ' + url);
   }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
   assert.match(reply.instructions, /phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다/);
-  assert.match(reply.instructions, /진행 중인 사건·업무·약속의 결과는 남는다/);
+  assert.match(reply.instructions, /진행 중인 사건·업무·약속의 결과는 사라지지 않/);
   assert.match(reply.instructions, /둘의 말투와 처음 거리는 scenario.relationship과 scenario.prologue에서 시작한다/);
   assert.match(reply.instructions, /사건이나 일은 먼저 꺼내지 않고, 사용자가 꺼낼 때만/);
   // Every call starts from the two, not the case: the recent talk, the summary, what the member has told.

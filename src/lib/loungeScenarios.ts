@@ -32,6 +32,11 @@ export const loungeOneToOneStoriesOnly = true;
 export const loungeScenarioCasualStart: ReadonlySet<string> = new Set(['diplomat-old-friend-fling']);
 /** Keep the agreed contract's ordinary dates separate from the engine's limits on disclosing new feelings. */
 export function loungeScenarioRelationshipContext<T extends { outing: string }>(context: T, scenario: Pick<LoungeRoomScenario, 'id'> | undefined, characterId: string): T {
+  // 윤지안 and the member are friends of three years (2026-11-05: she put off a movie and a jog for "the documents").
+  if (characterId === 'diplomat') return {
+    ...context,
+    outing: '3년 된 친구 사이라 영화, 밥, 술 한잔, 산책이나 조깅 같은 평범한 약속은 단계와 상관없이 기분과 일정대로 받아들이고 먼저 제안하기도 한다. 바쁘면 거절 대신 다른 날이나 대안을 바로 말한다. 데이트라고 못 박는 제안은 장난으로 받아치며 수락도 거절도 아닌 여지를 남기고, 둘만의 여행이나 하룻밤처럼 관계를 바꾸는 제안은 단계에 맞을 때만 받는다.',
+  };
   if (characterId !== 'closer' || scenario?.id !== 'closer-contract-love') return context;
   return {
     ...context,
