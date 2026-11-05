@@ -11,6 +11,22 @@ const blackRose = JSON.parse(readFileSync(new URL('../docs/stories/velvet-black-
 const episodes = story.normalizeLoungeStoryEpisodes(blackRose.episodes);
 const velvetStages = relationship.relationshipConfigs.velvet.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
 
+test('contract dates use the agreed story while other characters, stories and physical limits stay unchanged', () => {
+  const { loungeScenarioRelationshipContext } = loadTs(fileURLToPath(new URL('../src/lib/loungeScenarios.ts', import.meta.url)));
+  const config = relationship.relationshipConfigs.closer;
+  const original = relationship.relationshipPromptContext(relationship.createRelationship(config), config, relationship.initialMood(config));
+  const before = structuredClone(original);
+  const contract = { id: 'closer-contract-love' };
+  const adjusted = loungeScenarioRelationshipContext(original, contract, 'closer');
+  assert.match(adjusted.outing, /둘만의 평범한 데이트에도 성실하게 참여/);
+  assert.match(adjusted.outing, /명시적인 계약 종료나 합의 변경/);
+  assert.deepEqual(original, before, 'do not mutate the shared base context');
+  assert.deepEqual({ ...adjusted, outing: original.outing }, original, 'physical intimacy, stages and scores keep their existing limits');
+  assert.equal(loungeScenarioRelationshipContext(original, undefined, 'closer'), original);
+  assert.equal(loungeScenarioRelationshipContext(original, { id: 'another-story' }, 'closer'), original);
+  assert.equal(loungeScenarioRelationshipContext(original, contract, 'diplomat'), original);
+});
+
 test('《검은 장미》 is six episodes, each with checkpoints the page keeps, and gates that are real stages of 선우령', () => {
   assert.deepEqual(checkStory(blackRose), [], 'the file passes the same check as the upload');
   assert.equal(episodes.length, 6);

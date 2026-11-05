@@ -19,16 +19,26 @@ export type LoungeStreamEvent =
 const eventTypes = ['host', 'text', 'audio', 'photo', 'saved', 'relationship', 'story', 'done', 'error'];
 
 // NDJSON frames may split anywhere, including inside a Korean UTF-8 character.
-export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, signal?: AbortSignal) {
+export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, signal?: AbortSignal, options: { idleMs?: number } = {}) {
   const reader = stream.getReader();
   const cancel = () => { void reader.cancel().catch(() => {}); };
   signal?.addEventListener('abort', cancel, { once: true });
   if (signal?.aborted) cancel();
   const decoder = new TextDecoder();
   let pending = '', done = false;
+  const read = async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new LoungeApiError('답변 연결이 오래 멈췄어요. 잠시 후 다시 연결할게요.', 'lounge_stream_timeout', true, 5)), options.idleMs ?? 45_000);
+    });
+    try { return await Promise.race([reader.read(), timeout]); }
+    finally { clearTimeout(timer); }
+  };
   try {
     while (!done) {
-      const chunk = await reader.read();
+      signal?.throwIfAborted();
+      const chunk = await read();
+      signal?.throwIfAborted();
       pending += decoder.decode(chunk.value, { stream: !chunk.done });
       let newline: number;
       while ((newline = pending.indexOf('\n')) >= 0) {
@@ -49,7 +59,7 @@ export async function* readLoungeStream(stream: ReadableStream<Uint8Array>, sign
       if (chunk.done && !done) throw new LoungeApiError('사회자 음성 연결이 중간에 끊겼어요. 다시 시도해 주세요.', 'lounge_stream_interrupted');
     }
   } catch (error) { if (signal?.aborted) throw error; throw loungeConnectionError(error, '사회자 음성 서버'); }
-  finally { signal?.removeEventListener('abort', cancel); await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  finally { signal?.removeEventListener('abort', cancel); void reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 
 // PCM16 is mono, little endian, 24 kHz. Preserve an odd trailing byte across packets.

@@ -736,9 +736,8 @@ test('browser network failures are retryable while deliberate cancellation is pr
     });
   }
   const controller = new AbortController();controller.abort();
-  const cancellation = new DOMException('Cancelled by leaving the room', 'AbortError');
-  await run(async () => { throw cancellation; }, async () => {
-    await assert.rejects(client.requestLoungeHost(roomId, 'opening', controller.signal), error => error === cancellation);
+  await run(async () => { assert.fail('An already cancelled turn must not reach fetch'); }, async () => {
+    await assert.rejects(client.requestLoungeHost(roomId, 'opening', controller.signal), error => error === controller.signal.reason);
   });
   const rpcClient = compile('../src/lib/loungeApi.ts', () => ({ supabase: { rpc: async () => ({data:null,error:{message:'TypeError: Failed to fetch'}}) } }));
   await assert.rejects(rpcClient.joinLounge(roomId,'나'), error => error.code === 'lounge_network_error' && error.retryable);
@@ -2154,7 +2153,8 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   // Engine v4 (2026-11-02): together in one place, no narrator.
   assert.match(instructions, /정해진 줄거리 없이 주고받는 1:1 대화이고, 너와 상대는 지금 같은 곳에 함께 있다/);
   assert.match(instructions, /turn\.progress를 따른다/);
-  assert.match(instructions, /이 대화에는 서술자가 없으므로 그 일을 설명하는 문장을 쓰지 않고 네 행동과 대사로만 드러낸다/);
+  assert.match(instructions, /무엇이 일어났고 누구에게 답하는지 먼저 알린다/);
+  assert.match(instructions, /사용자의 반응이나 선택은 대신 쓰지 않는다/);
   assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
   // The length is kept as it was (2026-11-02) unless the character's sheet sets its own (윤서연's does since 2026-11-03).
   assert.match(instructions, /캐릭터 설명의 '분량'을 따른다/);
@@ -2170,7 +2170,8 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   assert.match(instructions, /3인칭 서술\(그는, 그녀는, 네 이름으로 시작하는 서술\)과 풍경이나 분위기를 묘사하는 문단을 쓰지 않는다/);
   assert.match(instructions, /별표나 괄호 없이 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
   assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
-  assert.match(instructions, /곧바로 사과하며 물러서지 않는다/);
+  assert.match(instructions, /불편한 차이를 즉각적인 양보나 장난으로 덮지 않는다/);
+  assert.match(instructions, /거절하거나 불편함을 표현하면 즉시 멈추고 존중한다/);
   assert.match(instructions, /metrics의 점수와 이름\(예: 사로잡힘, 눈을 떼지 못함\)은 참고일 뿐이고/);
   assert.match(instructions, /그 기억 때문에 말투가 상담하듯 순해지지 않는다/);
   assert.match(instructions, /매 답을 질문으로 끝내지 않는다/);
@@ -2224,7 +2225,8 @@ test('a chat reply in another language is written once more in Korean before it 
   assert.match(asked[1].instructions, /이번 답은 반드시 한국어로만 쓴다/);
   assert.equal(events.find(event => event.type === 'host').text, '같이 장 보고 저녁 만들어 보고 싶어요.\n\n[속마음]\n아직은 취향 얘기다.');
   assert.match(asked[0].instructions, /대사와 속마음은 언제나 한국어로 쓴다/);
-  assert.match(asked[0].instructions, /turn\.event가 있으면 이번 턴 둘 주변에서 일어난 일이고, 이번 답에서 반드시 그 일에 반응한다/);
+  assert.match(asked[0].instructions, /turn\.event는 주변 사건의 제안이다/);
+  assert.match(asked[0].instructions, /충돌하는 사건은 보류한다/);
   assert.equal(messengerLib.loungeNotKorean('좋아요. 오늘 와인은 Pinot Noir예요.'), false);
   assert.equal(messengerLib.loungeNotKorean('さっきと同じ 질문이네요'), true);
   assert.equal(messengerLib.loungeNotKorean('我们一起去吃饭吧，好不好'), true);
@@ -2262,12 +2264,14 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
   assert.match(instructions, /보통 사람들이 너를 대하는 방식: 12년 동안/);
   assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
-  // Every house character has one (2026-11-01), with what it never says, what never changes and humour shown by example.
+  // A bible needs actual principles, not a quota of examples or exception performances.
   for (const character of charactersLib.loungeCharacters) {
     assert.ok(character.bible, `${character.name} has a bible`);
-    assert.ok(character.bible.reactions.length >= 5 && character.bible.invariants.length >= 3, `${character.name}'s bible has rules`);
-    assert.ok(character.bible.humorExamples?.good.length && character.bible.humorExamples.bad.length, `${character.name} has humour examples`);
-    assert.ok(character.baseline && character.specialToMe, `${character.name} says how people usually treat them and why this member differs`);
+    assert.ok(character.bible.reactions.length > 0 && character.bible.invariants.length > 0, character.name + ': bible has rules');
+    const compiled = charactersLib.loungeBiblePrompt(character);
+    for (const rule of character.bible.invariants) assert.ok(compiled.includes(rule), character.id + ': invariants reach the model');
+    if (character.baseline) assert.ok(compiled.includes(character.baseline));
+    if (character.specialToMe) assert.ok(compiled.includes(character.specialToMe));
   }
   const ina = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
   assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
@@ -2331,6 +2335,8 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
       assert.equal(input.reading.scene_change_request, undefined, 'the scene signals are used by code, not shown to the reply');
       assert.equal(input.turn.progress, 'transition');
       assert.equal(input.turn.progress_target, '분식집 가자');
+      assert.equal(input.turn.scene, undefined, 'the old scene is not presented as the current destination');
+      assert.equal(input.turn.previous_scene.location, '오마카세 카운터');
     } else {
       assert.equal(input.reading, undefined);
       assert.equal(input.turn.progress, 'stay', 'without the analyzer the scene stays');
@@ -2861,9 +2867,21 @@ test('the scene moves only when the member asks or the activity is over, and an 
   assert.equal(decide(base, calm).event.id, 'once');
   assert.equal(decide(base, { ...calm, is_emotional_moment: true }).event, undefined);
   assert.equal(decide(base, undefined).event, undefined, 'nothing happens without the analyzer');
-  assert.equal(decide(base, { ...calm, topic_stale: false }).event, undefined, 'only when the talk goes in circles or the place has lasted');
-  assert.equal(decide({ ...base, scene_turns: 8 }, { ...calm, topic_stale: false }).event.id, 'once');
+  assert.equal(decide(base, { ...calm, topic_stale: false }).event, undefined, 'only when the talk is stale');
+  assert.equal(decide({ ...base, scene_turns: 18 }, { ...calm, topic_stale: false }).event, undefined, 'staying in one place is not a reason to interrupt');
+  for (const blocked of [{ is_sincere_refusal: true }, { is_repair_request: true }, { request: '사건 자료가 어떻게 됐는지 답하기' }, { activity_finished: true }]) {
+    assert.equal(decide({ ...base, scene_turns: 18 }, { ...calm, ...blocked }).event, undefined, JSON.stringify(blocked));
+  }
   assert.equal(decide({ ...base, last_event_turn: 16 }, calm).event, undefined, 'six turns at least between events');
+  // The turns after a serious moment are its afterglow (2026-11-04, 윤지안: a colleague's tease right after a confession).
+  for (const gap of [1, 2, 3]) assert.equal(decide({ ...base, last_emotional_turn: 20 - gap }, calm).event, undefined, `quiet ${gap} turn(s) after`);
+  assert.equal(decide({ ...base, last_emotional_turn: 16 }, calm).event.id, 'once', 'the quiet ends');
+  const felt = messengerLib.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 7, reply: '응.', inner: '', emotional: true });
+  assert.equal(messengerLib.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(felt)), 'room-1').last_emotional_turn, 7);
+  assert.equal(messengerLib.nextLoungeCompanionState({ state: felt, decision: { progress: 'stay' }, turn: 8, reply: '응.', inner: '' }).last_emotional_turn, 7, 'kept until the next serious moment');
+  // A correction reaches the reply too, not only the event gate (2026-11-04, 강무진 repeated a joke after "별로에요").
+  assert.equal(messengerLib.loungeReading({ ...calm, is_repair_request: true }).is_repair_request, true);
+  assert.equal('is_repair_request' in messengerLib.loungeReading({ ...calm, is_repair_request: false }), false);
   assert.equal(decide({ ...base, used_events: ['once'] }, calm).event, undefined, 'an event that does not repeat happens once');
   const inside = { ...base, used_events: ['once'], scene: { location: '레스토랑', scene_type: '식당', activity: '', time_of_day: '', season: '', objects: [] } };
   assert.equal(decide(inside, calm).event.id, 'indoor');
@@ -3111,6 +3129,119 @@ test('lounge client hands the live response to playback without waiting for its 
     upstream.enqueue(new TextEncoder().encode('{"type":"done"}\n')); upstream.close();
     assert.equal(await new Response(response.stream).text(), '{"type":"done"}\n');
   });
+});
+
+test('a chat request times out stalled auth, response headers and JSON bodies without sending a late request', async () => {
+  for (const phase of ['auth', 'headers', 'body']) {
+    let releaseAuth, calls = 0, requestSignal;
+    const stalledAuth = new Promise(resolve => { releaseAuth = resolve; });
+    const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: () => phase === 'auth' ? stalledAuth : Promise.resolve({ data: { session: { access_token: 'test-session' } } }) } } }));
+    client.loungeHostRequestTiming.responseMs = 20;
+    await run(async (_url, init) => {
+      calls++; requestSignal = init.signal;
+      if (phase === 'headers') return new Promise(() => {});
+      return new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'application/json' } });
+    }, async () => {
+      await assert.rejects(client.requestLoungeHost(roomId, 'followup'), error => error.code === 'lounge_reply_timeout' && error.retryable);
+      if (phase === 'auth') {
+        assert.equal(calls, 0);
+        releaseAuth({ data: { session: { access_token: 'late-session' } } });
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.equal(calls, 0, 'a late auth refresh must not send a timed-out model request');
+      } else assert.equal(requestSignal.aborted, true);
+    });
+  }
+});
+
+test('an explicitly cancelled chat request stays cancelled and never calls fetch after stalled auth', async () => {
+  let finishAuth, calls = 0;
+  const auth = new Promise(resolve => { finishAuth = resolve; });
+  const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: () => auth } } }));
+  await run(async () => { calls++; return result({}); }, async () => {
+    const controller = new AbortController();
+    const pending = client.requestLoungeHost(roomId, 'followup', controller.signal);
+    controller.abort();
+    await assert.rejects(pending, error => error.name === 'AbortError');
+    finishAuth({ data: { session: { access_token: 'test-session' } } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(calls, 0);
+  });
+});
+
+test('a silent or stalled chat stream ends even when the upstream cancellation never resolves', async () => {
+  const client = compile('../src/lib/loungeApi.ts', () => ({}));
+  const streaming = compile('../src/lib/loungeStream.ts', () => client);
+  for (const partial of [false, true]) {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      start(controller) { if (partial) controller.enqueue(new TextEncoder().encode('{"type":"text","text":"시작"}\n')); },
+      cancel() { cancelled = true; return new Promise(() => {}); },
+    });
+    const events = [];
+    await assert.rejects(async () => {
+      for await (const event of streaming.readLoungeStream(stream, undefined, { idleMs: 20 })) events.push(event.type);
+    }, error => error.code === 'lounge_stream_timeout' && error.retryable);
+    assert.equal(cancelled, true);
+    assert.deepEqual(events, partial ? ['text'] : []);
+  }
+});
+
+test('incoming chat frames reset the idle deadline and done does not wait for socket closure', async () => {
+  const client = compile('../src/lib/loungeApi.ts', () => ({}));
+  const streaming = compile('../src/lib/loungeStream.ts', () => client);
+  const encode = value => new TextEncoder().encode(JSON.stringify(value) + '\n');
+  const timers = [];
+  let cancelled = false;
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encode({ type: 'text', text: '첫' }));
+      timers.push(setTimeout(() => controller.enqueue(encode({ type: 'text', text: '첫 답변' })), 20));
+      timers.push(setTimeout(() => controller.enqueue(encode({ type: 'done' })), 40));
+    },
+    cancel() { cancelled = true; timers.forEach(clearTimeout); return new Promise(() => {}); },
+  });
+  const events = [];
+  for await (const event of streaming.readLoungeStream(stream, undefined, { idleMs: 35 })) events.push(event.type);
+  assert.deepEqual(events, ['text', 'text', 'done']);
+  assert.equal(cancelled, true);
+});
+
+test('completed OpenAI and DeepSeek replies are saved without waiting for an upstream socket to close', async () => {
+  const savedKey = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = 'test-deepseek';
+  try {
+    for (const provider of ['openai', 'deepseek']) {
+      let cancelled = false, saved = false;
+      const answer = JSON.stringify({ text: '기다리게 했네요. 이어서 이야기하죠.', inner_voice: '' });
+      const frames = provider === 'deepseek'
+        ? [{ choices: [{ delta: { content: answer }, finish_reason: 'stop' }] }, '[DONE]']
+        : [{ type: 'response.output_text.delta', output_index: 0, delta: answer }, { type: 'response.completed', response: { status: 'completed' } }];
+      const upstream = () => new Response(new ReadableStream({
+        start(controller) { controller.enqueue(new TextEncoder().encode(frames.map(frame => 'data: ' + (typeof frame === 'string' ? frame : JSON.stringify(frame)) + '\n\n').join(''))); },
+        cancel() { cancelled = true; return new Promise(() => {}); },
+      }), { headers: { 'Content-Type': 'text/event-stream' } });
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '대화', host_persona: 'closer', memory: '', capacity: 1, voice_on: false, ai_model: provider === 'deepseek' ? 'deepseek-flash' : 'gpt' }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
+        if (url.includes('finish_voice_lounge_reply')) { saved = true; return result(true); }
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses') || url.endsWith('/chat/completions')) return upstream();
+        if (url.includes('save_voice_lounge_room_memory')) return result(true);
+        throw new Error('Unexpected mocked request');
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+        let timer;
+        try {
+          const body = await Promise.race([response.text(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Completed reply was left waiting for EOF')), 1000); })]);
+          assert.equal(JSON.parse(body.trim().split('\n').at(-1)).type, 'done', provider);
+          assert.equal(saved, true, provider);
+          assert.equal(cancelled, true, provider);
+        } finally { clearTimeout(timer); }
+      });
+    }
+  } finally { if (savedKey === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = savedKey; }
 });
 
 test('NDJSON, PCM byte boundaries, scheduled playback and cancellation work without buffering a whole reply', async () => {
@@ -3652,7 +3783,7 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.doesNotMatch(plainChat.instructions, /방금까지 전화 통화를 하다 끊은 것이다/);
 });
 
-test('a call in a room started from a story keeps the case in the background and the summary in the chat\'s form', async () => {
+test('a call in a story room preserves work and consequences with the chat summary', async () => {
   // On 2026-11-01 선우령 talked of nothing but the story's case on a call: the call had neither rule, and its summary
   // went back to a case log ("다음: 곧 벌어질 일") that the chat after it read again.
   const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '당신은 이 전시를 혹평한 평론가다.', user_role: '평론가', relationship: '앙숙', place: '갤러리 홀' };
@@ -3670,7 +3801,7 @@ test('a call in a room started from a story keeps the case in the background and
     throw new Error('Unexpected call ' + url);
   }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
   assert.match(reply.instructions, /phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다/);
-  assert.match(reply.instructions, /대화의 중심은 둘 사이다/);
+  assert.match(reply.instructions, /진행 중인 사건·업무·약속의 결과는 남는다/);
   assert.match(reply.instructions, /둘의 말투와 처음 거리는 scenario.relationship과 scenario.prologue에서 시작한다/);
   assert.match(reply.instructions, /사건이나 일은 먼저 꺼내지 않고, 사용자가 꺼낼 때만/);
   // Every call starts from the two, not the case: the recent talk, the summary, what the member has told.
@@ -3906,5 +4037,97 @@ test('임시우 is the member\'s former lover of seven years ago: the past they 
   for (const character of charactersLib.loungeCharacters) for (const event of character.bible?.sceneEvents ?? []) {
     assert.equal('sceneType' in event, false, `${character.id}/${event.id}: the field is sceneTypes`);
     for (const place of event.sceneTypes ?? []) assert.ok(messengerLib.loungeSceneTypes.includes(place), `${character.id}/${event.id}: unknown place ${place}`);
+  }
+});
+
+test('story helpers keep the current record beside a stored scene without duplicating prologues or future episodes', () => {
+  const scenario = { id: 'closer-contract-love', user_role: '상무', relationship: '6개월 계약 연인', place: '본가 앞', prologue: '긴 프롤로그'.repeat(1000), episodes: [{ keep: ['아직 공개하지 않은 비밀'] }] };
+  const scene = { location: '식탁', scene_type: '집', activity: '가족 저녁', time_of_day: '저녁', season: '', objects: [] };
+  const memory = '계약과 비밀 유지 의무는 유효하다. 아직 계약 다음 날이다.';
+  for (const helper of [messengerLib.loungeAnalyzerInput, messengerLib.loungeDirectorInput]) {
+    const input = helper({ character: '강무진', scenario, memory, scene, messages: [] });
+    assert.equal(input.memory, memory, 'having a scene does not hide current story facts');
+    assert.deepEqual(input.scenario, { id: scenario.id, user_role: scenario.user_role, relationship: scenario.relationship, place: scenario.place });
+    assert.equal(input.scenario.prologue, undefined);
+    assert.equal(input.scenario.episodes, undefined);
+  }
+});
+
+test('the real reply pipeline shares story constraints with helpers and prioritizes repair over an automatic event', async t => {
+  const saved = { analyzer: process.env.LOUNGE_ANALYZER, director: process.env.LOUNGE_DIRECTOR };
+  process.env.LOUNGE_ANALYZER = 'on';
+  process.env.LOUNGE_DIRECTOR = 'on';
+  t.after(() => {
+    for (const [name, value] of [['LOUNGE_ANALYZER', saved.analyzer], ['LOUNGE_DIRECTOR', saved.director]]) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  });
+  for (const host of ['closer', 'diplomat']) {
+    const config = relationshipLib.getRelationshipConfig(host);
+    const scenario = host === 'closer'
+      ? { id: 'closer-contract-love', title: '6개월의 연인', prologue: '6개월 계약 연인이다. 계약의 실체는 가족에게 공개하지 않는다.', user_role: '상무', relationship: '6개월 계약 연인', place: '가족 식탁' }
+      : { id: 'diplomat-old-friend-fling', title: '오래된 친구와의 썸', prologue: '3년 지기와 함께 취재를 돕는다.', user_role: '오랜 친구', relationship: '친구에서 달라지는 사이', place: '차 안' };
+    const memory = host === 'closer' ? '지금 장면: 가족 식탁\n계약과 비밀 유지 의무는 유효하다.' : '지금 장면: 밤, 차 안\n내일 점심 식당에서 보기로 했다.';
+    const latest = host === 'closer' ? '(어머니가 묻는다) 계약으로 만나는 거 아니죠?' : '지금은 어제 약속한 다음 날 점심 국밥집이야. 정신차려.';
+    const scene = { location: host === 'closer' ? '가족 식탁' : '차 안', scene_type: host === 'closer' ? '집' : '이동', activity: '이야기', time_of_day: host === 'closer' ? '저녁' : '밤', season: '', objects: [] };
+    const state = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), scene, scene_turns: 18 };
+    const row = { ...velvetRow, character_id: host, stage: config.stages[0].id, scores: relationshipLib.createRelationship(config).scores };
+    const analysis = { user_tone: '진지', subtext: '', quote_hook: '', user_action: '', request: '질문 또는 정정에 답하기', references_memory: '', emotional_need: '정보', scene_change_request: host === 'diplomat' ? '다음 날 점심 국밥집' : '', activity_finished: false, topic_stale: true, is_emotional_moment: false, is_repair_request: host === 'diplomat', is_sincere_refusal: false, intimacy_proposal: 'none' };
+    const calls = [];
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: scenario.title, host_persona: host, memory, capacity: 1, ai_turns: 24, voice_on: false, space_id: null, scenario }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: latest }]);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+      if (url.includes('voice_lounge_companion_state')) return init?.method === 'POST' ? result(null, 201) : result([{ character_id: host, state }]);
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
+      if (url.endsWith('/responses')) {
+        const body = JSON.parse(init.body);
+        calls.push(body);
+        const name = body.text.format.name;
+        if (name === 'lounge_analyzer') return modelAnswer(analysis);
+        if (name === 'lounge_director') return modelAnswer({ tone: '진지', request: '', quote: '', reaction: '진지하게 듣기', goal: '사용자 질문과 장면 정정에 정확히 답한다', ending: '담백' });
+        if (name === 'lounge_after_reply') return modelAnswer({ memory, events: [], memory_ops: [], scene, reaction_type: '진지하게 듣기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+        return modelAnswer({ text: '알겠습니다.', inner_voice: '' });
+      }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship')) return result(true);
+      throw new Error('Unexpected mocked path: ' + new URL(url).pathname);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      assert.equal(response.status, 200);
+      assert.doesNotMatch(await response.text(), /"type":"error"/);
+    }));
+    assert.deepEqual(calls.map(call => call.text.format.name).sort(), ['lounge_after_reply', 'lounge_analyzer', 'lounge_director', 'lounge_host'].sort(), 'no extra model calls');
+    for (const call of calls) {
+      assert.match(call.instructions, /계약 기간·조건·비밀·확정된 사건은 명시적인 변경 합의 없이 유지/);
+      const input = JSON.parse(call.input);
+      assert.equal(input.scenario.relationship, scenario.relationship);
+      assert.equal(input.memory, memory);
+    }
+    const reply = calls.find(call => call.text.format.name === 'lounge_host');
+    const input = JSON.parse(reply.input);
+    assert.equal(input.recent.at(-1).text, latest);
+    assert.equal(input.turn.event, undefined, 'a pending question or repair is not interrupted');
+    assert.doesNotMatch(reply.instructions + JSON.stringify(input.relationship), /이 사람 앞에서는 매번 진다|지면 바로 승리|질문이 쏟아지다/);
+    if (host === 'diplomat') {
+      assert.equal(input.turn.scene, undefined);
+      assert.equal(input.turn.previous_scene.location, '차 안');
+      assert.equal(input.turn.progress_target, '다음 날 점심 국밥집');
+    } else {
+      assert.match(reply.instructions, /계약 기간과 비밀 유지 의무를 지키되 감정의 변화까지 금지하지 않는다/);
+      assert.equal((reply.instructions.match(/\[\d단계 · /g) ?? []).length, 6, 'all six supplied examples reach the actual reply');
+      assert.match(input.relationship.reserve, /가벼운 플러팅을 숨기거나 차갑게 튕길 필요는 없다/);
+      for (const call of calls.filter(call => call.text.format.name !== 'lounge_analyzer')) {
+        const body = JSON.parse(call.input);
+        const outing = call.text.format.name === 'lounge_director' ? body.outing : body.relationship.outing;
+        assert.match(outing, /둘만의 평범한 데이트에도 성실하게 참여/);
+        assert.doesNotMatch(outing, /상황극 제안은 아직 받아들이지 않는다/);
+      }
+      assert.match(reply.instructions, /합의가 기본값보다 먼저/);
+      assert.match(calls.find(call => call.text.format.name === 'lounge_after_reply').instructions, /서로 합의한 말투/);
+    }
   }
 });

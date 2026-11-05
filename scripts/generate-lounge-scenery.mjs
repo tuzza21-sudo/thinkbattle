@@ -1,5 +1,5 @@
 // Generates lounge room scenery (1536x1024 WebP) with the OpenAI image API (paid, one request each).
-//   node scripts/generate-lounge-scenery.mjs [--only=embassy] [--overwrite] [--model=gpt-image-2] [--quality=medium]
+//   node scripts/generate-lounge-scenery.mjs [--only=embassy] [--overwrite] [--model=gpt-image-2] [--quality=low]
 // Needs OPENAI_API_KEY in .env.local and Python with Pillow (PNG -> WebP).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local', quiet: true });
 const options = Object.fromEntries(process.argv.slice(2).map(arg => { const [key, value = 'true'] = arg.replace(/^--/, '').split('='); return [key, value]; }));
-const model = options.model || 'gpt-image-2', quality = options.quality || 'medium';
+const model = options.model || 'gpt-image-2', quality = options.quality || 'low';
 if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in .env.local');
 
 const common = 'Use case: photorealistic-natural. Asset type: wide 3:2 background photograph for a voice conversation app, an empty, inviting interior with no people. Premium editorial interior photography, warm cinematic lighting, realistic materials, shallow depth of field with the foreground softly out of focus, the centre of the frame calm and uncluttered. No people, no text, no logos, no watermark, no readable signs.';

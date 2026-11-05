@@ -1,6 +1,6 @@
 // Generates full-body photos of the six lounge characters from their existing portraits with the OpenAI image
 // edit API (paid, one request each), so the face stays the same person.
-//   node scripts/generate-lounge-character-full-body.mjs [--only=velvet] [--overwrite] [--model=gpt-image-2] [--quality=medium]
+//   node scripts/generate-lounge-character-full-body.mjs [--only=velvet] [--overwrite] [--model=gpt-image-2] [--quality=low]
 // Needs OPENAI_API_KEY in .env.local and Python with Pillow (WebP <-> PNG, 768x1152 WebP output).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local', quiet: true });
 const options = Object.fromEntries(process.argv.slice(2).map(arg => { const [key, value = 'true'] = arg.replace(/^--/, '').split('='); return [key, value]; }));
-const model = options.model || 'gpt-image-2', quality = options.quality || 'medium';
+const model = options.model || 'gpt-image-2', quality = options.quality || 'low';
 if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in .env.local');
 
 const common = 'Use case: identity-preserve. Turn the supplied portrait of an entirely fictional person into a full-body standing photograph of the same fictional person: keep the same face, hairstyle, age, skin tone and expression. The whole figure from head to shoes is visible in a vertical 2:3 frame, with some space above the head and below the feet. Natural, relaxed adult pose. Premium editorial lifestyle photography, realistic natural skin and fabric texture, soft cinematic lighting, 50mm lens, shallow depth of field. The person must not resemble any real person or celebrity. Tasteful and fully clothed. No text, logo, watermark, microphone or headset.';
@@ -25,8 +25,8 @@ const workScenes = {
     prompt: `${workCommon} He is a semiconductor researcher, very tall at about 188 cm with broad shoulders and a lean athletic build. He wears the same crisp white shirt with the sleeves rolled up, slim dark trousers, a plain unmarked ID badge on a lanyard with no logo and no readable text, and a slim black watch. He stands at a large whiteboard in a bright modern research office in the evening, a marker in one hand, drawing an abstract diagram of connected blocks and arrows with no letters or numbers, and glances back toward the camera with a thoughtful, warm half-smile. Two large monitors with abstract pattern graphics glow behind him.` },
   closer: { portrait: 'host-closer-v4.webp', file: 'host-closer-work-v3.webp',
     prompt: `${workCommon} He is a charismatic veteran negotiator in his early forties, attractive and commanding with a slightly tough edge. He wears the same perfectly tailored dark charcoal suit jacket over a crisp white open-collar shirt with no tie, slim dark trousers and a slim steel watch. He stands beside a long walnut boardroom table at dusk with one hand resting on the back of a leather chair and the other holding a pen, looking toward someone off-frame with a calm, assured, slow half-smile. Floor-to-ceiling windows with a city skyline in warm amber light, a glass of water and a closed folder with no readable text on the table behind him.` },
-  trickster: { portrait: 'host-trickster-v3.webp', file: 'host-trickster-work-v3.webp',
-    prompt: `${workCommon} He is a handsome, relaxed and witty 35-year-old late-night talk show host, caught mid-show. He wears the same deep forest-green knit polo-collar sweater under an unbuttoned black wool coat, dark slim trousers and polished dark boots, with a thin silver chain at the collar. He sits easily behind a dark wood talk show desk on a warm studio set, leaning back with one arm along the back of the chair and a ceramic mug on the desk, turning toward a guest chair just off-frame with an amused, unhurried grin and one eyebrow slightly raised as he waits for the punchline to land. A deep blue city-skyline backdrop with golden bokeh lights, a warm desk lamp and softly blurred studio cameras and a laughing audience behind him.` },
+  trickster: { portrait: 'host-trickster-v4.webp', file: 'host-trickster-work-v4.webp',
+    prompt: `${workCommon} He is a sharp-tongued 35-year-old columnist and TV pundit on a late-night debate show set. He wears the same black fine-knit turtleneck under a charcoal wool jacket, dark slim trousers and black leather shoes. He sits at a dark panel desk with his forearms resting on it and his hands loosely clasped, leaning slightly toward a guest just off-frame, one eyebrow raised and a dry half-smirk as he waits for an answer he already doubts. A blank printed page with no readable text and a glass of water on the desk, a dark studio backdrop, warm key light and softly blurred studio lights behind him.` },
   diplomat: { portrait: 'host-reporter-v1.webp', file: 'host-reporter-work-v1.webp',
     prompt: `${workCommon} She is a social-affairs newspaper reporter working late in a newsroom. She wears the same ivory blouse and tailored soft-grey blazer with slim dark trousers and low heels, a plain blank press ID badge on a lanyard at her chest, and a slim leather shoulder bag. She leans over a desk reading a printed document with a pen in one hand, a notebook, an open laptop and a paper coffee cup beside her, with an amused, curious expression as if she just spotted something odd in the story. Rows of desks, warm desk lamps and city lights through a tall window softly blurred behind her at night.`,
   },
@@ -42,8 +42,8 @@ const characters = {
     prompt: `${common} He wears the same dark navy suit and white open-collar shirt with no tie, a slim steel watch and dark leather shoes. He stands beside a floor-to-ceiling window of a rooftop lounge at dusk with city lights and an amber sky behind him, hands loosely clasped in front, calm and quietly commanding, steady eye contact.` },
   velvet: { portrait: 'host-velvet-v2.webp', file: 'host-velvet-full-v1.webp',
     prompt: `${common} She wears an elegant deep wine-burgundy velvet suit with a tailored blazer and matching wide trousers over a silk camisole, pearl drop earrings, a thin gold necklace, a slim vintage gold wristwatch and refined pointed heels. She stands in a dim late-night hotel bar with deep plum shadows and warm gold bokeh, partly in shadow, poised and composed, one hand resting lightly on the back of a velvet bar chair, with a faint enigmatic half-smile. Mysterious, sophisticated and dignified, not sultry.` },
-  trickster: { portrait: 'host-trickster-v1.webp', file: 'host-trickster-full-v1.webp',
-    prompt: `${common} He wears the same mustard-yellow overshirt open over a plain white tee, relaxed dark jeans and white sneakers, holding a paper takeaway coffee cup. He leans casually against a rain-streaked cafe window with warm string lights and a cozy blurred cafe interior, one eyebrow raised and a lopsided mischievous grin, as if he just thought of a joke.` },
+  trickster: { portrait: 'host-trickster-v4.webp', file: 'host-trickster-full-v2.webp',
+    prompt: `${common} He wears the same black fine-knit turtleneck under a charcoal wool jacket, dark slim trousers and black leather shoes. He stands outside a broadcast building late at night under a street lamp, one hand in his pocket and a can of coffee in the other, looking at the camera with a dry, knowing half-smirk and one eyebrow raised. Wet pavement and blurred city lights behind him.` },
 };
 
 // Characters added with scripts/new-lounge-character.mjs keep their prompts in scripts/lounge-character-prompts.json

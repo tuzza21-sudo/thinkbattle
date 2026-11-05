@@ -36,9 +36,9 @@ node scripts/new-lounge-character.mjs seoyeon --name 윤서연 --job "출판 편
    - 이 캐릭터만의 점수가 필요하면 `configs/<id>.ts`의 `uniqueMetrics`와 단계 조건을 바꿔요(`seoyeon.ts`가 예시).
 2. **이미지** — 프롬프트를 `scripts/lounge-character-prompts.json`에 쓴 뒤:
    ```
-   node scripts/generate-lounge-character-portraits.mjs --only=<id> --quality=high
-   node scripts/generate-lounge-character-full-body.mjs --only=<id> --quality=high
-   node scripts/generate-lounge-character-full-body.mjs --set=work --only=<id> --quality=high
+   node scripts/generate-lounge-character-portraits.mjs --only=<id>
+   node scripts/generate-lounge-character-full-body.mjs --only=<id>
+   node scripts/generate-lounge-character-full-body.mjs --set=work --only=<id>
    ```
    대표 사진을 먼저 만들고, 눈으로 확인한 뒤 전신·일하는 모습을 만들어요(같은 얼굴로 이어져요). 파일은 `public/lounge/host-<id>-v1.webp` 등이에요.
 3. **목소리** — ElevenLabs 라이브러리에서 한국어 목소리를 골라(후보 샘플을 만들어 들어 보세요) `loungeEngineVoices.eleven`에 id를 넣어요. 없으면 성별 기본 목소리가 쓰여요. 그다음:

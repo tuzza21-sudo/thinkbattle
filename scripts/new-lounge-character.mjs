@@ -155,7 +155,6 @@ ${wins.map(type => move(type, 'win')).join('\n')}
 ${losses.map(type => move(type, 'loss')).join('\n')}
     ],
     boundaries: ['장난과 비판은 상황과 말에만 하고 사람 자체를 깎아내리지 않는다.', '${TODO} 이 인물만의 선'],
-    relations: [],
   },`, 'page', 'export const loungeCharacters');
 write('src/lib/loungeCharacters.ts', page);
 
