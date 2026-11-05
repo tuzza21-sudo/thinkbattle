@@ -6,7 +6,7 @@
  */
 export type LoungeTarotCard = { id: string; name: string; ko: string; upright: string; reversed: string };
 export type LoungeTarotSpread = 'one' | 'three';
-export type LoungeTarotDrawn = { position: string; id: string; ko: string; reversed: boolean; meaning: string };
+export type LoungeTarotDrawn = { position: string; id: string; name: string; ko: string; reversed: boolean; meaning: string };
 
 const majors: ReadonlyArray<[string, string, string, string]> = [
   ['The Fool', '바보', '새로운 시작, 모험, 순수한 용기', '무모함, 준비 부족, 망설임'],
@@ -92,9 +92,30 @@ export const loungeTarotPositions: Record<LoungeTarotSpread, readonly string[]> 
  */
 export function drawLoungeTarot(spread: LoungeTarotSpread, randomInt: (max: number) => number): LoungeTarotDrawn[] {
   const pool = [...loungeTarotDeck];
-  return loungeTarotPositions[spread].map(position => {
-    const [card] = pool.splice(randomInt(pool.length), 1);
-    const reversed = randomInt(2) === 1;
-    return { position, id: card.id, ko: card.ko, reversed, meaning: reversed ? card.reversed : card.upright };
+  return loungeTarotPositions[spread].map(position => turned(position, pool.splice(randomInt(pool.length), 1)[0], randomInt));
+}
+const turned = (position: string, card: LoungeTarotCard, randomInt: (max: number) => number): LoungeTarotDrawn => {
+  const reversed = randomInt(2) === 1;
+  return { position, id: card.id, name: card.name, ko: card.ko, reversed, meaning: reversed ? card.reversed : card.upright };
+};
+
+/** The deck in a new order (Fisher-Yates with the given random source), as card ids: the cards laid face down. */
+export function shuffleLoungeTarot(randomInt: (max: number) => number): string[] {
+  const ids = loungeTarotDeck.map(card => card.id);
+  for (let i = ids.length - 1; i > 0; i--) { const j = randomInt(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  return ids;
+}
+
+/**
+ * The cards the member picked from the face-down deck (`order`, from shuffleLoungeTarot), one per position of the spread.
+ * A pick that is out of range or repeated is replaced by the next card not taken, so a spread is always complete.
+ */
+export function loungeTarotFromPicks(spread: LoungeTarotSpread, order: readonly string[], picks: readonly number[], randomInt: (max: number) => number): LoungeTarotDrawn[] {
+  const taken = new Set<number>();
+  return loungeTarotPositions[spread].map((position, index) => {
+    let at = picks[index];
+    if (!Number.isInteger(at) || at < 0 || at >= order.length || taken.has(at)) at = order.findIndex((_, i) => !taken.has(i));
+    taken.add(at);
+    return turned(position, loungeTarotDeck.find(card => card.id === order[at]) ?? loungeTarotDeck[0], randomInt);
   });
 }

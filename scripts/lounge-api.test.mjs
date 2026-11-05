@@ -31,7 +31,8 @@ process.env.LOUNGE_ANALYZER ??= 'off';
 // The same for the director, which a fast-model chat asks beside the analyzer (back on 2026-11-02).
 process.env.LOUNGE_DIRECTOR ??= 'off';
 const consultLib = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', import.meta.url)));
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const sajuLib = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -4133,9 +4134,11 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
   }
 });
 
-test('홍실당 상담: code decides the turn, the cards are read by their own call, 한결 says the first part, and no relationship is scored', async () => {
+test('홍실당 상담: the picked cards are read by their own call, 한결 tells the reading, and no relationship is scored', async () => {
   const scenario = { id: 'shaman-hongsil', title: '홍실당 상담', prologue: '청담동 오피스텔 꼭대기 층, 붉은 실이 걸린 신당.', user_role: '상담받으러 온 손님', relationship: '처음 온 손님', place: '홍실당 상담 테이블' };
-  const before = { kind: 'consult', phase: 'intake', module: 'tarot', step: 1, answers: { question: '그 친구랑 다시 잘 지낼 수 있을까?' }, said: 0, followups: 0, turn: 3, last: 'ask' };
+  // The deck laid face down for this reading (any whole deck in a known order), and the member picks three places from it.
+  const deck = loadTs(fileURLToPath(new URL('../src/lib/loungeTarot.ts', import.meta.url))).loungeTarotDeck.map(card => card.id).reverse();
+  const before = { kind: 'consult', phase: 'tarot_pick', module: 'tarot', answers: { question: '그 친구랑 다시 잘 지낼 수 있을까?' }, deck, since: 6, turn: 4, last: 'ask_pick' };
   const reading = { headline: '먼저 말하면 풀린다', core: ['서로 기다리는 중이다'], detail: ['오해가 쌓였다'], advice: ['짧게 먼저 연락한다'], homework: '오늘 한 줄만 보내기', tone_hint: '미루는 건 짚는다', evidence: ['컵 2 정방향'], safety: [], memory_note: '타로: 친구와 서운함', thread_state: 'none' };
   let asked, reply, patch, scored = 0, body = '';
   await withServiceKey(() => run(async (url, init) => {
@@ -4143,7 +4146,7 @@ test('홍실당 상담: code decides the turn, the cards are read by their own c
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { patch = JSON.parse(init.body); return new Response(null, { status: 204 }); }
     if (url.includes('voice_lounge_rooms?') && !url.includes('host_id=')) return result([{ topic: '상담', host_persona: 'shaman', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 3, scenario, story_state: before }]);
-    if (url.includes('voice_lounge_messages?')) return result([{ id: 4, user_id: 'user-1', nickname: '나', kind: 'human', text: '세 장 (과거·현재·미래)', created_at: '2026-11-05T00:00:00Z' }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 4, user_id: 'user-1', nickname: '나', kind: 'human', text: '🃏 고른 카드: 2, 7, 11', created_at: '2026-11-05T00:00:00Z' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.includes('save_voice_lounge_relationship')) { scored++; return result(true); }
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_reading') { asked = JSON.parse(init.body); return modelAnswer(reading); }
@@ -4153,22 +4156,26 @@ test('홍실당 상담: code decides the turn, the cards are read by their own c
     return result([]);
   }, async () => { body = await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
   // The reading: its own neutral call, given the cards code drew (three for this spread) and the member's question.
-  // Terra without reasoning (2026-11-05, the owner's call: Sol costs too much, Terra writes better than Luna). Code chose the
-  // cards; the interpreter only writes them up.
-  assert.equal(asked.model, 'gpt-6.1-terra');
+  // Sol without reasoning (2026-11-05, the owner's call: a reading is small, so the better writer is worth it). Code chose
+  // the cards; the interpreter only writes them up.
+  assert.equal(asked.model, 'gpt-6-sol');
   assert.equal(asked.reasoning.effort, 'none');
   assert.equal(asked.text.format.strict, true);
   const readingInput = JSON.parse(asked.input);
   assert.equal(readingInput.cards.length, 3);
-  assert.equal(readingInput.answers.question, '그 친구랑 다시 잘 지낼 수 있을까?');
+  assert.equal(readingInput.question, '그 친구랑 다시 잘 지낼 수 있을까?');
   assert.match(asked.instructions, /캐릭터 말투를 쓰지 않고/);
-  // 한결 says the first part only, in the room's rules.
+  // 한결 tells the whole reading, in the room's rules.
   const input = JSON.parse(reply.input);
-  assert.deepEqual([input.consult.do, input.consult.step, input.consult.say.headline, input.consult.cards.length], ['reading', 1, '먼저 말하면 풀린다', 3]);
+  assert.deepEqual([input.consult.do, input.consult.reading.headline, input.consult.cards.length], ['reading', '먼저 말하면 풀린다', 3]);
   assert.match(reply.instructions, /홍실당 상담: 이 방은 신당 홍실당에서/);
   assert.equal(input.turn?.event, undefined, 'nothing happens around them during a reading');
   // The state goes back to the room (and to the page, for the buttons); the relationship is not scored.
-  assert.deepEqual([patch.story_state.phase, patch.story_state.said, patch.story_state.draw.length], ['reading', 1, 3]);
-  assert.ok(body.split('\n').some(line => line.includes('"type":"story"') && line.includes('"kind":"consult"')), 'the page gets the new state at once');
+  assert.deepEqual([patch.story_state.phase, patch.story_state.last, patch.story_state.draw.length], ['chat', 'reading', 3]);
+  assert.deepEqual(patch.story_state.draw.map(card => card.id), [deck[1], deck[6], deck[10]], 'the cards at the places the member picked');
+  // The new state (its buttons) reaches the page before the reply, so the old buttons never show again under it.
+  const lines = body.split('\n');
+  const storyAt = lines.findIndex(line => line.includes('"type":"story"') && line.includes('"kind":"consult"')), hostAt = lines.findIndex(line => line.includes('"type":"host"'));
+  assert.ok(storyAt >= 0 && storyAt < hostAt, `story ${storyAt}, host ${hostAt}`);
   assert.equal(scored, 0, 'a consulting room scores no relationship');
 });
