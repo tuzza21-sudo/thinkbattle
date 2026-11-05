@@ -24,7 +24,11 @@ test('contract dates use the agreed story while other characters, stories and ph
   assert.deepEqual({ ...adjusted, outing: original.outing }, original, 'physical intimacy, stages and scores keep their existing limits');
   assert.equal(loungeScenarioRelationshipContext(original, undefined, 'closer'), original);
   assert.equal(loungeScenarioRelationshipContext(original, { id: 'another-story' }, 'closer'), original);
-  assert.equal(loungeScenarioRelationshipContext(original, contract, 'diplomat'), original);
+  assert.equal(loungeScenarioRelationshipContext(original, contract, 'trickster'), original);
+  // 윤지안 and the member are friends of three years: ordinary plans are open from the start (2026-11-05).
+  const friends = loungeScenarioRelationshipContext(original, { id: 'diplomat-old-friend-fling' }, 'diplomat');
+  assert.match(friends.outing, /영화, 밥, 술 한잔, 산책이나 조깅 같은 평범한 약속은 단계와 상관없이/);
+  assert.deepEqual({ ...friends, outing: original.outing }, original, 'only the outing changes');
 });
 
 test('《검은 장미》 is six episodes, each with checkpoints the page keeps, and gates that are real stages of 선우령', () => {
