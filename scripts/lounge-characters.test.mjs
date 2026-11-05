@@ -4,7 +4,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
-const { loungeCharacters, loungePersonaPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+const { loungeCharacters, loungePersonaPrompt, loungeBiblePrompt, loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+const { loungeTurnConditions, normalizeLoungeCompanionState } = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
 const { relationshipConfigs, defaultEventEffects, protectiveEvents, relationshipEventTypes } = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const { loungeHosts, loungeThemes, loungeHostGroups, loungeCharacterProfiles, loungeHostThemes, loungeEngineVoice } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
 const effect = (config, event) => (config.events[event] ?? defaultEventEffects[event]).deltas;
@@ -15,7 +16,6 @@ test('every host has a character page with a real theme and an existing photo', 
   for (const character of loungeCharacters) {
     assert.ok(loungeThemes.some(theme => theme.id === character.place), `${character.id}: unknown place ${character.place}`);
     if (character.fullBody) assert.ok(existsSync(fileURLToPath(new URL(`../public${character.fullBody}`, import.meta.url))), `${character.id}: missing ${character.fullBody}`);
-    for (const relation of character.relations) assert.ok(loungeHosts.some(h => h.id === relation.with) && relation.with !== character.id);
   }
 });
 
@@ -70,6 +70,30 @@ test('every character has a full profile for the model: name, age, work, past, t
   }
 });
 
+test('character-specific prompt choices preserve autonomy without compulsory comedy', () => {
+  const { loungeBiblePrompt, loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  for (const id of ['closer', 'diplomat']) {
+    const character = loungeCharacters.find(item => item.id === id);
+    const config = relationshipConfigs[id];
+    const prompt = [loungePersonaPrompt(character, { withBible: true }), loungeBiblePrompt(character), loungeCompanionSheetPrompt(character, 'on')].join('\n');
+    // The user's bible of 2026-11-05 brought back banter and examples for every stage; it stays among the shortest sheets.
+    if (id === 'diplomat') assert.ok(prompt.length < 5000, id + ': keep the character prompt concise');
+    if (character.bible.voice.rhythm) assert.ok(loungeCompanionSheetPrompt(character, 'on').includes(character.bible.voice.rhythm), id + ': rhythm is actually used');
+    const allStages = JSON.stringify(config);
+    assert.doesNotMatch(prompt + allStages, /이 사람 앞에서는 매번 진다|지면 바로 승리|일부러 질 판|질문이 다섯 개|질문이 쏟아지다/);
+    assert.ok(config.core.some(line => /판단/.test(line)), id + ': independent judgment at every stage');
+    assert.equal(character.bible.pressureLadder, undefined, id + ': no redundant mandatory pressure ladder');
+    assert.equal(character.bible.exceptionFormula, undefined, id + ': no scripted exception performance');
+  }
+  const closer = loungeCharacters.find(item => item.id === 'closer');
+  assert.match(closer.bible.invariants.join(' '), /6개월.*계약 기간과 비밀 유지/);
+  assert.equal(closer.bible.fewShot.length, 6, 'use the six examples from the supplied patch');
+  assert.match(closer.bible.voice.tone, /서로 합의해 반말로 전환하면 이후 일관되게 유지/);
+  assert.match(closer.bible.invariants.join(' '), /외부 인물에게 계약의 실체나 문서를 공개하지 않는다/);
+  const reporter = loungeCharacters.find(item => item.id === 'diplomat');
+  assert.doesNotMatch(reporter.bible.sceneEvents.map(event => event.content + event.purpose).join(' '), /그의 휴대폰|둘 다 펄쩍|아직도 안 사귀어/);
+});
+
 test('her flirtation and dominance are written down with their limits, and nobody else is given them', () => {
   const { loungeHosts } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
   const velvet = loungeHosts.find(host => host.id === 'velvet');
@@ -106,7 +130,7 @@ test('no character is shipped with the placeholders scripts/new-lounge-character
   }
 });
 
-test('a character with a companion sheet has all of it: the lens, ten actions or more, the inner voice at every stage, and events the engine can use', () => {
+test('a companion sheet has a lens, distinct actions, stage limits and usable events without padding quotas', () => {
   const { loungeCompanionSheetPrompt, loungeFewShotTurn } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
   const sheetFields = ['interpretationLens', 'actionAnchors', 'innerVoice', 'ruleBreak', 'relationshipLadder', 'fewShot', 'sceneEvents'];
   const withSheet = loungeCharacters.filter(character => sheetFields.some(field => character.bible?.[field]));
@@ -114,7 +138,8 @@ test('a character with a companion sheet has all of it: the lens, ten actions or
   assert.ok(['auditor', 'closer'].every(id => withSheet.some(character => character.id === id)));
   for (const { id, bible } of withSheet) {
     assert.ok(bible.interpretationLens, `${id}: a lens`);
-    assert.ok(bible.actionAnchors?.length >= 10, `${id}: ten actions or more`);
+    assert.ok(bible.actionAnchors?.length > 0, `${id}: action material`);
+    assert.equal(new Set(bible.actionAnchors).size, bible.actionAnchors.length, `${id}: no duplicate actions`);
     assert.ok(bible.innerVoice?.style, `${id}: how the inner voice speaks`);
     for (const stage of [1, 2, 3, 4]) {
       assert.ok(bible.innerVoice.ladder[stage]?.level, `${id}: the inner voice at stage ${stage}`);
@@ -185,4 +210,35 @@ test('임시우: his story card is the reunion his sheet tells, and the reason h
   assert.doesNotMatch(disclosure.FIRST_SCREENING + disclosure.SPARRING, /한 컷|믿었/, 'not before the third stage');
   assert.doesNotMatch(JSON.stringify(siwoo.bible), /한 컷|기다려 줄 거라고 믿었/, 'not in anything the model reads at every stage');
   assert.match(siwoo.bible.reservedMoments[0], /self_disclosure에 열려 있는 만큼만/);
+});
+
+/**
+ * What of a character reaches the model in a one-to-one chat (2026-11-05). Every turn, in the cached instructions: the
+ * tagline, story, personality (since 2026-11-05), habits and the bible's rules, voice, actions, inner-voice style and
+ * every example. With the turn: the inner-voice level of the stage (in full one turn in three, its first sentence on the
+ * others) and an event when one comes. Never sent: quote and wins/losses (the page; scoring reads the relationship
+ * config) and boundaries. look goes to photo prompts only.
+ */
+test('every part of a companion sheet meant for the model reaches it', () => {
+  const state = normalizeLoungeCompanionState(null, 'room-1');
+  const sent = (prompt, text) => prompt.includes(text) || prompt.includes(JSON.stringify(text).slice(1, -1));
+  for (const character of loungeCharacters.filter(item => item.bible?.innerVoice)) {
+    const bible = character.bible;
+    const prompt = [loungePersonaPrompt(character, { withBible: true }), loungeBiblePrompt(character), loungeCompanionSheetPrompt(character, 'on')].join(' ');
+    const parts = [character.tagline, ...character.story, ...character.personality.map(item => item.text), ...character.habits, bible.desire, bible.fear, bible.outward, bible.hidden, bible.humor,
+      bible.interpretationLens, bible.voice?.tone, bible.voice?.length, ...(bible.actionAnchors ?? []), bible.innerVoice.style,
+      ...bible.reactions.flatMap(item => [item.when, item.then]), ...bible.invariants, bible.growth,
+      ...(bible.fewShot ?? []).flatMap(shot => [shot.user, 'on' in shot ? shot.on.reply : shot.reply])].filter(Boolean);
+    for (const text of parts) assert.ok(sent(prompt, text), `${character.id}: not sent: ${text.slice(0, 40)}`);
+    for (const stage of [1, 2, 3, 4]) {
+      const level = bible.innerVoice.ladder[stage].level;
+      const at = turn => loungeTurnConditions({ bible, stage, state, turn, decision: { progress: 'stay' }, innerVoice: 'on' }).inner_voice_level.level;
+      assert.equal(at(3), level, `${character.id}: stage ${stage} in full`);
+      assert.equal(at(4), level.split('.')[0], `${character.id}: stage ${stage} in short`);
+    }
+    for (const event of bible.sceneEvents ?? []) {
+      const turn = loungeTurnConditions({ bible, stage: 4, state, turn: 3, decision: { progress: 'stay', event }, innerVoice: 'on' });
+      assert.deepEqual(turn.event, { content: event.content, purpose: event.purpose }, `${character.id}: ${event.id}`);
+    }
+  }
 });

@@ -231,7 +231,7 @@ export function registerLoungeCustomCharacterRow(row: LoungeCustomCharacterRow, 
     id: row.id as LoungeHostId, name: sheet.name, age: `${sheet.age}세`, role: sheet.job, place: theme.id, look: sheet.look, job: sheet.job,
     quote: sheet.greeting, tagline: sheet.tagline, story: sheet.intro.split(/\n\s*\n/).map(item => item.trim()).filter(Boolean), tastes: sheet.tastes,
     personality: [{ label: '성격과 말투', text: sheet.personality }], habits: [],
-    wins: [], losses: [], boundaries: [], relations: [],
+    wins: [], losses: [], boundaries: [],
   };
   registerLoungeCustomCharacter(character);
   registerCustomRelationshipConfig(relationshipFromTemplate(template, {

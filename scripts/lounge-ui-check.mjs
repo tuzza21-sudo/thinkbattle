@@ -120,7 +120,7 @@ try {
   }
   await send('Page.navigate', { url: `${base}/lounge` });
   await waitFor("document.querySelectorAll('.lounge-voice-preview').length===6");
-  for (const file of ['host-witty-v1', 'host-seoyeon-v1', 'host-auditor-v1', 'host-closer-v1', 'host-velvet-v1', 'host-trickster-v1']) {
+  for (const file of ['host-witty-v1', 'host-seoyeon-v1', 'host-auditor-v1', 'host-closer-v1', 'host-velvet-v1', 'host-trickster-v2']) {
     const duration = await evaluate(`new Promise((resolve,reject)=>{const a=new Audio('/lounge/${file}.mp3');a.onloadedmetadata=()=>resolve(a.duration);a.onerror=()=>reject(new Error('voice sample did not load'));a.load();})`);
     assert.ok(duration > 3 && duration < 45, 'short Korean voice sample decodes');
   }

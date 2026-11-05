@@ -16,6 +16,21 @@ export class LoungeApiError extends Error {
   }
 }
 
+/** Bounds the chat request before its stream is handed off, including a stalled auth/session refresh. */
+export const loungeHostRequestTiming = { responseMs: 30_000 };
+async function withLoungeHostDeadline<T>(task: (signal: AbortSignal) => Promise<T>, outer?: AbortSignal): Promise<T> {
+  const deadline = new AbortController();
+  const signal = outer ? AbortSignal.any([outer, deadline.signal]) : deadline.signal;
+  let onAbort: () => void = () => {};
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason ?? new DOMException('Request aborted', 'AbortError'));
+    if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, { once: true });
+  });
+  const timer = setTimeout(() => deadline.abort(new LoungeApiError('답변 서버의 응답이 늦어지고 있어요. 잠시 후 다시 연결할게요.', 'lounge_reply_timeout', true, 5)), loungeHostRequestTiming.responseMs);
+  try { return await Promise.race([aborted, Promise.resolve().then(() => { signal.throwIfAborted(); return task(signal); })]); }
+  finally { clearTimeout(timer); signal.removeEventListener('abort', onAbort); }
+}
+
 export function loungeConnectionError(error: unknown, source = '서버') {
   if (error instanceof LoungeApiError) return error;
   const message = error instanceof Error ? error.message : typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '';
@@ -42,7 +57,12 @@ async function loungeAccessToken(forceRefresh = false) {
 }
 /** Sends an authenticated request; if the server rejects the token, refreshes the session once and sends it again. */
 async function loungeAuthorizedFetch(url: string, init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }, source: string) {
-  const send = async (forceRefresh: boolean) => loungeFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${await loungeAccessToken(forceRefresh)}` } }, source);
+  const send = async (forceRefresh: boolean) => {
+    init.signal?.throwIfAborted();
+    const token = await loungeAccessToken(forceRefresh);
+    init.signal?.throwIfAborted();
+    return loungeFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } }, source);
+  };
   const response = await send(false);
   if (response.status !== 401) return response;
   const retried = await send(true);
@@ -175,6 +195,10 @@ async function interactionRequest(body: Record<string, unknown>) {
   return payload as { skipped?: boolean; voiceSyncPending?: boolean; question_queued?: boolean };
 }
 async function apiRequest(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
+  if (body.action === 'host' && streaming) return withLoungeHostDeadline(active => readApiResponse(body, active, streaming), signal);
+  return readApiResponse(body, signal, streaming);
+}
+async function readApiResponse(body: Record<string, unknown>, signal?: AbortSignal, streaming = false) {
   const source = body.action === 'transcribe' ? '발언 전사 서버' : body.action === 'prepare' ? '자료 준비 서버' : body.action === 'topics' ? '주제 추천 서버' : '사회자 서버';
   const response = await loungeAuthorizedFetch('/api/lounge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal }, source);
   if (response.ok && streaming && response.headers.get('content-type')?.includes('application/x-ndjson') && response.body) return { stream: response.body };

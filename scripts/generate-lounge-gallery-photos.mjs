@@ -1,6 +1,6 @@
 // Generates the gallery photos on the character pages: two scenes from each lounge character's own day, drawn from
 // their portrait with the OpenAI image edit API (paid, one request each) so the face stays the same person.
-//   node scripts/generate-lounge-gallery-photos.mjs [--only=auditor,ina] [--overwrite] [--model=gpt-image-2.5-sunburst] [--quality=low]
+//   node scripts/generate-lounge-gallery-photos.mjs [--only=auditor,ina] [--overwrite] [--model=gpt-image-2] [--quality=low]
 // Needs OPENAI_API_KEY in .env.local and Python with Pillow. Writes public/lounge/gallery/<id>-<n>.webp (768x1152);
 // the captions shown under them are in src/lib/loungeCharacters.ts (gallery).
 import { execFileSync } from 'node:child_process';
@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local', quiet: true });
 const options = Object.fromEntries(process.argv.slice(2).map(arg => { const [key, value = 'true'] = arg.replace(/^--/, '').split('='); return [key, value]; }));
-const model = options.model || 'gpt-image-2.5-sunburst', quality = options.quality || 'low';
+const model = options.model || 'gpt-image-2', quality = options.quality || 'low';
 if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in .env.local');
 
 const common = 'Use case: identity-preserve. A candid photo from the everyday life of the entirely fictional person in the supplied portrait, as if posted on their own social feed: keep the same face, hairstyle, age, skin tone and general look. Natural, unposed moment, vertical 2:3 frame. Realistic lifestyle photography, natural skin and fabric texture, soft natural light, shallow depth of field. The person must not resemble any real person or celebrity. Tasteful and fully clothed. No readable text, no logos, no watermark.';
@@ -36,9 +36,9 @@ const scenes = {
     `${common} She stands alone in a dim private gallery after closing, studying a large abstract painting with her back half-turned, a glass of red wine in one hand, glancing at the camera over her shoulder with an enigmatic half-smile. Burgundy satin shirt, black blazer, long black hair with wine-coloured ends, a single spotlight.`,
     `${common} Late at night on the balcony of a hotel suite overlooking city lights, she leans on the railing in a black silk robe-style coat over her clothes, the stopped gold watch on her wrist, looking out into the night, poised and mysterious. Cool blue night with warm interior light behind her.`,
   ] },
-  trickster: { portrait: 'host-trickster-v3.webp', shots: [
-    `${common} After the show at a late-night pojangmacha tent, he sits with a plastic cup and a plate of snacks, leaning back in a dark coat over a green knit, laughing hard at his own joke with his eyes crinkled. Warm orange tent light, steam, blurred city street outside.`,
-    `${common} A quiet afternoon in his small messy apartment, he lies on a worn sofa holding a notebook above his face, scribbling a joke with a pen in his mouth, one eyebrow raised as he notices the camera. Soft window light, a guitar and stacked records in the background.`,
+  trickster: { portrait: 'host-trickster-v4.webp', shots: [
+    `${common} Late at night after a recording, he stands alone in a quiet 24-hour convenience store, leaning on the counter by the window with a can of coffee in one hand, still in a black turtleneck and charcoal jacket, looking out at the empty street with a faint wry smile. Cool fluorescent light inside, a dark city street with a few lights outside, no readable text or logos anywhere.`,
+    `${common} At a desk in his small study late at night, he edits a printed column draft with a red pen, sleeves of a black turtleneck pushed up, a laptop and a cold mug beside him, glancing up at the camera with one eyebrow raised as if you caught him rewriting a harsh line. Warm desk lamp, shelves of books softly blurred, no readable text on the pages or screen.`,
   ] },
   diplomat: { portrait: 'host-reporter-v1.webp', shots: [
     `${common} Off duty on a weekend afternoon, she rides a bicycle slowly along a tree-lined riverside path in a light ivory blouse and jeans, her long dark-brown waves blowing, laughing toward the camera. Soft spring sunlight and blossoms.`,

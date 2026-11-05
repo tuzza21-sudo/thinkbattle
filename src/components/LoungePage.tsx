@@ -1179,7 +1179,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       // A voice reply speaks with the engine the member chose (none chosen: the character's own).
       const response = await requestLoungeHost(roomId, reason, controller.signal, kind, undefined, callStart);
       if (!mounted.current || controller.signal.aborted) { await response.stream?.cancel(); return; }
-      if (!response.skipped) { setError(''); quietFailures.current = 0; }
       if (response.stream && chatTurn) {
         // A chat reply is text only: show it as soon as it arrives, then reload the room once it is saved.
         for await (const event of readLoungeStream(response.stream, controller.signal)) {
@@ -1204,11 +1203,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           // Saved: the room is reloaded with the reply and the next message can be answered, while the summary and
           // relationship are still being written after it.
           if (event.type === 'saved') {
+            quietFailures.current = 0; setError('');
             if (mounted.current) await refreshAfterMessage();
             console.info(`[Lounge latency] ${JSON.stringify({ savedMs: Math.round(performance.now() - started) })}`);
             release(); continue;
           }
           if (event.type !== 'host' || !mounted.current) continue;
+          quietFailures.current = 0; setError('');
           spoke = true; setChatHostText(event.text.slice(0, 1200)); setPending(false);
           console.info(`[Lounge latency] ${JSON.stringify({ ...event.timings, textDoneMs: Math.round(performance.now() - started) })}`);
         }
@@ -1224,6 +1225,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         if (!canWaitForAudio()) { await response.stream.cancel(); return; }
         let timings: Record<string, number> = {};
         await current.current.audio.playHostStream(response.stream, () => {
+          quietFailures.current = 0; setError('');
           spoke = true;
           if (mounted.current) setPending(false);
           console.info(`[Lounge latency] ${JSON.stringify({ ...timings, firstAudioMs: Math.round(performance.now() - started) })}`);
@@ -1257,6 +1259,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       // anyway, and the room's refresh shows it. The page waits for it quietly instead of showing an error.
       if (chatTurn && err instanceof LoungeApiError && ['lounge_stream_interrupted', 'lounge_network_error'].includes(err.code ?? '')) {
         hostBlocked.current = false; nextHostAttempt.current = Date.now() + 20_000;
+        quietFailures.current++;
+        if (mounted.current && quietFailures.current >= 3) setError(errorText(err));
         return;
       }
       // One to one (a chat or a call), a failure that passes on its own is not shown: a crashed or slow server instance
@@ -1268,6 +1272,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         hostBlocked.current = false;
         nextHostAttempt.current = Date.now() + Math.min(30, 3 * 2 ** quietFailures.current) * 1000;
         quietFailures.current++;
+        if (mounted.current && (quietFailures.current >= 3 || (err instanceof LoungeApiError && ['lounge_reply_timeout', 'lounge_stream_timeout'].includes(err.code ?? '')))) setError(errorText(err));
         return;
       }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.

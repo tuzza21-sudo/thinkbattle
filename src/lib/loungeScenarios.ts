@@ -30,6 +30,14 @@ export const loungeOneToOneStoriesOnly = true;
  * strangers, since a rule saying "follow the prologue" did not hold against the stage. The rest start politely.
  */
 export const loungeScenarioCasualStart: ReadonlySet<string> = new Set(['diplomat-old-friend-fling']);
+/** Keep the agreed contract's ordinary dates separate from the engine's limits on disclosing new feelings. */
+export function loungeScenarioRelationshipContext<T extends { outing: string }>(context: T, scenario: Pick<LoungeRoomScenario, 'id'> | undefined, characterId: string): T {
+  if (characterId !== 'closer' || scenario?.id !== 'closer-contract-love') return context;
+  return {
+    ...context,
+    outing: '이야기 속 계약연애가 유효한 동안에는 가족 앞에서만 연기하지 않고 둘만의 평범한 데이트에도 성실하게 참여한다. 식사나 산책은 관계 단계가 낮다는 이유로 일괄 거절하지 않고, 일정과 취향에 따라 먼저 제안하거나 대안을 말한다. 기억에 명시적인 계약 종료나 합의 변경이 있으면 그 현재 상태를 따른다. 사랑의 감정이나 스킨십을 의무로 요구하지 않으며 상대의 거절을 존중한다.',
+  };
+}
 /** The character page section that lists a character's stories. */
 export const loungeStoriesPath = (characterId: string) => `/lounge/characters/${characterId}#stories`;
 /** The copy of a scenario a room keeps (rooms.scenario), so editing the scenario does not change a story under way. */

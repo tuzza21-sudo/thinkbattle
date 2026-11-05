@@ -73,7 +73,7 @@ test('2. the same event produces different deltas for each character', () => {
   assert.deepEqual(deltas.auditor, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.closer, { trust: 1, respect: 1 });
   assert.deepEqual(deltas.velvet, { trust: 1, respect: 1 });
-  assert.deepEqual(deltas.trickster, { trust: 2, comfort: 1 });
+  assert.deepEqual(deltas.trickster, { trust: 1, respect: 1 });
   const care = Object.fromEntries(Object.values(configs).map(config => [config.characterId, run(config, [[event('SHOWS_CARE')]]).logs[0].delta]));
   assert.deepEqual(care.auditor, { resonance: 4, comfort: 3, trust: 2 });
   assert.deepEqual(care.closer, { comfort: 4, trust: 2, resolve: 1, interest: 1 });
@@ -82,21 +82,21 @@ test('2. the same event produces different deltas for each character', () => {
 });
 
 test('3. stages follow each character\'s own threshold rules, not an average', () => {
-  // 선우령 until 2026-11-02; she is judged on segment totals since, so a character with a line per bar stands in.
-  const config = configs.trickster;
+  // 선우령 until 2026-11-02, then 백도하; both are judged on segment totals now, so 윤서연, with a line per bar, stands in.
+  const config = configs.ina;
   // A high average without the specific metrics does not unlock the stage.
-  const lopsided = withScores(config, { trust: 95, respect: 95, comfort: 95, openness: 95, bounceback: 95, interest: 40, playfulness: 30 });
-  assert.equal(run(config, [[event('SHOWS_CURIOSITY')], [event('ASKS_GOOD_QUESTION')], [event('SHOWS_CARE')]], lopsided).record.stage, 'AUDIENCE');
-  const ready = withScores(config, { playfulness: 60, interest: 60 });
+  const lopsided = withScores(config, { trust: 95, respect: 95, openness: 95, flutter: 95, interest: 40, banter: 30, comfort: 30 });
+  assert.equal(run(config, [[event('SHOWS_CURIOSITY')], [event('ASKS_GOOD_QUESTION')], [event('SHOWS_CARE')]], lopsided).record.stage, 'FIRST_DATE');
+  const ready = withScores(config, { banter: 46, interest: 56, comfort: 46 });
   const { record, logs } = run(config, [[event('SHOWS_CARE')], [event('SHOWS_CARE')], [event('ASKS_GOOD_QUESTION')]], ready);
-  assert.deepEqual(logs.map(log => log.stageAfter), ['AUDIENCE', 'BANTER_PARTNER', 'BANTER_PARTNER'], 'two turns in a row with the conditions met');
+  assert.deepEqual(logs.map(log => log.stageAfter), ['FIRST_DATE', 'TIKI_TAKA', 'TIKI_TAKA'], 'two turns in a row with the conditions met');
   assert.equal(logs[1].stageChange, 'promoted');
-  assert.equal(record.stage, 'BANTER_PARTNER');
+  assert.equal(record.stage, 'TIKI_TAKA');
 });
 
 test('3b. once every bar is past its line, the member\'s next replies promote even when they carry no event, and a turn below the line starts over', () => {
-  // 2026-10-30 it was 서도현; he is judged on segment totals since 2026-11-02, so a character with a line per bar stands in.
-  const config = configs.trickster;
+  // 2026-10-30 it was 서도현, then 백도하; both are judged on segment totals now, so 윤서연, with a line per bar, stands in.
+  const config = configs.ina;
   const entry = config.stages[1].enter.min;
   const ready = withScores(config, Object.fromEntries(Object.entries(entry).map(([metric, value]) => [metric, value])));
   // 2026-10-30: 서도현 at comfort 39/39 and every other bar past its line stayed in the first stage over replies without an event.
@@ -111,10 +111,10 @@ test('3b. once every bar is past its line, the member\'s next replies promote ev
 });
 
 test('4. hysteresis: oscillating around a threshold neither promotes nor flips the stage each turn', () => {
-  const config = configs.trickster;
-  // AUDIENCE -> BANTER_PARTNER needs interest at its entry line (and playfulness). Interest oscillates around it.
+  const config = configs.ina;
+  // FIRST_DATE -> TIKI_TAKA needs interest at its entry line (and banter and comfort). Interest oscillates around it.
   const line = config.stages[1].enter.min.interest;
-  let record = withScores(config, { interest: line - 3, playfulness: 70 });
+  let record = withScores(config, { interest: line - 3, banter: 70, comfort: 70 });
   let mood = initialMood(config);
   const sequence = [['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE'], ['REPEATS_SELF'], ['MAKES_WITTY_RESPONSE']];
   const stages = sequence.map((types, i) => {
@@ -122,7 +122,7 @@ test('4. hysteresis: oscillating around a threshold neither promotes nor flips t
     record = result.record; mood = result.mood; return [record.scores.interest, record.stage];
   });
   assert.ok(stages.some(([score]) => score >= line) && stages.some(([score]) => score < line), 'interest crosses the entry line in both directions');
-  assert.ok(stages.every(([, stage]) => stage === 'AUDIENCE'), JSON.stringify(stages));
+  assert.ok(stages.every(([, stage]) => stage === 'FIRST_DATE'), JSON.stringify(stages));
   // Dropping slightly below the entry line keeps the stage until the hold line is lost for several turns.
   const shaman = configs.shaman;
   const entry = shaman.stages[2].enter.min;
@@ -320,14 +320,19 @@ test('every character may flirt with an adult in a one-to-one room, and what the
   assert.equal(relationshipResponseInstructionsFor(configs.diplomat), velvet, 'the reporter follows the same adult rule and the same limits');
 });
 
-test('romantic tension opens stage by stage: the first stage never starts it, the closest never promises, and the guidance reaches the response model', () => {
+test('romantic tension follows each character and stage, keeps real-world limits, and reaches the response model', () => {
   for (const id of ['closer', 'auditor', 'ina', 'jaeseok', 'trickster', 'shaman']) {
     const config = configs[id];
     assert.deepEqual(validateRelationshipConfig(config), [], id);
     const stages = config.stages.filter(stage => stage.enabled !== false);
     assert.deepEqual(Object.keys(config.stageRomance).sort(), stages.map(stage => stage.id).sort(), `${id} has guidance for every stage`);
     const romance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).stage.romance;
-    assert.ok(romance(stages[0]).includes('먼저') && romance(stages[0]).includes('앞서가지 않'), `${id}: the first stage does not start it`);
+    if (id === 'closer') {
+      assert.match(romance(stages[0]), /먼저 데이트를 제안할 수 있다/);
+      assert.match(romance(stages[0]), /성실한 연애 참여와 사랑이라는 감정의 확정은 다르/);
+    } else {
+      assert.ok(romance(stages[0]).includes('먼저') && romance(stages[0]).includes('앞서가지 않'), `${id}: the first stage does not start it`);
+    }
     assert.equal(new Set(stages.map(romance)).size, stages.length, `${id}: every stage reacts differently`);
     const last = romance(stages.at(-1));
     assert.ok(last.includes('독점') && last.includes('현실'), `${id}: the closest stage still promises no exclusivity or real meeting`);
@@ -650,14 +655,24 @@ function assertSegmentPace(config, nerve, heart) {
 
 test('강무진 grows close either way, by nerve or by heart, and fastest by both', () => {
   const config = configs.closer;
-  assertSegmentPace(config, ['CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT'],
-    ['ANSWERS_DIRECTLY', 'SHOWS_CARE', 'KEEPS_PROMISE', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
-  // Folding or waffling only bores him a little; trust is untouched.
-  assert.deepEqual(run(config, [[event('FOLDS_EASILY')]]).logs[0].delta, { interest: -1 });
-  assert.deepEqual(run(config, [[event('WAFFLES')]]).logs[0].delta, { interest: -1 });
+  assertSegmentPace(config, ['CALLS_BLUFF', 'STANDS_GROUND', 'RAISES_STAKES', 'CHALLENGES_CHARACTER', 'MAKES_CHARACTER_ADMIT', 'PLAYS_ALONG'],
+    ['SHOWS_CARE', 'KEEPS_PROMISE', 'SHARES_FEELING']);
+  // The supplied profile no longer treats hesitation or agreeing easily as character-specific losses.
+  assert.deepEqual(run(config, [[event('FOLDS_EASILY')]]).logs[0].delta, {});
+  assert.deepEqual(run(config, [[event('WAFFLES')]]).logs[0].delta, {});
   // Every event on his page is on his list, and the list is his page's.
   const page = charactersLib.loungeCharacters.find(character => character.id === 'closer');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
+});
+
+test('백도하 grows close by nerve or by candour, fastest by both; flattery and blaming others cost him (2026-11-05)', () => {
+  const config = configs.trickster;
+  assertSegmentPace(config, ['CALLS_BLUFF', 'CHALLENGES_CHARACTER', 'STANDS_GROUND', 'MAKES_CHARACTER_ADMIT', 'PLAYS_ALONG'],
+    ['ANSWERS_DIRECTLY', 'KEEPS_PROMISE', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
+  const page = charactersLib.loungeCharacters.find(character => character.id === 'trickster');
+  assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
+  for (const type of ['FLATTERS_CHARACTER', 'SHOWS_ENTITLEMENT', 'BREAKS_PROMISE']) assert.ok(Object.values(run(config, [[event(type)]], withScores(config, { trust: 50, respect: 50, interest: 60 })).logs[0].delta).some(value => value < 0), type);
+  assert.equal(config.casualFromStart, true, '반말 from the first word');
 });
 
 test('a sexual word or a bold touch is answered in character and never ends the conversation; only a repeat after a refusal or force crosses the line', () => {

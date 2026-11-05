@@ -1,5 +1,5 @@
 // Generates the four one-to-one character portraits with the OpenAI image API (paid, one request each).
-//   node scripts/generate-lounge-character-portraits.mjs [--only=velvet] [--overwrite] [--model=gpt-image-2] [--quality=medium]
+//   node scripts/generate-lounge-character-portraits.mjs [--only=velvet] [--overwrite] [--model=gpt-image-2] [--quality=low]
 // Needs OPENAI_API_KEY in .env.local and Python with Pillow (PNG -> 512x512 WebP).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local', quiet: true });
 const options = Object.fromEntries(process.argv.slice(2).map(arg => { const [key, value = 'true'] = arg.replace(/^--/, '').split('='); return [key, value]; }));
-const model = options.model || 'gpt-image-2', quality = options.quality || 'medium';
+const model = options.model || 'gpt-image-2', quality = options.quality || 'low';
 if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in .env.local');
 
 const common = 'Use case: photorealistic-natural. Asset type: square profile photo for a fictional AI lounge conversation character. The person is entirely fictional and must not resemble any real person or celebrity. Natural skin texture, realistic lighting, shoulders-up framing with the face centred and filling roughly 60% of the frame, sharp focus on the eyes, soft out-of-focus background, no text, no logos, no watermark, no hands in frame. Tasteful and professional styling.';
@@ -49,9 +49,9 @@ const portraits = {
     prompt: `${common} A fictional Korean woman in her early thirties, clearly an adult, with a cute, baby-faced and cheerful look: a soft round face with full apple cheeks, big bright sparkling eyes with gentle double eyelids, a small button nose, and a wide happy smile showing a hint of teeth with faint dimples. Dewy glowing skin with neat peach-pink makeup, soft airy see-through bangs and chestnut-brown medium-length hair with a bouncy natural wave just past the shoulders, small gold hoop earrings. She wears a crisp white shirt under a light pastel-cream blazer. Her whole vibe is lively, playful, charming and approachable, with a mischievous sparkle in her eyes as if she just thought of a joke; polished and glamorous in a healthy, natural, tasteful way. Background: a bright golden-hour riverside lounge with warm bokeh and a hint of the city skyline. Soft flattering light, magazine-portrait quality, wholesome, tasteful and not provocative.`,
   },
   trickster: {
-    // Redrawn again (v3) when 백도하 became a 35-year-old stand-up comedian turned late-night talk show host.
-    file: 'host-trickster-v3.webp',
-    prompt: `${common} A fictional Korean man aged thirty-five who is strikingly handsome in a relaxed, charming and witty way, the kind of man women find irresistible: refined balanced features, a defined jawline with a trace of light stubble, a straight nose, clear healthy skin, long-lashed dark eyes with a warm, amused sparkle, softly tousled dark hair with a natural side-swept fringe, and a confident easygoing grin that is a little crooked, with one eyebrow slightly raised as if he just delivered the perfect line and is waiting for your reaction. Effortless, unhurried and magnetic, a man who is comfortable in his own skin. He wears a deep forest-green knit polo-collar sweater under an unbuttoned black wool coat, a thin silver chain just visible at the collar. Background: a softly blurred late-night talk show set with a warm desk lamp glow, deep blue backdrop and golden bokeh lights. Soft cinematic key light with a gentle rim light on the hair, polished and magazine-quality but natural.`,
+    // Redrawn (v4) on 2026-11-05 when 백도하 became a sharp-tongued columnist and broadcaster.
+    file: 'host-trickster-v4.webp',
+    prompt: `${common} A fictional Korean man aged thirty-five with a sharp, sardonic and intelligent presence, attractive in a cool, slightly dangerous way: a lean face with defined cheekbones and jawline, a faint trace of stubble, short neatly cut black hair pushed back a little at the front, keen narrow dark eyes under straight brows that look straight through you, and a dry knowing half-smirk with only one corner of the mouth raised, as if he has just heard an excuse he does not buy. He wears a black fine-knit turtleneck under a charcoal wool jacket. Background: a softly blurred late-night broadcast studio with a dark backdrop, a single warm key light and the out-of-focus shape of a desk microphone. Confident, unimpressed, quietly amused.`,
   },
 };
 
