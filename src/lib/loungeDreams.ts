@@ -1,0 +1,85 @@
+/**
+ * The dream symbols 이한결 reads at 홍실당 (2026-11-05, 상담 phase 1). The member's telling of the dream is matched against
+ * each symbol's words in code (no model call), and what matched goes to the interpreter with both readings: the
+ * traditional Korean one and a psychological one. No symbol foretells death, illness, an accident or a pregnancy: a dream
+ * that frightens is read as what the member is worried about now. Start of a list meant to grow to 200-300 symbols.
+ */
+export type LoungeDreamSymbol = { symbol: string; words: readonly string[]; traditional: string; psychological: string };
+
+export const loungeDreamSymbols: readonly LoungeDreamSymbol[] = [
+  { symbol: '이빨', words: ['이빨', '치아', '이가 빠', '이가 흔들', '이가 부러'], traditional: '가까운 사람이나 내 몸을 챙기라는 신호로 흔히 읽는다.', psychological: '할 말을 삼키고 있거나, 남의 평가와 통제력을 잃을까 신경 쓰일 때 자주 꾼다.' },
+  { symbol: '물', words: ['물속', '물에 빠', '물이 차', '홍수', '바다', '강물', '파도', '계곡'], traditional: '맑은 물은 재물과 순조로움, 흙탕물은 일이 꼬일 걱정으로 읽는다.', psychological: '감정의 상태다. 잔잔하면 마음이 안정됐고, 넘치거나 빠지면 감정에 휩쓸리는 중이다.' },
+  { symbol: '뱀', words: ['뱀', '구렁이'], traditional: '재물이나 귀한 인연이 들어오는 길몽으로 보는 경우가 많다.', psychological: '경계하는 사람이나 숨은 불안, 혹은 허물을 벗듯 변하고 싶은 마음이다.' },
+  { symbol: '돼지', words: ['돼지'], traditional: '재물과 복이 들어오는 대표적인 길몽이다.', psychological: '풍족하고 싶은 마음, 여유를 바라는 마음이다.' },
+  { symbol: '똥', words: ['똥', '대변'], traditional: '재물이 들어오는 길몽으로 읽는다.', psychological: '털어내고 싶은 감정이나 일을 정리하고 싶은 마음이다.' },
+  { symbol: '불', words: ['불이 나', '불길', '불타', '화재', '불이 붙'], traditional: '활활 타는 불은 일이 번창하는 기세로 읽는다.', psychological: '분노나 열정처럼 강한 감정이 올라와 있다.' },
+  { symbol: '시험', words: ['시험', '수능', '면접'], traditional: '앞둔 일에 대한 걱정이 꿈에 나온 것으로 본다.', psychological: '평가받는 데 대한 불안, 준비가 덜 됐다는 느낌이다.' },
+  { symbol: '추락', words: ['떨어지', '추락', '낭떠러지'], traditional: '자리나 처지가 흔들릴까 걱정하는 마음으로 읽는다.', psychological: '통제력을 잃을까 하는 불안이다. 붙잡을 데가 필요하다는 신호다.' },
+  { symbol: '쫓기는 꿈', words: ['쫓기', '쫓아오', '도망', '쫓겨'], traditional: '피하고 싶은 일이 따라붙는 것으로 읽는다.', psychological: '마주하기 싫어 미뤄 둔 문제가 있다.' },
+  { symbol: '돌아가신 분', words: ['돌아가신', '조상', '죽은 할머니', '죽은 할아버지', '죽은 사람'], traditional: '조상이 도움이나 당부를 전하러 온 꿈으로 읽는다.', psychological: '그리움이나 아직 정리되지 않은 마음이다.' },
+  { symbol: '내가 죽는 꿈', words: ['내가 죽', '죽는 꿈', '죽었'], traditional: '다시 태어나는 길몽으로 본다. 실제 죽음과는 상관없다.', psychological: '한 시기가 끝나고 큰 변화를 맞는 중이다.' },
+  { symbol: '장례식', words: ['장례', '상여', '관 속'], traditional: '묵은 일이 끝나고 새 일이 열리는 꿈으로 읽는다.', psychological: '무언가를 끝맺고 정리하고 싶은 마음이다.' },
+  { symbol: '시체', words: ['시체', '송장'], traditional: '재물이 들어오는 길몽으로 읽는다.', psychological: '이미 끝난 일을 아직 붙들고 있다.' },
+  { symbol: '결혼', words: ['결혼', '웨딩', '결혼식', '신부', '신랑'], traditional: '새로운 결합이나 약속이 생기는 꿈으로 읽는다.', psychological: '관계에 대한 기대나 부담, 책임감이다.' },
+  { symbol: '아기', words: ['아기', '아이를 안', '갓난'], traditional: '새로 시작되는 일의 상징으로 읽는다.', psychological: '새로 품은 계획이나 돌보고 싶은 마음이다.' },
+  { symbol: '임신', words: ['임신', '배가 불러'], traditional: '새 일을 품고 키우는 꿈으로 읽는다. 실제 임신을 알려 주는 꿈은 아니다.', psychological: '준비 중인 계획, 아직 드러내지 않은 생각이다.' },
+  { symbol: '돈', words: ['돈을', '지폐', '현금', '금덩', '금반지', '동전'], traditional: '재물운과 연결해 읽는다. 돈을 줍는 꿈은 기회, 잃는 꿈은 지출 조심으로 본다.', psychological: '인정받고 싶은 마음이나 돈 걱정이다.' },
+  { symbol: '피', words: ['피가', '피를', '피투성이'], traditional: '재물이나 기운이 들어오는 꿈으로 읽기도 한다.', psychological: '마음의 상처나 기운이 빠져나가는 느낌이다.' },
+  { symbol: '집', words: ['우리 집', '집이 무너', '집에 들어', '이사'], traditional: '집은 나와 가정의 형편이다. 이사는 처지가 바뀌는 꿈이다.', psychological: '지금 내 마음의 상태다. 낯선 방은 아직 모르는 내 모습이다.' },
+  { symbol: '화장실', words: ['화장실', '변기'], traditional: '근심이 빠져나가는 꿈으로 읽는다.', psychological: '털어놓고 싶은 감정, 혹은 사생활이 드러날까 하는 불안이다.' },
+  { symbol: '길을 잃음', words: ['길을 잃', '헤매', '길을 못 찾'], traditional: '방향을 정하지 못한 처지로 읽는다.', psychological: '진로나 관계에서 어디로 가야 할지 고민하는 중이다.' },
+  { symbol: '지각', words: ['지각', '늦어서', '늦었', '놓쳤'], traditional: '기회를 놓칠까 하는 걱정으로 읽는다.', psychological: '시간에 쫓기는 압박감, 준비가 덜 됐다는 느낌이다.' },
+  { symbol: '하늘을 나는 꿈', words: ['날아', '하늘을 날', '날개'], traditional: '지위가 오르고 일이 잘 풀리는 길몽이다.', psychological: '해방감, 자신감, 벗어나고 싶은 마음이다.' },
+  { symbol: '고양이', words: ['고양이'], traditional: '신경 쓰이는 사람이나 작은 다툼으로 읽는다.', psychological: '독립하고 싶은 마음, 직감, 경계심이다.' },
+  { symbol: '개', words: ['강아지', '개가', '개한테', '개를'], traditional: '믿을 만한 사람이나 친구로 읽는다. 물리면 가까운 사람과의 다툼이다.', psychological: '충성과 우정, 지켜 주고 싶은 관계다.' },
+  { symbol: '호랑이', words: ['호랑이'], traditional: '귀인이나 큰 힘을 얻는 길몽이다.', psychological: '권위 있는 사람에 대한 부담, 혹은 내 안의 힘이다.' },
+  { symbol: '용', words: ['용이', '용을', '용 꿈', '용꿈'], traditional: '큰 성취와 승진을 뜻하는 대표적인 길몽이다.', psychological: '큰 목표, 인정받고 싶은 마음이다.' },
+  { symbol: '물고기', words: ['물고기', '잉어', '붕어'], traditional: '재물이나 좋은 기회가 들어오는 꿈이다.', psychological: '놓치기 싫은 기회, 풍요를 바라는 마음이다.' },
+  { symbol: '꽃', words: ['꽃이', '꽃을', '꽃밭'], traditional: '기쁜 일이나 좋은 인연이 생기는 꿈이다.', psychological: '마음이 피어나는 중이다. 시든 꽃은 아쉬움이다.' },
+  { symbol: '비', words: ['비가', '소나기', '빗속'], traditional: '막힌 일이 풀리는 꿈으로 읽는다.', psychological: '쌓인 감정을 씻어 내고 싶은 마음이다.' },
+  { symbol: '눈', words: ['눈이 내', '눈이 와', '눈사람', '눈밭'], traditional: '묵은 일이 덮이고 새로 시작되는 꿈이다.', psychological: '조용히 정리하고 싶은 마음, 새 출발이다.' },
+  { symbol: '산', words: ['산에', '산을', '등산', '정상'], traditional: '목표와 오르막의 노력으로 읽는다. 정상에 오르면 성취다.', psychological: '지금 오르고 있는 목표와 그 버거움이다.' },
+  { symbol: '엘리베이터', words: ['엘리베이터'], traditional: '처지가 오르내리는 꿈으로 읽는다.', psychological: '내 힘으로 조절되지 않는 상황에 대한 불안이다.' },
+  { symbol: '계단', words: ['계단'], traditional: '한 단계씩 오르는 성장의 꿈이다.', psychological: '차근차근 가야 한다는 부담이나 지친 마음이다.' },
+  { symbol: '전 연인', words: ['전 애인', '전남친', '전여친', '헤어진', '구남친', '구여친'], traditional: '지난 인연이 정리되는 과정으로 읽는다.', psychological: '정리되지 않은 감정, 혹은 지금 관계와 견주는 마음이다.' },
+  { symbol: '연예인', words: ['연예인', '아이돌', '배우가'], traditional: '귀인을 만나거나 이름이 알려지는 꿈으로 읽는다.', psychological: '인정받고 싶은 마음, 동경이다.' },
+  { symbol: '머리카락', words: ['머리카락', '머리를 자르', '머리가 빠', '삭발'], traditional: '근심을 덜어 내는 꿈으로 읽기도 한다.', psychological: '자신감이나 이미지 변화에 대한 마음이다.' },
+  { symbol: '알몸', words: ['알몸', '옷을 벗', '벗은 채', '옷이 없'], traditional: '숨기던 일이 드러나는 꿈으로 읽는다.', psychological: '드러날까 하는 불안, 혹은 솔직해지고 싶은 마음이다.' },
+  { symbol: '신발', words: ['신발', '구두'], traditional: '진로나 짝을 뜻한다. 잃어버리면 방향이 흔들리는 꿈이다.', psychological: '어디로 갈지, 누구와 갈지에 대한 고민이다.' },
+  { symbol: '문', words: ['문을', '문이 안', '문이 잠'], traditional: '열리는 문은 기회, 잠긴 문은 막힌 일이다.', psychological: '새 기회 앞의 기대, 혹은 막혀 있다는 답답함이다.' },
+  { symbol: '열쇠', words: ['열쇠'], traditional: '문제를 풀 실마리를 얻는 꿈이다.', psychological: '해결책을 찾고 싶은 마음이다.' },
+  { symbol: '거울', words: ['거울'], traditional: '자신을 돌아보라는 꿈으로 읽는다.', psychological: '남에게 어떻게 보일지, 내가 누구인지에 대한 생각이다.' },
+  { symbol: '사고', words: ['사고', '교통사고', '부딪'], traditional: '조심하라는 경계로 읽지만 실제 사고를 알려 주는 꿈은 아니다.', psychological: '갑작스러운 변화에 대한 불안, 속도를 늦추라는 마음이다.' },
+  { symbol: '싸움', words: ['싸우', '싸움', '전쟁', '때리'], traditional: '다툼 뒤에 일이 풀리는 꿈으로 읽기도 한다.', psychological: '속에 쌓인 갈등이나 화다.' },
+  { symbol: '귀신', words: ['귀신', '유령', '가위'], traditional: '해결되지 않은 근심으로 읽는다.', psychological: '정체를 모르는 걱정, 피로가 쌓인 상태다.' },
+  { symbol: '벌레', words: ['벌레', '바퀴벌레', '구더기'], traditional: '구더기는 재물로, 다른 벌레는 자잘한 걱정으로 읽는다.', psychological: '신경을 긁는 작은 일들이다.' },
+  { symbol: '쥐', words: ['쥐가', '쥐를'], traditional: '작은 손실이나 뒷말을 조심하라는 꿈이다.', psychological: '사소하지만 계속 신경 쓰이는 일이다.' },
+  { symbol: '새', words: ['새가', '새를', '까치'], traditional: '소식이 오는 꿈이다. 까치는 반가운 소식이다.', psychological: '자유롭고 싶은 마음, 기다리는 연락이다.' },
+  { symbol: '해', words: ['해가', '태양', '일출'], traditional: '성공과 밝은 기운이 들어오는 길몽이다.', psychological: '자신감, 드러나고 싶은 마음이다.' },
+  { symbol: '달', words: ['보름달', '달이', '달을'], traditional: '보름달은 바라던 일이 이뤄지는 꿈이다.', psychological: '감정과 직감, 조용히 바라는 마음이다.' },
+  { symbol: '별', words: ['별이', '별을', '별똥'], traditional: '희망과 좋은 소식의 꿈이다.', psychological: '바라는 꿈, 놓지 않은 기대다.' },
+  { symbol: '무지개', words: ['무지개'], traditional: '좋은 소식과 경사가 오는 꿈이다.', psychological: '힘든 시기 뒤의 기대와 안도다.' },
+  { symbol: '학교', words: ['학교', '교실', '선생님'], traditional: '배울 일이나 지난 일을 다시 돌아보는 꿈이다.', psychological: '평가받던 시절의 압박, 혹은 그리운 시절이다.' },
+  { symbol: '군대', words: ['군대', '입대', '재입대'], traditional: '의무와 규율에 매인 처지로 읽는다.', psychological: '해야만 하는 일에 대한 압박감이다.' },
+  { symbol: '감옥', words: ['감옥', '갇혀', '갇힌'], traditional: '묶인 처지가 곧 풀리는 꿈으로 읽기도 한다.', psychological: '답답함, 벗어나고 싶은 마음이다.' },
+  { symbol: '도둑', words: ['도둑', '훔치', '도난'], traditional: '재물을 조심하라는 꿈이다.', psychological: '무언가를 빼앗길까, 놓칠까 하는 불안이다.' },
+  { symbol: '반지', words: ['반지'], traditional: '약속이나 인연이 맺어지는 꿈이다.', psychological: '관계에 대한 기대나 약속의 무게다.' },
+  { symbol: '과일', words: ['과일', '복숭아', '포도', '감을', '밤을'], traditional: '결실과 재물, 좋은 인연의 꿈이다.', psychological: '노력의 결과를 기다리는 마음이다.' },
+  { symbol: '음식', words: ['밥을', '음식', '먹는 꿈', '먹었'], traditional: '맛있게 먹으면 복이 들어오는 꿈이다.', psychological: '채우고 싶은 무언가, 돌봄을 받고 싶은 마음이다.' },
+  { symbol: '우는 꿈', words: ['울었', '울고', '펑펑'], traditional: '울고 나면 근심이 풀리는 길몽으로 읽는다.', psychological: '참아 둔 감정을 쏟아내고 싶은 마음이다.' },
+  { symbol: '잃어버림', words: ['잃어버', '분실', '찾을 수가 없'], traditional: '소중한 것을 챙기라는 꿈이다.', psychological: '놓칠까 하는 불안, 무언가 빠진 느낌이다.' },
+  { symbol: '고백', words: ['고백'], traditional: '마음을 전할 일이 생기는 꿈이다.', psychological: '드러내고 싶은 마음이다.' },
+  { symbol: '키스', words: ['키스', '뽀뽀'], traditional: '가까워지는 인연의 꿈이다.', psychological: '친밀함과 인정에 대한 바람이다.' },
+  { symbol: '바람피우는 꿈', words: ['바람을 피', '바람피', '외도'], traditional: '관계를 돌아보라는 꿈으로 읽는다. 실제 일을 알려 주는 꿈은 아니다.', psychological: '관계에 대한 불안, 신뢰에 대한 걱정이다.' },
+  { symbol: '부모', words: ['엄마', '아빠', '어머니', '아버지'], traditional: '도움을 받거나 집안일을 챙기라는 꿈이다.', psychological: '보호받고 싶은 마음, 혹은 책임감이다.' },
+  { symbol: '수영', words: ['수영'], traditional: '어려움을 헤쳐 나가는 꿈이다.', psychological: '감정의 흐름에 적응하는 중이다.' },
+  { symbol: '비행기', words: ['비행기', '공항'], traditional: '먼 곳으로 뻗어 가는 일, 큰 이동의 꿈이다.', psychological: '변화나 떠나고 싶은 마음, 목표를 향한 기대다.' },
+  { symbol: '버스·기차', words: ['버스를', '기차를', '지하철'], traditional: '기회를 타거나 놓치는 꿈이다.', psychological: '흐름에 늦을까 하는 걱정이다.' },
+  { symbol: '휴대폰', words: ['핸드폰', '휴대폰', '전화가 안', '연락이 안'], traditional: '소식을 기다리는 꿈이다.', psychological: '연락과 소통에 대한 불안이다.' },
+];
+
+/** The symbols a dream told in the member's words touches, in the list's order and at most `limit`. */
+export function matchLoungeDreamSymbols(text: string, limit = 5): LoungeDreamSymbol[] {
+  const told = text.replace(/\s+/g, ' ');
+  return loungeDreamSymbols.filter(item => item.words.some(word => told.includes(word))).slice(0, limit);
+}
