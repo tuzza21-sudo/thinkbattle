@@ -5,8 +5,8 @@ import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeC
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { alignLoungeProposalEvents, cleanLoungeCompanionReply, effectiveIntimacyStage, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
-import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
-import { computeLoungeSaju } from '../src/lib/loungeSaju';
+import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
+import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
@@ -1021,12 +1021,23 @@ ${photoRule}`;
     if (knowledgeAttempted) console.info('[Lounge knowledge wait]', JSON.stringify({ host: host.id, waitedMs: Math.round(performance.now() - knowledgeWaitStarted) }));
     const knowledgeText = loungeKnowledgePrompt(knowledge);
     if (consult?.interpret) {
-      // A 사주 chart is computed here by code (loungeSaju.ts); a birth that cannot be read is asked for again.
-      const sajuInput = consult.state.module === 'saju' ? loungeConsultSajuInput(consult.state) : undefined;
-      const chart = sajuInput ? (() => { try { return computeLoungeSaju(sajuInput); } catch (error) { console.warn('[Lounge consult] chart not computed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; } })() : undefined;
-      const asked = loungeInterpreterRequest(consult.state, undefined, chart);
+      // A 사주, 궁합, 운세 or 별자리 chart is computed here by code (loungeSaju.ts); a birth that cannot be read is asked for again.
+      const module = consult.state.module;
+      const needsChart = module === 'saju' || module === 'compat' || module === 'fortune' || module === 'zodiac';
+      const chart = !needsChart ? undefined : (() => {
+        try {
+          const state = consult.state, form = loungeConsultFormInput(state);
+          if (module === 'saju') { const input = loungeConsultSajuInput(state); if (!input) return undefined; const made = computeLoungeSaju(input); return { reading: made as unknown, display: made.display, pillars: made.pillars }; }
+          if (!form) return undefined;
+          if (module === 'compat' && 'partner' in form) { const made = computeLoungeCompat(form.me, form.partner); return { reading: made.reading as unknown, display: made.display, partnerChart: made.partnerDisplay }; }
+          if (module === 'fortune' && 'period' in form) { const made = computeLoungeFortune(form.me, form.period); return { reading: made.reading as unknown, display: made.display }; }
+          if (module === 'zodiac') { const made = computeLoungeZodiac(form.me); return { reading: made.reading as unknown, zodiac: made.display }; }
+          return undefined;
+        } catch (error) { console.warn('[Lounge consult] chart not computed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }
+      })();
+      const asked = loungeInterpreterRequest(consult.state, undefined, chart?.reading);
       const readingStarted = performance.now();
-      const reading = consult.state.module === 'saju' && !chart ? undefined : await (async () => {
+      const reading = needsChart && !chart ? undefined : await (async () => {
         try {
           const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
             model: process.env.LOUNGE_READING_MODEL || 'gpt-6-sol', reasoning: { effort: ['low', 'medium'].includes(process.env.LOUNGE_READING_REASONING ?? '') ? process.env.LOUNGE_READING_REASONING : 'none' },
@@ -1037,8 +1048,8 @@ ${photoRule}`;
           return readLoungeReading(JSON.parse(modelOutputText(result) ?? ''));
         } catch (error) { console.warn('[Lounge consult] reading not made', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
       })();
-      consult = withLoungeReading(consult.state, reading, asked.draw, chart?.display);
-      console.info('[Lounge consult]', JSON.stringify({ module: consult.state.module, ms: Math.round(performance.now() - readingStarted), made: Boolean(reading), cards: asked.draw?.map(card => `${card.ko}${card.reversed ? ' 역' : ''}`), pillars: chart?.pillars, safety: reading?.safety }));
+      consult = withLoungeReading(consult.state, reading, asked.draw, chart && 'display' in chart ? chart.display : undefined, { ...(chart && 'partnerChart' in chart ? { partnerChart: chart.partnerChart } : {}), ...(chart && 'zodiac' in chart ? { zodiac: chart.zodiac } : {}) });
+      console.info('[Lounge consult]', JSON.stringify({ module: consult.state.module, ms: Math.round(performance.now() - readingStarted), made: Boolean(reading), cards: asked.draw?.map(card => `${card.ko}${card.reversed ? ' 역' : ''}`), pillars: chart && 'pillars' in chart ? chart.pillars : undefined, safety: reading?.safety }));
     }
     // The model the member chose for a one-to-one room (the fast GPT unless they picked another). A slow model (GPT with
     // reasoning, Gemini Pro) answers chats only; a voice reply uses its faster fallback instead of a long silence.
