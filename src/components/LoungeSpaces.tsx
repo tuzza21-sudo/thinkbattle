@@ -16,6 +16,7 @@ import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } fr
 /** With group rooms closed there are no open tables to fetch. */
 const noTables = async (): Promise<LoungeOpenTable[]> => [];
 import { currentLoungeWait, setLoungeWaitAhead, startLoungeWait, stopLoungeWait, useLoungeWait } from '../lib/loungeWait';
+import { LoungePricing } from './LoungePricing';
 import './LoungeSpaces.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -190,6 +191,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     </section>
     <LoungeNewCast topics={topics} />
     {isSuperAdminUser(user) && <LoungeMemberCast user={user} />}
+    <LoungePricing />
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
     {selected && <LoungeCharacterSheet key={selected.id} character={selected} spaces={spaces} tables={tables}
       onCreate={() => { closeSheet(); setCreating({ host: selected.id }); }} onClose={closeSheet} />}
