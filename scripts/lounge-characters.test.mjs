@@ -246,19 +246,11 @@ test('every part of a companion sheet meant for the model reaches it', () => {
 });
 
 test('서도현 is settled from the start: his own life, no learned manual and no turn engine (2026-11-06)', () => {
-  const { loungeCompanionRules, loungeTurnEngineDirectorNote } = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
   const doHyun = loungeCharacters.find(character => character.id === 'auditor');
   const bible = doHyun.bible;
   const prompt = [loungeBiblePrompt(doHyun), loungeCompanionSheetPrompt(doHyun, 'on')].join('\n');
-  for (const field of ['turnEngine', 'hooks', 'weakSpots', 'materialBank', 'hobbyAnswer', 'relationshipDevice']) assert.equal(bible[field], undefined, field);
   assert.doesNotMatch(prompt, /진공관|메모장|코스를 세 개|플랜 [ABC]|턴 엔진/, 'nothing of the learned manual is left');
   for (const text of [bible.interpretationLens, bible.voice.tone, ...bible.forbidden]) assert.ok(prompt.includes(text), `not sent: ${text.slice(0, 40)}`);
-  // The mechanism stays for a character that has a turn engine; he keeps the shared ending rule.
-  const own = loungeCompanionRules({ ownLength: true, innerVoice: 'on', ownEnding: true });
-  assert.match(own, /턴 엔진\(turnEngine\)대로 매 답을 사용자가 한두 마디로 받아칠 수 있는 미끼로 끝낸다/);
-  assert.doesNotMatch(own, /매 답을 질문으로 끝내지 않는다/);
-  assert.match(loungeCompanionRules({ ownLength: true, innerVoice: 'on' }), /매 답을 질문으로 끝내지 않는다/, 'the others keep the shared rule');
-  assert.match(loungeTurnEngineDirectorNote, /담백을 고르지 않고/);
   // Eight examples across the four stages, each with both forms; an action is a line of its own.
   assert.equal(bible.fewShot.length, 8);
   assert.deepEqual([...new Set(bible.fewShot.map(shot => shot.stage))], [1, 2, 3, 4]);
@@ -266,5 +258,35 @@ test('서도현 is settled from the start: his own life, no learned manual and n
     assert.ok('on' in shot && shot.on.reply && shot.off.reply, shot.user);
     for (const line of shot.on.reply.split('\n')) assert.ok(!line.includes('(') || /^\([^()]+\)$/.test(line), `an action on its own line: ${line}`);
   }
-  for (const character of loungeCharacters) assert.equal(character.bible?.turnEngine, undefined, character.id);
+});
+
+test('a reply ends when it has said its piece: no hooks, forced questions or turn engine for anyone (2026-11-06)', () => {
+  const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
+  for (const innerVoice of ['on', 'off']) {
+    const rules = messenger.loungeCompanionRules({ ownLength: true, innerVoice });
+    assert.match(rules, /할 말을 하고 그대로 끝낸다\. 대화를 이어 가게 하려고 질문, 미끼, 선택지, 다음 제안을 일부러 붙이지 않는다/);
+    assert.match(rules, /"그쪽은요\?"/);
+    assert.doesNotMatch(rules, /턴 엔진|미끼로 끝낸다|무언가 조금 달라졌는가/);
+  }
+  for (const character of loungeCharacters) {
+    for (const field of ['turnEngine', 'hooks', 'weakSpots', 'materialBank', 'hobbyAnswer', 'relationshipDevice']) assert.equal(character.bible?.[field], undefined, `${character.id}.${field}`);
+    const sheet = loungeCompanionSheetPrompt(character, 'on');
+    assert.doesNotMatch(sheet, /턴 엔진|미끼의 종류|끝맺음 방식:/, character.id);
+    if (character.bible?.hookStyle) assert.match(sheet, /대화를 이어 가려고 쓰지 않고, 대부분의 답은 할 말을 하고 그대로 끝난다/, character.id);
+  }
+  // The director no longer picks how a reply ends.
+  assert.equal('ending' in messenger.loungeDirectorSchema.properties, false);
+  assert.match(messenger.loungeDirectorInstructions, /대화를 이어 가려고 질문하기, 되묻기, 선택지 내밀기, 다음 제안을 goal로 정하지 않는다/);
+  assert.equal(messenger.loungeTurnEngineDirectorNote, undefined);
+  // Code keeps two replies in a row from ending on a question.
+  assert.equal(messenger.loungeEndsOnQuestion('(잔을 내려놓는다)\n그럼 다음엔 어디 갈까요?\n(웃는다)'), true);
+  assert.equal(messenger.loungeEndsOnQuestion('그렇군요. 저도 좋아해요.'), false);
+  const base = messenger.normalizeLoungeCompanionState(null, 'r');
+  const asked = messenger.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 4, reply: '주말엔 뭐 하세요?', inner: '' });
+  assert.equal(asked.last_question_turn, 4);
+  assert.equal(messenger.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(asked)), 'r').last_question_turn, 4);
+  const conditions = turn => messenger.loungeTurnConditions({ state: asked, turn, decision: { progress: 'stay' }, innerVoice: 'on' });
+  assert.equal(conditions(5).avoid?.question_ending, true, 'the next reply does not end on a question');
+  assert.equal(conditions(6).avoid?.question_ending, undefined, 'after that it may, when it really asks something');
+  assert.equal(messenger.nextLoungeCompanionState({ state: asked, decision: { progress: 'stay' }, turn: 5, reply: '저는 테니스 쳐요.', inner: '' }).last_question_turn, 4);
 });
