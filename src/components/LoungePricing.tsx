@@ -80,6 +80,11 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   </section>;
 }
 
+/** /lounge/pricing: the plans on a page of their own, linked from the header. */
+export function LoungePricingPage({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest?: () => void }) {
+  return <main className="lounge-lobby lounge-home"><LoungePricing user={user} onLoginRequest={onLoginRequest} /></main>;
+}
+
 type PaymentRecord = { plan: string; amount: number; status: string; period_end: string | null };
 const dateText = (value: string) => new Date(value).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 
