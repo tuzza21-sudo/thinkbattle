@@ -4055,6 +4055,37 @@ test('story helpers keep the current record beside a stored scene without duplic
   }
 });
 
+test('in a plain chat the helpers read the summary, the member, the relationship and the long-term memories', () => {
+  const memory = '지금 장면: 청담 와인바, 저녁\n둘 사이: 사용자가 두 번이나 선수 같다고 놀렸다.';
+  const member = { persona: { call_name: '지수', job: '스타트업 마케터', personality: '장난이 많다', details: '고양이 두 마리' }, note: '천천히 친해지고 싶어요' };
+  const relationship = { metrics: { trust: { score: 40, label: '조심스러움' } }, mood: { curious: 0.7 }, moments: ['처음 웃음이 터졌다'], recent_changes: [{ what: '도발', turns_ago: 1, up: true }] };
+  const analyzer = messengerLib.loungeAnalyzerInput({ character: '서도현', memory, member, relationship, userMemories: [{ ref: 'm1', kind: 'preference', summary: '단 음식을 싫어한다' }], messages: [{ kind: 'human', text: '선수 같아요' }] });
+  assert.equal(analyzer.memory, memory, 'the summary goes without a story');
+  assert.equal(analyzer.scenario, undefined);
+  assert.deepEqual(analyzer.member, member);
+  assert.deepEqual(analyzer.relationship, relationship);
+  assert.deepEqual(analyzer.user_memories, [{ kind: 'preference', summary: '단 음식을 싫어한다' }], 'refs are for the call that writes memories');
+  assert.match(messengerLib.loungeAnalyzerInstructions, /처음인지 되풀이인지/);
+  const director = messengerLib.loungeDirectorInput({ memory, member, messages: [] });
+  assert.equal(director.memory, memory);
+  assert.deepEqual(director.member, member);
+  assert.equal('scene' in director, false, 'no scene, and the summary is not sent twice');
+  const bare = messengerLib.loungeAnalyzerInput({ character: '서도현', memory: '', member: { persona: undefined, note: '  ' }, relationship: { moments: [], recent_changes: [] }, messages: [] });
+  for (const key of ['memory', 'member', 'relationship', 'user_memories']) assert.equal(key in bare, false, `${key} is left out when empty`);
+});
+
+test('the recent changes of a relationship are listed newest first, with their direction', () => {
+  const config = relationshipLib.getRelationshipConfig('auditor');
+  const scored = Object.entries(config.events).find(([, effect]) => Object.values(effect.deltas).some(Boolean));
+  assert.ok(scored, 'the character scores at least one event');
+  const record = { ...relationshipLib.relationshipFromRow(config, undefined), turnCount: 10, recentEvents: [{ type: 'STANDS_GROUND', turn: 4, at: '' }, { type: scored[0], turn: 9, at: '' }] };
+  const changes = relationshipLib.relationshipRecentChanges(record, config);
+  assert.equal(changes[0].turns_ago, 1);
+  assert.equal(changes[0].what, relationshipLib.relationshipEventLabels[scored[0]]);
+  assert.equal(typeof changes[0].up, 'boolean');
+  assert.equal(changes[1].turns_ago, 6);
+});
+
 test('the real reply pipeline shares story constraints with helpers and prioritizes repair over an automatic event', async t => {
   const saved = { analyzer: process.env.LOUNGE_ANALYZER, director: process.env.LOUNGE_DIRECTOR };
   process.env.LOUNGE_ANALYZER = 'on';

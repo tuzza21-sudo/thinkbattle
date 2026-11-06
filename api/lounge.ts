@@ -14,7 +14,7 @@ import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, lo
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, relationshipRecentChanges, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -767,10 +767,19 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const analyzerStarted = performance.now();
     const analyzerRead = companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
         const state = currentRelationshipContext();
+        // The member's words are read on the record of the two, in a plain chat as in a story (2026-11-06): who the member
+        // says they are, the relationship and what moved it lately, and the long-term memories by importance (the reply
+        // ranks them by what was just said, which needs the embedding the analyzer does not wait for). The memory rows
+        // have been read since the start of the request, and the reply waits for them as well.
+        const rows = relationship ? await memoryRowsRead : null;
+        const userMemories = relationship && rows ? selectMemoriesForPrompt(rows, relationship.config.characterId, relationship.now).forPrompt : undefined;
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
           model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: 'lounge-analyzer',
           instructions: [loungeAnalyzerInstructions, loungeContinuityRule].join('\n'),
           input: JSON.stringify(loungeAnalyzerInput({ character: companionCharacter ? `${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}` : host.name, stage: state?.stage.label, scene: companionState.scene, sceneTurns: companionState.scene_turns, memory: String(room.memory ?? ''), scenario,
+            member: { persona: memberPersona, note: scenario?.member_note },
+            relationship: state && relationship ? { metrics: state.metrics, mood: state.mood, moments: state.memories, recent_changes: relationshipRecentChanges(relationship.record, relationship.config) } : undefined,
+            userMemories,
             messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
           text: { format: { type: 'json_schema', name: 'lounge_analyzer', strict: true, schema: loungeAnalyzerSchema } },
         }), undefined, Number(process.env.LOUNGE_ANALYZER_WAIT_MS ?? 3000)), 'openai');
@@ -791,7 +800,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
           instructions: [loungeDirectorInstructions, loungeContinuityRule, `인물 요약: ${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}. ${companionCharacter.tagline}`,
             loungeBiblePrompt(companionCharacter) || `성격: ${companionCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`,
             ...(companionCharacter.bible?.turnEngine ? [loungeTurnEngineDirectorNote] : [])].join('\n'),
-          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, intimacy, explicit, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''), scenario,
+          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, intimacy, explicit, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''), scenario, member: { persona: memberPersona, note: scenario?.member_note },
             messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
           text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
         }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
@@ -1116,6 +1125,9 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
         scenario ? messenger || messengerCall ? `scenario가 있으면 memory는 둘의 대화 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '있었던 일: 둘 사이에 있었던 중요한 일(사건이나 일은 한 줄로만)', '남은 것: 아직 꺼내지 않은 마음, 둘이 한 약속'을 600자 이내로 적는다. 상대에게 되묻기로 한 장난이나 해명 요구(왜 그렇게 말했는지 등)는 숙제가 되므로 남은 것에 적지 않는다. 계약의 유효 상태·기간·비밀과 바뀐 합의, 직전 사건의 결과와 남은 확인 사항을 잡담보다 우선한다. 확인하지 않은 날짜·조항·과거는 만들지 않는다.` : `scenario가 있으면 이 대화는 이야기이고 memory는 그 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '줄거리: 지금까지 일어난 일(중요한 것부터)', '남은 것: 아직 꺼내지 않은 마음이나 풀리지 않은 일', '다음: 곧 벌어질 일'을 600자 이내로 적는다.` : '',
         phoneCall ? `이번 대화는 전화 통화다(phone_call). memory 첫 줄은 '지금 장면: 통화 중 — 각자 있는 곳과 하고 있는 일'로 쓰고, 통화에서 나눈 이야기와 약속을 기록한다. 이 규칙은 위의 '지금 장면' 규칙보다 우선한다.` : '',
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
+        // The member's words are read once (2026-11-06): the events follow the reading the reply was given, so the score
+        // moves the way the character just took them (until then only a proposal was aligned, in code).
+        relationship ? 'reading이 있으면 캐릭터가 답하기 전에 읽어 둔 사용자의 가장 최근 발언의 해석이고, 캐릭터는 그 해석을 보고 답했다. events는 이 해석과 같은 방향으로 판정한다(장난이나 떠보기로 읽은 말을 공격이나 무례로, 여러 가능성이 적힌 말을 그중 가장 나쁜 쪽으로 판정하지 않는다). reading이 recent와 분명히 어긋날 때만 recent를 따른다.' : '',
         relationship && writesMemory ? `user_memories는 이번 답을 쓸 때 보여 준 기억이고 ref로 가리킨다.\n${longMemoryWriteInstructions}${scenario ? `\n${longMemoryStoryWriteInstructions}` : ''}` : '',
         storyEpisode ? loungeStoryCheckpointInstructions : '',
         chatPhotos ? `photo_subject: 방금 답에서 캐릭터가 찍은 사진에 누가 담겼는지다. character는 캐릭터 자신(셀카, 누가 찍어 준 캐릭터의 사진), member는 사용자(캐릭터가 사용자를 찍어 줌), scenery는 사람 없는 풍경이나 물건, none은 사진을 찍는 장면이 없음이다. 사용자가 자기를 찍어 달라고 해서 찍어 준 사진은 member다.
@@ -1125,6 +1137,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         companionStored ? loungeCompanionUpdateInstructions : '',
       ].filter(Boolean).join('\n'),
       input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
+        ...(analysis && relationship ? { reading: loungeReading(analysis) } : {}),
         ...(companionStored && companionState ? { scene: companionState.scene ?? null, self_facts: companionState.self_facts.map(item => item.fact), ...(sceneDecision?.event ? { event: sceneDecision.event.content } : {}) } : {}),
         recent: [...context.recent, (() => { const { reply: said, inner } = splitLoungeInnerVoice(reply); return { kind: 'host', nickname: characterName, text: said, ...(inner ? { inner_voice: inner } : {}) }; })()] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {

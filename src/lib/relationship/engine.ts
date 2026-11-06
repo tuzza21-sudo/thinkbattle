@@ -330,6 +330,17 @@ export function describeTurnChange(log: TurnLog, config: RelationshipConfig): Re
   };
 }
 
+/**
+ * What moved the relationship lately, newest first, with how many turns ago and which way (when the character's config
+ * scores it). Given to the analyzer so a jab said for the third time reads as a pattern, not a first joke (2026-11-06).
+ */
+export function relationshipRecentChanges(record: RelationshipRecord, config: RelationshipConfig, limit = 8) {
+  return record.recentEvents.slice(-limit).reverse().map(item => {
+    const sum = Object.values(config.events[item.type]?.deltas ?? {}).reduce<number>((total, value) => total + (value ?? 0), 0);
+    return { what: relationshipEventLabels[item.type] ?? item.type, turns_ago: Math.max(0, record.turnCount - item.turn), ...(sum ? { up: sum > 0 } : {}) };
+  });
+}
+
 /** How the character addresses the user in a one-to-one room at this stage. */
 export function speechLevel(config: RelationshipConfig, stageId: string): 'polite' | 'casual' {
   if (config.casualFromStart) return 'casual';
