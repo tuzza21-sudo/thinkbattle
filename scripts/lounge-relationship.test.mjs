@@ -280,9 +280,9 @@ test('the thriller director grows by candour and a shared view; jokes help only 
   assert.equal(record.stage, 'SPARRING');
 });
 
-test('the engineer grows on both axes: breaking his manual is the fun, reaching the engineer behind it the depth', () => {
-  // His bible of 2026-11-02: indifference and seeing through his act make him want to win; the real question and care
-  // reach him; flattery and going along with everything only file the member with the others.
+test('the engineer grows on both axes: a conversation with her own view is the fun, caring about the man the depth', () => {
+  // His bible of 2026-11-06: her own view, wit and taste keep him interested; the real question and care reach him;
+  // praising only his conditions and hiding every opinion bore him, and using him costs trust.
   const config = configs.auditor;
   assert.deepEqual(config.stages.map(stage => stage.id), ['FIRST_MEETING', 'WARMING_UP', 'KNOWS_YOUR_MIND', 'MUTUAL_TRUST']);
   assert.deepEqual(config.uniqueMetrics.map(metric => metric.id), ['resonance', 'epistemicHonesty']);
@@ -291,13 +291,14 @@ test('the engineer grows on both axes: breaking his manual is the fun, reaching 
   assert.equal(delta('CALLS_BLUFF').interest, 5);
   assert.equal(delta('ASKS_GOOD_QUESTION').resonance, 4);
   assert.equal(delta('SHOWS_CARE').resonance, 4);
-  for (const type of ['ANSWERS_DIRECTLY', 'MAKES_CHARACTER_ADMIT']) assert.ok(delta(type).epistemicHonesty >= 4, type);
+  assert.ok(delta('ANSWERS_DIRECTLY').epistemicHonesty >= 4);
+  for (const type of ['RAISES_STAKES', 'MAKES_CHARACTER_ADMIT']) assert.ok(!config.mainEvents.includes(type), `${type} is no longer his`);
   assert.deepEqual(delta('FOLDS_EASILY'), { interest: -1 });
   assert.ok(delta('FLATTERS_CHARACTER').interest < 0 && delta('FLATTERS_CHARACTER').trust === undefined, 'flattery bores, it does not cost trust');
   assert.ok(delta('SHOWS_ENTITLEMENT').trust < 0, 'using him costs trust');
   assert.ok(delta('DECEIVES_CHARACTER').epistemicHonesty < 0);
   for (const type of ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'EVADES_QUESTION', 'SEEKS_REASSURANCE_REPEATEDLY']) assert.deepEqual(delta(type), {}, type);
-  assertSegmentPace(config, ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER', 'RAISES_STAKES', 'MAKES_CHARACTER_ADMIT'],
+  assertSegmentPace(config, ['STANDS_GROUND', 'CALLS_BLUFF', 'ANSWERS_DIRECTLY', 'FLIRTS_PLAYFULLY', 'CHALLENGES_CHARACTER'],
     ['ASKS_GOOD_QUESTION', 'SHOWS_CARE', 'REMEMBERS_DETAIL', 'SHARES_FEELING', 'SHOWS_VULNERABILITY']);
   const page = charactersLib.loungeCharacters.find(character => character.id === 'auditor');
   assert.deepEqual([...config.mainEvents].sort(), [...page.wins, ...page.losses].map(move => move.event).sort());
