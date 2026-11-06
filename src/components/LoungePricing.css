@@ -22,3 +22,21 @@
   .lounge-pricing-card { padding:20px 18px 18px; }
   .lounge-pricing-price b { font-size:26px; }
 }
+.lounge-pricing-cta { display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; }
+.lounge-pricing-cta:disabled { opacity:.6; cursor:default; }
+.lounge-pricing-cta.solid { background:var(--l-green); color:#fffaf0; }
+.lounge-pricing-spin { animation:lounge-pricing-spin 1s linear infinite; vertical-align:-2px; }
+@keyframes lounge-pricing-spin { to { transform:rotate(360deg); } }
+.lounge-payment-page { display:flex; flex-direction:column; }
+.lounge-payment-result { width:100%; max-width:440px; margin:72px auto 0; padding:32px 24px; border:1px solid var(--l-line); border-radius:20px; background:var(--l-paper,#fffefb); text-align:center; box-sizing:border-box; }
+.lounge-payment-result h1 { margin:14px 0 8px; font-size:22px; font-weight:800; letter-spacing:-.5px; }
+.lounge-payment-result > p { margin:0; color:var(--l-muted); font-size:14px; line-height:1.6; word-break:keep-all; }
+.lounge-payment-icon.ok { color:var(--l-green); }
+.lounge-payment-icon.fail { color:#b0573f; }
+.lounge-payment-summary { display:grid; gap:10px; margin:20px 0 0; padding:18px 0 0; border-top:1px solid var(--l-line); text-align:left; font-size:14px; }
+.lounge-payment-summary div { display:flex; justify-content:space-between; gap:12px; }
+.lounge-payment-summary dt { color:var(--l-muted); }
+.lounge-payment-summary dd { margin:0; font-weight:700; word-break:break-all; text-align:right; }
+.lounge-payment-actions { display:grid; gap:8px; margin-top:24px; }
+.lounge-payment-result .lounge-pricing-fine { margin-top:16px; }
+@media (max-width:640px) { .lounge-payment-result { margin:32px 16px 0; width:auto; } }

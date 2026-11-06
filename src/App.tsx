@@ -47,6 +47,7 @@ const SimulationHubPage = lazy(async () => ({ default: (await import('./componen
 const SimulationSessionPage = lazy(async () => ({ default: (await import('./components/SimulationSessionPage')).SimulationSessionPage }));
 const PersonalTrainingPage = lazy(async () => ({ default: (await import('./components/PersonalTrainingPage')).PersonalTrainingPage }));
 const LegalPage = lazy(async () => ({ default: (await import('./components/LegalPage')).LegalPage }));
+const LoungePaymentResult = lazy(async () => ({ default: (await import('./components/LoungePricing')).LoungePaymentResult }));
 const LoungePage = lazy(async () => ({ default: (await import('./components/LoungePage')).LoungePage }));
 const LoungePersonaPage = lazy(async () => ({ default: (await import('./components/LoungePersonaPage')).LoungePersonaPage }));
 
@@ -205,6 +206,7 @@ function App() {
         <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/create" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/create/:editId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge/payment" element={<LoungePaymentResult />} />
         <Route path="/lounge/personas" element={<LoungePersonaPage user={user} onLoginRequest={requestLogin} />} />
         <Route path="/lounge/characters/:characterId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
