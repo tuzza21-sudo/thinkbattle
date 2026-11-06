@@ -1,0 +1,24 @@
+.lounge-pricing-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; max-width:760px; margin:0; padding:0; list-style:none; }
+.lounge-pricing-card { display:flex; flex-direction:column; padding:24px 22px 22px; border:1px solid var(--l-line); border-radius:18px; background:var(--l-paper,#fffefb); }
+.lounge-pricing-card.featured { border-color:var(--l-green); box-shadow:0 10px 28px #425c441f; }
+.lounge-pricing-head { display:flex; align-items:center; gap:8px; }
+.lounge-pricing-head strong { font-size:20px; font-weight:800; letter-spacing:-.4px; }
+.lounge-pricing-badge { padding:3px 9px; border-radius:999px; background:var(--l-green); color:#fffaf0; font-size:11px; font-weight:700; }
+.lounge-pricing-tagline { margin:6px 0 0; color:var(--l-muted); font-size:13px; line-height:1.5; word-break:keep-all; }
+.lounge-pricing-price { display:flex; align-items:baseline; gap:6px; margin:18px 0 0; }
+.lounge-pricing-price b { font-size:30px; font-weight:800; letter-spacing:-1px; }
+.lounge-pricing-price span { color:var(--l-muted); font-size:14px; }
+.lounge-pricing-features { display:grid; gap:9px; margin:18px 0 22px; padding:18px 0 0; border-top:1px solid var(--l-line); list-style:none; font-size:14px; }
+.lounge-pricing-features li { display:flex; align-items:center; gap:8px; word-break:keep-all; }
+.lounge-pricing-features svg { flex-shrink:0; color:var(--l-green); }
+.lounge-pricing-cta { margin-top:auto; padding:12px 16px; border:1px solid var(--l-green); border-radius:11px; background:transparent; color:var(--l-green); font:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+.lounge-pricing-card.featured .lounge-pricing-cta { background:var(--l-green); color:#fffaf0; }
+.lounge-pricing-cta:hover { background:#344c37; border-color:#344c37; color:#fffaf0; }
+.lounge-pricing-notice { margin:14px 0 0; color:var(--l-green); font-size:13px; font-weight:700; }
+.lounge-pricing-fine { max-width:760px; margin:14px 0 0; color:var(--l-muted); font-size:12px; line-height:1.7; word-break:keep-all; }
+.lounge-pricing-fine a { color:inherit; }
+@media (max-width:640px) {
+  .lounge-pricing-grid { grid-template-columns:1fr; gap:12px; }
+  .lounge-pricing-card { padding:20px 18px 18px; }
+  .lounge-pricing-price b { font-size:26px; }
+}
