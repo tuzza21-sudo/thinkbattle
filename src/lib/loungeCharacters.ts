@@ -122,23 +122,12 @@ export type LoungeCharacterBible = {
    * intimacy ladder, where the scene may be told directly. Its hard limits hold in every mode.
    */
   adultMode?: LoungeAdultMode;
-  hookStyle?: string;
   /**
-   * The turn engine (서도현, 2026-11-05): the beats every chat reply goes through, the last one a hook the member can answer
-   * in a word, and the rules that hold them. With it the chat's shared ending rule (not every reply ends on a question)
-   * gives way to the engine (loungeCompanionRules `ownEnding`), and the director picks no flat ending.
+   * How the character sometimes ends a reply, in its own way. Told as a habit for now and then, never as a hook to keep
+   * the talk going (2026-11-06: replies kept ending on forced, empty questions; the turn engine of 2026-11-05 that ended
+   * every reply on a hook, and its hooks, weak spots, material bank, hobby answer and running game, were removed).
    */
-  turnEngine?: { beats: readonly string[]; rules: readonly string[] };
-  /** The kinds of hook a reply ends on, turned in rotation. */
-  hooks?: ReadonlyArray<{ type: string; example: string }>;
-  /** Gaps left open on purpose for the member to poke at and tease. */
-  weakSpots?: readonly string[];
-  /** Concrete material, one piece a turn: what was learned (each with its failure), what is really the character's, the boasts. */
-  materialBank?: { studied?: readonly string[]; real?: readonly string[]; brags?: readonly string[] };
-  /** The two-step answer to the set question about hobbies: the rehearsed one breaks off, the real one comes for a trade. */
-  hobbyAnswer?: { rehearsed: string; real: string; rule: string };
-  /** The running game between the two (서도현's 재시험 장부), so that every meeting gives a reason for the next. */
-  relationshipDevice?: { name: string; rule: string };
+  hookStyle?: string;
   /** Moments kept for when the two are close, used once. */
   reservedMoments?: readonly string[];
   /** Things that happen around the two (see decideLoungeScene in loungeMessenger.ts). */
@@ -2522,11 +2511,6 @@ export function loungeBiblePrompt(character?: LoungeCharacter) {
       `유머: ${bible.humor}`,
       ...(bible.humorExamples ? [`웃음이 나는 상황과 방식(정해진 대사가 아니다. 그 상황에서 이렇게 반응한다는 방식만 따르고, 말은 매번 그 자리에 맞게 새로 만든다):${newline}${bible.humorExamples.good.map(line => `- ${line}`).join(newline)}${newline}${bible.humorExamples.bad.map(line => `- 하지 않는 것: ${line}`).join(newline)}`] : []),
       ...(bible.avoidWords?.length ? [`쓰지 않는 말: ${bible.avoidWords.join(', ')}`] : []),
-      ...(bible.weakSpots?.length ? [`빈틈(weakSpots, 상대가 찌르고 놀릴 수 있게 일부러 열어 둔 것이다. 대사와 행동에 자연스럽게 드러내고, 상대가 찌르면 버티다 지는 쪽으로 받는다):${newline}${bible.weakSpots.map(line => `- ${line}`).join(newline)}`] : []),
-      ...(bible.materialBank ? [`재료 창고(materialBank, 한 답에 하나만 꺼내고, recent에서 이미 꺼낸 재료는 상대가 다시 묻기 전까지 되풀이하지 않는다. 문장을 옮기지 말고 재료만 쓴다):${newline}${([['studied', '공부해서 익힌 것과 그 실패담'], ['real', '진짜 자기 것'], ['brags', '흘리는 자랑(숫자는 말하지 않는다)']] as const)
-        .filter(([key]) => bible.materialBank![key]?.length).map(([key, label]) => `${label}:${newline}${bible.materialBank![key]!.map(line => `- ${line}`).join(newline)}`).join(newline)}`] : []),
-      ...(bible.hobbyAnswer ? [`취미를 물을 때(hobbyAnswer): 1단 외운 답 "${bible.hobbyAnswer.rehearsed}" / 2단 진짜 답 "${bible.hobbyAnswer.real}" / ${bible.hobbyAnswer.rule} 이미 진짜 답을 한 대화에서는 1단을 되풀이하지 않는다.`] : []),
-      ...(bible.relationshipDevice ? [`둘 사이의 장치(${bible.relationshipDevice.name}): ${bible.relationshipDevice.rule}`] : []),
       `이럴 때 이렇게 한다:${newline}${bible.reactions.map(item => `- ${item.when} → ${item.then}`).join(newline)}`,
       `호감이 생겨도 갑자기 바뀌지 않는 것: ${bible.invariants.join(' / ')}`,
       `관계가 깊어지며 달라지는 것: ${bible.growth}`,
@@ -2558,9 +2542,7 @@ export function loungeCompanionSheetPrompt(character: LoungeCharacter | undefine
     ...(bible.negotiationTactics?.length ? [`압박의 도구(남에게는 진지하게, 상대에게는 장난으로 쓴다. 한 답에 많아야 하나이고, 최근 답에서 쓴 것은 다시 쓰지 않는다): ${bible.negotiationTactics.join(' / ')}`] : []),
     ...(bible.forbidden?.length ? [`하지 않는 것: ${bible.forbidden.join(' / ')}`] : []),
     ...(bible.intimacyProposal ? [`상대가 더 가까운 관계나 네가 이끄는 놀이를 먼저 제안할 때: 품위 있게 제안하면 ${bible.intimacyProposal.elegant.response} 단계별 결(대사를 옮기지 않는다): ${([1, 2, 3, 4] as const).map(stage => `${stage}단계 ${bible.intimacyProposal!.elegant.byStage[stage]}`).join(' / ')}. 무례하게 요구하면 ${bible.intimacyProposal.crude.response} 이번 턴에 제안이 있으면 turn.intimacy.proposal에 있고, 열린 단계는 turn.intimacy.now다.`] : []),
-    ...(bible.turnEngine ? [`턴 엔진(turnEngine, 모든 답이 이 박자로 간다. 순서는 자연스럽게 섞어도 되지만 마지막은 언제나 미끼다):${newline}${bible.turnEngine.beats.map(line => `- ${line}`).join(newline)}${newline}규칙:${newline}${bible.turnEngine.rules.map(line => `- ${line}`).join(newline)}`] : []),
-    ...(bible.hooks?.length ? [`미끼의 종류(hooks, 돌려 쓴다. 예시는 결만 참고하고 그 자리에 맞는 말로 새로 만든다):${newline}${bible.hooks.map(hook => `- ${hook.type}: ${hook.example}`).join(newline)}`] : []),
-    ...(bible.hookStyle ? [`끝맺음 방식: ${bible.hookStyle}${bible.turnEngine ? '' : ' 매 답에 쓰지 않고, 담백하게 할 말을 하고 끝내는 답이 더 많다.'}`] : []),
+    ...(bible.hookStyle ? [`가끔 보이는 끝맺음 버릇: ${bible.hookStyle} 이건 그 장면이 실제로 그렇게 끝날 때만 나오는 버릇이다. 대화를 이어 가려고 쓰지 않고, 대부분의 답은 할 말을 하고 그대로 끝난다.`] : []),
     ...(bible.engineNote ? [`상대의 반응 읽기: ${bible.engineNote}`] : []),
     ...(bible.reservedMoments?.length ? [`아껴 둔 순간(둘이 충분히 가까워진 뒤 맞는 순간에 한 번씩만 쓴다):${newline}${bible.reservedMoments.map(line => `- ${line}`).join(newline)}`] : []),
     ...(shots.length ? [`좋은 예시(그 장면과 그 단계에서 나온 답이다. 문장을 옮기지 말고 형식, 분량, 결만 참고한다. 예시의 단계가 turn.stage보다 높으면 그 단계의 행동은 아직 하지 않는다${innerVoice === 'on' ? '. 속마음이 필요 없는 턴은 inner_voice를 빈 문자열로 둔다' : ''}):${newline}${shots.map(shot => `[${shot.stage}단계 · ${shot.scene}] 상대: ${shot.user}${newline}${JSON.stringify((turn => ({ ...turn, inner_voice: withoutStars(turn.inner_voice) }))(loungeFewShotTurn(shot, innerVoice)))}`).join(newline)}`] : []),

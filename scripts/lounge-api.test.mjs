@@ -2176,7 +2176,7 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   assert.match(instructions, /거절하거나 불편함을 표현하면 즉시 멈추고 존중한다/);
   assert.match(instructions, /metrics의 점수와 이름\(예: 사로잡힘, 눈을 떼지 못함\)은 참고일 뿐이고/);
   assert.match(instructions, /그 기억 때문에 말투가 상담하듯 순해지지 않는다/);
-  assert.match(instructions, /매 답을 질문으로 끝내지 않는다/);
+  assert.match(instructions, /할 말을 하고 그대로 끝낸다/);
   // Neither the director nor the old star rules are left.
   assert.doesNotMatch(instructions, /direction이 있으면/);
   assert.doesNotMatch(instructions, /거의 모든 답에 별표로 감싼 지문/);
@@ -2371,7 +2371,7 @@ test('the director sets a fast-model chat reply\'s direction beside the analyzer
   process.env.LOUNGE_DIRECTOR = 'auto';
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = saved; });
   const messages = [{ id: 2, user_id: 'host', nickname: '지수', kind: 'human', text: '사진좀 부탁드려요', created_at: '2026-11-01T00:00:00Z' }];
-  const direction = { request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다', ending: '행동' };
+  const direction = { request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다' };
   for (const [works, aiModel] of [[true, undefined], [false, undefined], [true, 'gpt-terra']]) {
     let asked, reply;
     await run(async (url, init) => {
@@ -4146,7 +4146,7 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
         calls.push(body);
         const name = body.text.format.name;
         if (name === 'lounge_analyzer') return modelAnswer(analysis);
-        if (name === 'lounge_director') return modelAnswer({ request: '', quote: '', reaction: '진지하게 듣기', goal: '사용자 질문과 장면 정정에 정확히 답한다', ending: '담백' });
+        if (name === 'lounge_director') return modelAnswer({ request: '', quote: '', reaction: '진지하게 듣기', goal: '사용자 질문과 장면 정정에 정확히 답한다' });
         if (name === 'lounge_after_reply') return modelAnswer({ memory, events: [], memory_ops: [], scene, reaction_type: '진지하게 듣기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
         return modelAnswer({ text: '알겠습니다.', inner_voice: '' });
       }

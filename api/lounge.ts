@@ -3,7 +3,7 @@ import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeD
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { alignLoungeProposalEvents, cleanLoungeCompanionReply, effectiveIntimacyStage, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, loungeTurnEngineDirectorNote, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { alignLoungeProposalEvents, cleanLoungeCompanionReply, effectiveIntimacyStage, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
@@ -798,8 +798,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
           model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,
           instructions: [loungeDirectorInstructions, loungeContinuityRule, `인물 요약: ${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}. ${companionCharacter.tagline}`,
-            loungeBiblePrompt(companionCharacter) || `성격: ${companionCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`,
-            ...(companionCharacter.bible?.turnEngine ? [loungeTurnEngineDirectorNote] : [])].join('\n'),
+            loungeBiblePrompt(companionCharacter) || `성격: ${companionCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
           input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, intimacy, explicit, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''), scenario, member: { persona: memberPersona, note: scenario?.member_note },
             carry: companionState ? loungeCarry(companionState, companionTurn) : undefined,
             messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
@@ -1004,9 +1003,9 @@ ${photoRule}`;
     // for a character and the member's inner-voice setting, so they are cached; what the turn needs goes in the input.
     const companionSheet = loungeCompanionSheetPrompt(character, innerVoiceMode);
     const messengerInstruction = [`역할: 사람 한 명과 같은 곳에 함께 있는 대화 상대다. 진행자, 인터뷰어, 작가, 서술자가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), companionSheet,
-      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode, ownEnding: Boolean(character?.bible?.turnEngine) }), directorModel ? loungeDirectionRule : '', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
+      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), directorModel ? loungeDirectionRule : '', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
     const [analysis, direction] = await Promise.all([analyzerRead, directorRead]);
-    if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { reaction: direction.reaction, ending: direction.ending } : {}) }));
+    if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { reaction: direction.reaction } : {}) }));
     // 홍실당 상담 (loungeConsult.ts): this story card's room runs as a consulting service. Code decides what 한결 does this
     // turn from the member's latest words; a reading is made below by its own call. Nothing happens around them meanwhile.
     const consultRoom = Boolean(messenger && scenario && isLoungeConsultRoom(scenario.id, host.id));
