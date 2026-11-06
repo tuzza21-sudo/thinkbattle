@@ -123,7 +123,7 @@ function RoomCard({ table }: { table: LoungeOpenTable }) {
 }
 
 /** 사석 home: open rooms by place on top, the characters who help conversations below. */
-export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onGuestRequest: () => Promise<void> }) {
+export function LoungeHome({ user, onGuestRequest, onLoginRequest }: { user: AppUser | null; onGuestRequest: () => Promise<void>; onLoginRequest?: () => void }) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -191,7 +191,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     </section>
     <LoungeNewCast topics={topics} />
     {isSuperAdminUser(user) && <LoungeMemberCast user={user} />}
-    <LoungePricing />
+    <LoungePricing user={user} onLoginRequest={onLoginRequest} />
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
     {selected && <LoungeCharacterSheet key={selected.id} character={selected} spaces={spaces} tables={tables}
       onCreate={() => { closeSheet(); setCreating({ host: selected.id }); }} onClose={closeSheet} />}

@@ -2,7 +2,8 @@
   "functions": {
     "api/lounge-interaction.ts": { "maxDuration": 60 },
     "api/lounge-images.ts": { "maxDuration": 300 },
-    "api/lounge-characters.ts": { "maxDuration": 180 }
+    "api/lounge-characters.ts": { "maxDuration": 180 },
+    "api/payments.ts": { "maxDuration": 60 }
   },
   "crons": [
     { "path": "/api/lounge-images", "schedule": "0 3 * * *" }
@@ -19,13 +20,21 @@
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/payments).*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), geolocation=(), microphone=(self)" },
         { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" }
+      ]
+    },
+    {
+      "source": "/api/payments(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
       ]
     },
     {
