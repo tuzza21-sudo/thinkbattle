@@ -4074,6 +4074,30 @@ test('in a plain chat the helpers read the summary, the member, the relationship
   for (const key of ['memory', 'member', 'relationship', 'user_memories']) assert.equal(key in bare, false, `${key} is left out when empty`);
 });
 
+test('a leftover feeling and an intention carry over a few turns, are rewritten after each reply and never shown after a no', () => {
+  const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
+  const decision = { progress: 'stay' };
+  const after = (state, turn, update) => messengerLib.nextLoungeCompanionState({ state, update, decision, turn, reply: '네.', inner: '' });
+  const written = after(base, 5, { lingering: '선수 소리를 세 번 들어 살짝 오기가 생김', next_intent: '왜 자꾸 의심하는지 묻기' });
+  assert.deepEqual(written.lingering, { what: '선수 소리를 세 번 들어 살짝 오기가 생김', turn: 5 });
+  const conditions = (state, turn, sincereRefusal) => messengerLib.loungeTurnConditions({ state, turn, decision, innerVoice: 'on', sincereRefusal });
+  assert.equal(conditions(written, 6).lingering, '선수 소리를 세 번 들어 살짝 오기가 생김');
+  assert.equal(conditions(written, 6).next_intent, '왜 자꾸 의심하는지 묻기');
+  assert.equal(conditions(written, 6, true).lingering, undefined, 'a sincere no is not met with a leftover feeling');
+  assert.equal(conditions(written, 6, true).next_intent, undefined);
+  const failed = after(written, 6, undefined);
+  assert.deepEqual(failed.lingering, written.lingering, 'without the call after the reply the last one stays');
+  assert.equal(conditions(failed, 9).lingering, undefined, 'and is let go after a few turns');
+  const resolved = after(written, 6, { lingering: '', next_intent: '' });
+  assert.equal(resolved.lingering, undefined, 'an empty line lets it go');
+  assert.equal(resolved.next_intent, undefined);
+  assert.deepEqual(messengerLib.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(written)), 'room-1').next_intent, written.next_intent);
+  assert.equal(messengerLib.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(written)), 'room-2').lingering, undefined, 'a new room starts without it');
+  for (const field of ['lingering', 'next_intent']) assert.ok(messengerLib.loungeCompanionUpdateFields.includes(field));
+  assert.deepEqual(messengerLib.loungeDirectorInput({ memory: '', carry: messengerLib.loungeCarry(written, 6), messages: [] }).carry, { lingering: written.lingering.what, next_intent: written.next_intent.what });
+  assert.equal('carry' in messengerLib.loungeDirectorInput({ memory: '', carry: messengerLib.loungeCarry(written, 20), messages: [] }), false);
+});
+
 test('the recent changes of a relationship are listed newest first, with their direction', () => {
   const config = relationshipLib.getRelationshipConfig('auditor');
   const scored = Object.entries(config.events).find(([, effect]) => Object.values(effect.deltas).some(Boolean));
