@@ -2300,7 +2300,7 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
   delete process.env.LOUNGE_ANALYZER;
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ANALYZER; else process.env.LOUNGE_ANALYZER = saved; });
   const messages = [{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '여기 다 먹었으니까 분식집 가요!', created_at: '2026-11-01T00:00:00Z' }];
-  const analysis = { user_tone: '장난', subtext: '더 편한 곳에서 이어 가고 싶다', quote_hook: '', user_action: '', request: '분식집 가자', references_memory: '', emotional_need: '함께하기', scene_change_request: '분식집 가자', activity_finished: true, topic_stale: false, is_emotional_moment: false };
+  const analysis = { subtext: '더 편한 곳에서 이어 가고 싶다', quote_hook: '', user_action: '', request: '분식집 가자', references_memory: '', scene_change_request: '분식집 가자', activity_finished: true, topic_stale: false, is_emotional_moment: false };
   const stored = { room_id: roomId, scene: { location: '오마카세 카운터', scene_type: '식당', activity: '디저트 먹는 중', time_of_day: '저녁', season: '초겨울', objects: ['녹차 아이스크림'] }, scene_turns: 3, event_turns: {}, used_events: [], reactions: ['당황하기', '당황하기'], phrases: ['반응 데이터'], anchors: ['와인잔을 돌린다'], inner: [], shared: [], self_facts: [{ fact: '오마카세는 두 달 기다려 예약함', turn: 1 }] };
   for (const [works, aiModel] of [[true, undefined], [true, 'gpt-terra'], [false, undefined]]) {
     let asked, reply, after, written;
@@ -2371,7 +2371,7 @@ test('the director sets a fast-model chat reply\'s direction beside the analyzer
   process.env.LOUNGE_DIRECTOR = 'auto';
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = saved; });
   const messages = [{ id: 2, user_id: 'host', nickname: '지수', kind: 'human', text: '사진좀 부탁드려요', created_at: '2026-11-01T00:00:00Z' }];
-  const direction = { tone: '장난', request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다', ending: '행동' };
+  const direction = { request: '사용자 자신을 사진으로 찍어 달라', quote: '', reaction: '제안하기', goal: '자리를 잡아 주고 빛과 포즈를 정해 찍는다', ending: '행동' };
   for (const [works, aiModel] of [[true, undefined], [false, undefined], [true, 'gpt-terra']]) {
     let asked, reply;
     await run(async (url, init) => {
@@ -2422,7 +2422,7 @@ test('선우령: a graceful proposal opens her intimacy ladder one step in that 
   assert.match(asked(base, 3, 'crude').intimacy.proposal, /그렇게 묻는 사람한테는 안 열어요/);
   assert.equal(asked(base, 3, 'elegant', { sincereRefusal: true }).intimacy.now, bible.intimacyLadder[1], 'a sincere no comes first');
   assert.deepEqual(messengerLib.effectiveIntimacyStage({ state: base, stage: 4, turn: 3, proposal: 'elegant' }), { level: 4, opensNow: false }, 'four is the top');
-  assert.equal(messengerLib.readLoungeAnalysis({ user_tone: '도발', emotional_need: '티키타카' }).intimacy_proposal, 'none');
+  assert.equal(messengerLib.readLoungeAnalysis({ subtext: '' }).intimacy_proposal, 'none');
   assert.match(messengerLib.loungeAnalyzerInstructions, /캐릭터의 초대가 없었어도 사용자가 먼저 품위 있게 제안하면 elegant/);
   assert.match(relationshipLib.relationshipEventCatalog.MAKES_BOLD_MOVE.description, /초대가 없었더라도/);
   // The scored event follows the analyzer's reading.
@@ -2458,7 +2458,7 @@ test('선우령 through the handler: a graceful proposal opens the step in the r
   const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
   const scene = { location: '호텔 라운지 바 끝자리', scene_type: '바', activity: '샴페인 한 잔', time_of_day: '밤', season: '', objects: ['샴페인 잔'] };
   const stored = { room_id: roomId, scene, scene_turns: 2, event_turns: {}, used_events: [], reactions: [], phrases: [], anchors: [], inner: [], shared: [], self_facts: [] };
-  const calm = { user_tone: '도발', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '티키타카', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false };
+  const calm = { subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false };
   // The call after the reply gets it wrong on purpose: the analyzer's reading wins.
   for (const [proposal, updaterEvents, text] of [['elegant', [], '령 씨가 리드하는 거, 한번 겪어 보고 싶은데요'], ['crude', [{ type: 'MAKES_BOLD_MOVE', confidence: 0.9, note: '' }], '몸매 좋네요. 오늘 밤 어때요']]) {
     let reply, written, relationshipSaved;
@@ -2805,7 +2805,7 @@ test('cache: two chat turns in a row share the whole fixed part, and only the tu
       }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
       return { instructions: reply.instructions, input: JSON.parse(reply.input), key: reply.prompt_cache_key };
     };
-    const calm = { user_tone: '도발', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '티키타카', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
+    const calm = { subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
     const human = (id, text) => ({ id, user_id: 'user-1', nickname: '지수', kind: 'human', text, created_at: '2026-11-02T00:00:00Z' });
     const hostSaid = (id, text) => ({ id, user_id: null, nickname: '령', kind: 'host', text, created_at: '2026-11-02T00:00:00Z' });
     const first = await capture({ turns: 9, memory: '지금 장면: 호텔 라운지 바', state: base, messages: [human(2, '오늘 뭐 마셔요?')], analysis: { ...calm, subtext: '가볍게 말을 건다', quote_hook: '뭐 마셔요' } });
@@ -2860,7 +2860,7 @@ test('what changes at a stage is told one turn in three, and its sample lines wi
 
 test('the scene moves only when the member asks or the activity is over, and an event comes rarely, never in a serious moment', () => {
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
-  const calm = { user_tone: '담백', subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', emotional_need: '관심', scene_change_request: '', activity_finished: false, topic_stale: true, is_emotional_moment: false };
+  const calm = { subtext: '', quote_hook: '', user_action: '', request: '', references_memory: '', scene_change_request: '', activity_finished: false, topic_stale: true, is_emotional_moment: false };
   const events = [{ id: 'once', minStage: 1, content: '비가 온다', purpose: '우산' }, { id: 'later', minStage: 3, content: '늦게', purpose: '' }, { id: 'indoor', minStage: 1, sceneTypes: ['식당'], content: '소믈리에', purpose: '', repeatable: true, cooldown: 30 }];
   const decide = (state, analysis, extra = {}) => messengerLib.decideLoungeScene({ state, analysis, stage: 1, events, memory: '', turn: 20, random: () => 0, ...extra });
   assert.equal(decide(base, { ...calm, scene_change_request: '카페 가자' }).progress, 'transition');
@@ -4074,7 +4074,7 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
     const scene = { location: host === 'closer' ? '가족 식탁' : '차 안', scene_type: host === 'closer' ? '집' : '이동', activity: '이야기', time_of_day: host === 'closer' ? '저녁' : '밤', season: '', objects: [] };
     const state = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), scene, scene_turns: 18 };
     const row = { ...velvetRow, character_id: host, stage: config.stages[0].id, scores: relationshipLib.createRelationship(config).scores };
-    const analysis = { user_tone: '진지', subtext: '', quote_hook: '', user_action: '', request: '질문 또는 정정에 답하기', references_memory: '', emotional_need: '정보', scene_change_request: host === 'diplomat' ? '다음 날 점심 국밥집' : '', activity_finished: false, topic_stale: true, is_emotional_moment: false, is_repair_request: host === 'diplomat', is_sincere_refusal: false, intimacy_proposal: 'none' };
+    const analysis = { subtext: '', quote_hook: '', user_action: '', request: '질문 또는 정정에 답하기', references_memory: '', scene_change_request: host === 'diplomat' ? '다음 날 점심 국밥집' : '', activity_finished: false, topic_stale: true, is_emotional_moment: false, is_repair_request: host === 'diplomat', is_sincere_refusal: false, intimacy_proposal: 'none' };
     const calls = [];
     await withServiceKey(() => run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1' });
@@ -4091,7 +4091,7 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
         calls.push(body);
         const name = body.text.format.name;
         if (name === 'lounge_analyzer') return modelAnswer(analysis);
-        if (name === 'lounge_director') return modelAnswer({ tone: '진지', request: '', quote: '', reaction: '진지하게 듣기', goal: '사용자 질문과 장면 정정에 정확히 답한다', ending: '담백' });
+        if (name === 'lounge_director') return modelAnswer({ request: '', quote: '', reaction: '진지하게 듣기', goal: '사용자 질문과 장면 정정에 정확히 답한다', ending: '담백' });
         if (name === 'lounge_after_reply') return modelAnswer({ memory, events: [], memory_ops: [], scene, reaction_type: '진지하게 듣기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
         return modelAnswer({ text: '알겠습니다.', inner_voice: '' });
       }
