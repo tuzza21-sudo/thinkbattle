@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { listLoungeUsage, type LoungeUsageMember } from '../lib/superAdmin';
-import { loungeCallDuration, loungeCallMinutes, loungeFreeCallMinutesDefault } from '../lib/loungePlans';
+import { loungeCallDuration, loungeCallMinutes, loungeFreeCallMinutesDefault, loungeTesterCallMinutesDefault } from '../lib/loungePlans';
 
 const planLabel = { plus: 'Plus', pro: 'Pro' } as const;
 const number = (value: number) => value.toLocaleString('ko-KR');
@@ -42,7 +42,7 @@ export const LoungeAdminUsage = () => {
     </div>
     <p className="admin-lead">
       통화는 연결된 시간을 서버가 30초마다 세어 분으로 보여 주고, 크레딧은 프리미엄 목소리(ElevenLabs·Typecast)로 말한 글자 수입니다(한 글자에 1크레딧).
-      한도는 Plus {loungeCallMinutes.plus}분, Pro {loungeCallMinutes.pro}분, 이용권이 없으면 {loungeFreeCallMinutesDefault}분(설정으로 바꿀 수 있음)이며, 서버에서 LOUNGE_CALL_LIMITS=on일 때만 적용됩니다.
+      한도는 Plus {loungeCallMinutes.plus}분, Pro {loungeCallMinutes.pro}분이고, 이용권이 없는 새 회원은 {loungeFreeCallMinutesDefault}분, 베타테스터는 {loungeTesterCallMinutesDefault}분입니다(각각 LOUNGE_FREE_CALL_MINUTES, LOUNGE_TESTER_CALL_MINUTES로 바꿀 수 있음). 슈퍼 관리자와 한도가 생기기 전에 가입한 이용권 없는 회원은 무제한이고, 서버에서 LOUNGE_CALL_LIMITS=off이면 아무도 제한하지 않습니다.
     </p>
     {error && <div className="super-admin-notice error" role="alert">{error}</div>}
     {members && <p className="admin-lead"><b>{month.slice(0, 7)}</b> · 이용 회원 {number(members.length)}명 · 통화 합계 <b>{loungeCallDuration(total.seconds)}</b> · 크레딧 합계 <b>{number(total.credits)}</b></p>}
@@ -50,12 +50,12 @@ export const LoungeAdminUsage = () => {
       <table className="super-admin-table">
         <thead><tr>{['닉네임', '이메일', '요금제', '통화(분·초)', '한도(분)', '크레딧'].map(label => <th key={label}>{label}</th>)}</tr></thead>
         <tbody>{shown.map(member => {
-          const limit = member.plan ? loungeCallMinutes[member.plan] : loungeFreeCallMinutesDefault;
+          const limit = member.exempt ? null : member.plan ? loungeCallMinutes[member.plan] : member.tester ? loungeTesterCallMinutesDefault : loungeFreeCallMinutesDefault;
           return <tr key={member.user_id}>
             <td>{member.nickname || '—'}</td><td>{member.email || '—'}</td>
-            <td>{member.plan ? planLabel[member.plan] : '무료'}</td>
-            <td style={{ fontVariantNumeric: 'tabular-nums', ...(member.seconds >= limit * 60 ? { color: '#c0392b', fontWeight: 700 } : {}) }}>{loungeCallDuration(member.seconds)}</td>
-            <td style={{ fontVariantNumeric: 'tabular-nums' }}>{limit}</td>
+            <td>{member.plan ? planLabel[member.plan] : member.tester ? '베타테스터' : '무료'}</td>
+            <td style={{ fontVariantNumeric: 'tabular-nums', ...(limit !== null && member.seconds >= limit * 60 ? { color: '#c0392b', fontWeight: 700 } : {}) }}>{loungeCallDuration(member.seconds)}</td>
+            <td style={{ fontVariantNumeric: 'tabular-nums' }}>{limit ?? '무제한'}</td>
             <td style={{ fontVariantNumeric: 'tabular-nums' }}>{number(member.credits)}</td>
           </tr>;
         })}</tbody>

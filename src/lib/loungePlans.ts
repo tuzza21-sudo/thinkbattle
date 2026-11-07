@@ -16,17 +16,24 @@ export const loungePlans: LoungePlan[] = [
 
 /**
  * Minutes of voice calls a month (the month in Korea), counted as the time spent in calls, not as characters spoken.
- * A member with no plan has LOUNGE_FREE_CALL_MINUTES (10 when unset). The limit is only applied when
- * LOUNGE_CALL_LIMITS=on; before that calls are timed and shown but never stopped.
+ * A member with no plan has LOUNGE_FREE_CALL_MINUTES (5 when unset), but only one who signed up after the limit began
+ * (lounge_call_limits.applies_from); a beta tester has LOUNGE_TESTER_CALL_MINUTES (30); the earlier members and the super
+ * admin have no limit (lounge_call_exempt in the database). The limit is applied unless LOUNGE_CALL_LIMITS=off.
  */
 export const loungeCallMinutes: Record<LoungePlanId, number> = { plus: 60, pro: 120 };
-export const loungeFreeCallMinutesDefault = 10;
-export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>) {
+export const loungeFreeCallMinutesDefault = 5;
+/** A beta tester without a plan: 30 minutes a month (LOUNGE_TESTER_CALL_MINUTES). */
+export const loungeTesterCallMinutesDefault = 30;
+export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>, tester = false) {
   if (plan === 'plus' || plan === 'pro') return loungeCallMinutes[plan];
+  if (tester) {
+    const value = Number(env.LOUNGE_TESTER_CALL_MINUTES);
+    return env.LOUNGE_TESTER_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeTesterCallMinutesDefault;
+  }
   const value = Number(env.LOUNGE_FREE_CALL_MINUTES);
   return env.LOUNGE_FREE_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeFreeCallMinutesDefault;
 }
-export const loungeCallLimitsOn = (env: Record<string, string | undefined>) => env.LOUNGE_CALL_LIMITS === 'on';
+export const loungeCallLimitsOn = (env: Record<string, string | undefined>) => env.LOUNGE_CALL_LIMITS !== 'off';
 
 /** Seconds as the call time is told: "12분 34초". */
 export const loungeCallDuration = (seconds: number) => { const total = Math.max(0, Math.floor(seconds)); return `${Math.floor(total / 60)}분 ${total % 60}초`; };
@@ -34,10 +41,10 @@ export const loungeCallDuration = (seconds: number) => { const total = Math.max(
  * The line on the call screen: the time spent in calls this month, counted to the second and told as minutes and seconds,
  * against the plan's minutes when there is one (or a limit in force). `extraSeconds` is the time since the server's count.
  */
-export function loungeCallAllowanceText(call?: { usedSeconds: number; limitMinutes: number; plan: unknown; enforced: boolean } | null, extraSeconds = 0) {
+export function loungeCallAllowanceText(call?: { usedSeconds: number; limitMinutes: number | null; plan: unknown; enforced: boolean } | null, extraSeconds = 0) {
   if (!call) return '';
   const used = loungeCallDuration(call.usedSeconds + extraSeconds);
-  return call.plan || call.enforced ? `이번 달 통화 ${used} / ${call.limitMinutes}분` : `이번 달 통화 ${used}`;
+  return call.limitMinutes !== null && (call.plan || call.enforced) ? `이번 달 통화 ${used} / ${call.limitMinutes}분` : `이번 달 통화 ${used}`;
 }
 
 export const getLoungePlan = (id: unknown) => loungePlans.find(plan => plan.id === id);

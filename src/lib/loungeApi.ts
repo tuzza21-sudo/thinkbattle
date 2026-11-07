@@ -386,7 +386,7 @@ export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'top
 /** What a member has left in each premium voice engine this month (characters), from the server. */
 export type LoungeSpeechUsage = Record<string, { available: boolean; member: boolean; allowed: boolean; used: number; left: number; limit: number; unavailable?: boolean; reason?: 'member' | 'total' }>;
 /** The month's time in voice calls, by the minutes actually spent (not characters), and what the plan allows. */
-export type LoungeCallUsage = { usedSeconds: number; limitMinutes: number; plan: 'plus' | 'pro' | null; enforced: boolean; exhausted: boolean };
+export type LoungeCallUsage = { usedSeconds: number; limitMinutes: number | null; plan: 'plus' | 'pro' | null; enforced: boolean; exhausted: boolean; unlimited?: boolean; tester?: boolean };
 export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage; call?: LoungeCallUsage | null }>;
 /** One tick of a voice call, every 30 seconds while it is connected (`start` for the first of a call): the server adds the time. */
 export const tickLoungeCall = (roomId: string, start = false) => apiRequest({ action: 'call-tick', roomId, ...(start ? { start: true } : {}) }) as Promise<{ call?: LoungeCallUsage | null }>;
