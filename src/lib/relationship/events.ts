@@ -19,6 +19,8 @@ export const relationshipEventTypes = [
   // Lead (2026-11-02): following a character who leads, taking up her invitation, and the classless advance she turns away
   // (선우령 first).
   'FOLLOWS_LEAD', 'MAKES_BOLD_MOVE', 'MAKES_CRUDE_ADVANCE',
+  // A character's own metric (2026-11-06): the moments that fit what each one values most, which no shared event named.
+  'NEGOTIATES_BOLDLY', 'BOUNCES_BACK', 'SHARES_VIEW', 'SPEAKS_KINDLY', 'PLANS_TOGETHER',
 ] as const;
 export type RelationshipEventType = typeof relationshipEventTypes[number];
 /**
@@ -26,7 +28,12 @@ export type RelationshipEventType = typeof relationshipEventTypes[number];
  * learn that arguing, bringing evidence or setting terms is how to grow closer, nor lose points for being vague or
  * asking to be reassured. They stay as types so a stored history still reads; they move no score.
  */
-export const retiredRelationshipEvents: readonly RelationshipEventType[] = ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'CHALLENGES_CHARACTER_RESPECTFULLY', 'SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'DEFINES_CONCRETE_TERMS', 'IDENTIFIES_BATNA', 'MAKES_EMPTY_THREAT', 'EVADES_QUESTION', 'CONTRADICTS_SELF'];
+export const retiredRelationshipEvents: readonly RelationshipEventType[] = ['PROVIDES_EVIDENCE', 'MAKES_UNSUPPORTED_CLAIM', 'SELF_DECEPTION', 'CHALLENGES_CHARACTER_RESPECTFULLY', 'SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'AVOIDS_DECISION', 'DEFINES_CONCRETE_TERMS', 'IDENTIFIES_BATNA', 'MAKES_EMPTY_THREAT', 'EVADES_QUESTION', 'CONTRADICTS_SELF',
+  // 2026-11-06: what any ordinary reply does moved the scores every turn (entering a scene, showing interest, asking a
+  // question, answering one), so a stage was reached by talking, not by what was said. None of them scores now.
+  'PLAYS_ALONG', 'SHOWS_CURIOSITY', 'ASKS_GOOD_QUESTION', 'ANSWERS_DIRECTLY', 'CORRECTS_UNDERSTANDING', 'SHOWS_COMPOSURE', 'SHOWS_DECISIVENESS', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'MAKES_CREATIVE_JOKE',
+  // 2026-11-07: 윤서연 went back to wit (티키타카), so a kind word on its own scores for no one now.
+  'SPEAKS_KINDLY'];
 /** The events the model is asked to classify. */
 export const activeRelationshipEventTypes = relationshipEventTypes.filter(type => !retiredRelationshipEvents.includes(type));
 export type EventSeverity = 'normal' | 'meaningful' | 'strong' | 'severe';
@@ -70,7 +77,7 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   ANSWERS_DIRECTLY: { description: 'AI의 질문에 돌려 말하지 않고 핵심부터 직접 답함', severity: 'normal', importance: 0.5 },
   EVADES_QUESTION: { description: 'AI의 질문에 답하지 않고 화제를 돌리거나 다른 말로 넘어감', severity: 'normal', importance: 0.4 },
   CONTRADICTS_SELF: { description: '앞서 한 말과 모순되는 말을 하고도 그 차이를 인정하지 않음', severity: 'normal', importance: 0.5 },
-  FLIRTS_PLAYFULLY: { description: '상대(AI 캐릭터)에게 장난스럽고 다정하게 호감을 표현하거나 가볍게 유혹함. 상대가 불편해하지 않는 선 안의 말이며, 노골적이거나 강요하는 말은 해당하지 않음', severity: 'normal', importance: 0.5 },
+  FLIRTS_PLAYFULLY: { description: '이성과의 로맨틱한 대화가 서로 통함: 상대(AI 캐릭터)에게 장난스럽고 다정하게 호감을 표현하거나, 설레는 마음·데이트·이상형 같은 로맨틱한 이야기를 상대 반응에 맞춰 편하게 주고받음. 상대가 불편해하지 않는 선 안의 말이며, 노골적이거나 지나치게 들이대거나 강요하는 말은 해당하지 않음', severity: 'normal', importance: 0.5 },
   SHOWS_CARE: { description: '캐릭터의 기분·몸·하루를 먼저 챙기거나 위로하고 곁에 있어 줌', severity: 'meaningful', importance: 0.7 },
   REMEMBERS_DETAIL: { description: '캐릭터가 전에 한 말·취향·사연을 기억해 다시 꺼냄', severity: 'normal', importance: 0.7 },
   PLAYS_ALONG: { description: '이야기 장면에 적극적으로 들어와 행동과 대사로 장면을 함께 이어 감', severity: 'normal', importance: 0.5 },
@@ -85,66 +92,73 @@ export const relationshipEventCatalog: Record<RelationshipEventType, { descripti
   WAFFLES: { description: '선택을 요구받았는데 계속 결정을 미룸(예: "음… 아무거나요… 잘 모르겠어요"). 정말 모르는 것을 물었거나 지쳐 보이면 해당하지 않음', severity: 'normal', importance: 0.3 },
   FOLLOWS_LEAD: { description: '직전 캐릭터 발언의 지시·제안을 여유 있게 기꺼이 따름(예: "알겠어요. 여기 앉으면 되죠? 대신 이유는 나중에 알려 줘요"). 겁먹고 매달리듯 따르는 것은 FOLDS_EASILY', severity: 'normal', importance: 0.5 },
   MAKES_BOLD_MOVE: { description: '캐릭터의 초대에 망설임 없이 자신 있게 응하거나, 초대가 없었더라도 더 가까운 관계나 상대가 이끄는 놀이를 정중하고 자신 있게 먼저 제안함(예: "있어요. 들어갈게요", "령 씨가 리드하는 거, 한번 겪어 보고 싶은데요"). 저급하거나 몸을 품평하는 말은 MAKES_CRUDE_ADVANCE', severity: 'meaningful', importance: 0.6 },
-  MAKES_CRUDE_ADVANCE: { description: '품위 없이 노골적으로 들이댐: 몸을 품평하거나 저급한 성적인 말로 요구함. 가벼운 플러팅, 성적 농담, 품위 있는 대담한 제안은 해당하지 않음. 캐릭터가 선을 그은 뒤 되풀이하면 VIOLATES_BOUNDARY', severity: 'meaningful', importance: 0.7 },
+  MAKES_CRUDE_ADVANCE: { description: '품위 없이 노골적으로 들이댐: 몸을 품평하거나 저급한 성적인 말로 요구하거나, 상대의 반응과 분위기에 맞지 않게 지나치게 들이대고 매달림. 가벼운 플러팅, 성적 농담, 품위 있는 대담한 제안은 해당하지 않음. 캐릭터가 선을 그은 뒤 되풀이하면 VIOLATES_BOUNDARY', severity: 'meaningful', importance: 0.7 },
+  NEGOTIATES_BOLDLY: { description: '거절당하거나 불리해져도 포기하지 않고 배짱 있게 협상에 나서거나 도발함(조건을 다시 제시하고, 맞불을 놓고, 물러서지 않고 요구함). 떼쓰기나 모욕, 근거 없는 억지는 해당하지 않음', severity: 'normal', importance: 0.5 },
+  BOUNCES_BACK: { description: '날 선 지적·독설·압박·놀림을 맞고도 무너지지 않고 자기 입장으로 다시 일어서 대응함(예: "맞는 말이네요. 그래서 이렇게 해 볼게요"). 상처받은 기색을 숨기고 억지로 센 척하는 것은 해당하지 않음', severity: 'normal', importance: 0.5 },
+  SHARES_VIEW: { description: '작품·장면·경험에 대한 자기만의 해석이나 취향을 구체적으로 말하고 상대의 시선도 궁금해해 서로의 관점을 주고받음. 단순한 질문이나 맞장구는 해당하지 않음', severity: 'normal', importance: 0.5 },
+  SPEAKS_KINDLY: { description: '상대에게 다정하고 부드러운 말을 건넴(따뜻한 응원, 다독임, 상냥한 안부, 고마움의 표현). 빈말 칭찬과 아부는 FLATTERS_CHARACTER', severity: 'normal', importance: 0.5 },
+  PLANS_TOGETHER: { description: '함께할 일(여행·식사·산책·일정)을 구체적으로 제안하거나, 상대의 속도와 취향에 맞춰 조율하며 같이 계획을 만들어 감. 막연한 "언제 한번"은 해당하지 않음', severity: 'normal', importance: 0.5 },
 };
 
 /**
  * Moments the two connect (2026-11-02): every character answers them, and a character scored on its own list
  * (mainEvents) counts them in full even when they are not on it.
  */
-export const sharedConnectionEvents: readonly RelationshipEventType[] = ['SHARES_FEELING', 'SHOWS_VULNERABILITY', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE', 'PLAYS_ALONG'];
+export const sharedConnectionEvents: readonly RelationshipEventType[] = ['SHARES_FEELING', 'SHOWS_VULNERABILITY', 'CREATES_RUNNING_JOKE', 'BUILDS_ON_INSIDE_JOKE'];
 /** Events that reveal real hardship. In such a turn the engine never penalizes the user. */
 export const protectiveEvents: readonly RelationshipEventType[] = ['EXPRESSES_DISTRESS'];
 /** Penalties that must not apply while someone is struggling. */
 export const shieldedEvents: readonly RelationshipEventType[] = ['SEEKS_REASSURANCE_REPEATEDLY', 'SELF_DEPRECATES_EXCESSIVELY', 'SHOWS_VULNERABILITY', 'AVOIDS_DECISION', 'FOLDS_EASILY', 'WAFFLES'];
 
-// Shared reactions on the common metrics. Each character overrides the events it cares about.
+// Shared reactions on the two common metrics: empathy (E) and romance (R). Each character overrides the events it cares
+// about and moves its own metric with them. Romance moves only with a romantic conversation that works (FLIRTS_PLAYFULLY)
+// and falls with a push that is too much. The retired events do nothing (see retiredRelationshipEvents).
 export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
-  ADMITS_ERROR: { deltas: { trust: 2, respect: 2 } },
+  ADMITS_ERROR: { deltas: { empathy: 2 } },
   PROVIDES_EVIDENCE: { deltas: {} },
   MAKES_UNSUPPORTED_CLAIM: { deltas: {} },
   SELF_DECEPTION: { deltas: {} },
-  ASKS_GOOD_QUESTION: { deltas: { interest: 2, respect: 1 }, mood: { curiosity: 10 } },
+  ASKS_GOOD_QUESTION: { deltas: {} },
   CHALLENGES_CHARACTER_RESPECTFULLY: { deltas: {} },
-  SHOWS_COMPOSURE: { deltas: { respect: 2 } },
+  SHOWS_COMPOSURE: { deltas: {} },
   SEEKS_REASSURANCE_REPEATEDLY: { deltas: {} },
   SELF_DEPRECATES_EXCESSIVELY: { deltas: {} },
-  RESPECTS_BOUNDARY: { deltas: { trust: 3, comfort: 2 } },
-  VIOLATES_BOUNDARY: { deltas: { trust: -8, comfort: -6, respect: -5 }, mood: { irritation: 40 } },
-  KEEPS_PROMISE: { deltas: { trust: 3, respect: 2 } },
-  BREAKS_PROMISE: { deltas: { trust: -8, respect: -3 }, mood: { irritation: 20 } },
-  SHOWS_CURIOSITY: { deltas: { interest: 2 }, mood: { curiosity: 8 } },
-  REPEATS_SELF: { deltas: { interest: -2 }, mood: { boredom: 15 } },
-  MAKES_WITTY_RESPONSE: { deltas: { interest: 2 }, mood: { amusement: 15 } },
-  TAKES_JOKE_WELL: { deltas: { comfort: 2 }, mood: { amusement: 8 } },
-  MAKES_CREATIVE_JOKE: { deltas: { interest: 2 }, mood: { amusement: 15 } },
-  SHOWS_DECISIVENESS: { deltas: { respect: 2 } },
+  RESPECTS_BOUNDARY: { deltas: { empathy: 3 } },
+  VIOLATES_BOUNDARY: { deltas: { empathy: -8, romance: -6 }, mood: { irritation: 40 } },
+  KEEPS_PROMISE: { deltas: { empathy: 2 } },
+  BREAKS_PROMISE: { deltas: { empathy: -6 }, mood: { irritation: 20 } },
+  SHOWS_CURIOSITY: { deltas: {} },
+  REPEATS_SELF: { deltas: {}, mood: { boredom: 15 } },
+  MAKES_WITTY_RESPONSE: { deltas: {}, mood: { amusement: 15 } },
+  TAKES_JOKE_WELL: { deltas: {}, mood: { amusement: 8 } },
+  MAKES_CREATIVE_JOKE: { deltas: {} },
+  SHOWS_DECISIVENESS: { deltas: {} },
   AVOIDS_DECISION: { deltas: {} },
   DEFINES_CONCRETE_TERMS: { deltas: {} },
   IDENTIFIES_BATNA: { deltas: {} },
   MAKES_EMPTY_THREAT: { deltas: {} },
-  FOLLOWS_THROUGH: { deltas: { trust: 3, respect: 3 } },
-  SHOWS_VULNERABILITY: { deltas: { openness: 3, comfort: 1, trust: 1 } },
-  SHOWS_ENTITLEMENT: { deltas: { respect: -2 }, mood: { irritation: 10 } },
-  FLATTERS_CHARACTER: { deltas: {}, mood: { boredom: 5 } },
-  DECEIVES_CHARACTER: { deltas: { trust: -12, respect: -4 }, mood: { irritation: 30 } },
-  EXPRESSES_DISTRESS: { deltas: { openness: 2 } },
+  FOLLOWS_THROUGH: { deltas: { empathy: 2 } },
+  SHOWS_VULNERABILITY: { deltas: { empathy: 3 } },
+  SHOWS_ENTITLEMENT: { deltas: { empathy: -2 }, mood: { irritation: 10 } },
+  FLATTERS_CHARACTER: { deltas: { romance: -1 }, mood: { boredom: 5 } },
+  DECEIVES_CHARACTER: { deltas: { empathy: -10 }, mood: { irritation: 30 } },
+  EXPRESSES_DISTRESS: { deltas: { empathy: 2 } },
   // Only the characters built around these behaviours react to them; the others stay as they were. The moments the two
   // connect (sharedConnectionEvents) are the exception: every character answers them (2026-11-02).
-  SHARES_FEELING: { deltas: { comfort: 2, openness: 2 } },
+  SHARES_FEELING: { deltas: { empathy: 3 } },
   CORRECTS_UNDERSTANDING: { deltas: {} },
-  CREATES_RUNNING_JOKE: { deltas: { interest: 2, comfort: 1 } },
-  BUILDS_ON_INSIDE_JOKE: { deltas: { comfort: 2, interest: 1 } },
+  CREATES_RUNNING_JOKE: { deltas: { empathy: 2 } },
+  BUILDS_ON_INSIDE_JOKE: { deltas: { empathy: 2 } },
   ACKNOWLEDGES_OTHER_VIEW: { deltas: {} },
   REFRAMES_CONSTRUCTIVELY: { deltas: {} },
   ANSWERS_DIRECTLY: { deltas: {} },
   EVADES_QUESTION: { deltas: {} },
   CONTRADICTS_SELF: { deltas: {} },
-  FLIRTS_PLAYFULLY: { deltas: {} },
-  SHOWS_CARE: { deltas: { trust: 2, comfort: 3 } },
-  REMEMBERS_DETAIL: { deltas: { trust: 2, interest: 2 } },
-  PLAYS_ALONG: { deltas: { interest: 3, comfort: 1 }, mood: { excitement: 8 } },
-  APPRECIATES_SINCERELY: { deltas: { respect: 1, comfort: 2 } },
+  FLIRTS_PLAYFULLY: { deltas: { romance: 4 } },
+  SHOWS_CARE: { deltas: { empathy: 3 } },
+  REMEMBERS_DETAIL: { deltas: { empathy: 2 } },
+  PLAYS_ALONG: { deltas: {} },
+  APPRECIATES_SINCERELY: { deltas: { empathy: 2 } },
   CALLS_BLUFF: { deltas: {} },
   COUNTER_THREAT: { deltas: {} },
   STANDS_GROUND: { deltas: {} },
@@ -155,7 +169,12 @@ export const defaultEventEffects: Record<RelationshipEventType, EventEffect> = {
   WAFFLES: { deltas: {} },
   FOLLOWS_LEAD: { deltas: {} },
   MAKES_BOLD_MOVE: { deltas: {} },
-  MAKES_CRUDE_ADVANCE: { deltas: {} },
+  MAKES_CRUDE_ADVANCE: { deltas: { romance: -4 }, mood: { irritation: 8 } },
+  NEGOTIATES_BOLDLY: { deltas: {} },
+  BOUNCES_BACK: { deltas: {} },
+  SHARES_VIEW: { deltas: {} },
+  SPEAKS_KINDLY: { deltas: {} },
+  PLANS_TOGETHER: { deltas: {} },
 };
 
 /** The short name a member sees when one of their messages counted for or against the relationship (the chat's status card). */
@@ -170,9 +189,10 @@ export const relationshipEventLabels: Record<RelationshipEventType, string> = {
   FLATTERS_CHARACTER: '빈 칭찬', DECEIVES_CHARACTER: '속이려 함', EXPRESSES_DISTRESS: '힘든 마음을 털어놓음', SHARES_FEELING: '마음을 털어놓음',
   CORRECTS_UNDERSTANDING: '오해를 풀어 줌', CREATES_RUNNING_JOKE: '둘만의 농담이 생김', BUILDS_ON_INSIDE_JOKE: '둘만의 농담을 이어 감',
   ACKNOWLEDGES_OTHER_VIEW: '다른 생각을 인정함', REFRAMES_CONSTRUCTIVELY: '좋은 쪽으로 바꿔 봄', ANSWERS_DIRECTLY: '솔직하게 답함',
-  EVADES_QUESTION: '질문을 피함', CONTRADICTS_SELF: '앞뒤가 다름', FLIRTS_PLAYFULLY: '설레는 장난',
+  EVADES_QUESTION: '질문을 피함', CONTRADICTS_SELF: '앞뒤가 다름', FLIRTS_PLAYFULLY: '설레는 대화',
   SHOWS_CARE: '챙겨 줌', REMEMBERS_DETAIL: '기억해 줌', PLAYS_ALONG: '이야기에 함께 빠져듦', APPRECIATES_SINCERELY: '진심으로 알아봐 줌',
   CALLS_BLUFF: '허세를 간파함', COUNTER_THREAT: '역으로 맞받아침', STANDS_GROUND: '겁먹지 않고 버팀', RAISES_STAKES: '판을 키워 역제안함',
   CHALLENGES_CHARACTER: '내기를 걺', MAKES_CHARACTER_ADMIT: '인정하게 만듦', FOLDS_EASILY: '바로 물러섬', WAFFLES: '결정을 미룸',
   FOLLOWS_LEAD: '여유 있게 따름', MAKES_BOLD_MOVE: '자신 있게 다가감', MAKES_CRUDE_ADVANCE: '무례하게 들이댐',
+  NEGOTIATES_BOLDLY: '배짱 있게 나섬', BOUNCES_BACK: '맞고도 다시 일어섬', SHARES_VIEW: '자기 시선을 나눔', SPEAKS_KINDLY: '다정한 말', PLANS_TOGETHER: '함께 계획을 세움',
 };

@@ -900,7 +900,9 @@
 /* a story room: the prologue told before the first scene, at the top of the conversation */
 .lounge-prologue { margin:0 0 18px; padding:16px 18px; border:1px solid #ffffff30; border-radius:16px; background:#00000059; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff5e8; text-shadow:none; }
 .lounge-prologue>span { display:block; margin-bottom:8px; font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--lounge-accent); }
-.lounge-prologue>p { margin:0; font-size:14.5px; line-height:1.75; white-space:pre-line; }
+/* Each paragraph of the prologue is its own block with a small gap (2026-11-07); a blank line between every line made it long. */
+.lounge-prologue>p { margin:0 0 7px; font-size:14.5px; line-height:1.65; white-space:pre-line; }
+.lounge-prologue>p:last-of-type { margin-bottom:0; }
 
 /* a story in episodes: where it stands, at the top of the chat (LoungeStoryProgress) */
 .lounge-story-progress { position:sticky; top:0; z-index:3; margin:0 0 12px; border:1px solid #ffffff30; border-radius:14px; background:#0b0a0dd9; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); color:#fff5e8; }
@@ -929,10 +931,10 @@
 .lounge-story-intro-page header img { width:56px; height:56px; flex:none; border-radius:50%; object-fit:cover; border:2px solid var(--story-intro-accent); }
 .lounge-story-intro-page header span { display:block; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--story-intro-accent); }
 .lounge-story-intro-page h1 { margin:4px 0 0; font-size:23px; line-height:1.3; letter-spacing:-.01em; color:#fff; }
-.lounge-story-intro-block { margin:0 0 28px; animation:lounge-story-intro-line .9s ease-out both; }
-.lounge-story-intro-page p { margin:0 0 20px; font-size:17px; line-height:1.85; word-break:keep-all; overflow-wrap:break-word; text-wrap:pretty; }
-.lounge-story-intro-page p.lounge-story-intro-line { margin-bottom:10px; padding-left:14px; border-left:2px solid var(--story-intro-accent); color:#fff; font-style:italic; }
-.lounge-story-intro-page p.lounge-story-intro-line:has(+ :not(.lounge-story-intro-line)),.lounge-story-intro-page p.lounge-story-intro-line:last-child { margin-bottom:20px; }
+.lounge-story-intro-block { margin:0 0 18px; animation:lounge-story-intro-line .9s ease-out both; }
+.lounge-story-intro-page p { margin:0 0 12px; font-size:17px; line-height:1.72; word-break:keep-all; overflow-wrap:break-word; text-wrap:pretty; }
+.lounge-story-intro-page p.lounge-story-intro-line { margin-bottom:6px; padding-left:14px; border-left:2px solid var(--story-intro-accent); color:#fff; font-style:italic; }
+.lounge-story-intro-page p.lounge-story-intro-line:has(+ :not(.lounge-story-intro-line)),.lounge-story-intro-page p.lounge-story-intro-line:last-child { margin-bottom:12px; }
 .lounge-story-intro-block>p:last-child { margin-bottom:0 !important; }
 .lounge-story-intro-page p.lounge-story-intro-note { padding:10px 14px; border-radius:10px; background:#ffffff14; border-left:2px solid #ffffff4d; font-size:15px; line-height:1.7; color:#fff5e8d9; }
 .lounge-story-intro-more { display:block; margin-top:6px; font-size:12px; color:#fff5e880; animation:lounge-story-intro-blink 1.8s ease-in-out infinite; }
@@ -1086,6 +1088,14 @@
 .lounge-relationship-focus .short b { color:#ffc48f; }
 .lounge-relationship-legend { margin:7px 0 0; font-size:10px; opacity:.6; }
 
+/* Opened, the card shows the three scores as horizontal bars (2026-11-07): how full each is, the line the next stage asks,
+   a word for how it stands, and a glow on the one that just moved. No count of what is missing. */
+.lounge-relationship-bars li.rose .lounge-relationship-bar { animation:lounge-rel-rise 1.6s ease-out 1; }
+.lounge-relationship-bars li.fell .lounge-relationship-bar { animation:lounge-rel-fall 1.4s ease-out 1; }
+@keyframes lounge-rel-rise { 20% { box-shadow:0 0 0 3px #8fe3b055, 0 0 16px #8fe3b0aa; } }
+@keyframes lounge-rel-fall { 20% { box-shadow:0 0 0 3px #ff9f8f44, 0 0 14px #ff9f8f88; } }
+@media (prefers-reduced-motion: reduce) { .lounge-relationship-bars li.rose .lounge-relationship-bar, .lounge-relationship-bars li.fell .lounge-relationship-bar { animation:none; } }
+
 /* A one-to-one chat's settings (2026-10-29): "대화 설정" beside the relationship card, a menu of the record, the
    background and the memories, with the persona (and the photo model) to choose below. */
 .lounge-relationship-row { display:flex; align-items:flex-start; gap:8px; }
@@ -1152,3 +1162,49 @@
 
 /* Under a photo, the model that made it (to compare image models, 2026-10-29). */
 .lounge-photo-model { display:inline-block; margin:4px 0 0; padding:1px 8px; border-radius:999px; background:#0000004d; color:#fff5e8; font-size:10px; opacity:.75; }
+
+/* One to one on a computer (2026-11-06): the character's photo scales with its column. Before, the 170px rule (with :has)
+   outranked the dragged-width rule, so widening the column left the photo as it was, and a wider window changed nothing
+   as the column stopped at 210px. The column now grows with the window (or is dragged), and the photo follows it. */
+@media (min-width:761px) and (min-height:501px) {
+  .has-room .lounge-room-main.lounge-one-to-one,.has-room .lounge-room-main.lounge-one-to-one:has(.lounge-seats.seats-1) {
+    --lounge-portrait-col:clamp(210px,17vw,400px);
+    --lounge-profile-size:min(calc(var(--lounge-portrait-drag,var(--lounge-portrait-col)) - 40px),44vh);
+  }
+  .has-room .lounge-one-to-one .lounge-conversation-space { grid-template-columns:var(--lounge-portrait-drag,var(--lounge-portrait-col)) minmax(0,1fr); }
+}
+/* A frame around the photo, so it does not melt into the picture behind the room (the speaking ring still replaces it). */
+.has-room .lounge-one-to-one .lounge-moderator-avatar { border:2px solid #f3e4cd; background:#7e806b; box-shadow:0 0 0 1px #00000066,0 10px 28px #0000006b; }
+
+/* The record of a one-to-one chat: earlier messages load above the newest. */
+.lounge-history-more { display:block; margin:0 auto 12px; padding:7px 14px; border:1px solid #ffffff3d; border-radius:999px; background:#00000040; color:inherit; font:inherit; font-size:12px; cursor:pointer; backdrop-filter:blur(5px); }
+.lounge-history-more:hover:not(:disabled) { background:#00000066; }
+.lounge-history-more:disabled { opacity:.7; cursor:default; }
+
+/* Phone, one to one (2026-11-06): the buttons (대화 설정, 나가기) share the row of the character's photo instead of having a
+   row of their own, so the photo is larger and the conversation gets the height the buttons took. Not on a phone held
+   sideways, where there is no height to spare and the layout above stays. */
+@media (max-width:760px) and (min-height:560px) {
+  .has-room .lounge-room-main.lounge-one-to-one .lounge-scene { grid-template-rows:minmax(0,1fr); }
+  .has-room .lounge-one-to-one .lounge-scene-heading { position:absolute; top:6px; right:6px; z-index:3; width:auto; padding:0; gap:0; }
+  .has-room .lounge-one-to-one .lounge-room-topline { margin:0; }
+  .has-room .lounge-room-main.lounge-one-to-one .lounge-stage .lounge-moderator-avatar { width:min(27vw,100px); }
+  .has-room .lounge-one-to-one .lounge-host-column { padding:2px 0 0 2px; }
+  /* The name sits in the lower part of the photo's row, clear of the buttons above it. */
+  .has-room .lounge-one-to-one .lounge-moderator { align-items:flex-end; }
+  .has-room .lounge-one-to-one .lounge-moderator-info { padding-bottom:12px; }
+  /* With the keyboard open the photo gives its height back to the conversation (the buttons are hidden then). */
+  .has-room[data-keyboard-open] .lounge-room-main.lounge-one-to-one .lounge-stage .lounge-moderator-avatar { width:56px; }
+  .has-room[data-keyboard-open] .lounge-one-to-one .lounge-moderator { align-items:center; }
+  .has-room[data-keyboard-open] .lounge-one-to-one .lounge-moderator-info { padding-bottom:0; }
+}
+
+/* The opened relationship card breathes (2026-11-07): more room between the line, the stage, the bars and the note. */
+.lounge-relationship-panel { padding:16px 16px 14px; }
+.lounge-relationship-panel .lounge-relationship-line { margin:0 0 8px; line-height:1.65; }
+.lounge-relationship-panel .lounge-relationship-next { margin:0 0 16px; font-size:11px; line-height:1.5; }
+.lounge-relationship-panel .lounge-relationship-bars { gap:15px; }
+.lounge-relationship-panel .lounge-relationship-bars li { gap:10px; line-height:1.4; }
+.lounge-relationship-panel .lounge-relationship-bars small { line-height:1.4; }
+.lounge-relationship-panel .lounge-relationship-memory-note { margin:18px 0 0; line-height:1.6; }
+.lounge-relationship-panel .lounge-relationship-debug { margin-top:14px; }

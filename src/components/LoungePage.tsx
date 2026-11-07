@@ -3,17 +3,18 @@ import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphone
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { readLoungeRoomBackground, loungeBlankScene, loungeRoomSceneTheme, type LoungeRoomBackground, getLoungeHost, getLoungeHostLoudness, loungeDefaultSpeechEngine, type LoungeSpeechEngine, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
-import { chooseLoungeRoomBackground, makeLoungeRoomBackground, matchLoungeSceneBackground, type LoungeSpeechUsage, LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, loadLoungeSpeechUsage, postLoungeText, resumeLoungeChat, hasNewLoungeMessage, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
+import { startCallRingback } from '../lib/callRingback';
+import { readLoungeRoomBackground, loungeBlankScene, loungeRoomSceneTheme, type LoungeRoomBackground, getLoungeHost, getLoungeHostLoudness, loungeDefaultSpeechEngine, type LoungeSpeechEngine, getLoungeTheme, getLoungeTopic, isLoungeChatRoom, isLoungeRelationshipHost, loungeHelpOptions, loungeIsSolo, loungePresentMembers, loungeTopics, loungeMinimumParticipants, loungeHostCooldownMs, loungeCallChain, loungeSoloTiming, nextLoungeHostReason, previewHostReply, type LoungeHelpKind, type LoungeTopicBrief, type LoungeHostId, type LoungeThemeId, type LoungeMember, type LoungeMessage, type LoungeRoom, type LoungeTopicStudy } from '../lib/lounge';
+import { chooseLoungeRoomBackground, makeLoungeRoomBackground, matchLoungeSceneBackground, type LoungeSpeechUsage, type LoungeCallUsage, tickLoungeCall, LoungeApiError, claimLoungeBroadcaster, controlLounge, controlLoungeSession, getMyLoungeBetaUsage, joinLounge, loadLounge, loadLoungeRelationship, loadLoungeSpeechUsage, postLoungeText, resumeLoungeChat, hasNewLoungeMessage, prepareLoungeTopic, requestLoungeHost, requestLoungePhoto, getMyLoungePhotoUsage, type LoungePhotoUsage, suggestLoungeReplies, requestLoungeModerator, setLoungeTopic, setLoungePersona, setLoungeVoice, setLoungeModel, suggestLoungeTopics, transcribeLoungeAudio, reviewLoungeInteraction, syncLoungeSafety, releaseLoungeRestriction } from '../lib/loungeApi';
 import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { loadLoungeRoomPhotos, signLoungeBackground, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
 import { LoungeBackgroundPicker } from './LoungeBackgroundPicker';
 import { LoungeChatSettings, LoungeSettingsChoice, type LoungeSettingsItem } from './LoungeChatSettings';
 import { LoungeMemorySheet } from './LoungeMemorySheet';
-import { listMyLoungePersonas, loadLoungeImageModel, loadLoungeInnerVoice, saveLoungeImageModel, saveLoungeInnerVoice, setLoungeRoomPersona, type LoungeMemoryBook } from '../lib/loungeApi';
-import { isLoungeImageModel, loungeImageModelLabel, loungeImageModels } from '../lib/loungePhotos';
-import type { LoungeMemberPersonaRow } from '../lib/loungePersonas';
+import { listMyLoungePersonas, loadEarlierLoungeMessages, loungeHistoryPage, loadLoungeImageModel, loadLoungeInnerVoice, saveLoungeImageModel, saveLoungeInnerVoice, setLoungeRoomPersona, type LoungeMemoryBook } from '../lib/loungeApi';
+import { isLoungeImageModel, loungeImageModelLabel, loungeImageModels, loungeSceneFromMemory, loungeScenePlace } from '../lib/loungePhotos';
+import { loungePersonaStoryScenario, loungeRoomPersonaRow, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../lib/loungePersonas';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { getLoungeChatModel } from '../lib/loungeModels';
 import { LoungeModelPicker } from './LoungeModelPicker';
@@ -135,7 +136,7 @@ const previewSpeechUsage: LoungeSpeechUsage = {
   'eleven-v4-turbo': { available: true, member: true, allowed: true, used: 1700, left: 3300, limit: 5000 },
   typecast: { available: false, member: true, allowed: true, used: 0, left: 5000, limit: 5000 },
 };
-type RoomViewProps = { /** 홍실당 상담's state: the tarot deck to pick from and the cards drawn for the reading. */ consult?: LoungeConsultState | null; /** A one-to-one chat's settings menu (beside 나가기): its items and its choices. */ settingsItems?: LoungeSettingsItem[]; settingsChoices?: ReactNode; /** False when the member hides the character's inner voices (대화 설정 › 속마음). */ innerVoice?: boolean; scenario?: LoungeRoomScenario | null; /** Where a story in episodes stands (LoungeStoryProgress). */ storyProgress?: ReactNode; /** The choices the character's last reply put to the member (LoungeStoryChoicePanel). */ storyChoice?: { id: string; label: string; choices: string[] }; sceneImage?: string | null; /** The empty space instead of a place (the background sheet's 빈 공간). */ sceneBlank?: boolean; backgroundPicker?: ReactNode; chatModel?: string; onModelChange?: (model: string) => void; speechEngine?: LoungeSpeechEngine; onSpeechEngineChange?: (engine: LoungeSpeechEngine) => void; speechUsage?: LoungeSpeechUsage; modelBusy?: boolean; photos?: LoungePhotoView[]; photoPending?: boolean; photosLeft?: number | null; onPhotoRequest?: () => void; chat?: boolean; chatHostText?: string; onVoiceToggle?: () => void; voiceBusy?: boolean; voiceLocked?: boolean; replySuggest?: { suggest: () => Promise<string[]>; send: (text: string) => Promise<void> }; place?: string; topicPicker?: LoungeTopicPickerProps; relationship?: RelationshipView | null; relationshipChange?: LoungeRelationshipChange | null; topicBrief?: LoungeTopicBrief | null; now?: number; onReleaseRestriction?: (userId: string) => Promise<void>; guidedSession?: boolean; session?: LoungeSession | null; sessionNames?: Record<string, string>; onSessionAction?: (action: LoungeSessionAction) => Promise<void>; study?: LoungeTopicStudy | null; theme?: LoungeThemeId; liveHostText?: string; hostId: LoungeHostId; topic: string; capacity: number; messages: LoungeMessage[]; members: Array<{ id: string; name: string; muted: boolean; warnings?: number; restrictedUntil?: string | null; avatarIndex?: number; avatarUrl?: string }>; speakers: string[]; aiSpeaking: boolean; pending: boolean; status: string; remaining: string; preview?: boolean; micOn: boolean; connected: boolean; connecting?: boolean; audioReady?: boolean; starting?: boolean; isHost: boolean; error: string; onConnect: () => void; onMic: () => void; onAsk: (kind: Exclude<LoungeHelpKind, 'direct'>) => void; helpRequested?: boolean; onStart: () => void; onLeave: () => void; inviteUrl?: string; currentUserId?: string; demoPlaying?: boolean; onDemoToggle?: () => void; roomId?: string; socialMember?: boolean };
+type RoomViewProps = { /** The month's minutes in calls (shown on the call screen). */ callUsage?: (LoungeCallUsage & { at: number }) | null; /** The call is ringing: the character has not picked up yet. */ ringing?: boolean; /** 홍실당 상담's state: the tarot deck to pick from and the cards drawn for the reading. */ consult?: LoungeConsultState | null; /** A one-to-one chat's settings menu (beside 나가기): its items and its choices. */ settingsItems?: LoungeSettingsItem[]; settingsChoices?: ReactNode; /** False when the member hides the character's inner voices (대화 설정 › 속마음). */ innerVoice?: boolean; scenario?: LoungeRoomScenario | null; /** Where a story in episodes stands (LoungeStoryProgress). */ storyProgress?: ReactNode; /** The choices the character's last reply put to the member (LoungeStoryChoicePanel). */ storyChoice?: { id: string; label: string; choices: string[] }; sceneImage?: string | null; /** The empty space instead of a place (the background sheet's 빈 공간). */ sceneBlank?: boolean; backgroundPicker?: ReactNode; chatModel?: string; onModelChange?: (model: string) => void; speechEngine?: LoungeSpeechEngine; onSpeechEngineChange?: (engine: LoungeSpeechEngine) => void; speechUsage?: LoungeSpeechUsage; modelBusy?: boolean; photos?: LoungePhotoView[]; photoPending?: boolean; photosLeft?: number | null; onPhotoRequest?: () => void; chat?: boolean; chatHostText?: string; onVoiceToggle?: () => void; voiceBusy?: boolean; voiceLocked?: boolean; replySuggest?: { suggest: () => Promise<string[]>; send: (text: string) => Promise<void> }; place?: string; topicPicker?: LoungeTopicPickerProps; relationship?: RelationshipView | null; relationshipChange?: LoungeRelationshipChange | null; topicBrief?: LoungeTopicBrief | null; now?: number; onReleaseRestriction?: (userId: string) => Promise<void>; guidedSession?: boolean; session?: LoungeSession | null; sessionNames?: Record<string, string>; onSessionAction?: (action: LoungeSessionAction) => Promise<void>; study?: LoungeTopicStudy | null; theme?: LoungeThemeId; liveHostText?: string; hostId: LoungeHostId; topic: string; capacity: number; messages: LoungeMessage[]; members: Array<{ id: string; name: string; muted: boolean; warnings?: number; restrictedUntil?: string | null; avatarIndex?: number; avatarUrl?: string }>; speakers: string[]; aiSpeaking: boolean; pending: boolean; status: string; remaining: string; preview?: boolean; micOn: boolean; connected: boolean; connecting?: boolean; audioReady?: boolean; starting?: boolean; isHost: boolean; error: string; onConnect: () => void; onMic: () => void; onAsk: (kind: Exclude<LoungeHelpKind, 'direct'>) => void; helpRequested?: boolean; onStart: () => void; onLeave: () => void; inviteUrl?: string; currentUserId?: string; demoPlaying?: boolean; onDemoToggle?: () => void; roomId?: string; socialMember?: boolean };
 
 function LoungeTopicDescription({ brief }: { brief: LoungeTopicBrief }) {
   const category = getLoungeTopic(brief.category);
@@ -181,6 +182,7 @@ const subscribeDesktopLayout = (onChange: () => void) => {
   return () => query.removeEventListener('change', onChange);
 };
 
+const noMessages: LoungeMessage[] = [];
 function RoomView(props: RoomViewProps) {
   const host = getLoungeHost(props.hostId);
   const theme = getLoungeTheme(props.theme);
@@ -201,10 +203,62 @@ function RoomView(props: RoomViewProps) {
   const restricted = Date.parse(ownSafety?.restrictedUntil ?? '') > (props.now ?? 0);
   const latestHost = props.messages.filter(message => message.kind === 'host').at(-1);
   const participantMessages = props.messages.filter(message => message.kind === 'human').slice(-12);
-  const conversationMessages = props.messages.filter(message => message.kind === 'host' || participantMessages.includes(message)).slice(-24);
+  // A member's one-to-one chat shows its whole record, not only the newest messages: the first page of earlier ones loads
+  // as the chat opens, more as the log is scrolled to its top. The story's prologue, which opens the record, is shown
+  // once nothing older is left (2026-11-06).
+  const historyChat = Boolean(props.chat && props.capacity === 1 && props.roomId && !props.preview);
+  const [history, setHistory] = useState<{ room?: string; list: LoungeMessage[]; state: 'loading' | 'more' | 'done' }>({ list: [], state: 'loading' });
+  const historyHere = history.room === props.roomId;
+  const earlier = historyHere ? history.list : noMessages;
+  const historyState = historyChat ? historyHere ? history.state : 'loading' : 'done';
+  const recordMessages = useMemo(() => {
+    if (!earlier.length) return props.messages;
+    const seen = new Set<number>(), merged: LoungeMessage[] = [];
+    for (const message of [...earlier, ...props.messages]) if (!seen.has(message.id)) { seen.add(message.id); merged.push(message); }
+    return merged.sort((a, b) => a.id - b.id);
+  }, [earlier, props.messages]);
+  // The story's prologue stays above a chat that has only just begun; a conversation that is being continued shows its record
+  // alone, from the first message it has, scrolled back through (2026-11-07).
+  const loungePrologueMaxMessages = 6;
+  const conversationMessages = historyChat ? recordMessages.filter(message => message.kind === 'host' || message.kind === 'human')
+    : props.messages.filter(message => message.kind === 'host' || participantMessages.includes(message)).slice(-24);
   const participantLog = useRef<HTMLDivElement>(null);
   const participantSeats = useRef<HTMLDivElement>(null);
   const followParticipantLog = useRef(true);
+  const historyBusy = useRef(false);
+  const historyAnchor = useRef<{ height: number; top: number } | null>(null);
+  const historyStarted = useRef<string | null>(null);
+  const loadEarlier = useCallback(async (roomId: string, beforeId?: number) => {
+    if (historyBusy.current) return;
+    historyBusy.current = true;
+    const element = participantLog.current;
+    historyAnchor.current = element ? { height: element.scrollHeight, top: element.scrollTop } : null;
+    setHistory(previous => ({ room: roomId, list: previous.room === roomId ? previous.list : [], state: 'loading' }));
+    try {
+      const page = await loadEarlierLoungeMessages(roomId, beforeId);
+      setHistory(previous => ({ room: roomId, list: [...page, ...(previous.room === roomId ? previous.list : [])], state: page.length >= loungeHistoryPage ? 'more' : 'done' }));
+    } catch {
+      historyAnchor.current = null;
+      setHistory(previous => ({ room: roomId, list: previous.room === roomId ? previous.list : [], state: 'done' }));
+    } finally { historyBusy.current = false; }
+  }, []);
+  const oldestLoaded = Math.min(earlier[0]?.id ?? Infinity, props.messages[0]?.id ?? Infinity);
+  const loadMoreHistory = () => { if (historyChat && props.roomId && historyState === 'more') void loadEarlier(props.roomId, Number.isFinite(oldestLoaded) ? oldestLoaded : undefined); };
+  // A chat opens with the first page of its earlier messages, once for each room.
+  useEffect(() => {
+    if (!historyChat || !props.roomId || historyStarted.current === props.roomId) return;
+    historyStarted.current = props.roomId;
+    void loadEarlier(props.roomId, props.messages[0]?.id);
+  // Only the room decides: later changes to the newest messages do not reload the record.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyChat, props.roomId, loadEarlier]);
+  // After earlier messages are added above, a log that was scrolled up stays where the reader was.
+  useLayoutEffect(() => {
+    const element = participantLog.current, anchor = historyAnchor.current;
+    if (!element || !anchor) return;
+    historyAnchor.current = null;
+    if (!followParticipantLog.current) element.scrollTop = anchor.top + element.scrollHeight - anchor.height;
+  }, [history.list]);
   const reply = useLoungeReplies(props.replySuggest, false);
   // On desktop the newest bubble is held near the top of the log, in every room and with every host. Phones keep it pinned to the bottom.
   const spotlightLatest = useSyncExternalStore(subscribeDesktopLayout, desktopLayout, () => false);
@@ -214,7 +268,9 @@ function RoomView(props: RoomViewProps) {
   // Photos the character sent sit in the conversation by the time they were made.
   const timeline = [
     ...conversationMessages.map(message => ({ at: Date.parse(message.created_at), message, photo: undefined })),
-    ...(props.photos ?? []).map(photo => ({ at: Date.parse(photo.created_at), message: undefined, photo })),
+    // While earlier messages are still to be loaded, a photo older than the oldest message shown waits for its turn.
+    ...(props.photos ?? []).filter(photo => !historyChat || historyState === 'done' || !conversationMessages.length || Date.parse(photo.created_at) >= Date.parse(conversationMessages[0].created_at))
+      .map(photo => ({ at: Date.parse(photo.created_at), message: undefined, photo })),
   ].sort((a, b) => a.at - b.at);
   const photoCount = props.photos?.length ?? 0;
   // A new message or a reply starting brings the log back to the newest, even if it had been scrolled up.
@@ -333,7 +389,7 @@ function RoomView(props: RoomViewProps) {
     return <main className="lounge-room-main lounge-one-to-one lounge-call" data-theme={theme.id} style={roomStyle} ref={roomElement}>
       {props.preview && <div className="lounge-preview-notice"><Sparkles size={17} /><span>실제 AI 연결 없이 통화 화면을 둘러보는 미리보기예요.</span><Link to="/lounge">실제 방 만들기 <ArrowRight size={14} /></Link></div>}
       <LoungeCall hostId={props.hostId} name={hostCharacter?.name ?? host.name} job={hostCharacter?.job} place={props.scenario?.title ?? props.place ?? theme.name} remaining={props.remaining}
-        preview={props.preview} lobby={props.status === 'lobby'} connecting={props.connecting} connected={props.connected} audioReady={props.audioReady} starting={props.starting} needsConnection={needsConnection}
+        preview={props.preview} usage={props.callUsage} ringing={props.ringing} lobby={props.status === 'lobby'} connecting={props.connecting} connected={props.connected} audioReady={props.audioReady} starting={props.starting} needsConnection={needsConnection}
         micOn={props.micOn} micDisabled={restricted || Boolean(props.preview) || !props.connected || !props.audioReady} hostSpeaking={hostSpeaking} userSpeaking={liveSpeakers.some(member => member.id === props.currentUserId)}
         pending={props.pending} replyDelayed={replyDelayed} topicDisabled={helpDisabled} chatDisabled={props.voiceBusy} chatBusy={props.voiceBusy}
         options={props.onModelChange || props.onSpeechEngineChange ? options : undefined} notice={safetyNotice || undefined} error={props.error || sendError || undefined}
@@ -388,9 +444,10 @@ function RoomView(props: RoomViewProps) {
               <h2><MessageCircle size={14} />나누는 이야기</h2>
               {/* One to one, the relationship is a status card over the conversation; the chat's settings are at the top, beside 나가기. */}
               {solo && props.relationship && <div className="lounge-relationship-row"><LoungeRelationship view={props.relationship} change={props.relationshipChange} /></div>}
-              <div className={`lounge-participant-log ${spotlightLatest ? 'spotlight' : ''}`} ref={participantLog} role="log" aria-label="라운지 대화" onScroll={event => { const element = event.currentTarget; followParticipantLog.current = spotlightLatest ? element.scrollTop >= spotlightAnchor.current - 24 : element.scrollHeight - element.scrollTop - element.clientHeight < 48; }}>
+              <div className={`lounge-participant-log ${spotlightLatest ? 'spotlight' : ''}`} ref={participantLog} role="log" aria-label="라운지 대화" onScroll={event => { const element = event.currentTarget; followParticipantLog.current = spotlightLatest ? element.scrollTop >= spotlightAnchor.current - 24 : element.scrollHeight - element.scrollTop - element.clientHeight < 48; if (element.scrollTop < 120) loadMoreHistory(); }}>
+                {historyChat && historyState !== 'done' && <button type="button" className="lounge-history-more" disabled={historyState === 'loading'} onClick={loadMoreHistory}>{historyState === 'loading' ? '이전 대화를 불러오는 중…' : '이전 대화 더 보기'}</button>}
                 {props.storyProgress}
-                {props.scenario && <div className="lounge-prologue" role="note" aria-label="이야기의 시작"><span>프롤로그 · {props.scenario.title}</span><p>{personalizeLoungeStory(props.scenario.prologue, (props.members.find(member => member.id === props.currentUserId)?.name))}</p><small>{personalizeLoungeStory('당신의 역할', (props.members.find(member => member.id === props.currentUserId)?.name))} · {personalizeLoungeStory(props.scenario.user_role, (props.members.find(member => member.id === props.currentUserId)?.name))}</small></div>}
+                {props.scenario && historyState === 'done' && conversationMessages.length <= loungePrologueMaxMessages && <div className="lounge-prologue" role="note" aria-label="이야기의 시작"><span>프롤로그 · {props.scenario.title}</span>{personalizeLoungeStory(props.scenario.prologue, (props.members.find(member => member.id === props.currentUserId)?.name)).split(/\n{2,}/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}<small>{personalizeLoungeStory('당신의 역할', (props.members.find(member => member.id === props.currentUserId)?.name))} · {personalizeLoungeStory(props.scenario.user_role, (props.members.find(member => member.id === props.currentUserId)?.name))}</small></div>}
                 {!props.scenario && (props.status === 'lobby' || !conversationMessages.length) && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? props.chat ? '오늘은 둘이 편하게 이야기해요. 곧 먼저 인사할게요.' : '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : host.greeting}</div></div>}
                 <div className="lounge-guidance">{props.topicBrief && <LoungeTopicDescription brief={props.topicBrief} />}{props.study && <LoungeStudyNotes study={props.study} />}
             {sessionProps && <LoungeSessionPanel {...sessionProps} mode="context" />}</div>
@@ -433,7 +490,7 @@ function RoomView(props: RoomViewProps) {
 }
 
 /** The example events behind the preview's replies, in turn: warm ones, and now and then one that costs something. */
-const previewRelationshipEvents: RelationshipEventType[][] = [['SHARES_FEELING'], ['MAKES_WITTY_RESPONSE', 'SHOWS_CURIOSITY'], ['FLIRTS_PLAYFULLY'], ['REPEATS_SELF'], ['ASKS_GOOD_QUESTION']];
+const previewRelationshipEvents: RelationshipEventType[][] = [['SHARES_FEELING'], ['MAKES_WITTY_RESPONSE', 'SHOWS_CARE'], ['FLIRTS_PLAYFULLY'], ['REPEATS_SELF'], ['REMEMBERS_DETAIL']];
 
 /** The preview's example of what a character remembers, with the character's real stages for the timeline. */
 function loungePreviewMemoryBook(stages: string[]): LoungeMemoryBook {
@@ -625,6 +682,14 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const quietFailures = useRef(0);
   // A call the member just placed from the chat: the character picks up first, once, when the call is connected.
   const callPlaced = useRef(false);
+  // A call just placed (its first tick starts the clock); a page opened onto a call in progress goes on from the last tick.
+  const newCall = useRef(false);
+  // The ringback heard while the call is put through, until the character picks up (see startCallRingback).
+  const ringback = useRef<(() => void) | null>(null);
+  // True from the call button until the character picks up: the call screen says it is calling and shows no mute state.
+  const [ringing, setRinging] = useState(false);
+  const stopRingback = useCallback(() => { const stop = ringback.current; ringback.current = null; stop?.(); }, []);
+  useEffect(() => stopRingback, [stopRingback]);
   // A story opens with its prologue full screen, and the character speaks only once the member starts it (LoungeStoryIntro).
   const [storyStarted, setStoryStarted] = useState(() => { try { return sessionStorage.getItem(`lounge.storyStarted.${roomId}`) === '1'; } catch { return false; } });
   const storyIntroOpen = useRef(false);
@@ -650,6 +715,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const endingTurn = useRef<string | null>(null);
   const refreshAfterInput = useRef<() => Promise<void>>(async () => {});
   const answerNow = useRef<() => Promise<void>>(async () => {});
+  // The reply a call's transcription request already started (see transcribeLoungeAudio), handed to the turn that plays it.
+  const answerChained = useRef<(stream: ReadableStream<Uint8Array>) => Promise<void>>(async stream => { void stream.cancel().catch(() => {}); });
   const reviewAfterInput = useCallback(async () => {
     if (!mounted.current || activeRoomId.current !== roomId || interactionBlockedRoom.current === roomId) return;
     const refresh = refreshAfterInput.current;
@@ -666,10 +733,16 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const [broadcaster, setBroadcaster] = useState<string | null>(null);
   const isHost = room?.space_id ? broadcaster === user?.id : room?.host_id === user?.id;
   const viewRoom = room ? effectiveRoom(room, members, clock) : null;
+  // The member's personas (read for their own one-to-one chat, below). The narrative a persona carries with this character
+  // takes the story card's place on screen, as it does for the model (2026-11-07), except in a consultation.
+  const [personas, setPersonas] = useState<LoungeMemberPersonaRow[] | null>(null);
+  const personasPending = Boolean(room && user && !user.isAnonymous && room.host_id === user.id && room.capacity === 1 && !room.space_id && personas === null);
+  const personaStory = room && personas && !isLoungeConsultRoom(room.scenario?.id, room.host_persona) ? loungeRoomPersonaStory(room.member_persona, personas, room.host_persona) : undefined;
+  const roomScenario = personaStory && room && personas ? loungePersonaStoryScenario(personaStory, loungeRoomPersonaRow(room.member_persona, personas)) : room?.scenario ?? null;
   // Only a story that has not begun: once the character has spoken, the prologue stays as the box at the top of the chat.
-  const storyIntro = Boolean(room?.scenario && isHost && room.capacity === 1 && !storyStarted && !messages.some(message => message.kind === 'host'));
+  const storyIntro = Boolean(room && roomScenario && !personasPending && isHost && room.capacity === 1 && !storyStarted && !messages.some(message => message.kind === 'host'));
   // A story in episodes: once an episode is done the next one opens full screen, and its first scene is told when the member starts it.
-  const storyEpisodes = loungeStoryEpisodesOn ? room?.scenario?.episodes ?? [] : [];
+  const storyEpisodes = loungeStoryEpisodesOn ? roomScenario?.episodes ?? [] : [];
   const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room?.story_state, storyEpisodes) : null;
   const [episodeShown, setEpisodeShown] = useState(() => { try { return Number(sessionStorage.getItem(`lounge.episodeShown.${roomId}`)) || 0; } catch { return 0; } });
   const episodeIntro = Boolean(storyState && isHost && room?.capacity === 1 && storyState.episode > 0 && !storyState.opened && episodeShown < storyState.episode);
@@ -690,6 +763,24 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   // keepBackground only writes state; the room and episode decide when to ask.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneWanted, sceneEpisode, roomId]);
+  // The background follows the place (2026-11-07): when the scene the chat's summary keeps moves to another place (a
+  // restaurant, a hotel room, a kitchen), the server is asked for a background that fits among the places and the shared
+  // scenes. It only reuses one that exists, and leaves a background the member chose, so a failure or no match changes
+  // nothing. The place the page opens with is only remembered, not asked for.
+  const scenePlace = loungeScenePlace(loungeSceneFromMemory(room?.memory) ?? '');
+  const placeFollowed = useRef<{ room: string; place: string } | null>(null);
+  const followsPlace = Boolean(room && user && !user.isAnonymous && room.capacity === 1 && !room.space_id && room.host_id === user.id && !storyState);
+  useEffect(() => {
+    if (!followsPlace || !scenePlace) return;
+    const seen = placeFollowed.current;
+    if (!seen || seen.room !== roomId) { placeFollowed.current = { room: roomId, place: scenePlace }; return; }
+    if (seen.place === scenePlace) return;
+    placeFollowed.current = { room: roomId, place: scenePlace };
+    void matchLoungeSceneBackground(roomId, true).then(result => { const picked = readLoungeRoomBackground(result.background); if (picked && mounted.current) keepBackground(picked); })
+      .catch(err => console.warn('[Lounge scene] not followed', err instanceof Error ? err.message.slice(0, 80) : 'error'));
+  // keepBackground only writes state; the place decides when to ask.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [followsPlace, scenePlace, roomId]);
   const chat = isLoungeChatRoom(room);
   // A member's character is read and registered before the room is drawn with it.
   const customCharacter = useLoungeCustomCharacter(room?.host_persona);
@@ -732,15 +823,25 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       const delay = Math.max(0, nextAudioAttempt.current - Date.now());
       if (delay) await new Promise(resolve => setTimeout(resolve, delay));
       if (!mounted.current || audioBlocked.current) return;
+      // A call that is ready to be answered asks for the reply in the same request, so the character answers as soon as
+      // what was said is written down. Anything else (a turn of a table, a character still speaking, a failed earlier
+      // reply) is answered the usual way afterwards.
+      const chain = () => {
+        const latest = current.current, room = latest.room;
+        return loungeCallChain && !turnId && Boolean(room && room.capacity === 1 && !room.space_id && !isLoungeChatRoom(room) && room.status === 'active' && latest.isHost
+          && !room.guided_session && !(room.study_required && !room.topic_study) && latest.audio.connected && latest.audio.audioReady && !latest.audio.aiSpeaking
+          && !latest.audio.speakers.length && !latest.audio.getSpeechActivity().recording && !latest.restrictedIds.includes(room.host_id) && !busy.current
+          && !hostBlocked.current && Date.now() >= nextHostAttempt.current && Date.now() - lastAttempt.current >= loungeHostCooldownMs(room.capacity, false));
+      };
       let result;
-      try { result = await transcribeLoungeAudio(roomId, blob, undefined, turnId); }
+      try { result = await transcribeLoungeAudio(roomId, blob, undefined, turnId, chain()); }
       catch (err) {
         if (!(err instanceof LoungeApiError) || err.code !== 'lounge_audio_cooldown') throw err;
         await new Promise(resolve => setTimeout(resolve, err.retryAfterSeconds * 1000));
         if (!mounted.current || audioBlocked.current) return;
-        result = await transcribeLoungeAudio(roomId, blob, undefined, turnId);
+        result = await transcribeLoungeAudio(roomId, blob, undefined, turnId, chain());
       }
-      if (!mounted.current || activeRoomId.current !== roomId) return;
+      if (!mounted.current || activeRoomId.current !== roomId) { void result.stream?.cancel().catch(() => {}); return; }
       setTranscriptError('');
       if (result.posted) {
         if (user) trackMetaOnce('FirstConversation', user.id);
@@ -751,8 +852,10 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           if (mounted.current && activeRoomId.current === roomId) setTranscriptError(errorText(err));
         });
         void reviewAfterInput();
+        // The reply began in the same request: it plays now, without the settle wait and a second request.
+        if (result.stream) void answerChained.current(result.stream);
       }
-      console.info(`[Lounge latency] ${JSON.stringify({ transcriptionMs: Math.round(performance.now() - started) })}`);
+      console.info(`[Lounge latency] ${JSON.stringify({ transcriptionMs: Math.round(performance.now() - started), chained: Boolean(result.stream) })}`);
     }
     catch (err) {
       if (err instanceof LoungeApiError) {
@@ -795,6 +898,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const restrictedIds = restrictedLoungeMembers(members, clock);
   // The voice engine the member chose, kept for every room on this device.
   const [speechUsage, setSpeechUsage] = useState<LoungeSpeechUsage | undefined>();
+  // The month's minutes in calls, as the server counted them, and what the plan allows.
+  // `at` is when it was read: between the server's counts the call screen adds the seconds since.
+  const [callUsage, setCallUsage] = useState<(LoungeCallUsage & { at: number }) | null>(null);
   // The engine that speaks, for the host's playback gain: a premium one only while it is open to this member.
   // Every character speaks with ElevenLabs (2026-10-26); there is no voice to choose.
   const spokenEngine = loungeDefaultSpeechEngine(room?.host_persona ?? '');
@@ -1008,7 +1114,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   // The chat's settings menu (2026-10-29): the memories, the background sheet and the persona of one's own chat.
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
-  const [personas, setPersonas] = useState<LoungeMemberPersonaRow[] | null>(null);
   const [personaBusy, setPersonaBusy] = useState(false);
   const [imageModel, setImageModel] = useState(loadLoungeImageModel);
   const [innerVoice, setInnerVoice] = useState(loadLoungeInnerVoice);
@@ -1025,15 +1130,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     : error || transcriptError || (/다른 창이나 기기|마이크|소리 켜기/.test(audio.error) ? audio.error : '');
   const disconnectAudio = audio.disconnect;
   useEffect(() => { if (ended || chat) disconnectAudio(); }, [ended, chat, disconnectAudio]);
-  // A room takes at most 120 replies. From the 110th a one-to-one chat goes on in a new room that keeps the story, where
-  // it stands and the latest messages; without this the character went silent at 120 until the room expired.
-  const carriedOn = useRef('');
-  const longChat = Boolean(chat && room && room.capacity === 1 && !room.space_id && room.host_id === user?.id && (room.ai_turns ?? 0) >= 110);
-  useEffect(() => {
-    if (!longChat || pending || carriedOn.current === roomId) return;
-    carriedOn.current = roomId;
-    void resumeLoungeChat(roomId).then(next => { if (mounted.current && next && next !== roomId) navigate(`/lounge/${next}`, { replace: true }); }).catch(() => {});
-  }, [longChat, pending, roomId, navigate]);
   useEffect(() => { if (ended || (!chat && !audio.connected)) hostRequest.current?.abort(); }, [ended, chat, audio.connected]);
   const [modelBusy, setModelBusy] = useState(false);
   const changeModel = async (model: string) => {
@@ -1047,13 +1143,17 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const on = isLoungeChatRoom(room);
     setVoiceBusy(true); setError('');
     try {
+      // Ending a call: the time since the last tick is counted before the voice is turned off (after it, the server no longer counts).
+      if (!on) await tickLoungeCall(roomId).catch(() => {});
       await setLoungeVoice(roomId, on);
-      callPlaced.current = on;
+      callPlaced.current = on; newCall.current = on;
+      stopRingback();
+      if (on) { setRinging(true); ringback.current = startCallRingback(() => setRinging(false)); }
       // Turning the voice on connects and prepares the microphone again, as on entering a voice room.
       if (on) { autoConnectAttempted.current = false; autoMicAttempted.current = false; }
       setMicPrepared(false);
       await refreshAfterMessage();
-    } catch (err) { if (mounted.current) setError(errorText(err)); }
+    } catch (err) { stopRingback(); if (mounted.current) setError(errorText(err)); }
     finally { if (mounted.current) setVoiceBusy(false); }
   };
   // A conversation that lasts: five minutes connected to an active room, reported once per member.
@@ -1150,16 +1250,20 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     return () => clearTimeout(timer);
   }, [room, roomId, isHost, chat, audio.connected, audio.audioReady, micPrepared, ended, refreshAfterMessage]);
 
-  const hostTurn = useCallback(async (reason: LoungeHostReason, requestKind?: LoungeHelpKind, callStart = false) => {
+  const hostTurn = useCallback(async (reason: LoungeHostReason, requestKind?: LoungeHelpKind, callStart = false, chained?: ReadableStream<Uint8Array>) => {
+    // A reply the transcription request already started (a call): the waits for the member to finish and for the
+    // transcript to settle are over, so only whether it can still be played is checked; if not, it is dropped (the
+    // reply stays in the conversation).
+    const drop = () => { if (chained) void chained.cancel().catch(() => {}); };
     const state = current.current;
-    if (state.room && state.restrictedIds.includes(state.room.host_id)) return;
+    if (state.room && state.restrictedIds.includes(state.room.host_id)) { drop(); return; }
     const speech = state.audio.getSpeechActivity();
     const chatTurn = isLoungeChatRoom(state.room);
-    if (busy.current || transcribing.current || speech.transcribing || !state.isHost || (!chatTurn && (!state.audio.connected || !state.audio.audioReady)) || state.room?.status !== 'active' || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording) return;
-    if (state.room.capacity === 1 && !chatTurn && (Date.now() - Math.max(lastActivity.current, speech.lastVoiceAt) < loungeSoloTiming.endOfTurnMs || Date.now() - inputReadyAt.current < loungeSoloTiming.settleAfterTranscriptMs || Date.now() - lastHostEnded.current < loungeSoloTiming.afterAiMs)) return;
-    if (state.room.guided_session && !['ready', 'free'].includes(state.session?.state ?? '')) return;
-    if (state.room.study_required && !state.room.topic_study) return;
-    if (Date.now() - lastAttempt.current < loungeHostCooldownMs(state.room.capacity, chatTurn)) return;
+    if (busy.current || (!chained && (transcribing.current || speech.transcribing)) || !state.isHost || (!chatTurn && (!state.audio.connected || !state.audio.audioReady)) || state.room?.status !== 'active' || state.audio.aiSpeaking || state.audio.speakers.length || speech.recording) { drop(); return; }
+    if (!chained && state.room.capacity === 1 && !chatTurn && (Date.now() - Math.max(lastActivity.current, speech.lastVoiceAt) < loungeSoloTiming.endOfTurnMs || Date.now() - inputReadyAt.current < loungeSoloTiming.settleAfterTranscriptMs || Date.now() - lastHostEnded.current < loungeSoloTiming.afterAiMs)) return;
+    if (state.room.guided_session && !['ready', 'free'].includes(state.session?.state ?? '')) { drop(); return; }
+    if (state.room.study_required && !state.room.topic_study) { drop(); return; }
+    if (!chained && Date.now() - lastAttempt.current < loungeHostCooldownMs(state.room.capacity, chatTurn)) return;
     const requestAt = state.room.moderator_requested_at;
     const newRequest = reason === 'requested' && (!requestAt || requestAt !== lastModeratorRequest.current);
     if (newRequest) { hostBlocked.current = false; audioBlocked.current = false; nextHostAttempt.current = 0; lastModeratorRequest.current = requestAt ?? null; }
@@ -1167,9 +1271,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     // wait: on 2026-10-23 one failed reply left a chat unanswered, message after message, until the page was reloaded.
     const latestHuman = state.messages.filter(message => message.kind === 'human').at(-1)?.id ?? 0;
     if (state.room.capacity === 1 && (hostBlocked.current || nextHostAttempt.current) && latestHuman > failedAtMessage.current) { hostBlocked.current = false; nextHostAttempt.current = 0; }
-    if (hostBlocked.current || Date.now() < nextHostAttempt.current) return;
+    if (!chained && (hostBlocked.current || Date.now() < nextHostAttempt.current)) return;
+    if (chained && hostBlocked.current) { drop(); return; }
     busy.current = true; lastAttempt.current = Date.now(); setPending(true);
-    if (callStart) callPlaced.current = false;
     const controller = new AbortController(); hostRequest.current = controller;
     const started = performance.now(), requestedAt = Date.now();
     // Unprompted speech yields to people: if anyone starts talking, it is dropped instead of waiting.
@@ -1178,13 +1282,13 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     // Ends this turn for the page. A chat ends it once the reply is saved, while the stream goes on with the photo.
     const release = () => {
       if (released) return;
-      released = true;
+      released = true; if (callStart) stopRingback();
       if (spoke) lastHostEnded.current = Date.now(); if (hostRequest.current === controller) hostRequest.current = null; busy.current = false; if (mounted.current) { setPending(false); if (chatTurn) setChatHostText(''); }
     };
     try {
       const kind = reason === 'requested' ? requestKind ?? state.room.moderator_request_kind ?? undefined : undefined;
       // A voice reply speaks with the engine the member chose (none chosen: the character's own).
-      const response = await requestLoungeHost(roomId, reason, controller.signal, kind, undefined, callStart);
+      const response = chained ? { stream: chained } : await requestLoungeHost(roomId, reason, controller.signal, kind, undefined, callStart);
       if (!mounted.current || controller.signal.aborted) { await response.stream?.cancel(); return; }
       if (response.stream && chatTurn) {
         // A chat reply is text only: show it as soon as it arrives, then reload the room once it is saved.
@@ -1233,7 +1337,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         let timings: Record<string, number> = {};
         await current.current.audio.playHostStream(response.stream, () => {
           quietFailures.current = 0; setError('');
-          spoke = true;
+          spoke = true; stopRingback(); if (callStart) callPlaced.current = false;
           if (mounted.current) setPending(false);
           console.info(`[Lounge latency] ${JSON.stringify({ ...timings, firstAudioMs: Math.round(performance.now() - started) })}`);
         }, value => { timings = value; }, () => {
@@ -1288,7 +1392,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     }
     finally { release(); }
   }, [roomId, refreshAfterMessage]);
-  useEffect(() => { answerNow.current = () => hostTurn('followup'); }, [hostTurn]);
+  useEffect(() => { answerNow.current = () => hostTurn('followup'); answerChained.current = stream => hostTurn('followup', undefined, false, stream); }, [hostTurn]);
   useEffect(() => {
     const interval = setInterval(() => {
       // The prologue is still on screen: the story has not started yet.
@@ -1316,9 +1420,14 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       }
       // A call just placed from the chat: the character answers the phone first. A conversation that has not begun opens
       // as before.
-      if (callPlaced.current && state.room.capacity === 1 && state.messages.some(message => message.kind === 'host')) { void hostTurn('opening', undefined, true); return; }
+      // It stays asked for until the greeting is spoken (a failed first try is tried again), and is dropped once the member has spoken.
+      if (callPlaced.current && state.room.capacity === 1) {
+        if (state.messages.at(-1)?.kind === 'human') callPlaced.current = false;
+        else { void hostTurn('opening', undefined, true); return; }
+      }
       const reason = nextLoungeHostReason(state.room, state.messages, Date.now(), Math.max(lastActivity.current, speech.lastVoiceAt), lastAttempt.current, lastHostEnded.current, inputReadyAt.current);
-      if (reason) void hostTurn(reason);
+      // A one-to-one voice room that opens by itself (no chat before it) is answered as a phone call too.
+      if (reason) void hostTurn(reason, undefined, reason === 'opening' && state.room.capacity === 1 && !state.room.space_id);
     }, viewRoom?.capacity === 1 ? loungeSoloTiming.pollMs : room?.guided_session ? 500 : 3000);
     return () => clearInterval(interval);
   }, [hostTurn, viewRoom?.capacity, room?.guided_session, micPrepared]);
@@ -1338,9 +1447,22 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   useEffect(() => {
     if (!speechPicker || aiSpeaking) return;
     let cancelled = false;
-    void loadLoungeSpeechUsage(roomId).then(result => { if (!cancelled && mounted.current) setSpeechUsage(result.engines); }).catch(() => { /* The picker shows the engines without amounts. */ });
+    void loadLoungeSpeechUsage(roomId).then(result => { if (!cancelled && mounted.current) { setSpeechUsage(result.engines); setCallUsage(result.call ? { ...result.call, at: Date.now() } : null); } }).catch(() => { /* The picker shows the engines without amounts. */ });
     return () => { cancelled = true; };
   }, [roomId, speechPicker, latestSpeechHost, aiSpeaking]);
+  // The call is timed by the server: a tick every 30 seconds while the member's voice call is connected (the first one
+  // starts the clock). The server adds the time since the last tick, so the minutes shown are the minutes spent.
+  // It starts when the character answers (the ringing is over), not when the line is connected.
+  const callTiming = speechPicker && !chat && audio.connected && !ringing && viewRoom?.status === 'active';
+  useEffect(() => {
+    if (!callTiming) return;
+    let first = newCall.current, stopped = false;
+    newCall.current = false;
+    const tick = () => { void tickLoungeCall(roomId, first).then(result => { if (!stopped && mounted.current && result.call) setCallUsage({ ...result.call, at: Date.now() }); }).catch(() => { /* A missed tick is only a few seconds not counted. */ }); first = false; };
+    tick();
+    const timer = window.setInterval(tick, 30_000);
+    return () => { stopped = true; window.clearInterval(timer); void tickLoungeCall(roomId).catch(() => {}); };
+  }, [roomId, callTiming]);
   const askModerator = async (kind: Exclude<LoungeHelpKind, 'direct'>) => {
     if (current.current.room?.capacity === 1) { await hostTurn('requested', kind); return; }
     try { await requestLoungeModerator(roomId, kind); await refreshAfterMessage(); }
@@ -1425,6 +1547,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     options={[{ value: 'on', label: '보기', hint: '대사 아래에 캐릭터의 속마음이 보여요' }, { value: 'off', label: '숨기기', hint: '속마음 대신 말과 행동에 마음이 묻어나요' }]} /> : null;
   const settingsChoices = personaChoice || imageModelChoice || innerVoiceChoice ? <>{innerVoiceChoice}{personaChoice}{imageModelChoice}</> : undefined;
   return <>{memoryOpen && <LoungeMemorySheet characterId={room.host_persona} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} onClose={() => setMemoryOpen(false)} />}{episodeIntro && room.scenario && episode && <LoungeStoryIntro scenario={{ ...room.scenario, title: `${episode.number}화 · ${episode.title}`, prologue: episode.opening || episode.scene }} kicker={`${room.scenario.title} ${episode.number}화`} startLabel={`${episode.number}화 시작하기`} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} portrait={getLoungeHost(room.host_persona).portrait} image={episodeImage} accent={storyTheme.accent} memberName={members.find(member => member.user_id === user.id)?.nickname ?? user.nickname} onStart={startEpisode} />}
-  {storyIntro && room.scenario && <LoungeStoryIntro scenario={room.scenario} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} portrait={getLoungeHost(room.host_persona).portrait} image={storyTheme.image} accent={storyTheme.accent} memberName={members.find(member => member.user_id === user.id)?.nickname ?? user.nickname} onStart={startStory} />}
-  <RoomView settingsItems={settingsItems} settingsChoices={settingsChoices} innerVoice={innerVoice === 'on'} scenario={room.scenario} storyProgress={storyState && room.scenario ? <LoungeStoryProgress title={room.scenario.title} episodes={storyEpisodes} state={storyState} /> : undefined} storyChoice={storyState && isHost ? loungeStoryChoices(storyEpisodes, storyState) : undefined} consult={isHost && isLoungeConsultRoom(room.scenario?.id, room.host_persona) ? readLoungeConsultState(room.story_state) : null} chatModel={getLoungeChatModel(room.ai_model).id} onModelChange={modelChoice ? model => void changeModel(model) : undefined} speechEngine={spokenEngine} speechUsage={speechUsage} modelBusy={modelBusy} photos={photoRoom ? photos : undefined} photoPending={photoPending} photosLeft={photoUsage ? photoUsage.enabled ? Math.max(0, photoUsage.daily - photoUsage.used) : 0 : null} onPhotoRequest={photoRoom ? () => void requestPhoto('request') : undefined} chat={chat} chatHostText={chatHostText} onVoiceToggle={room.capacity === 1 && !room.space_id && room.host_id === user.id && room.voice_on !== undefined ? () => void toggleVoice() : undefined} voiceBusy={voiceBusy} voiceLocked={soloVoiceOut} roomId={roomId} replySuggest={replySuggest} socialMember={!user.isAnonymous} place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={loungeRoomSceneTheme({ ...room, background })} sceneImage={background?.image ? backgroundUrl : null} sceneBlank={Boolean(background?.blank)} backgroundPicker={backgroundPicker} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={chat ? '채팅으로 대화 중' : betaCounting && betaSeconds !== null && !betaOut ? `오늘 ${Math.floor(betaSeconds / 60)}:${String(betaSeconds % 60).padStart(2, '0')} 남음` : room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={betaOut ? betaNotice : roomNotice || betaNotice} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && room.capacity > 1 && !window.confirm('나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} relationshipChange={relationshipChange} /></>;
+  {storyIntro && roomScenario && <LoungeStoryIntro scenario={roomScenario} characterName={getLoungeCharacter(room.host_persona)?.name ?? getLoungeHost(room.host_persona).name} portrait={getLoungeHost(room.host_persona).portrait} image={storyTheme.image} accent={storyTheme.accent} memberName={members.find(member => member.user_id === user.id)?.nickname ?? user.nickname} onStart={startStory} />}
+  <RoomView callUsage={callUsage} ringing={ringing} settingsItems={settingsItems} settingsChoices={settingsChoices} innerVoice={innerVoice === 'on'} scenario={roomScenario} storyProgress={storyState && roomScenario ? <LoungeStoryProgress title={roomScenario.title} episodes={storyEpisodes} state={storyState} /> : undefined} storyChoice={storyState && isHost ? loungeStoryChoices(storyEpisodes, storyState) : undefined} consult={isHost && isLoungeConsultRoom(room.scenario?.id, room.host_persona) ? readLoungeConsultState(room.story_state) : null} chatModel={getLoungeChatModel(room.ai_model).id} onModelChange={modelChoice ? model => void changeModel(model) : undefined} speechEngine={spokenEngine} speechUsage={speechUsage} modelBusy={modelBusy} photos={photoRoom ? photos : undefined} photoPending={photoPending} photosLeft={photoUsage ? photoUsage.enabled ? Math.max(0, photoUsage.daily - photoUsage.used) : 0 : null} onPhotoRequest={photoRoom ? () => void requestPhoto('request') : undefined} chat={chat} chatHostText={chatHostText} onVoiceToggle={room.capacity === 1 && !room.space_id && room.host_id === user.id && room.voice_on !== undefined ? () => void toggleVoice() : undefined} voiceBusy={voiceBusy} voiceLocked={soloVoiceOut} roomId={roomId} replySuggest={replySuggest} socialMember={!user.isAnonymous} place={room.space?.name} topicPicker={topicPicker} now={clock} guidedSession={room.guided_session} session={session} sessionNames={Object.fromEntries(members.map(member => [member.user_id, member.nickname]))} onSessionAction={sessionAction} study={room.topic_study} theme={loungeRoomSceneTheme({ ...room, background })} sceneImage={background?.image ? backgroundUrl : null} sceneBlank={Boolean(background?.blank)} backgroundPicker={backgroundPicker} hostId={room.host_persona} liveHostText={audio.hostText} currentUserId={user.id} topic={room.topic} topicBrief={room.topic_brief} capacity={viewRoom!.capacity} messages={messages} onReleaseRestriction={async targetId => { await releaseLoungeRestriction(roomId, targetId); await refreshAfterMessage(); }} members={seats.map(seat => { const safety = members.find(member => member.user_id === seat.id); return { ...seat, warnings: safety?.moderation_warnings, restrictedUntil: safety?.speaking_restricted_until }; })} speakers={audio.speakers} aiSpeaking={audio.aiSpeaking} pending={pending} status={ended ? 'ended' : room.status} remaining={chat ? '채팅으로 대화 중' : betaCounting && betaSeconds !== null && !betaOut ? `오늘 ${Math.floor(betaSeconds / 60)}:${String(betaSeconds % 60).padStart(2, '0')} 남음` : room.space_id ? `${Math.max(1, present)}명 함께` : room.guided_session ? `약 30분 · ${Math.max(0, Math.floor((clock - Date.parse(room.started_at || new Date(clock).toISOString())) / 60000))}분 함께` : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`} micOn={audio.micOn} connected={audio.connected} connecting={audio.connecting} audioReady={audio.audioReady} starting={starting || (audio.connected && audio.audioReady && !micPrepared)} isHost={isHost && !room.space_id} error={betaOut ? betaNotice : roomNotice || betaNotice} onConnect={() => { if (!audio.connected) void audio.connect(); else if (!audio.audioReady) audio.enableAudio(); else void action('start'); }} onMic={() => { if (audio.micOn) audio.stopMicrophone(); else void audio.startMicrophone(); }} onAsk={kind => void askModerator(kind)} helpRequested={Boolean(room.moderator_requested_at)} onStart={() => void action('start')} onLeave={() => { if (isHost && !room.space_id && !ended && room.capacity > 1 && !window.confirm('나가면 모두의 대화방이 종료돼요. 대화를 마칠까요?')) return; void action('leave'); }} inviteUrl={`${window.location.origin}/lounge/${roomId}`} relationship={relationship} relationshipChange={relationshipChange} /></>;
 }

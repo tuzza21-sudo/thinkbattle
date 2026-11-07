@@ -1,11 +1,16 @@
 import type { RelationshipEventType } from './events.js';
 
-export const commonMetrics = ['trust', 'respect', 'interest', 'comfort', 'openness'] as const;
+/**
+ * Every character is scored on the same three things (2026-11-06): empathy (공감, the heart), romance (설렘, a romantic
+ * conversation that works) and one metric of its own. Interest, respect, comfort and openness were ways of saying the
+ * same thing, and trust (a fourth metric for a day) was one more of them.
+ */
+export const commonMetrics = ['empathy', 'romance'] as const;
 export type CommonMetric = typeof commonMetrics[number];
 export const moodKeys = ['amusement', 'irritation', 'curiosity', 'excitement', 'boredom'] as const;
 export type MoodKey = typeof moodKeys[number];
 export type Mood = Record<MoodKey, number>;
-/** Scores keyed by metric id: the five common metrics plus the character's two unique metrics. */
+/** Scores keyed by metric id: the two common metrics plus the character's own. */
 export type Scores = Record<string, number>;
 
 export type MetricSpec = { id: string; name: string; description: string; labels: readonly [string, string, string, string, string] };
@@ -16,8 +21,6 @@ export type EventEffect = {
 };
 export type StageCondition = {
   min?: Partial<Record<string, number>>; max?: Partial<Record<string, number>>;
-  /** With `segments`: the fun and heart scores added together (0-200) are at least this. */
-  total?: number;
 };
 export type StageRule = {
   id: string;
@@ -37,7 +40,10 @@ export type RelationshipConfig = {
   characterId: string;
   displayName: string;
   core: readonly string[];
-  uniqueMetrics: readonly [MetricSpec, MetricSpec];
+  /** The character's own metric: the one thing that sets how this character grows close. */
+  uniqueMetrics: readonly [MetricSpec];
+  /** Metric ids a stored record may still carry from before 2026-11-06, read into the new ones (see restoreRelationship). */
+  legacy?: { empathy?: readonly string[]; romance?: readonly string[]; unique?: readonly string[] };
   initial: Scores;
   initialMood: Mood;
   /** Character-specific reactions. Events not listed fall back to the shared defaults. */
@@ -47,12 +53,6 @@ export type RelationshipConfig = {
    * at relationshipSettings.offListWeight. Absent, every event counts in full as before.
    */
   mainEvents?: readonly RelationshipEventType[];
-  /**
-   * Two segments the stages are judged on (2026-11-02): fun (interest and the character's playful metric) and heart (the
-   * rest). Each is the mean of its metrics (0-100), and a stage asks for their sum (`enter.total`), so either way of
-   * playing gets there and both together get there first. The metrics themselves still move and still reach the reply.
-   */
-  segments?: { fun: readonly string[]; heart: readonly string[] };
   /** Ordered from the first stage to the closest. The first stage has no conditions. */
   stages: readonly StageRule[];
   responseHints: readonly string[];
@@ -62,7 +62,7 @@ export type RelationshipConfig = {
   casualFromStage?: string;
   /** One-to-one speech is casual (banmal) from the first stage: the two are old friends (윤지안, 2026-11-02). */
   casualFromStart?: boolean;
-  /** The first stage's distance (relationship.reserve) in this character's own terms, for one who leads from the start (선우령, 2026-11-02). */
+  /** Optional character-specific emotional distance at the first stage; shared defaults never override it. */
   firstStageReserve?: string;
   /** One-to-one rooms only: the character may flirt with the adult user, with suggestive tension and mild sexual undertones but nothing explicit. Without it the shared rule forbids romantic and sexual play. */
   adultFlirtation?: boolean;

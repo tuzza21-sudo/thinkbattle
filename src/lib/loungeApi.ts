@@ -169,6 +169,21 @@ export async function loadLounge(id: string) {
   }
   return { room, session, members: results[1].data as LoungeMember[], messages: (results[2].data as LoungeMessage[]).reverse() };
 }
+/** How many earlier messages a one-to-one chat loads at a time (see loadEarlierLoungeMessages). */
+export const loungeHistoryPage = 50;
+/**
+ * The messages before `beforeId` in a member's one-to-one chat, oldest first: the room's own and, since a chat could be
+ * spread over several rooms before 20261208, those of their earlier rooms with the same character (migration
+ * 20261208000200). Without that migration only this room's earlier messages are read.
+ */
+export async function loadEarlierLoungeMessages(roomId: string, beforeId?: number, limit = loungeHistoryPage): Promise<LoungeMessage[]> {
+  const ranked = await supabase.rpc('get_my_lounge_history', { p_room: roomId, p_before: beforeId ?? null, p_limit: limit });
+  if (!ranked.error) return (ranked.data as LoungeMessage[]).slice().reverse();
+  const query = supabase.from('voice_lounge_messages').select('*').eq('room_id', roomId);
+  const own = await (beforeId === undefined ? query : query.lt('id', beforeId)).order('id', { ascending: false }).limit(limit);
+  if (own.error) throw loungeConnectionError(new Error(own.error.message), '대화방 상태 서버');
+  return (own.data as LoungeMessage[]).reverse();
+}
 /**
  * Whether a room has a message newer than `afterId`: one id at most, the cheap check a one-to-one room makes every
  * second instead of reading the room, its members and sixty messages (about 15 KB a second per open room before).
@@ -217,9 +232,41 @@ async function readApiResponse(body: Record<string, unknown>, signal?: AbortSign
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new LoungeApiError('사회자 응답이 비어 있거나 불완전해요. 잠시 뒤 다시 시도해 주세요.', 'lounge_invalid_response');
   return payload;
 }
-export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?: AbortSignal, turnId?: string) {
+/**
+ * A response that began with the `transcribed` event of a chained call (see transcribeLoungeAudio): the rest of the
+ * stream, which is the character's reply as the host request sends it. Null when the response is not one.
+ */
+async function replyAfterTranscript(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  let held = new Uint8Array(0);
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done || !value) return null;
+    const joined = new Uint8Array(held.length + value.length); joined.set(held); joined.set(value, held.length); held = joined;
+    const end = held.indexOf(10);
+    if (end < 0) continue;
+    let lead: { type?: string } | null = null;
+    try { lead = JSON.parse(new TextDecoder().decode(held.slice(0, end))); } catch { /* not ours */ }
+    if (lead?.type !== 'transcribed') { void reader.cancel().catch(() => {}); return null; }
+    const rest = held.slice(end + 1);
+    return new ReadableStream<Uint8Array>({
+      start(controller) { if (rest.length) controller.enqueue(rest); },
+      async pull(controller) { const next = await reader.read(); if (next.done) controller.close(); else controller.enqueue(next.value); },
+      cancel(reason) { return reader.cancel(reason); },
+    });
+  }
+}
+/**
+ * Sends a recording to be written down and saved. With `reply` (a call that is ready to be answered) the server also
+ * starts the character's reply in the same request, and `stream` is that reply; without a stream the page asks for the
+ * reply itself, as it always did.
+ */
+export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?: AbortSignal, turnId?: string, reply = false) {
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
-  return await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}) }, signal) as { posted?: boolean };
+  const result = await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}), ...(reply ? { reply: { ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) } } : {}) }, signal, reply) as { posted?: boolean; stream?: ReadableStream<Uint8Array> };
+  if (!result.stream) return { posted: result.posted } as { posted?: boolean; stream?: ReadableStream<Uint8Array> };
+  const rest = await replyAfterTranscript(result.stream);
+  return rest ? { posted: true, stream: rest } : { posted: true };
 }
 export const requestLoungeHost = (roomId: string, reason: LoungeHostReason, signal?: AbortSignal, requestKind?: LoungeHelpKind, speech?: LoungeSpeechEngine, callStart = false) => apiRequest({ action: 'host', roomId, reason, stream: true, ...(requestKind ? { requestKind } : {}), ...(speech ? { speech } : {}), ...(callStart ? { callStart: true } : {}), ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) }, signal, true) as Promise<{ stream?: ReadableStream<Uint8Array>; skipped?: boolean; audio?: string; text?: string; audioError?: boolean }>;
 /**
@@ -265,8 +312,9 @@ export async function chooseLoungeRoomBackground(roomId: string, choice: LoungeB
   }
 }
 /** The background for where the conversation is now (a story's episode or the chat's scene): picked, or made and shared. */
-export async function matchLoungeSceneBackground(roomId: string) {
-  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'scene', roomId }) }, '배경 서버');
+/** `automatic`: the page asks because the place of the conversation changed; the server then only reuses a background that fits (see sceneBackground). */
+export async function matchLoungeSceneBackground(roomId: string, automatic = false) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'scene', roomId, ...(automatic ? { auto: true } : {}) }) }, '배경 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '장면에 맞는 배경을 찾지 못했어요.', typeof payload?.code === 'string' ? payload.code : `lounge_scene_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { background: unknown };
@@ -320,6 +368,8 @@ export const startLoungeScenario = (id: string, nickname: string, note?: string,
 /** A member's one-to-one conversation in their chat list: the latest with each character they have talked with. */
 export type LoungeChatSummary = { room_id: string; character_id: string; story: string | null; last_text: string; last_kind: string; last_at: string; open: boolean; character_name: string | null; character_portrait: string | null };
 export const listLoungeChats = () => loungeRpc<LoungeChatSummary[]>('list_my_lounge_chats', {});
+/** Deletes the conversation and resets this character's memory and relationship. */
+export const deleteLoungeChat = (roomId: string) => loungeRpc<boolean>('delete_lounge_chat', { p_room: roomId });
 /** Opens a member's own one-to-one conversation again and returns the room to open (a long one goes on in a new room). */
 export const resumeLoungeChat = (roomId: string) => loungeRpc<string>('resume_lounge_chat', { p_room: roomId });
 export const startLoungeCustomChat = (id: string, nickname: string) => loungeRpc<string>('start_lounge_custom_chat', { p_character: id, p_nickname: nickname });
@@ -335,7 +385,11 @@ export const postLoungeText = (roomId: string, text: string) => loungeRpc<void>(
 export const suggestLoungeTopics = (roomId: string) => apiRequest({ action: 'topics', roomId }) as Promise<{ topics?: string[]; skipped?: boolean }>;
 /** What a member has left in each premium voice engine this month (characters), from the server. */
 export type LoungeSpeechUsage = Record<string, { available: boolean; member: boolean; allowed: boolean; used: number; left: number; limit: number; unavailable?: boolean; reason?: 'member' | 'total' }>;
-export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage }>;
+/** The month's time in voice calls, by the minutes actually spent (not characters), and what the plan allows. */
+export type LoungeCallUsage = { usedSeconds: number; limitMinutes: number; plan: 'plus' | 'pro' | null; enforced: boolean; exhausted: boolean };
+export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage; call?: LoungeCallUsage | null }>;
+/** One tick of a voice call, every 30 seconds while it is connected (`start` for the first of a call): the server adds the time. */
+export const tickLoungeCall = (roomId: string, start = false) => apiRequest({ action: 'call-tick', roomId, ...(start ? { start: true } : {}) }) as Promise<{ call?: LoungeCallUsage | null }>;
 export const loadLoungeRelationship = (roomId: string) => apiRequest({ action: 'relationship', roomId }) as Promise<{ enabled: boolean; relationship?: RelationshipView }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {
@@ -353,6 +407,7 @@ export type LoungeMemoryItem = { id: string; kind: string; summary: string; foll
 export type LoungeRelationshipEvent = { type: string; summary: string; at: string; importance: number; turn: number };
 export type LoungeMemoryBook = {
   memories: LoungeMemoryItem[];
+  conversation?: Array<{ id: string; kind: string; summary: string; status: string }>;
   relationship: { stage: string; events: LoungeRelationshipEvent[]; started_at: string; turn_count: number; last_at: string | null } | null;
   milestones: Array<{ from: string | null; to: string; at: string }>;
   limit: number;
@@ -367,18 +422,31 @@ export const forgetMyLoungeEvent = (characterId: string, at: string, summary: st
 const personaFailure = (error: { message?: string; code?: string }) => /schema cache|does not exist|Could not find|42P01/i.test(`${error.message} ${error.code}`)
   ? new Error('페르소나 기능을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.')
   : new Error(/다섯 개/.test(error.message ?? '') ? '페르소나는 다섯 개까지 만들 수 있어요.' : '페르소나를 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+const personaColumns = 'id,title,call_name,job,personality,details,story_character,story,is_default';
+const personaColumnsBefore = 'id,title,call_name,job,personality,details,is_default';
+/** Before migration 20261208000300 the narrative columns are missing: the personas still read and save without them. */
+const missingStoryColumns = (error: { message?: string; code?: string } | null) => Boolean(error && /story/.test(`${error.message}`) && /column|schema cache|42703|PGRST204/i.test(`${error.message} ${error.code}`));
 export async function listMyLoungePersonas() {
-  const { data, error } = await supabase.from('lounge_member_personas').select('id,title,call_name,job,personality,details,is_default').order('created_at');
-  if (error) throw personaFailure(error);
-  return (data ?? []) as LoungeMemberPersonaRow[];
+  const read = (columns: string) => supabase.from('lounge_member_personas').select(columns).order('created_at');
+  let result = await read(personaColumns);
+  if (missingStoryColumns(result.error)) result = await read(personaColumnsBefore);
+  if (result.error) throw personaFailure(result.error);
+  return (result.data ?? []) as unknown as LoungeMemberPersonaRow[];
 }
 export async function saveMyLoungePersona(persona: Omit<LoungeMemberPersonaRow, 'id'> & { id?: string }) {
-  const { id, ...fields } = persona;
-  const { data, error } = id
-    ? await supabase.from('lounge_member_personas').update(fields).eq('id', id).select('id,title,call_name,job,personality,details,is_default').single()
-    : await supabase.from('lounge_member_personas').insert(fields).select('id,title,call_name,job,personality,details,is_default').single();
-  if (error) throw personaFailure(error);
-  return data as LoungeMemberPersonaRow;
+  const { id, ...all } = persona;
+  const write = async (fields: Record<string, unknown>, columns: string) => id
+    ? await supabase.from('lounge_member_personas').update(fields).eq('id', id).select(columns).single()
+    : await supabase.from('lounge_member_personas').insert(fields).select(columns).single();
+  let result = await write(all, personaColumns);
+  if (missingStoryColumns(result.error)) {
+    if (all.story?.trim()) throw new Error('캐릭터와의 서사는 업데이트가 끝난 뒤 저장할 수 있어요. 잠시 뒤 다시 시도해 주세요.');
+    const before: Record<string, unknown> = { ...all };
+    delete before.story_character; delete before.story;
+    result = await write(before, personaColumnsBefore);
+  }
+  if (result.error) throw personaFailure(result.error);
+  return result.data as unknown as LoungeMemberPersonaRow;
 }
 export async function deleteMyLoungePersona(id: string) {
   const { error } = await supabase.from('lounge_member_personas').delete().eq('id', id);

@@ -20,6 +20,7 @@ import {
 import type { SuperAdminDashboard as DashboardData, SuperAdminRecord, SuperAdminSimulationSession } from '../types';
 import { HomepageTopicManager } from './HomepageTopicManager';
 import { LoungeAdminActivity } from './LoungeAdminActivity';
+import { LoungeAdminUsage } from './LoungeAdminUsage';
 import { LoungeBetaLimits } from './LoungeBetaLimits';
 import { LoungeImageLimits } from './LoungeImageLimits';
 import { LoungeCharacterReviews } from './LoungeCharacterReviews';
@@ -179,7 +180,7 @@ export const SuperAdminDashboard = () => {
 
           {activeSection === 'scenarios' && <LoungeScenarioAdmin />}
 
-          {activeSection === 'beta' && <><LoungeBetaLimits /><LoungeImageLimits /><LoungeCharacterReviews /></>}
+          {activeSection === 'beta' && <><LoungeBetaLimits /><LoungeAdminUsage /><LoungeImageLimits /><LoungeCharacterReviews /></>}
 
           {activeSection === 'organizations' && <section className="card admin-panel super-admin-organization-section">
             <div className="super-admin-section-heading">

@@ -10,7 +10,6 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
-import { isSuperAdminUser } from '../lib/superAdmin';
 import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
 /** With group rooms closed there are no open tables to fetch. */
@@ -138,6 +137,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   // What each character's stories are about, shown on its card.
   const [topics, setTopics] = useState<Record<string, string[]>>({});
   useEffect(() => { let cancelled = false; void listLoungeStoryTopics().then(value => { if (!cancelled) setTopics(value); }); return () => { cancelled = true; }; }, []);
+  const memberCast = useMemberCast(user);
   const lobbyCast = [...loungeLobbyCastOrder.map(id => loungeCharacters.find(character => character.id === id)), ...loungeCharacters.filter(character => !loungeLobbyCastOrder.includes(character.id))]
     .filter((character): character is LoungeCharacter => Boolean(character) && !newIds.has(character!.id));
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
@@ -186,10 +186,20 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
             {loungeGroupRoomsEnabled && <p className="lounge-cast-count"><Users size={13} aria-hidden="true" /> {tables ? count ? `${count}개 방에서 대화 중` : '지금은 쉬는 중' : '확인 중'}</p>}
           </li>;
         })}
+        {/* A character on the 신규 캐릭터 row (it is shown there once it is public) is not shown twice; one that is not public yet, or the member's own, stays here. */}
+        {memberCast.rows.filter(row => !(newIds.has(row.id) && row.status === 'public')).map(row => {
+          const portrait = loungeCustomPortrait(row), own = row.owner_id === memberCast.member;
+          return <li key={row.id}>
+            <Link to={`/lounge/characters/${row.id}`} className="lounge-cast-card">
+              {portrait ? <img src={portrait} alt={`${row.name}의 대표 사진`} loading="lazy" /> : <span className="lounge-cast-card-empty" aria-hidden="true">✨</span>}
+              <span><strong>{row.name}</strong><small>{row.sheet.job}</small></span>
+            </Link>
+            {own && <p className="lounge-cast-count">내 캐릭터 · {memberCastStatus[row.status]}</p>}
+          </li>;
+        })}
       </LoungeRow>
     </section>
     <LoungeNewCast topics={topics} />
-    {isSuperAdminUser(user) && <LoungeMemberCast user={user} />}
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
     {selected && <LoungeCharacterSheet key={selected.id} character={selected} spaces={spaces} tables={tables}
       onCreate={() => { closeSheet(); setCreating({ host: selected.id }); }} onClose={closeSheet} />}
@@ -245,37 +255,23 @@ function LoungeNewCast({ topics }: { topics: Record<string, string[]> }) {
 }
 
 const memberCastStatus: Record<LoungeCustomCharacterRow['status'], string> = { private: '나만 대화', pending: '공개 검수 중', public: '공개됨', rejected: '공개 반려' };
-/** Characters members made: the member's own (with where they stand) and public ones from everyone else. */
-function LoungeMemberCast({ user }: { user: AppUser | null }) {
+/**
+ * The characters members made, for the home's cast row (2026-11-07): the member's own, whatever their state (nobody else
+ * sees them), then the ones the administrator approved for everyone. They sit among the house characters; there is no
+ * section of their own.
+ */
+function useMemberCast(user: AppUser | null) {
   const member = user && !user.isAnonymous ? user.id : null;
   const [mine, setMine] = useState<LoungeCustomCharacterRow[]>([]);
   const [shared, setShared] = useState<LoungeCustomCharacterRow[]>([]);
   useEffect(() => {
     let cancelled = false;
-    listPublicLoungeCharacters().then(rows => { if (!cancelled) setShared(rows); }).catch(() => { /* The section waits for the table. */ });
-    if (member) listMyLoungeCharacters(member).then(rows => { if (!cancelled) setMine(rows); }).catch(() => {});
+    listPublicLoungeCharacters().then(rows => { if (!cancelled) setShared(rows); }).catch(() => { /* The row shows the house characters alone. */ });
+    if (member) listMyLoungeCharacters(member).then(rows => { if (!cancelled) setMine(rows); }).catch(() => {});;
     return () => { cancelled = true; };
   }, [member]);
-  const shown = [...(member ? mine : []), ...shared.filter(row => row.owner_id !== member)];
-  if (!shown.length) return null;
-  return <section className="lounge-home-section" aria-labelledby="lounge-member-cast-title">
-    <header className="lounge-home-subhead">
-      <h2 id="lounge-member-cast-title">회원이 만든 캐릭터</h2>
-      <p>내가 만든 캐릭터와, 검수를 거쳐 공개된 다른 회원의 캐릭터예요.</p>
-    </header>
-    <LoungeRow label="회원이 만든 캐릭터" className="lounge-cast-row">
-      {shown.map(row => {
-        const portrait = loungeCustomPortrait(row);
-        return <li key={row.id}>
-          <Link to={`/lounge/characters/${row.id}`} className="lounge-cast-card">
-            {portrait ? <img src={portrait} alt={`${row.name}의 대표 사진`} loading="lazy" /> : <span className="lounge-cast-card-empty" aria-hidden="true">✨</span>}
-            <span><strong>{row.name}</strong><small>{row.sheet.job}</small></span>
-          </Link>
-          <p className="lounge-cast-count">{row.owner_id === member ? `내 캐릭터 · ${memberCastStatus[row.status]}` : '회원이 만든 캐릭터'}</p>
-        </li>;
-      })}
-    </LoungeRow>
-  </section>;
+  const own = member ? mine : [];
+  return { member, rows: [...own, ...shared.filter(row => row.owner_id !== member)] };
 }
 
 /** A character's sheet over the home: who they are, the rooms they are helping now, and the ways to talk with them. */

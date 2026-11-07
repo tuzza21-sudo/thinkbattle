@@ -31,3 +31,11 @@
 .lounge-host-section .lounge-host-group { text-align:center; }
 .lounge-host-section .lounge-host-group h3 { justify-content:center; }
 @media(min-width:1025px) { .lounge-host-section .lounge-host-options.centered { grid-template-columns:repeat(2,minmax(0,1fr)); width:calc(50% - 6px); margin-left:auto; margin-right:auto; } }
+
+/* A character a member made has a tall photo (2:3) where the house characters have a square head-and-shoulders one. The photo
+   used to give the frame its height (the frame is "height:100%" of a parent that has none of its own), so a tall one made a
+   tall oval in a call and in the chat. Now the photo only fills the frame, and the frame is square when nothing else sizes it,
+   so every character is framed alike, round in a call. Cropped from near the top, a face is not cut off. */
+.lounge-host-photo { position: relative; aspect-ratio: 1 / 1; }
+.lounge-host-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; }
+.lounge-chat-portrait img { object-position: 50% 14%; }

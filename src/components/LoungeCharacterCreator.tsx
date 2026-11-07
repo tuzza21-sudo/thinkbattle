@@ -3,7 +3,7 @@ import { ArrowLeft, BookOpen, Camera, Check, LoaderCircle, MessageCircle, Play, 
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import {
-  LoungeCharacterError, chooseLoungeCharacterPortrait, draftLoungeCharacter, makeLoungeCharacterPortrait, saveLoungeCharacter,
+  LoungeCharacterError, draftLoungeCharacter, saveLoungeCharacter,
   setLoungeCustomStatus, startLoungeCustomChat, uploadLoungeCharacterPortrait, writeLoungeCharacterPrologue,
 } from '../lib/loungeApi';
 import {
@@ -52,9 +52,10 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
   const [theme, setTheme] = useState<string>(loungeCustomThemes[0].id);
   const [drafted, setDrafted] = useState(false);
   const [row, setRow] = useState<LoungeCustomCharacterRow | null>(null);
-  const [candidate, setCandidate] = useState<{ path: string; url: string } | null>(null);
   const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState<'draft' | 'prologue' | 'save' | 'portrait' | 'choose' | 'upload' | 'chat' | 'submit' | null>(null);
+  // Asked for at the start: the character is private until the administrator has looked at it and made it public.
+  const [wantPublic, setWantPublic] = useState(false);
+  const [busy, setBusy] = useState<'draft' | 'prologue' | 'save' | 'upload' | 'chat' | 'submit' | null>(null);
   const [problems, setProblems] = useState<Array<{ field: string; message: string }>>([]);
   const [notice, setNotice] = useState<{ kind: 'error' | 'done'; text: string } | null>(null);
   const [loading, setLoading] = useState(Boolean(editId));
@@ -95,23 +96,24 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
     set('gender', gender);
     if (gender !== 'other' && !loungeListedVoicePresets(gender).some(preset => preset.id === voice)) setVoice(loungeListedVoicePresets(gender)[0].id);
   };
+  // The request to make the character public goes in once it has a portrait (the database asks for one).
+  const requestPublic = async (character: LoungeCustomCharacterRow) => {
+    if (!wantPublic || !character.portrait_path || !['private', 'rejected'].includes(character.status)) return character;
+    const status = await setLoungeCustomStatus(character.id, 'submit');
+    return { ...character, status: status as LoungeCustomCharacterRow['status'] };
+  };
   const save = () => run('save', async () => {
-    const result = await saveLoungeCharacter({ ...(row ? { id: row.id } : {}), sheet, template, flirtation, voice, theme });
-    setRow(result.character); registerLoungeCustomRow(result.character);
-    setNotice({ kind: 'done', text: result.character.status === 'pending' ? '저장했어요. 공개 중이던 캐릭터라 바뀐 내용은 다시 검수를 거쳐요.' : '저장했어요. 이제 대표 사진을 정해 주세요.' });
-  });
-  const makePortrait = () => run('portrait', async () => { if (row) setCandidate(await makeLoungeCharacterPortrait(row.id, sheet.portraitPrompt)); });
-  const choose = () => run('choose', async () => {
-    if (!row || !candidate) return;
-    const result = await chooseLoungeCharacterPortrait(row.id, candidate.path);
-    setRow(result.character); registerLoungeCustomRow(result.character); setCandidate(null);
-    setNotice({ kind: 'done', text: '대표 사진을 정했어요. 이 얼굴로 대화 중에 사진도 보낼 수 있어요.' });
+    const saved = await saveLoungeCharacter({ ...(row ? { id: row.id } : {}), sheet, template, flirtation, voice, theme });
+    const character = await requestPublic(saved.character);
+    setRow(character); registerLoungeCustomRow(character);
+    setNotice({ kind: 'done', text: character.status === 'pending' ? (saved.character.status === 'pending' ? '저장했어요. 공개 중이던 캐릭터라 바뀐 내용은 다시 검수를 거쳐요.' : '저장하고 공개를 신청했어요. 관리자가 확인한 뒤 공개돼요.') : wantPublic && !character.portrait_path ? '저장했어요. 대표 사진을 올리면 공개 신청이 들어가요.' : '저장했어요. 이제 대표 사진을 올려 주세요.' });
   });
   const upload = (file: File) => run('upload', async () => {
     if (!row) return;
     const result = await uploadLoungeCharacterPortrait(row.id, await smallerImage(file));
-    setRow(result.character); registerLoungeCustomRow(result.character); setCandidate(null);
-    setNotice({ kind: 'done', text: '대표 사진으로 정했어요. 올린 사진으로는 대화 중 사진을 만들지 않아요.' });
+    const character = await requestPublic(result.character);
+    setRow(character); registerLoungeCustomRow(character);
+    setNotice({ kind: 'done', text: character.status === 'pending' ? '대표 사진으로 정하고 공개를 신청했어요. 관리자가 확인한 뒤 공개돼요.' : '대표 사진으로 정했어요. 올린 사진으로는 대화 중 사진을 만들지 않아요.' });
   });
   const startChat = () => run('chat', async () => { if (row) navigate(`/lounge/${await startLoungeCustomChat(row.id, user.nickname)}`); });
   const submit = () => run('submit', async () => {
@@ -194,7 +196,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
       <details>
         <summary>더 다듬기 <small>선택 · 비워 두면 AI가 채워요</small></summary>
         <Field label="한 줄 소개" hint={`${rules.tagline[0]}~${rules.tagline[1]}자`} problem={problemFor('tagline')}><input value={sheet.tagline} maxLength={rules.tagline[1]} onChange={event => set('tagline', event.target.value)} /></Field>
-        <Field label="외모" hint="대표 사진과 대화 중 사진에 쓰여요" problem={problemFor('look')}><textarea rows={2} value={sheet.look} maxLength={rules.look[1]} onChange={event => set('look', event.target.value)} /></Field>
+        <Field label="외모" hint="소개 화면에 보여요" problem={problemFor('look')}><textarea rows={2} value={sheet.look} maxLength={rules.look[1]} onChange={event => set('look', event.target.value)} /></Field>
         <Field label="첫 인사" problem={problemFor('greeting')}><input value={sheet.greeting} maxLength={rules.greeting[1]} onChange={event => set('greeting', event.target.value)} /></Field>
         <h3>관계 유형</h3>
         <div className="lounge-creator-choices" role="radiogroup" aria-label="관계 유형">
@@ -205,25 +207,19 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
           <Field label="대화할 장소"><select value={theme} onChange={event => setTheme(event.target.value)}>{loungeCustomThemes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         </div>
       </details>
+      {(!row || row.status === 'private' || row.status === 'rejected') && <label className="lounge-creator-check"><input type="checkbox" checked={wantPublic} onChange={event => setWantPublic(event.target.checked)} /> 다른 사람에게도 공개하고 싶어요 (관리자가 확인한 뒤 공개돼요. 신청하지 않으면 나만 볼 수 있어요)</label>}
       <button type="button" className="lounge-character-cta" onClick={() => void save()} disabled={Boolean(busy)}>{busy === 'save' ? <LoaderCircle size={16} className="lounge-spin" /> : <Check size={16} />}{busy === 'save' ? '검수하는 중…' : row ? '고친 내용 저장' : '저장하기'}</button>
     </section>
 
     {row && <section className="lounge-creator-step">
       <h2><span>7</span> 대표 사진</h2>
       <div className="lounge-creator-portrait">
-        <figure>{candidate ? <img src={candidate.url} alt="새로 만든 대표 사진 후보" /> : portraitUrl ? <img src={portraitUrl} alt={`${row.name}의 대표 사진`} /> : <span><Camera size={28} />아직 사진이 없어요</span>}{candidate && <figcaption>후보</figcaption>}</figure>
+        <figure>{portraitUrl ? <img src={portraitUrl} alt={`${row.name}의 대표 사진`} /> : <span><Camera size={28} />아직 사진이 없어요</span>}</figure>
         <div>
-          <p className="lounge-character-lead">아래 묘사와 외모 설명으로 AI가 사진을 만들어요(하루 10장). 이 얼굴로 대화 중에 사진도 보낼 수 있어요.</p>
-          <Field label="어떤 모습으로 그릴까요?" hint="얼굴, 머리, 옷, 표정, 분위기, 배경 (선택)" problem={problemFor('portraitPrompt')}>
-            <textarea rows={3} value={sheet.portraitPrompt} maxLength={rules.portraitPrompt[1]} onChange={event => set('portraitPrompt', event.target.value)} placeholder="예: 날렵한 턱선에 웨이브 진 검은 머리, 오버핏 베이지 니트, 살짝 웃는 눈매. 창가의 따뜻한 오후 햇살." />
-          </Field>
-          <div className="lounge-character-actions">
-            <button type="button" className="lounge-character-secondary" onClick={() => void makePortrait()} disabled={Boolean(busy)}>{busy === 'portrait' ? <LoaderCircle size={15} className="lounge-spin" /> : <Wand2 size={15} />}{candidate || portraitUrl ? '다시 만들기' : 'AI로 만들기'}</button>
-            {candidate && <button type="button" className="lounge-character-cta" onClick={() => void choose()} disabled={Boolean(busy)}>{busy === 'choose' ? <LoaderCircle size={15} className="lounge-spin" /> : <Check size={15} />}이 사진으로 정하기</button>}
-          </div>
+          <p className="lounge-character-lead">대표 사진은 직접 올려 주세요(JPG·PNG·WebP). 올린 사진은 프로필과 대화 화면에 쓰이고, 대화 중 사진은 따로 만들어지지 않아요.</p>
           <div className="lounge-creator-upload">
-            <label className="lounge-creator-check"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> 직접 만들었거나 쓸 권리가 있는 이미지이고, 실존 인물을 흉내 내지 않아요. 올린 사진은 프로필에만 쓰이고 대화 중 사진은 만들어지지 않아요.</label>
-            <label className={`lounge-character-secondary ${!consent || busy ? 'disabled' : ''}`}>{busy === 'upload' ? <LoaderCircle size={15} className="lounge-spin" /> : <Upload size={15} />}내 이미지 올리기
+            <label className="lounge-creator-check"><input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} /> 직접 만들었거나 쓸 권리가 있는 이미지이고, 실존 인물을 흉내 내지 않아요.</label>
+            <label className={`lounge-character-secondary ${!consent || busy ? 'disabled' : ''}`}>{busy === 'upload' ? <LoaderCircle size={15} className="lounge-spin" /> : <Upload size={15} />}{portraitUrl ? '다른 이미지로 바꾸기' : '내 이미지 올리기'}
               <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={!consent || Boolean(busy)} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(file); }} /></label>
           </div>
         </div>

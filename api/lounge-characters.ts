@@ -119,6 +119,8 @@ async function save(context: Context, body: Record<string, unknown>) {
 }
 
 async function portrait(context: Context, body: Record<string, unknown>) {
+  // A portrait made by the AI costs an image each time, so members upload their own (2026-11-07). LOUNGE_CUSTOM_PORTRAIT_AI=on brings it back.
+  if (process.env.LOUNGE_CUSTOM_PORTRAIT_AI !== 'on') throw new LoungeCharacterError('대표 사진은 직접 올려 주세요.', 403, 'lounge_character_portrait_upload_only');
   let row = await ownCharacter(context, body.id);
   // The member's description of how to draw them is kept on the sheet for the next try.
   const description = normalizeLoungeCustomSheet({ portraitPrompt: body.prompt }).portraitPrompt;
@@ -128,7 +130,7 @@ async function portrait(context: Context, body: Record<string, unknown>) {
   if (await claim.json() !== true) throw new LoungeCharacterError('오늘은 대표 사진을 10장까지 만들 수 있어요. 내일 다시 시도해 주세요.', 429, 'lounge_character_portrait_limit');
   const response = await timed('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { Authorization: `Bearer ${context.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
     model: process.env.LOUNGE_PORTRAIT_MODEL || 'gpt-image-2.5-flare', prompt: loungeCustomPortraitPrompt(normalizeLoungeCustomSheet(row.sheet)),
-    size: '1024x1536', quality: process.env.LOUNGE_IMAGE_QUALITY || 'medium', output_format: 'webp', output_compression: 82,
+    size: '1024x1536', quality: process.env.LOUNGE_IMAGE_QUALITY || 'low', output_format: 'webp', output_compression: 82,
   }) }, 150_000);
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;

@@ -154,3 +154,12 @@
 .lounge-persona-add small { color:#9fae98; }
 .lounge-persona-form { padding:14px; border:1px solid #ffffff1f; border-radius:14px; background:#ffffff06; }
 .lounge-persona-form-actions { display:flex; justify-content:flex-end; align-items:center; gap:10px; }
+/* A persona's narrative with one character (2026-11-07). */
+.lounge-persona-story { display:grid; gap:10px; margin:4px 0 0; padding:12px; border:1px solid #dbc28e40; border-radius:12px; background:#dbc28e0a; }
+.lounge-persona-story legend { padding:0 6px; color:#f1eadb; font-size:13px; font-weight:700; }
+.lounge-persona-story legend small { margin-left:4px; color:#9fae98; font-weight:400; }
+.lounge-persona-story p { margin:0; color:#b9c2b1; font-size:12px; line-height:1.6; }
+.lounge-persona-story select { width:100%; padding:10px 12px; border:1px solid #ffffff2e; border-radius:10px; background:#1d2520; color:#f1eadb; font:inherit; }
+.lounge-persona-count { justify-self:end; color:#9fae98; font-size:11px; }
+.lounge-persona-warning { color:#ffc48f !important; }
+.lounge-persona-list .lounge-persona-story-tag { width:fit-content; padding:1px 7px; border-radius:999px; background:#dbc28e26; color:#e6c994; font-size:10.5px; }

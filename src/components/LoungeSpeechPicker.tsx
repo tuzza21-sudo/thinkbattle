@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { AudioLines, Check, ChevronDown } from 'lucide-react';
-import { getLoungeSpeechEngine, loungeSpeechCharsPerMinute, loungeSpeechEngines, type LoungeSpeechEngine } from '../lib/lounge';
+import { getLoungeSpeechEngine, loungeSpeechEngines, type LoungeSpeechEngine } from '../lib/lounge';
 import type { LoungeSpeechUsage } from '../lib/loungeApi';
 
 /** What a premium engine offers this member now: a line under its name, and whether it can be chosen. */
@@ -11,8 +11,8 @@ function premiumState(engine: LoungeSpeechEngine, usage?: LoungeSpeechUsage) {
   if (!status.available) return { note: '곧 열려요', blocked: true };
   if (status.unavailable) return { note: '지금은 쓸 수 없어요', blocked: true };
   if (!status.allowed) return { note: status.reason === 'total' ? '이번 달 사용량이 모두 찼어요' : '이번 달 분량을 모두 썼어요 · 다음 달에 다시 열려요', blocked: true };
-  const minutes = Math.floor(status.left / loungeSpeechCharsPerMinute);
-  return { note: minutes >= 1 ? `이번 달 약 ${minutes}분 남음` : '이번 달 1분 미만 남음', blocked: false };
+  // What is left is not shown as minutes: the member's month is counted in the minutes spent in calls (the call screen).
+  return { note: '', blocked: false };
 }
 
 /**

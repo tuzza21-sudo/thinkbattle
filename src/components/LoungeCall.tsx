@@ -3,12 +3,18 @@ import { Headphones, LoaderCircle, MessageCircle, Mic, MicOff, PhoneOff, Sparkle
 import type { LoungeHostId } from '../lib/lounge';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { useScreenWakeLock } from '../lib/useScreenWakeLock';
+import { loungeCallAllowanceText } from '../lib/loungePlans';
+import type { LoungeCallUsage } from '../lib/loungeApi';
 import './LoungeCall.css';
 
 export type LoungeCallProps = {
   hostId: LoungeHostId; name: string; job?: string; place: string;
   /** The time left today or in the room, as the room shows it. */
   remaining: string;
+  /** This month's time in calls as the server counted it, and when ("이번 달 통화 12분 34초 / 60분"); the screen adds the seconds since. */
+  usage?: (LoungeCallUsage & { at: number }) | null;
+  /** The call was just placed and the character has not picked up: nothing of the call's own state (mute) shows yet. */
+  ringing?: boolean;
   preview?: boolean; lobby: boolean; connecting?: boolean; connected: boolean; audioReady?: boolean; starting?: boolean; needsConnection: boolean;
   micOn: boolean; micDisabled: boolean; hostSpeaking: boolean; userSpeaking: boolean; pending: boolean; replyDelayed: boolean;
   topicDisabled: boolean; chatDisabled?: boolean; chatBusy?: boolean;
@@ -28,15 +34,17 @@ export function LoungeCall(props: LoungeCallProps) {
   // A call keeps the screen on, as a phone call does: a screen turning off stopped the page and dropped the call.
   useScreenWakeLock(!props.preview);
   const live = !props.preview && !props.lobby && !props.needsConnection;
-  // The call time counts from the moment the call is connected, as on a phone.
+  // The call time counts from the moment the character answers, as on a phone (not while it is ringing).
   const startedAt = useRef<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  if ((live || props.preview) && startedAt.current === null) startedAt.current = Date.now();
+  const answered = live && !props.ringing;
+  if ((answered || props.preview) && startedAt.current === null) startedAt.current = Date.now();
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
-  const status = props.connecting ? '연결 중…'
+  const status = props.ringing && !props.preview ? '전화 거는 중…'
+    : props.connecting ? '연결 중…'
     : props.needsConnection ? !props.connected ? '연결이 끊겼어요' : !props.audioReady ? '소리를 켜면 통화가 시작돼요' : props.lobby ? '전화 거는 중…' : '통화가 잠시 멈췄어요'
     : props.lobby ? '전화 거는 중…'
     : props.hostSpeaking ? '말하는 중'
@@ -52,6 +60,7 @@ export function LoungeCall(props: LoungeCallProps) {
       <span className="lounge-call-place">{props.preview ? '통화 미리보기' : props.place}</span>
       <span className="lounge-call-remaining">{props.remaining}</span>
     </header>
+    {props.usage && <p className="lounge-call-allowance">{loungeCallAllowanceText(props.usage, answered ? Math.min(60, Math.max(0, Math.floor((now - props.usage.at) / 1000))) : 0)}</p>}
     {props.notice}
     <div className="lounge-call-person">
       <div className="lounge-call-portrait"><span className="lounge-call-ring" aria-hidden="true" /><span className="lounge-call-ring second" aria-hidden="true" /><LoungeHostPortrait hostId={props.hostId} /></div>
@@ -65,8 +74,8 @@ export function LoungeCall(props: LoungeCallProps) {
       {props.error && <p className="lounge-call-error" role="alert">{props.error}</p>}
       {props.options && <div className="lounge-room-controls lounge-call-options">{props.options}</div>}
       <div className="lounge-call-buttons">
-        <button type="button" className={`lounge-call-button ${props.micOn ? '' : 'muted'}`} onClick={props.onMic} disabled={props.micDisabled} aria-pressed={!props.micOn}>
-          <span>{props.micOn ? <Mic size={24} /> : <MicOff size={24} />}</span>{props.micOn ? '음소거' : '음소거 해제'}
+        <button type="button" className={`lounge-call-button ${props.micOn || props.ringing ? '' : 'muted'}`} onClick={props.onMic} disabled={props.micDisabled} aria-pressed={!props.micOn && !props.ringing}>
+          <span>{props.micOn || props.ringing ? <Mic size={24} /> : <MicOff size={24} />}</span>{props.micOn || props.ringing ? '음소거' : '음소거 해제'}
         </button>
         <button type="button" className="lounge-call-button" onClick={props.onTopic} disabled={props.topicDisabled}><span><Sparkles size={24} /></span>화제 던지기</button>
         {props.onChat && <button type="button" className="lounge-call-button" onClick={props.onChat} disabled={props.chatDisabled}><span>{props.chatBusy ? <LoaderCircle size={24} className="lounge-spin" /> : <MessageCircle size={24} />}</span>채팅으로</button>}

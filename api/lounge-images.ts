@@ -56,7 +56,7 @@ async function writeScene(context: Context, characterId: string, kind: 'chat' | 
 /** A made image: its bytes and type (GPT gives webp, FLUX jpeg). */
 type MadeImage = { bytes: Uint8Array<ArrayBuffer>; type: string; ext: string };
 const webp = (bytes: Uint8Array<ArrayBuffer>): MadeImage => ({ bytes, type: 'image/webp', ext: 'webp' });
-const gptQuality = (model: LoungeImageModel) => model === 'gpt-low' ? 'low' : process.env.LOUNGE_IMAGE_QUALITY || 'medium';
+const gptQuality = (model: LoungeImageModel) => model === 'gpt-low' ? 'low' : process.env.LOUNGE_IMAGE_QUALITY || 'low';
 const bytesToBase64 = (bytes: Uint8Array) => { let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
 
 /**
@@ -239,16 +239,22 @@ async function gptBackground(context: Context, request: string, model: LoungeIma
  * the two settled, when it was), else the scene the chat's summary keeps, else the story's first place. A story episode
  * that already has a shared scene gets it at once; otherwise the model picks a place or a shared scene that fits, or a
  * new one is made and shared. Saved on the room as chosen for the scene (`auto`), with the episode it is for.
+ * `automatic` (2026-11-07) is the page asking because the place of the conversation changed (a restaurant, a hotel room, a
+ * kitchen): only the scene the summary keeps counts, a background the member chose is left alone, one that already fits
+ * is not written again, and nothing is made (LOUNGE_AUTO_SCENE=make allows it, =off stops the whole thing): without a
+ * place or a shared scene that fits, the background stays as it is.
  */
-async function sceneBackground(context: Context, userId: string, roomId: string) {
-  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory`, { headers: serviceHeaders(context) });
-  const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown }> : [];
+async function sceneBackground(context: Context, userId: string, roomId: string, automatic = false) {
+  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory,background`, { headers: serviceHeaders(context) });
+  const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown; background?: Record<string, unknown> | null }> : [];
   if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
+  const autoMode = process.env.LOUNGE_AUTO_SCENE === 'off' ? 'off' : process.env.LOUNGE_AUTO_SCENE === 'make' ? 'make' : 'reuse';
+  if (automatic && (autoMode === 'off' || (room.background && room.background.auto !== true))) return json({ background: null });
   const scenario = normalizeLoungeRoomScenario(room.scenario);
   const episodes = loungeStoryEpisodesOn ? scenario?.episodes ?? [] : [];
   const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
   const episode = state ? loungeStoryEpisodeAt(episodes, state) : undefined;
-  const scene = episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;
+  const scene = automatic ? loungeSceneFromMemory(room.memory) : episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;
   if (!scene) return json({ background: null });
   const key = scenario && episode ? loungeSceneKey(scenario.id, episode.number, state?.adapted ? episode.scene : undefined) : undefined;
   const saveOnRoom = async (background: Record<string, unknown>) => {
@@ -281,10 +287,14 @@ async function sceneBackground(context: Context, userId: string, roomId: string)
   if (match && 'id' in match) {
     const chosen = match.id;
     const theme = loungeThemes.find(item => item.id === chosen);
+    // An automatic ask that finds the background already there changes nothing.
+    if (theme && automatic && room.background?.theme === theme.id) return json({ background: null });
     if (theme) return saveOnRoom({ theme: theme.id });
     const row = shared.find(item => item.id === chosen);
+    if (row && automatic && room.background?.scene === row.id) return json({ background: null });
     if (row) return sharedScene(row);
   }
+  if (automatic && autoMode !== 'make') return json({ background: null });
   const place = match && 'place' in match ? match.place : scene;
   // A new scene, within the member's allowance for the day; past it (or when it fails) the empty space.
   const kst = new Date(Date.now() + 9 * 3_600_000);
@@ -354,7 +364,7 @@ async function handle(req: Request) {
     if (!authorization?.startsWith('Bearer ')) return json({ error: '로그인이 필요합니다.' }, 401);
     const raw = await req.text();
     if (raw.length > 2000) return json({ error: '요청이 너무 큽니다.' }, 413);
-    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown };
+    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown; auto?: unknown };
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = body.roomId;
     const background = body.action === 'background' || body.action === 'scene';
@@ -366,7 +376,7 @@ async function handle(req: Request) {
     if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
     const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
     const model: LoungeImageModel = isLoungeImageModel(body.imageModel) ? body.imageModel : 'gpt';
-    if (body.action === 'scene') return await sceneBackground(context, user.id, roomId);
+    if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
     if (background) return await memberBackground(context, user.id, roomId, request, model);
     return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request, model);
   } catch (error) {

@@ -132,3 +132,44 @@ test('guests cannot receive photos and the daily run needs the cron secret', asy
     assert.equal((await handler(new Request('https://app.test/api/lounge-images', { headers: { authorization: 'Bearer wrong' } }))).status, 401);
   });
 });
+
+test('the place of a scene line is what comes before its first dash or comma', () => {
+  assert.equal(photos.loungeScenePlace('식당 — 저녁을 먹는 중'), '식당');
+  assert.equal(photos.loungeScenePlace('호텔 객실, 창가에서 와인을 따르는 중'), '호텔 객실');
+  assert.equal(photos.loungeScenePlace('주방 - 같이 요리'), '주방');
+  assert.equal(photos.loungeScenePlace('카페'), '카페');
+  assert.equal(photos.loungeScenePlace('식당  —  저녁'), photos.loungeScenePlace('식당 — 점심'), 'what they do there does not change the place');
+});
+
+test('a background that follows the place (automatic): a place that fits is saved, a member\'s own choice and a background that already fits are left, and nothing is made', async () => {
+  const ask = async ({ background = null, choice, shared = [], env = {} }) => {
+    const calls = { patched: null, images: 0, matched: 0 };
+    Object.assign(process.env, env);
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/v1/user')) return result({ id: userId });
+        if (url.includes('voice_lounge_rooms?id=eq.') && (init?.method ?? 'GET') === 'GET') return result([{ scenario: null, story_state: null, memory: '지금 장면: 호텔 객실 — 와인을 따르는 중', background }]);
+        if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { calls.patched = JSON.parse(init.body).background; return result([]); }
+        if (url.includes('lounge_scene_backgrounds?select=')) return result(shared);
+        if (url.endsWith('/responses')) { calls.matched++; return result(sceneOutput({ choice, place: choice === 'new' ? '밤의 호텔 객실, 창가의 낮은 조명' : '' })); }
+        if (url.includes('/images/generations') || url.includes('/storage/')) { calls.images++; return result({}); }
+        throw new Error('Unexpected call ' + url);
+      }, async () => { calls.response = await (await handler(request({ action: 'scene', roomId, auto: true }))).json(); });
+    } finally { for (const key of Object.keys(env)) delete process.env[key]; }
+    return calls;
+  };
+  const sharedRoom = { id: '11111111-1111-4111-8111-111111111111', scene_key: null, description: '밤의 호텔 객실, 창가의 낮은 조명', image_path: 'scenes/room.webp' };
+  const fits = await ask({ choice: sharedRoom.id, shared: [sharedRoom] });
+  assert.deepEqual(fits.patched, { scene: sharedRoom.id, image: 'scenes/room.webp', prompt: sharedRoom.description, auto: true }, 'the shared scene for a hotel room is used');
+  assert.equal(fits.response.background.scene, sharedRoom.id);
+  const theme = await ask({ choice: 'cafe' });
+  assert.deepEqual(theme.patched, { theme: 'cafe', auto: true }, 'one of the places');
+  const same = await ask({ choice: 'cafe', background: { theme: 'cafe', auto: true } });
+  assert.equal(same.patched, null, 'a background that already fits is not written again'); assert.equal(same.response.background, null);
+  const chosen = await ask({ choice: 'cafe', background: { theme: 'river' } });
+  assert.equal(chosen.matched, 0, 'a background the member chose is left alone (no model call)'); assert.equal(chosen.patched, null);
+  const none = await ask({ choice: 'new' });
+  assert.equal(none.patched, null, 'no place fits: the background stays as it is, not the empty space'); assert.equal(none.images, 0, 'and nothing is made'); assert.equal(none.response.background, null);
+  const off = await ask({ choice: 'cafe', env: { LOUNGE_AUTO_SCENE: 'off' } });
+  assert.equal(off.matched, 0); assert.equal(off.patched, null);
+});

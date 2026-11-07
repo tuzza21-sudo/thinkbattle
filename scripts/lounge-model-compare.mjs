@@ -1,3 +1,5 @@
+// Default: offline request comparison. Add --live to send paid requests (Luna only by default).
+// --room uses today's stored snapshot, not a historical reconstruction.
 // Compares conversation models on the reply the lounge really asks for (2026-10-30).
 //   node scripts/lounge-model-compare.mjs [out.json] [model[:effort] ...]
 // Each scene runs 선우령's 《검은 장미》 through the real handler (api/lounge.ts) with the database faked, so the request
@@ -13,6 +15,7 @@ import ts from 'typescript';
 import { loadTs } from './lounge-ts-loader.mjs';
 dotenv.config({ path: '.env.local', quiet: true });
 const realKey = process.env.OPENAI_API_KEY;
+const live = process.argv.includes('--live') && !process.argv.includes('--dry');
 const here = path => new URL(path, import.meta.url);
 const compile = (path, require = () => {}) => {
   const exports = {};
@@ -25,7 +28,9 @@ const study = compile('../src/lib/loungeStudy.ts'), filmStudy = compile('../src/
 const repliesLib = compile('../src/lib/loungeReplies.ts'), modelsLib = compile('../src/lib/loungeModels.ts'), storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : undefined);
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const turnsLib = load('../src/lib/loungeTurnPersistence.ts');
+const consultLib = load('../src/lib/loungeConsult.ts'), sajuLib = load('../src/lib/loungeSaju.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeTurnPersistence') ? turnsLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 
 const story = JSON.parse(readFileSync(here('../docs/stories/velvet-black-rose.json'), 'utf8'));
 const scenario = { id: story.id, title: story.title, prologue: story.prologue, user_role: story.user_role, relationship: story.relationship, place: story.place, episodes: story.episodes };
@@ -144,7 +149,7 @@ async function roomScenes(id) {
   const before = args.find(arg => arg.startsWith('--before='))?.slice(9);
   const all = await read(`voice_lounge_messages?room_id=eq.${id}${before ? `&created_at=lt.${encodeURIComponent(before)}` : ''}&order=id.desc&limit=80&select=id,user_id,nickname,kind,text,created_at`);
   const [relationship] = await read(`voice_lounge_relationships?user_id=eq.${room.host_id}&character_id=eq.${room.host_persona}&select=*`);
-  const memories = await read(`voice_lounge_memories?user_id=eq.${room.host_id}&select=*`);
+  const memories = await read(`voice_lounge_memories?user_id=eq.${room.host_id}&character_id=eq.${room.host_persona}&source_room=eq.${id}&select=*`);
   const sceneLine = args.find(arg => arg.startsWith('--scene='))?.slice(8);
   const memory = sceneLine ? [sceneLine, ...String(room.memory ?? '').split('\n').slice(1)].join('\n') : String(room.memory ?? '');
   const turns = Number(args.find(arg => arg.startsWith('--turns='))?.slice(8) ?? 4);
@@ -168,21 +173,22 @@ async function capture(scene) {
     if (url.includes('/auth/')) return result({ id: 'user-1' });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
     if (url.includes('lounge_member_personas?')) return result(scene.persona ? [{ id: 'p1', is_default: true, ...scene.persona }] : []);
+    if (url.includes('voice_lounge_companion_state?')) return result([]);
     if (url.includes('voice_lounge_memories?')) return result(scene.memories ?? []);
     if (url.includes('voice_lounge_relationships?')) return result([scene.row ?? row]);
     if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
     if (url.includes('score_voice_lounge_memories')) return result([]);
-    if (url.includes('voice_lounge_rooms?') && scene.room) return result([{ ...scene.room, memory: scene.memory, voice_on: false, space_id: null }]);
+    if (url.includes('voice_lounge_rooms?') && scene.room) return result([{ ...scene.room, companion_chat: undefined, memory: scene.memory, voice_on: false, space_id: null }]);
     if (url.includes('voice_lounge_rooms?')) return result([{ topic: ('scenario' in scene ? scene.scenario?.title ?? '저녁 대화' : scenario.title), host_persona: scene.host ?? 'velvet', memory: scene.memory, capacity: 1, ai_turns: 12, ai_mood: { curiosity: 60, boredom: 10 }, voice_on: false, space_id: null, scenario: 'scenario' in scene ? scene.scenario : scenario, story_state: scene.state ?? null }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: memberName, last_seen: '' }]);
     if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
     if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_after_reply') return modelAnswer({ memory: scene.memory, events: [], memory_ops: [], story_checkpoints: [], story_facts: [], story_choice: '' });
-    // The analyzer (a one-to-one chat, engine v4) is really asked, so the reply request carries its reading and the turn.
-    // The director (a fast-model chat) is really asked too; its time is counted with the analyzer's, as they run together.
-    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') return originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
-    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_analyzer') {
-      if (saved.SAVE_ANALYZER) writeFileSync(`${saved.SAVE_ANALYZER}-${scene.name.replace(/[^\w가-힣]+/g, '_')}.json`, init.body);
+    // Capture one common interpretation, then reuse exactly that prompt across reply targets.
+    // A dry/default run never forwards any model call outside the mock.
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') {
+      if (!live) return modelAnswer({ subtext: '', direction: null });
+      if (!realKey) throw new Error('OPENAI_API_KEY is required with --live');
       const started = performance.now();
       const answer = await originalFetch(url, { ...init, headers: { ...init.headers, Authorization: `Bearer ${realKey}` } });
       analyzerMs = Math.round(performance.now() - started);
@@ -219,17 +225,17 @@ async function ask(request, model, effort) {
 const args = process.argv.slice(2), only = args.find(arg => arg.startsWith('--only='))?.slice(7), withPersona = args.includes('--persona'), withFlorence = args.includes('--florence'), withDaily = args.includes('--daily'), withBibles = args.includes('--bibles'), withAb = args.includes('--ab');
 const kissArg = args.find(arg => arg === '--kiss' || arg.startsWith('--kiss=')), withKiss = Boolean(kissArg), kissHost = kissArg?.split('=')[1] ?? 'diplomat';
 const [outPath = 'model-compare.json', ...picked] = args.filter(arg => !arg.startsWith('--'));
-const targets = (picked.length ? picked : ['gpt-6-luna:none', 'gpt-6-sol:none', 'gpt-6.1-sol:none', 'gpt-6.1-terra:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
+const targets = (picked.length ? picked : ['gpt-6-luna:none']).map(item => { const [model, effort = 'none'] = item.split(':'); return { model, effort }; });
 const report = [];
 const roomArg = args.find(arg => arg.startsWith('--room='))?.slice(7), lastPrompt = new Map(), dryRows = [];
 for (const scene of roomArg ? await roomScenes(roomArg) : withPersona ? [personaScene] : withKiss ? [await kissScene(kissHost)] : withAb ? [...florenceScenes, ...dailyScenes, ...bibleScenes.filter(scene => scene.name.endsWith(' 2'))] : withBibles ? bibleScenes : withFlorence || withDaily ? (withDaily ? dailyScenes : florenceScenes).filter(scene => !only || scene.name.includes(only)) : scenes) {
   // The summary is rewritten after every reply, so a dry run changes its start each turn as a real room would.
-  if (args.includes('--dry') && scene.room) scene.memory = `${dryRows.length}턴 뒤 요약. ${scene.memory}`;
+  if (!live && scene.room) scene.memory = `${dryRows.length}턴 뒤 요약. ${scene.memory}`;
   const request = await capture(scene);
   if (scene === scenes[0]) console.log('speech_level the request asks for:', JSON.parse(request.input).relationship?.speech_level);
   // --dry builds the requests without asking any model (2026-11-01): how much of each prompt is the same as the last one
   // to the same character, which is what the provider's cache can reuse; the rest is written to the cache again.
-  if (args.includes('--dry')) {
+  if (!live) {
     const prompt = `${request.instructions}\n${request.input}`, last = lastPrompt.get(scene.host ?? 'velvet');
     let same = 0; if (last) while (same < prompt.length && prompt[same] === last[same]) same++;
     lastPrompt.set(scene.host ?? 'velvet', prompt);

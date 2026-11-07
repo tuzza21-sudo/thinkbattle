@@ -53,6 +53,15 @@ const portraits = {
     file: 'host-trickster-v4.webp',
     prompt: `${common} A fictional Korean man aged thirty-five with a sharp, sardonic and intelligent presence, attractive in a cool, slightly dangerous way: a lean face with defined cheekbones and jawline, a faint trace of stubble, short neatly cut black hair pushed back a little at the front, keen narrow dark eyes under straight brows that look straight through you, and a dry knowing half-smirk with only one corner of the mouth raised, as if he has just heard an excuse he does not buy. He wears a black fine-knit turtleneck under a charcoal wool jacket. Background: a softly blurred late-night broadcast studio with a dark backdrop, a single warm key light and the out-of-focus shape of a desk microphone. Confident, unimpressed, quietly amused.`,
   },
+  // A second take on each, to choose between (2026-11-07): copy the one you like over the first file name.
+  'trickster-alt': {
+    file: 'host-trickster-v5.webp',
+    prompt: `${common} A fictional Korean man aged thirty-five, a sharp-tongued columnist and broadcaster, in a different look from before: handsome in a lean, boyish-yet-sardonic way, soft tousled dark brown hair falling a little over his forehead, clear skin, a faint smirk with a raised eyebrow and eyes that crinkle slightly as if he is trying not to laugh at what you just said. He wears a dark olive shirt jacket over a plain white tee and round thin-framed glasses pushed up on his nose. Background: a softly blurred small late-night radio booth with a warm desk lamp and the out-of-focus shape of a microphone on a boom arm. Warm side light, relaxed and quietly amused.`,
+  },
+  'guide-alt': {
+    file: 'host-guide-v2.webp',
+    prompt: `${common} A strikingly handsome, polished fictional Korean man aged thirty-seven who has lived in Florence for over ten years, in a different look from before: a warm, sun-tanned complexion, short dark hair with a loose natural curl and a light trimmed stubble, kind crinkled eyes and an easy teasing grin, relaxed and charming. He wears a cream linen shirt with the sleeves rolled up, the collar open, a thin leather cord bracelet and a light scarf loosely at the neck. Background: a softly blurred narrow Florence street in the morning with warm stone walls, a bicycle and potted flowers. Soft warm morning light, natural and inviting.`,
+  },
 };
 
 // Characters added with scripts/new-lounge-character.mjs keep their prompts in scripts/lounge-character-prompts.json

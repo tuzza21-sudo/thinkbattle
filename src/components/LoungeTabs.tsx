@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, Plus, RefreshCw, Settings, Shield, UserRound } from 'lucide-react';
+import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, Plus, RefreshCw, Settings, Shield, Trash2, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeSpokenText, type LoungeHostId } from '../lib/lounge';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { listLoungeChats, type LoungeChatSummary } from '../lib/loungeApi';
+import { deleteLoungeChat, listLoungeChats, type LoungeChatSummary } from '../lib/loungeApi';
 import { loungeCustomPortrait } from '../lib/loungeCustomClient';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import './LoungeTabs.css';
@@ -50,7 +50,17 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
   const navigate = useNavigate();
   const [chats, setChats] = useState<LoungeChatSummary[] | null>(null);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState<string | null>(null);
   const load = useCallback(() => listLoungeChats().then(rows => { setChats(rows); setError(''); }, err => setError(errorText(err))), []);
+  const removeChat = async (chat: LoungeChatSummary, name: string) => {
+    if (!window.confirm(`${name}와의 대화를 삭제할까요? 대화 기록, 기억, 관계 점수가 모두 삭제되며 되돌릴 수 없어요.`)) return;
+    setDeleting(chat.room_id); setError('');
+    try {
+      if (!await deleteLoungeChat(chat.room_id)) throw new Error('이미 삭제되었거나 삭제할 수 없는 대화예요.');
+      await load();
+    } catch (error) { setError(errorText(error)); }
+    finally { setDeleting(null); }
+  };
   useEffect(() => {
     if (!user) return;
     void load();
@@ -70,11 +80,11 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
         const house = custom ? undefined : getLoungeCharacter(chat.character_id);
         const name = custom ? chat.character_name ?? '캐릭터' : house?.name ?? getLoungeHost(chat.character_id).name;
         const said = chat.last_kind === 'host' ? loungeSpokenText(chat.last_text) || chat.last_text.replace(/\*/g, '') : chat.last_text;
-        return <li key={chat.room_id}><button type="button" onClick={() => navigate(`/lounge/${chat.room_id}`)}>
+        return <li key={chat.room_id}><button type="button" disabled={Boolean(deleting)} onClick={() => navigate(`/lounge/${chat.room_id}`)}>
           <ChatPortrait chat={chat} />
           <span className="lounge-chat-text"><span className="lounge-chat-name"><strong>{name}</strong>{chat.story && <small>{chat.story}</small>}</span><span className="lounge-chat-last">{chat.last_kind === 'human' ? `나: ${said}` : said}</span></span>
           <time dateTime={chat.last_at}>{chatTime(chat.last_at)}</time>
-        </button></li>;
+        </button><button type="button" className="lounge-chat-delete" aria-label={`${name} 대화 삭제`} disabled={Boolean(deleting)} onClick={() => void removeChat(chat, name)}><Trash2 size={17} /></button></li>;
       })}
     </ul>}
   </main>;

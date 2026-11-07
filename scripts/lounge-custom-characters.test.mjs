@@ -172,10 +172,19 @@ test('saving a hand-written sheet: the AI writes the empty tagline, look and gre
 
 test('portraits: a daily limit, only the character\'s own drafts can be chosen, uploads need consent and pass the checks', async () => {
   const own = url => url.includes('lounge_custom_characters?id=eq.') ? result([row]) : null;
-  await run(async url => member(url) ?? own(url) ?? (url.includes('claim_lounge_custom_portrait') ? result(false) : Promise.reject(new Error('Must not make an image'))), async () => {
+  // The AI portrait is off unless LOUNGE_CUSTOM_PORTRAIT_AI=on (it costs an image): members upload their own.
+  await run(async url => member(url) ?? Promise.reject(new Error('Must not reach the database or make an image')), async () => {
     const response = await handler(request({ action: 'portrait', id }));
-    assert.equal(response.status, 429);
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'lounge_character_portrait_upload_only');
   });
+  process.env.LOUNGE_CUSTOM_PORTRAIT_AI = 'on';
+  try {
+    await run(async url => member(url) ?? own(url) ?? (url.includes('claim_lounge_custom_portrait') ? result(false) : Promise.reject(new Error('Must not make an image'))), async () => {
+      const response = await handler(request({ action: 'portrait', id }));
+      assert.equal(response.status, 429);
+    });
+  } finally { delete process.env.LOUNGE_CUSTOM_PORTRAIT_AI; }
   await run(async url => member(url) ?? own(url) ?? Promise.reject(new Error('Unexpected')), async () => {
     assert.equal((await handler(request({ action: 'choose', id, path: `c_${'b'.repeat(32)}/draft-0123456789abcdef.webp` }))).status, 400, 'another character\'s draft');
     assert.equal((await handler(request({ action: 'upload', id, image: 'data:image/png;base64,AAAA' }))).status, 400, 'no consent');
