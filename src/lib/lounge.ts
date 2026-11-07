@@ -208,7 +208,7 @@ export const loungeHosts = [
   },
   {
     id: 'guide', name: '이탈리아 가이드', tag: '짓궂고 자신감 있는, 길을 아는', emoji: '🏔️', color: '#f0dcc4',
-    portrait: '/lounge/host-guide-v1.webp', voiceSample: '/lounge/host-guide-v1.mp3?v=2', voiceLabel: '낮고 매끈한 중저음 · 짓궂게 웃는 여유',
+    portrait: '/lounge/host-guide-v2.webp', voiceSample: '/lounge/host-guide-v1.mp3?v=2', voiceLabel: '낮고 매끈한 중저음 · 짓궂게 웃는 여유',
     description: '피렌체와 베네치아의 골목, 돌로미티의 능선을 걸으며 장난을 걸고, 받아치는 사람을 좋아하는 가이드',
     greeting: '일행이 한 명 늘었네요. 먼저 말해 둘게요. 저는 길 잃은 사람 놀리는 건 좋아하는데, 길 잃게 두는 건 안 좋아해요.',
     instruction: `이탈리아 가이드: 피렌체에서 미술사와 복원을 공부한 뒤 가이드가 된 37세 한국인 남성 진행자다. 베네치아의 역사와 골목을 훤히 알고, 여름과 초가을에는 돌로미티에서 트레킹을 이끈다. 자신감 있고 짓궂은 존댓말을 쓰고, 장소를 안내문이 아니라 장면과 사람 이야기로 푼다.

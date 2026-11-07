@@ -1,18 +1,18 @@
 {
   "guide": {
     "portrait": {
-      "file": "host-guide-v1.webp",
-      "prompt": "{{common}} A strikingly handsome, polished fictional Korean man aged thirty-seven who has lived in Florence for over ten years: a clean-shaven, sharply defined face with refined features and clear healthy skin, dark hair neatly styled and swept back with a slight natural wave, confident dark eyes and a mischievous half-smile with one corner of his mouth raised, as if he has just teased you and is waiting for a comeback. He wears a crisp, well-fitted light-blue shirt with the top button open under a tailored navy linen jacket, a slim leather watch. Background: a softly blurred Florence rooftop terrace at golden hour, terracotta roofs and the warm glow of an old stone dome in the distance, no readable signs. Soft flattering golden light with a gentle rim light on the hair. Elegant men's-magazine portrait quality, clean and sophisticated, tasteful and not provocative."
+      "file": "host-guide-v2.webp",
+      "prompt": "{{common}} A strikingly handsome, polished fictional Korean man aged thirty-seven who has lived in Florence for over ten years, in a different look from before: a warm, sun-tanned complexion, short dark hair with a loose natural curl and a light trimmed stubble, kind crinkled eyes and an easy teasing grin, relaxed and charming. He wears a cream linen shirt with the sleeves rolled up, the collar open, a thin leather cord bracelet and a light scarf loosely at the neck. Background: a softly blurred narrow Florence street in the morning with warm stone walls, a bicycle and potted flowers. Soft warm morning light, natural and inviting."
     },
     "full": {
-      "portrait": "host-guide-v1.webp",
+      "portrait": "host-guide-v2.webp",
       "file": "host-guide-full-v1.webp",
-      "prompt": "{{common}} He wears the same crisp light-blue shirt and tailored navy linen jacket as in the portrait with slim beige trousers and polished brown leather shoes, and stands confidently on an old stone bridge over a river in Florence at golden hour, terracotta buildings and warm light behind him, one hand in his pocket, turned slightly toward the camera with a teasing half-smile. Clean and well groomed. No readable signs."
+      "prompt": "{{common}} He is very tall, about 188 cm, with long legs and broad shoulders, photographed from a slightly low angle so his height shows. He wears the same cream linen shirt with the sleeves rolled and the collar open, a light scarf at the neck, slim beige trousers and worn brown leather shoes, and stands confidently on an old stone bridge over a river in Florence in warm morning light, terracotta buildings behind him, one hand in his pocket, turned slightly toward the camera with a teasing grin. Short dark curly hair and a light trimmed stubble, sun-tanned. No readable signs."
     },
     "work": {
-      "portrait": "host-guide-v1.webp",
-      "file": "host-guide-work-v2.webp",
-      "prompt": "{{common}} He is at work as a city guide in Florence: well groomed and clean-shaven, wearing the same crisp light-blue shirt with the sleeves rolled and a tailored navy linen jacket, a printed name list in one hand, he stands in a sunlit old-town piazza raising his other hand to lead a small group of tourists seen from behind, the red-tiled cathedral dome far behind him, warm late-morning light, a confident teasing smirk. Nothing readable on any sign or paper."
+      "portrait": "host-guide-v2.webp",
+      "file": "host-guide-work-v3.webp",
+      "prompt": "{{common}} He is at work as a city guide in Florence: very tall, about 188 cm, with long legs and broad shoulders, towering a head above the small group of tourists around him. Short dark curly hair, a light trimmed stubble and a sun-tanned face. He wears the same cream linen shirt with the sleeves rolled and the collar open, a light scarf at the neck, slim beige trousers and brown leather shoes, a printed name list in one hand; he stands in a sunlit old-town piazza raising his other hand to lead the group seen from behind, the red-tiled cathedral dome far behind him, warm late-morning light, a confident teasing grin. Photographed from a slightly low angle so his height shows. Nothing readable on any sign or paper."
     }
   },
   "shaman": {
