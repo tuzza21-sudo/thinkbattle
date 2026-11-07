@@ -115,3 +115,7 @@
 .lounge-navy .lounge-intro-how .num { color:#e3c08c26; }
 .lounge-navy .lounge-intro-how h3 { color:var(--n-text); }
 .lounge-navy .lounge-intro-how p { color:var(--n-text-2); }
+
+/* the guide's closing card */
+.lounge-navy .lounge-guide-end { background:linear-gradient(160deg,#2c1d14,#20150f); border:1px solid var(--n-line); }
+.lounge-navy .lounge-guide-end h2 { color:var(--n-text); }
