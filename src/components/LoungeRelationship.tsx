@@ -8,9 +8,10 @@ export type LoungeRelationshipChange = RelationshipChange & { id: number };
 /** How long what one message changed stays on the card. */
 const changeShownMs = 6500;
 
-// The relationship's status card in the chat: the stage, how close the next one is, and, for a moment after each reply,
-// what the member's message did and the scores it moved (a stage change gets its own line). Opened, it shows every
-// score as a bar and what the character remembers. Mood and the event log appear only for developers.
+// The relationship's status card in the chat: the stage and how close the next one is, and, for a moment after each reply,
+// what the member's message did and the scores it moved (a stage change gets its own line). Opened, it shows the three
+// scores (the character's own, 설렘, 공감) as horizontal bars, each with the line the next stage asks of it and a word for
+// how it stands, never a count of what is missing. Mood and the event log appear only for developers.
 export function LoungeRelationship({ view, change }: { view: RelationshipView; change?: LoungeRelationshipChange | null }) {
   const [shown, setShown] = useState<LoungeRelationshipChange | null>(null);
   useEffect(() => {
@@ -23,12 +24,8 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
   const stage = view.stage;
   const progress = Math.round((stage?.progress ?? 0) * 100);
   const deltas = shown ? Object.entries(shown.delta).filter(([metric]) => view.metrics[metric]) : [];
-  // Against what the next stage asks: the scores already there (closest to done first) and the ones still short (furthest first).
-  const asked = Object.values(view.metrics).filter(metric => metric.need);
-  const ready = asked.filter(metric => (metric.score ?? 0) >= metric.need!).sort((a, b) => (b.score ?? 0) / b.need! - (a.score ?? 0) / a.need!).slice(0, 2);
-  const short = asked.filter(metric => (metric.score ?? 0) < metric.need!).sort((a, b) => (b.need! - (b.score ?? 0)) - (a.need! - (a.score ?? 0))).slice(0, 2);
-  // Only the scores the next stage asks for (2026-10-30): the ones later stages use showed as bars that seemed required.
-  const bars = Object.entries(view.metrics).filter(([, metric]) => !asked.length || metric.need);
+  const moved: Record<string, number> = Object.fromEntries(deltas);
+  const gauges = Object.entries(view.metrics);
   return <div className={`lounge-relationship ${shown?.stage === 'promoted' ? 'celebrating' : ''}`}>
     <details>
       <summary>
@@ -44,21 +41,20 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
       <div className="lounge-relationship-panel">
         {stage && <p className="lounge-relationship-line">“{stage.line}”</p>}
         <p className="lounge-relationship-next">{stage?.next ? <>다음 단계 <b>{stage.next}</b> · {progress}%</> : '가장 가까운 사이예요.'}</p>
-        {(ready.length > 0 || short.length > 0) && <p className="lounge-relationship-focus">
-          {ready.length > 0 && <span className="met">잘 쌓이고 있어요 · <b>{ready.map(metric => metric.name).join(', ')}</b></span>}
-          {short.length > 0 && <span className="short">더 필요해요 · <b>{short.map(metric => metric.name).join(', ')}</b></span>}
-        </p>}
-        <ul className="lounge-relationship-bars">{bars.map(([id, metric]) => {
-          const state = !metric.need ? '' : (metric.score ?? 0) >= metric.need ? 'met' : 'short';
-          return <li key={id} className={state}>
+        <ul className="lounge-relationship-bars" aria-label="관계 점수">{gauges.map(([id, metric]) => {
+          const score = metric.score ?? 0, need = metric.need;
+          const state = need === undefined ? '' : score >= need ? 'met' : 'short';
+          const gain = moved[id] ?? 0;
+          return <li key={id} className={`${state}${gain > 0 ? ' rose' : gain < 0 ? ' fell' : ''}`}>
             <span>{metric.name}</span>
-            <span className="lounge-relationship-bar"><i style={{ width: `${metric.score ?? 0}%` }} />{metric.need && <em style={{ left: `${metric.need}%` }} title={`다음 단계에 필요한 만큼 (${metric.need})`} />}</span>
-            <small>{metric.label}{state && <b>{state === 'met' ? '충분' : `${metric.need! - (metric.score ?? 0)} 부족`}</b>}</small>
+            <span className="lounge-relationship-bar" role="meter" aria-label={metric.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
+              <i style={{ width: `${score}%` }} />{need !== undefined && <em style={{ left: `${need}%` }} title="다음 단계에 필요한 만큼" />}
+            </span>
+            <small>{metric.label}{state && <b>{state === 'met' ? '충분' : '조금 더'}</b>}</small>
           </li>;
         })}</ul>
-        {asked.length > 0 && <p className="lounge-relationship-legend">막대의 세로선은 다음 단계에 필요한 만큼이에요.</p>}
         {/* The memories moved to the chat's settings (기억), where they can also be corrected (2026-10-29). */}
-        <p className="lounge-relationship-memory-note">기억하는 이야기와 둘의 흐름은 위쪽 <b>대화 설정 › 기억</b>에서 보고 고칠 수 있어요{view.remembered?.length ? ` · 지금 ${view.remembered.length}개` : ''}.</p>
+        <p className="lounge-relationship-memory-note">기억하는 이야기와 둘의 흐름은 위쪽 <b>대화 설정 › 기억</b>에서 보고 고칠 수 있어요.</p>
         {debug && <div className="lounge-relationship-debug" aria-label="개발자용 관계 상태">
           <p>{view.macroState.id} · {debug.turnCount}턴(의미 {debug.meaningfulTurns}) · v{debug.version}{debug.pending.direction ? ` · ${debug.pending.direction === 'up' ? '승급' : '강등'} 대기 ${debug.pending.turns}` : ''}</p>
           <p>점수 {Object.entries(debug.scores).map(([key, value]) => `${key} ${value}`).join(' · ')}</p>
@@ -74,7 +70,7 @@ export function LoungeRelationship({ view, change }: { view: RelationshipView; c
         {shown.stage === 'demoted' && <p className="lounge-relationship-stage down">거리가 조금 멀어졌어요 · <b>{view.macroState.label}</b></p>}
         <ul>
           {shown.events.map((event, index) => <li key={`e-${event.type}`} className={event.up ? 'up' : 'down'} style={{ animationDelay: `${index * 90}ms` }}>{event.label}</li>)}
-          {deltas.map(([metric, value], index) => <li key={`d-${metric}`} className={`delta ${value > 0 ? 'up' : 'down'}`} style={{ animationDelay: `${(shown.events.length + index) * 90}ms` }}>
+          {deltas.map(([metric, value], index) => <li key={`d-${metric}`} className={`delta ${value > 0 ? 'up' : 'down'}`} style={{ animationDelay: `${(shown!.events.length + index) * 90}ms` }}>
             {view.metrics[metric].name} {value > 0 ? `+${value}` : value}
           </li>)}
         </ul>

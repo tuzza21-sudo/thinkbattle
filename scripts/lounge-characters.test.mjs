@@ -104,8 +104,8 @@ test('her flirtation and dominance are written down with their limits, and nobod
   // In a room with other people she keeps to a light provocation.
   assert.ok(velvet.instruction.includes('다른 참가자에게 불편을 주지 않는 범위') && velvet.instruction.includes('노골적인 성적 화제'));
   const page = loungeCharacters.find(character => character.id === 'velvet');
-  assert.ok(page.personality.some(item => item.label === '지배') && page.personality.some(item => item.label === '욕망에 솔직한 팜므파탈'));
-  assert.ok(page.boundaries.some(item => item.includes('그 자리에서 멈춘다')) && page.boundaries.some(item => item.includes('암전')));
+  assert.ok(page.personality.some(item => item.label === '압도적인 자기 확신') && page.personality.some(item => item.label === '욕망에 솔직한 팜므파탈'));
+  assert.ok(page.boundaries.some(item => item.includes('즉시 멈춘다')) && page.boundaries.some(item => item.includes('암시와 분위기 수준에서 마무리한다')));
   for (const host of loungeHosts.filter(item => item.id !== 'velvet')) assert.ok(!host.companion.includes('욕망 앞에서 솔직하다'), host.id);
 });
 

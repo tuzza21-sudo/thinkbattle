@@ -12,46 +12,40 @@ export const tricksterRelationship = {
     '실제로 행동하고 노력한 것은 구체적으로 인정한다. 칭찬은 남발하지 않는다',
     '상대가 진지하게 힘들어하거나 그만하자고 하면 독설을 멈추고 진지해진다. 진단이나 치료를 대신한다고 하지 않는다',
   ],
+  // 2026-11-06: three metrics for every character: empathy (공감), romance (설렘: a romantic conversation that works) and one
+  // of its own. A stage asks for all three. Ordinary replies (entering a scene, showing interest, asking, answering) score nothing.
   uniqueMetrics: [
-    { id: 'playfulness', name: '맞받아치기', description: '독설에 기죽지 않고 자기 생각으로 맞서는가', labels: ['기가 죽음', '눈치 보는 중', '받아치기 시작함', '당당히 맞섬', '한 방씩 주고받음'] },
-    { id: 'bounceback', name: '실행력', description: '말한 것을 핑계 없이 실제로 해내는가', labels: ['말뿐임', '미루는 중', '시작은 함', '해내는 중', '말한 건 함'] },
+    { id: 'mental', name: '멘탈', description: '압박과 독설 속에서도 무너지지 않고 얼마나 잘 버티는가', labels: ['쉽게 무너짐', '흔들리는 중', '버티기 시작함', '잘 버팀', '단단함'] },
   ],
-  initial: { trust: 20, respect: 30, interest: 45, comfort: 25, openness: 20, playfulness: 30, bounceback: 30 },
+  initial: { empathy: 25, romance: 5, mental: 30 },
   initialMood: { amusement: 20, irritation: 10, curiosity: 30, excitement: 15, boredom: 20 },
-  // 반말 from the first word, as his bible has it.
   casualFromStart: true,
-  // His page's wins and losses (2026-11-05); other events count at half, the moments the two connect and losses in full.
-  mainEvents: ['CALLS_BLUFF', 'CHALLENGES_CHARACTER', 'STANDS_GROUND', 'MAKES_CHARACTER_ADMIT', 'ANSWERS_DIRECTLY', 'KEEPS_PROMISE',
-    'FLATTERS_CHARACTER', 'DECEIVES_CHARACTER', 'BREAKS_PROMISE', 'SHOWS_ENTITLEMENT'],
   events: {
-    // Nerve (맞받아치기 is playfulness).
-    CALLS_BLUFF: { deltas: { interest: 4, playfulness: 2, respect: 1 }, mood: { amusement: 10, excitement: 6 } },
-    CHALLENGES_CHARACTER: { deltas: { interest: 3, playfulness: 2 }, mood: { excitement: 8 } },
-    STANDS_GROUND: { deltas: { playfulness: 2, respect: 2 } },
-    MAKES_CHARACTER_ADMIT: { deltas: { openness: 3, playfulness: 2, interest: 1 } },
-    // Candour and kept promises (실행력 is bounceback).
-    ANSWERS_DIRECTLY: { deltas: { trust: 3, respect: 2, bounceback: 2, openness: 1, interest: 1 } },
-    KEEPS_PROMISE: { deltas: { trust: 4, bounceback: 4, respect: 2, comfort: 1, interest: 1 } },
-    // The moments the two connect, which every character answers (sharedConnectionEvents).
-    SHARES_FEELING: { deltas: { comfort: 3, openness: 3, trust: 2, interest: 1 } },
-    SHOWS_VULNERABILITY: { deltas: { trust: 2, comfort: 3, openness: 3 } },
-    PLAYS_ALONG: { deltas: { interest: 2, playfulness: 2, comfort: 1 }, mood: { amusement: 6 } },
-    FLATTERS_CHARACTER: { deltas: { interest: -2, respect: -1 }, mood: { boredom: 12 } },
-    DECEIVES_CHARACTER: { deltas: { trust: -14, respect: -5 }, mood: { irritation: 30 } },
-    BREAKS_PROMISE: { deltas: { trust: -10, bounceback: -5, respect: -3 }, mood: { irritation: 20 } },
-    SHOWS_ENTITLEMENT: { deltas: { respect: -4, trust: -3 }, mood: { irritation: 15 } },
+    BOUNCES_BACK: { deltas: { mental: 5 }, mood: { excitement: 8 } },
+    STANDS_GROUND: { deltas: { mental: 4 } },
+    TAKES_JOKE_WELL: { deltas: { mental: 3 }, mood: { amusement: 10 } },
+    CALLS_BLUFF: { deltas: { mental: 3 }, mood: { amusement: 10, excitement: 6 } },
+    ADMITS_ERROR: { deltas: { mental: 3, empathy: 1 } },
+    CHALLENGES_CHARACTER: { deltas: { mental: 2 }, mood: { excitement: 8 } },
+    MAKES_CHARACTER_ADMIT: { deltas: { mental: 2, empathy: 1 } },
+    SHOWS_VULNERABILITY: { deltas: { empathy: 3, mental: 2 } },
+    KEEPS_PROMISE: { deltas: { empathy: 2, mental: 1 } },
+    FLIRTS_PLAYFULLY: { deltas: { romance: 4, mental: 1 } },
+    FOLDS_EASILY: { deltas: { mental: -3 } },
+    WAFFLES: { deltas: { mental: -2 } },
+    BREAKS_PROMISE: { deltas: { empathy: -8, mental: -2 }, mood: { irritation: 20 } },
+    FLATTERS_CHARACTER: { deltas: { mental: -1 }, mood: { boredom: 8 } },
+    SHOWS_ENTITLEMENT: { deltas: { mental: -3, empathy: -3 }, mood: { irritation: 10 } },
+    DECEIVES_CHARACTER: { deltas: { empathy: -12 }, mood: { irritation: 30 } },
   },
-  // Judged on two segments: fun is interest and 맞받아치기, heart the rest; a stage asks for their sum, so either way of
-  // playing gets there and both together get there first (simulated 2026-11-05: about 40-55 turns one way, 37 both).
-  segments: { fun: ['interest', 'playfulness'], heart: ['trust', 'comfort', 'respect', 'openness', 'bounceback'] },
   stages: [
     { id: 'AUDIENCE', label: '간 보는 사이', line: '그래서, 오늘은 무슨 핑계부터 들어 볼까.', enter: {},
       hint: '처음부터 거침없는 반말로 상대의 말과 행동을 살핀다. 핑계나 허세가 보이면 짧게 찌르되 근거가 부족하면 먼저 확인한다. 잡담은 잡담으로 받는다.' },
-    { id: 'BANTER_PARTNER', label: '맞받아치는 사이', line: '오, 받아치네. 그건 좀 아팠다.', enter: { total: 80 },
+    { id: 'BANTER_PARTNER', label: '맞받아치는 사이', line: '오, 받아치네. 그건 좀 아팠다.', enter: { min: { empathy: 41, romance: 29, mental: 54 } },
       hint: '반박하고 자기 생각을 분명히 하는 상대를 인정한다. 독설을 주고받되 타당한 반론에는 "그건 인정"이라고 짧게 물러선다. 상대가 실제로 한 일을 기억해 다음 얘기로 잇는다.' },
-    { id: 'SPARRING_BUDDY', label: '믿고 직언하는 사이', line: '너한테는 돌려 말 안 해. 그게 예의니까.', enter: { total: 110 },
+    { id: 'SPARRING_BUDDY', label: '믿고 직언하는 사이', line: '너한테는 돌려 말 안 해. 그게 예의니까.', enter: { min: { empathy: 55, romance: 41, mental: 66 } },
       hint: '상대의 노력과 실패를 기억하고 진심 어린 관심을 보인다. 직언은 그대로지만 타이밍을 고른다. 계기가 있으면 자기가 남 탓하던 시절을 짧게 꺼낼 수 있다.' },
-    { id: 'CO_CONSPIRATOR', label: '같은 편', line: '좋아. 이번엔 나도 같이 책임질게.', enter: { total: 140 },
+    { id: 'CO_CONSPIRATOR', label: '같은 편', line: '좋아. 이번엔 나도 같이 책임질게.', enter: { min: { empathy: 70, romance: 60, mental: 75 } },
       hint: '직언에 그치지 않고 함께 해결책을 찾는다. 자기 약한 모습과 후회도 보여 줄 수 있고, 자기가 틀렸으면 먼저 사과한다. 거칠고 냉소적인 말투는 그대로다.' },
   ],
   adultFlirtation: true,
@@ -75,5 +69,5 @@ export const tricksterRelationship = {
     '같은 독설·비유·말버릇을 반복하지 않는다. 잡담에는 교훈 없이 가볍게 받아친다',
     '상대가 진지하게 힘들어하거나 그만하자고 하면 바로 독설을 멈추고 목소리를 낮춘다',
   ],
-  decay: { interest: { graceDays: 3, perDay: 1, floor: 45 } },
+  decay: { romance: { graceDays: 7, perDay: 1, floor: 5 } },
 } satisfies RelationshipConfig;

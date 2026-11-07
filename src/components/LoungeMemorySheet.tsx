@@ -69,10 +69,11 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample 
             </>}
           </li>)}</ul> : <p className="lounge-memory-empty">아직 기억하는 이야기가 없어요. 다음에도 이어 갈 만한 이야기를 나누면 여기에 남아요.</p>}
           {editing && !editing.id ? editor : <button type="button" className="lounge-memory-add" disabled={Boolean(busy) || Boolean(editing)} onClick={() => setEditing({ kind: 'preference', summary: '', follow_up: '' })}><Plus size={15} /> 기억 직접 남기기</button>}
-          <p className="lounge-memory-fine">건강, 종교, 연락처 같은 민감한 이야기는 기억하지 않아요.</p>
+          {Boolean(book.conversation?.length) && <><p className="lounge-memory-note">이 대화에서 나눈 합의와 마음에 남은 일이에요. 지켜야 할 약속은 위의 기억에 남아요.</p><ul className="lounge-memory-list">{book.conversation!.map(memory => <li key={memory.id}><div><span className="lounge-memory-kind">{({ agreement: '합의', promise: '약속', feeling: '감정의 원인', fact: '함께한 이야기' } as Record<string, string>)[memory.kind] ?? '이야기'}{memory.status === 'resolved' ? ' · 마무리됨' : ''}</span><p>{memory.summary}</p></div></li>)}</ul></>}
+          <p className="lounge-memory-fine">채팅을 삭제하면 기억과 관계도 함께 초기화돼요. 건강, 종교, 연락처 같은 민감한 이야기는 장기 기억에 남기지 않아요.</p>
         </div>}
         {tab === 'events' && <div className="lounge-memory-panel">
-          <p className="lounge-memory-note">둘 사이를 움직인 순간들이에요. {characterName}의 마음과 태도에 남아 있어요.</p>
+          <p className="lounge-memory-note">둘 사이를 움직인 순간들이에요. {characterName}의 마음과 태도에 남아 있고, 대화할 때는 그중 중요한 몇 가지를 떠올려요.</p>
           {events.length ? <ul className="lounge-memory-list">{events.map(event => <li key={`${event.at}-${event.summary}`}>
             <div><span className="lounge-memory-kind">{relationshipEventLabels[event.type as RelationshipEventType] ?? event.type}</span><p>{event.summary}</p><time>{day(event.at)}</time></div>
             <div className="lounge-memory-actions"><button type="button" title="지우기" disabled={Boolean(busy)} onClick={() => { if (window.confirm('이 순간을 지울까요?')) void run(`event-${event.at}`, () => forgetMyLoungeEvent(characterId, event.at, event.summary)); }}>{busy === `event-${event.at}` ? <LoaderCircle size={14} className="lounge-spin" /> : <Trash2 size={14} />}</button></div>

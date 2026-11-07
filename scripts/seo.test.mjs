@@ -41,7 +41,7 @@ test('robots.txt blocks the private paths and points to the sitemap; vercel.json
   for (const path of ['/api/', '/super-admin', '/admin', '/lounge/spaces', '/lounge/lounge-']) assert.ok(robots.includes(`Disallow: ${path}`), path);
   assert.ok(robots.includes('Sitemap: https://saseok.kr/sitemap.xml'));
   assert.ok(!/Disallow: \/lounge\s*$/m.test(robots) && !/Disallow: \/\s*$/m.test(robots), 'the public pages are not blocked');
-  const header = JSON.parse(read('vercel.json')).headers.find(item => item.headers.some(entry => entry.key === 'X-Robots-Tag'));
+  const header = JSON.parse(read('vercel.json')).headers.find(item => /super-admin/.test(item.source) && item.headers.some(entry => entry.key === 'X-Robots-Tag'));
   assert.ok(header && /super-admin/.test(header.source) && /lounge\/lounge-/.test(header.source));
 });
 

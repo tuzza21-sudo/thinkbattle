@@ -64,3 +64,6 @@
   .lounge-call-hangup { width:54px; height:54px; }
 }
 @media (prefers-reduced-motion:reduce) { .host-speaking .lounge-call-ring { animation:none; opacity:.6; transform:scale(1.08); } .host-speaking .lounge-call-ring.second { display:none; } }
+
+/* The month's minutes in calls, under the top bar (2026-11-07). */
+.lounge-call-allowance { margin:-4px 0 0; text-align:center; font-size:12px; opacity:.72; font-variant-numeric:tabular-nums; }

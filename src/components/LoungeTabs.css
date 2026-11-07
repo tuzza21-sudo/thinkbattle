@@ -19,6 +19,10 @@
 .lounge-tab-empty .lounge-primary { margin-top:8px; padding:12px 20px; }
 
 .lounge-chat-list { margin:0; padding:0; list-style:none; }
+.lounge-chat-list > li { display:flex; align-items:stretch; }
+.lounge-chat-list > li > button:first-child { flex:1; min-width:0; }
+.lounge-chat-list .lounge-chat-delete { display:flex; width:40px; flex:0 0 40px; align-items:center; justify-content:center; padding:8px; color:#8c8277; }
+.lounge-chat-list .lounge-chat-delete:hover { color:#9d3c32; }
 .lounge-chat-list button { display:grid; grid-template-columns:56px minmax(0,1fr) auto; align-items:center; gap:14px; width:100%; padding:12px 4px; border:0; border-bottom:1px solid var(--l-line,#e7e6df); background:none; color:inherit; text-align:left; }
 .lounge-chat-list button:hover { background:#f0efe6; }
 .lounge-chat-portrait { display:grid; place-items:center; width:56px; height:56px; border-radius:20px; overflow:hidden; background:#e9e7dc; }

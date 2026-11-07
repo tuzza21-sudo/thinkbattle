@@ -1,20 +1,22 @@
-import { loungeMemberPersonaRule, loungeRoomPersona, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
+import { drainLoungeTurns, type LoungePendingTurn, type LoungeTurnPayload, type LoungeTurnStore } from '../src/lib/loungeTurnPersistence';
+import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScenario, loungePersonaStoryScenarioId, loungeRoomPersona, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
 import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { alignLoungeProposalEvents, cleanLoungeCompanionReply, effectiveIntimacyStage, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeAnalyzerInstructions, loungeAnalyzerSchema, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeDirectorInput, loungeDirectorInstructions, loungeDirectorSchema, loungeReading, readLoungeDirection, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
+import { loungeCallLimitMinutes, loungeCallLimitsOn } from '../src/lib/loungePlans';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeCallGreetingRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, previousSessionSummary, selectMemoriesForPrompt, relationshipRecentChanges, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, selectMemoriesForPrompt, relationshipRecentChanges, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -26,6 +28,8 @@ const loungeKnowledgeWaitMs = 1200;
  * start with the request, so most are done by then; one still running is left out instead of holding the reply back.
  */
 const loungeLookupWaitMs = 500;
+/** In a call, the longest a reply waits for the memories to be ranked by what was just said (see callTurn). */
+const loungeCallLookupWaitMs = 150;
 /**
  * How long a one-to-one reply may think before writing anything; after that the fast model answers instead.
  * LOUNGE_REPLY_STALL_MS changes it.
@@ -361,7 +365,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -462,7 +466,26 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
           await post();
         }
       }
-      return json({ ok: true, posted: Boolean(result.text.trim()) });
+      const posted = Boolean(result.text.trim());
+      // A call asks for the reply in the same request (2026-11-07): what was said is saved, and the character's answer
+      // follows in this response, one round trip and one settle wait less than the page asking again. Anything that does
+      // not produce a reply stream here leaves the page to ask as before. LOUNGE_CALL_CHAIN=off turns it off.
+      const chain = body.reply && typeof body.reply === 'object' && !Array.isArray(body.reply) ? body.reply as Record<string, unknown> : undefined;
+      if (posted && chain && !turnId && process.env.LOUNGE_CALL_CHAIN !== 'off') {
+        const hostRequest = { action: 'host', roomId, reason: 'followup', stream: true, ...(chain.innerVoice === 'off' ? { innerVoice: 'off' } : {}) };
+        const answered = await handler(new Request(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(hostRequest), signal: req.signal }), { waitUntil: keepAlive }).catch(() => undefined);
+        if (answered?.ok && answered.body && answered.headers.get('content-type')?.includes('application/x-ndjson')) {
+          const reader = answered.body.getReader(), lead = new TextEncoder().encode(`${JSON.stringify({ type: 'transcribed', posted: true })}
+`);
+          return new Response(new ReadableStream<Uint8Array>({
+            start(controller) { controller.enqueue(lead); },
+            async pull(controller) { const { done, value } = await reader.read(); if (done) controller.close(); else controller.enqueue(value); },
+            cancel(reason) { return reader.cancel(reason); },
+          }), { status: 200, headers: answered.headers });
+        }
+        await answered?.body?.cancel().catch(() => {});
+      }
+      return json({ ok: true, posted });
     }
 
     // Relationship state is read and written only with the server role, never from the browser.
@@ -485,6 +508,16 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const allowance = loungeSpeechAllowance({ ...limits, member: yours }, used);
       return { available, member: !guest, allowed: allowance.allowed, used: used.member, left: allowance.left, limit: yours, ...(allowance.reason ? { reason: allowance.reason } : {}) };
     };
+    // This month's seconds of calls and the member's plan (the database counts them, see tick_lounge_call), with what the
+    // plan allows. The limit is applied only with LOUNGE_CALL_LIMITS=on; before that calls are timed and shown, never stopped.
+    const callService = async (name: 'lounge_call_status' | 'tick_lounge_call', params: Record<string, unknown>) => {
+      if (!serviceHeaders) return null;
+      const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify(params) }, 4_000);
+      if (!response.ok) { console.warn('[Lounge call] usage not read', name, response.status); return null; }
+      const state = await readJson<{ seconds: number; plan: string | null }>(response, 'lounge');
+      const limitMinutes = loungeCallLimitMinutes(state.plan, process.env), enforced = loungeCallLimitsOn(process.env);
+      return { usedSeconds: state.seconds, limitMinutes, plan: state.plan, enforced, exhausted: enforced && state.seconds >= limitMinutes * 60 };
+    };
     const readRelationship = async (userId: string, characterId: string) => {
       if (!serviceHeaders) return { ok: false as const };
       const response = await fetchTimed(`${url}/rest/v1/voice_lounge_relationships?user_id=eq.${encodeURIComponent(userId)}&character_id=eq.${encodeURIComponent(characterId)}&select=*`, { headers: serviceHeaders });
@@ -493,10 +526,10 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     };
 
     // Active long-term memories of a user (all characters; callers pick one). A missing table or a failed read means none.
-    async function readMemoryRows(userId: string) {
+    async function readMemoryRows(userId: string, characterId?: string) {
       if (!serviceHeaders || process.env.LOUNGE_LONG_MEMORY === 'off') return null;
       try {
-        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&status=eq.active&order=importance.desc,updated_at.desc&limit=200&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at`, { headers: serviceHeaders });
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&source_room=eq.${encodeURIComponent(roomId)}${characterId ? `&character_id=eq.${encodeURIComponent(characterId)}` : ''}&status=eq.active&order=importance.desc,updated_at.desc&limit=40&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at`, { headers: serviceHeaders });
         if (!response.ok) { console.warn('[Lounge memory] read failed', response.status); return null; }
         return await readJson<MemoryRow[]>(response, 'lounge');
       } catch { return null; }
@@ -517,7 +550,20 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
       const engines = Object.keys(loungePremiumSpeech) as LoungePremiumSpeechEngine[];
       const status = await Promise.all(engines.map(engine => readSpeechAllowance(engine, user).catch(() => ({ available: false, member: !user.is_anonymous, allowed: false, used: 0, left: 0, limit: 0, unavailable: true }))));
-      return json({ engines: Object.fromEntries(engines.map((engine, index) => [engine, status[index]])) });
+      const call = user.is_anonymous ? null : await callService('lounge_call_status', { p_user: user.id }).catch(() => null);
+      return json({ engines: Object.fromEntries(engines.map((engine, index) => [engine, status[index]])), call });
+    }
+
+    // One tick of a voice call (every 30 seconds while it is connected): the database adds the time since the last one.
+    // Only the room's owner, in their own one-to-one voice call, is timed.
+    if (body.action === 'call-tick') {
+      const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
+      if (user.is_anonymous) return json({ call: null });
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,capacity,space_id,status,voice_on`, { headers });
+      if (!roomResponse.ok) throw new Error('대화방을 확인하지 못했어요.');
+      const [room] = await readJson<Array<{ host_id: string; capacity: number; space_id?: string | null; status: string; voice_on?: boolean | null }>>(roomResponse, 'lounge');
+      if (!room || room.host_id !== user.id || room.capacity !== 1 || room.space_id || room.status !== 'active' || room.voice_on === false) return json({ call: null });
+      return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }).catch(() => null) });
     }
 
     if (body.action === 'relationship') {
@@ -541,7 +587,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const developer = isRelationshipDeveloper(user);
       const view = describeRelationship(record, config, { mood: moodFromRoom(config, room.ai_mood), debug: developer });
       // What this character remembers about the user: long-term memories first, then moments from the relationship.
-      const longTerm = await readMemoryRows(user.id) ?? [];
+      const longTerm = await readMemoryRows(user.id, config.characterId) ?? [];
       const remembered = [
         ...memoriesForView(longTerm, config.characterId).map(row => ({ kind: row.kind, label: memoryKindLabels[row.kind], summary: row.summary, ...(row.follow_up ? { followUp: row.follow_up } : {}) })),
         ...record.memories.slice(0, 5).map(memory => ({ kind: 'moment', label: '함께한 순간', summary: memory.summary })),
@@ -633,19 +679,20 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // Long-term memory and the previous one-to-one conversation, read in parallel; LOUNGE_LONG_MEMORY=off turns both off.
     const memoryRowsRead = readMemoryRows(user.id);
     // The member's personas (who they are in a conversation), read alongside; before migration 20261128 there are none.
+    // With the narrative a persona may carry (migration 20261208000300); before it, read without the narrative.
+    const readPersonas = async (columns: string) => {
+      const response = await fetchTimed(`${url}/rest/v1/lounge_member_personas?user_id=eq.${encodeURIComponent(user.id)}&select=${columns}`, { headers: serviceHeaders! });
+      return response.ok ? await readJson<LoungeMemberPersonaRow[]>(response, 'lounge') : null;
+    };
     const personasRead = serviceHeaders
-      ? fetchTimed(`${url}/rest/v1/lounge_member_personas?user_id=eq.${encodeURIComponent(user.id)}&select=id,title,call_name,job,personality,details,is_default`, { headers: serviceHeaders })
-        .then(async response => response.ok ? await readJson<LoungeMemberPersonaRow[]>(response, 'lounge') : []).catch(() => [] as LoungeMemberPersonaRow[])
+      ? readPersonas('id,title,call_name,job,personality,details,story_character,story,is_default')
+        .then(rows => rows ?? readPersonas('id,title,call_name,job,personality,details,is_default')).then(rows => rows ?? []).catch(() => [] as LoungeMemberPersonaRow[])
       : Promise.resolve([] as LoungeMemberPersonaRow[]);
     // The scene and the turn's record of a one-to-one chat (engine v4), per character; before migration 20261203 there is
     // none, and every turn starts from the summary's scene line as before.
     const companionRowsRead = serviceHeaders
-      ? fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?user_id=eq.${encodeURIComponent(user.id)}&select=character_id,state`, { headers: serviceHeaders })
-        .then(async response => response.ok ? await readJson<Array<{ character_id: string; state: unknown }>>(response, 'lounge') : null).catch(() => null)
-      : Promise.resolve(null);
-    const previousRoomsRead = serviceHeaders && process.env.LOUNGE_LONG_MEMORY !== 'off'
-      ? fetchTimed(`${url}/rest/v1/voice_lounge_rooms?host_id=eq.${encodeURIComponent(user.id)}&or=(capacity.eq.1,space_id.not.is.null)&id=neq.${encodeURIComponent(roomId)}&order=created_at.desc&limit=12&select=host_persona,memory,created_at`, { headers: serviceHeaders })
-        .then(async response => response.ok ? await readJson<Array<{ host_persona: string; memory: string | null; created_at: string }>>(response, 'lounge') : null).catch(() => null)
+      ? fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?user_id=eq.${encodeURIComponent(user.id)}&select=character_id,state,version,room_id`, { headers: serviceHeaders })
+        .then(async response => response.ok ? await readJson<Array<{ character_id: string; state: unknown; version?: number; room_id?: string }>>(response, 'lounge') : null).catch(() => null)
       : Promise.resolve(null);
     const responses = await Promise.all([
       // Every column, so a database without the chat migration (no voice_on) still answers; such a room keeps its voice.
@@ -654,7 +701,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     ]);
     const messages = await messagesRead;
     if (responses.some(response => !response.ok) || !messages) throw new Error('방의 이야기를 불러오지 못했어요.');
-    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; ai_model?: string | null; story_state?: unknown; scenario?: unknown; member_persona?: unknown }>>(responses[0], 'lounge');
+    const rooms = await readJson<Array<{ topic: string; host_persona: string; memory: string; capacity: number; ai_turns?: number; study_required?: boolean; topic_study?: LoungeTopicStudy; topic_brief?: LoungeTopicBrief | null; guided_session?: boolean; moderator_request_kind?: string | null; moderator_requested_by?: string | null; ai_mood?: unknown; space_id?: string | null; topic_source?: string | null; space?: { name: string } | null; background?: unknown; voice_on?: boolean; companion_chat?: boolean; ai_model?: string | null; story_state?: unknown; scenario?: unknown; member_persona?: unknown }>>(responses[0], 'lounge');
     const members = await readJson<Array<{ user_id?: string; nickname: string; last_seen: string }>>(responses[1], 'lounge');
     const room = rooms[0];
     if (!room) throw new Error('대화방을 찾을 수 없어요.');
@@ -666,11 +713,16 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // A chat reply runs longer, with actions; the database takes up to 1200 characters only with the chat migration,
     // which is also what makes a room a chat.
     const replyLimit = chat ? 1200 : 600;
+    // A call (the voice of a one-to-one room) answers without the character's knowledge lookup, and its memories are
+    // ranked by what was just said only when that ranking is already there; otherwise by importance, as before
+    // embeddings. The long-term memories themselves are always used (2026-11-07: calls answered too slowly).
+    const callTurn = !chat && room.capacity === 1 && !room.space_id;
     // The character's own knowledge and experience that fit what was just said, looked up while the rest of the context
     // loads. It needs the server role. A character with no entries costs nothing (checked, then remembered for a minute),
     // and a slow or failing lookup is dropped after a short wait so it can never hold the reply back.
     let knowledgeAttempted = false;
     const knowledgeRead = (async (): Promise<LoungeKnowledgeEntry[]> => {
+      if (callTurn) return [];
       const query = await lookupQuery;
       if (!query || !serviceHeaders || process.env.LOUNGE_KNOWLEDGE === 'off') return [];
       const started = performance.now();
@@ -722,14 +774,19 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const now = Date.now();
     const solo = loungeIsSolo(room, members, now);
     // A one-to-one chat started from a story (scenario, see loungeScenarios.ts): the story and the member's role go to the model.
-    const scenario = solo && !room.space_id ? normalizeLoungeRoomScenario(room.scenario) : undefined;
+    // A narrative the member wrote with this character in the persona the room uses takes the story card's place
+    // (2026-11-07), except in a consultation, which is not a story.
+    const roomScenario = solo && !room.space_id ? normalizeLoungeRoomScenario(room.scenario) : undefined;
+    const personaRows = solo && !room.space_id ? await personasRead : [];
+    const personaStory = solo && !room.space_id && !isLoungeConsultRoom(roomScenario?.id, room.host_persona) ? loungeRoomPersonaStory(room.member_persona, personaRows, room.host_persona) : undefined;
     const memberName = members.find(member => member.user_id === user.id)?.nickname?.replace(/\s+/g, ' ').trim().slice(0, 20);
     // The place the member chose for the scene (the background button of a one-to-one conversation). One chosen to fit
     // the scene (`auto`) follows the story and must not move it.
     const roomBackground = solo && !room.space_id ? readLoungeRoomBackground(room.background) : null;
     const chosenBackground = roomBackground?.auto ? null : roomBackground;
     // Who the member is in this conversation: the persona chosen for the room (read fresh, so an edit shows at once), or their default.
-    const memberPersona = solo && !room.space_id ? loungeRoomPersona(room.member_persona, await personasRead) : undefined;
+    const memberPersona = solo && !room.space_id ? loungeRoomPersona(room.member_persona, personaRows) : undefined;
+    const scenario = personaStory ? loungePersonaStoryScenario(personaStory, memberPersona) : roomScenario;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
@@ -748,10 +805,20 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // from the summary and an inner voice apart from what is said.
     const companionChat = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off';
     const companionCharacter = getLoungeCharacter(host.id);
-    const companionRows = companionChat ? await companionRowsRead : null;
-    const companionState = companionChat ? normalizeLoungeCompanionState(companionRows?.find(row => row.character_id === host.id)?.state, roomId) : undefined;
+    const companionRows = solo && !room.space_id && !session ? await companionRowsRead : null;
+    const companionState = solo && !room.space_id && !session ? normalizeLoungeCompanionState(companionRows?.find(row => row.character_id === host.id)?.state, roomId) : undefined;
     // Only where it can be kept (the server key and migration 20261203) does the call after the reply write the scene.
     const companionStored = Boolean(companionState) && Array.isArray(companionRows);
+    const durableCompanion = Boolean(room.companion_chat && serviceHeaders);
+    const readPendingTurns = async (): Promise<LoungePendingTurn[]> => {
+      if (!durableCompanion) return [];
+      const response = await fetchTimed(`${url}/rest/v1/voice_lounge_turn_updates?room_id=eq.${encodeURIComponent(roomId)}&user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(host.id)}&status=neq.applied&order=turn.asc&limit=32&select=*`, { headers: serviceHeaders! });
+      if (!response.ok) throw await loungeRpcFailure(response, 'voice_lounge_turn_updates');
+      return readJson<LoungePendingTurn[]>(response, 'lounge');
+    };
+    const pendingTurns = await readPendingTurns();
+    const pendingContext = pendingTurns.map(item => ({ turn: item.turn, user: item.user_text, character: splitLoungeInnerVoice(item.reply).reply }));
+
     // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
     const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
     // Every built-in character with adult flirtation has it; a character a member made does not (nobody can check its age).
@@ -761,51 +828,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
     const companionTurn = room.ai_turns ?? 0;
-    // The analyzer reads the member's latest words and what they do to the scene while memories and knowledge are looked
-    // up, for every model, as the scene and its events depend on it. Slow (3 s) or failed, the scene stays where it is,
-    // nothing happens around the two and the reply reads the member for itself.
-    const analyzerStarted = performance.now();
-    const analyzerRead = companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
-        const state = currentRelationshipContext();
-        // The member's words are read on the record of the two, in a plain chat as in a story (2026-11-06): who the member
-        // says they are, the relationship and what moved it lately, and the long-term memories by importance (the reply
-        // ranks them by what was just said, which needs the embedding the analyzer does not wait for). The memory rows
-        // have been read since the start of the request, and the reply waits for them as well.
-        const rows = relationship ? await memoryRowsRead : null;
-        const userMemories = relationship && rows ? selectMemoriesForPrompt(rows, relationship.config.characterId, relationship.now).forPrompt : undefined;
-        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
-          model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: 'lounge-analyzer',
-          instructions: [loungeAnalyzerInstructions, loungeContinuityRule].join('\n'),
-          input: JSON.stringify(loungeAnalyzerInput({ character: companionCharacter ? `${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}` : host.name, stage: state?.stage.label, scene: companionState.scene, sceneTurns: companionState.scene_turns, memory: String(room.memory ?? ''), scenario,
-            member: { persona: memberPersona, note: scenario?.member_note },
-            relationship: state && relationship ? { metrics: state.metrics, mood: state.mood, moments: state.memories, recent_changes: relationshipRecentChanges(relationship.record, relationship.config) } : undefined,
-            userMemories,
-            messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
-          text: { format: { type: 'json_schema', name: 'lounge_analyzer', strict: true, schema: loungeAnalyzerSchema } },
-        }), undefined, Number(process.env.LOUNGE_ANALYZER_WAIT_MS ?? 3000)), 'openai');
-        return readLoungeAnalysis(JSON.parse(modelOutputText(result) ?? ''));
-      })().catch(() => undefined) : undefined;
-    // The director, beside the analyzer and at the same time, for the fast model only (see loungeMessenger.ts): it sets
-    // the reaction, what the reply does and how it ends. LOUNGE_DIRECTOR=off turns it off, =on runs it for every model.
-    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR !== 'off' && (['gpt', 'deepseek-flash'].includes(getLoungeChatModel(room.ai_model).id) || process.env.LOUNGE_DIRECTOR === 'on');
-    const directorStarted = performance.now();
-    const directorRead = directorModel && companionCharacter && messages[0]?.kind === 'human' ? (async () => {
-        const state = currentRelationshipContext();
-        // The touch the stage takes, as the reply is told it: without it the director read "she sets the line" in the
-        // bible and told her to stop the member's hand at her closest step, in adult mode too (2026-11-03).
-        const intimacy = typeof state?.intimacy === 'string' ? (adultMode ? relationshipAdultModeText(state.intimacy) : state.intimacy) : undefined;
-        const explicit = adultMode && Boolean(stageNumber) && (companionCharacter.bible?.intimacyLadder && companionState ? effectiveIntimacyStage({ state: companionState, stage: stageNumber!, turn: companionTurn }).level : stageNumber) === 4;
-        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
-          model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 400, store: false, prompt_cache_key: `lounge-director-${host.id}`,
-          instructions: [loungeDirectorInstructions, loungeContinuityRule, `인물 요약: ${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}. ${companionCharacter.tagline}`,
-            loungeBiblePrompt(companionCharacter) || `성격: ${companionCharacter.personality.map(item => `${item.label} - ${item.text}`).join(' / ')}`].join('\n'),
-          input: JSON.stringify(loungeDirectorInput({ stage: state ? { label: state.stage.label, hint: state.stage.hint } : undefined, outing: state?.outing, intimacy, explicit, speechLevel: state?.speech_level, scene: companionState?.scene, memory: String(room.memory ?? ''), scenario, member: { persona: memberPersona, note: scenario?.member_note },
-            carry: companionState ? loungeCarry(companionState, companionTurn) : undefined,
-            messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) })),
-          text: { format: { type: 'json_schema', name: 'lounge_director', strict: true, schema: loungeDirectorSchema } },
-        }), undefined, Number(process.env.LOUNGE_DIRECTOR_WAIT_MS ?? 3000)), 'openai');
-        return readLoungeDirection(JSON.parse(modelOutputText(result) ?? ''));
-      })().catch(() => undefined) : undefined;
+    // Direction and intent now come from the same Luna call, regardless of the reply model.
+    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR !== 'off';
     // A story is fiction, but the member is a real person playing a role: the character knows what they said about
     // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
     // happens in it. The real world is not brought into the story: no follow-up of a real plan as its opening, and no
@@ -822,7 +846,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!response.ok) return undefined;
       return new Map((await readJson<Array<{ id: string; score: number }>>(response, 'lounge')).map(row => [row.id, Number(row.score)]));
     })().catch(() => undefined) : undefined;
-    const relevance = relevanceRead ? await withinLookupWait(relevanceRead) : undefined;
+    const relevance = relevanceRead ? await (callTurn ? Promise.race([relevanceRead, new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), loungeCallLookupWaitMs))]) : withinLookupWait(relevanceRead)) : undefined;
     if (relevanceRead) console.info('[Lounge memory relevance]', JSON.stringify({ character: relationship?.config.characterId, scored: relevance?.size ?? 0, ms: Math.round(performance.now() - relevanceStarted) }));
     // A story in episodes (see loungeStory.ts), told in a chat: where it stands, and what this episode asks of the character.
     // The model sees only the current episode; the room's copy of the story without its episodes is what it reads as scenario.
@@ -830,9 +854,37 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room.story_state, storyEpisodes) : undefined;
     const storyStageReached = storyState ? loungeStoryStageReached(storyEpisodes[storyState.episode], relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [], relationship?.record.stage) : true;
     const storyEpisode = storyState ? loungeStoryEpisodeContext(storyEpisodes, storyState, storyStageReached) : undefined;
-    const modelScenario = scenario ? { ...scenario, episodes: undefined } : undefined;
+    // A plotless one-to-one chat reads its story card's prologue only for the opening (2026-11-07). The prologue's last lines
+    // (an invitation, a place and a time) were read as if they were still being said, and the character came back to them in
+    // reply after reply; after the first turns the summary and the recent talk carry the story. Not for the member's own
+    // narrative (it is their story to follow) or a story told in episodes.
+    const prologueRead = solo && chat && !room.space_id && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off' && scenario?.id !== loungePersonaStoryScenarioId && !storyEpisodes.length && (room.ai_turns ?? 0) > 3;
+    const modelScenario = scenario ? { ...scenario, episodes: undefined, ...(prologueRead ? { prologue: '(사용자는 프롤로그를 이미 읽었고, 지금은 그 뒤를 이어 가는 중이다. 줄거리는 memory와 recent를 따른다.)' } : {}) } : undefined;
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance) : undefined;
-    const previousSession = relationship && longMemory && !scenario ? previousSessionSummary((await previousRoomsRead) ?? [], relationship.config.characterId, room.ai_turns ?? 0, relationship.now) : undefined;
+    const analyzerStarted = performance.now();
+    const analyzerRead = companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
+      const state = currentRelationshipContext();
+      const characterReading = companionCharacter ? { name: companionCharacter.name, role: companionCharacter.role,
+        personality: companionCharacter.personality, lens: companionCharacter.bible?.interpretationLens,
+        tone: companionCharacter.bible?.voice?.tone } : { name: host.name };
+      const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+        model: 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 850, store: false,
+        prompt_cache_key: 'lounge-turn-analysis', instructions: [loungeTurnAnalyzerInstructions, loungeContinuityRule].join('\n'),
+        input: JSON.stringify({ ...loungeAnalyzerInput({ character: companionCharacter ? `${companionCharacter.name}, ${companionCharacter.age}, ${companionCharacter.role}` : host.name,
+          stage: state?.stage.label, scene: companionState.scene, sceneTurns: companionState.scene_turns, memory: String(room.memory ?? ''), scenario,
+          member: { persona: memberPersona, note: scenario?.member_note },
+          relationship: state && relationship ? { metrics: state.metrics, mood: state.mood, moments: state.memories, recent_changes: relationshipRecentChanges(relationship.record, relationship.config) } : undefined,
+          userMemories: longMemory?.forPrompt, roomMemory: companionState.room_memory, carry: loungeCarry(companionState, companionTurn),
+          messages: [...messages].reverse().map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })) }),
+          pending_turns: pendingContext, character_identity: characterReading, direction_enabled: directorModel, outing: state?.outing,
+          intimacy: adultMode && typeof state?.intimacy === 'string' ? relationshipAdultModeText(state.intimacy) : state?.intimacy,
+          intimacy_explicit: adultMode && stageNumber === 4 || undefined,
+          speech_level: loungeRoomSpeechLevel(companionState) ?? state?.speech_level }),
+        text: { format: { type: 'json_schema', name: 'lounge_turn_analysis', strict: true, schema: loungeTurnAnalysisSchema } },
+      }), undefined, Number(process.env.LOUNGE_ANALYZER_WAIT_MS ?? 4000)), 'openai');
+      return readLoungeTurnAnalysis(JSON.parse(modelOutputText(result) ?? ''));
+    })().catch(error => { console.warn('[Lounge turn analysis]', JSON.stringify({ used: false, reason: error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error' })); return { analysis: undefined, direction: undefined }; }) : undefined;
+    const previousSession = undefined; // A companion chat never borrows a deleted or historical room's summary.
     // A new conversation opens with the most overdue unfinished story instead of the room topic.
     // Long-term memories are recorded only in solo play; at a space table (even alone) they are used, never written.
     const writesMemory = Boolean(longMemory) && !room.space_id;
@@ -879,23 +931,28 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // A story that starts with the two already speaking 반말 keeps it from the first stage.
     if (relationship && scenario && loungeScenarioCasualStart.has(scenario.id)) Object.assign(relationshipSteady, { speech_level: 'casual' });
     if (adultMode && typeof relationshipSteady.intimacy === 'string') relationshipSteady.intimacy = relationshipAdultModeText(relationshipSteady.intimacy);
+    if (companionState && loungeRoomSpeechLevel(companionState)) Object.assign(relationshipSteady, { speech_level: loungeRoomSpeechLevel(companionState) });
     const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
     const contextRecent = solo && chat ? recent.slice(-16) : recent;
+    // A one-to-one chat shortens an older message the way the readers before the reply do (loungeTurnMessages: 600); a room of several keeps 300.
+    const olderLimit = solo && chat ? 600 : 300;
+    const turnMessages = loungeTurnMessages(contextRecent.map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })));
     // On a call, what the member just said, named apart: the character kept answering the question before it, one turn
     // late (2026-11-02), as the call rules sent it back to the recent talk first.
-    const replyTo = phoneCall && recent.at(-1)?.kind === 'human' ? recent.at(-1)!.text.slice(0, 600) : undefined;
-    const context = { mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
+    const replyTo = phoneCall && recent.at(-1)?.kind === 'human' ? turnMessages.latest : undefined;
+    const context = { ...(pendingContext.length ? { pending_turns: pendingContext } : {}), mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
       ...(memberPersona ? { member_persona: memberPersona } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       // The relationship's stage texts change only with the stage; its scores, mood and memories after them change often.
       ...(relationship ? { relationship: { ...relationshipSteady, ...relationshipChanging, ...(longMemory ? { user_memories: longMemory.forPrompt, memory_style: relationship.config.memoryStyle } : {}), ...(previousSession ? { previous_session: previousSession } : {}), ...(openingThread ? { opening_follow_up: openingThread } : {}) } } : {}),
-      first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
+      ...(companionState?.room_memory?.length ? { room_memory: loungeRoomMemoryForPrompt(companionState.room_memory) } : {}), first_host_turn: room.ai_turns === 1, memory: String(room.memory).slice(0, 1800), members: present, reason: body.reason, request_kind: requestKind, ...(timeAway ? { time_away: timeAway } : {}),
       // A character's inner voice, saved with its reply, is read as its own field.
-      recent: contextRecent.map(({ created_at: _sent, ...message }, index) => {
+      recent: contextRecent.map((source, index) => {
+        const message = { ...source }; delete message.created_at;
         const { reply, inner } = message.kind === 'host' ? splitLoungeInnerVoice(message.text) : { reply: message.text, inner: '' };
-        return { ...message, text: fullHumanMessages.has(contextRecent[index]) ? reply.slice(0, 1200) : reply.length > 300 ? `${reply.slice(0, 150)} … ${reply.slice(-147)}` : reply, ...(inner ? { inner_voice: inner } : {}) };
+        return { ...message, text: fullHumanMessages.has(contextRecent[index]) ? reply.slice(0, 1200) : reply.length > olderLimit ? `${reply.slice(0, olderLimit / 2)} … ${reply.slice(-(olderLimit / 2 - 3))}` : reply, ...(inner ? { inner_voice: inner } : {}) };
       }) };
     const modelStarted = performance.now();
     // One to one, the bible goes into the prompt (the messenger instruction, or the one-to-one role in a call), except
@@ -1003,9 +1060,11 @@ ${photoRule}`;
     // for a character and the member's inner-voice setting, so they are cached; what the turn needs goes in the input.
     const companionSheet = loungeCompanionSheetPrompt(character, innerVoiceMode);
     const messengerInstruction = [`역할: 사람 한 명과 같은 곳에 함께 있는 대화 상대다. 진행자, 인터뷰어, 작가, 서술자가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), companionSheet,
-      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), directorModel ? loungeDirectionRule : '', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
-    const [analysis, direction] = await Promise.all([analyzerRead, directorRead]);
-    if (directorRead) console.info('[Lounge director]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - directorStarted), used: Boolean(direction), ...(direction ? { reaction: direction.reaction } : {}) }));
+      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), directorModel ? loungeDirectionRule : '', 'room_memory는 이 방에서 지금 유효한 합의와 풀리지 않은 감정의 원인이다. 합의는 명시적 변경 전까지 유지한다. pending_turns는 상태 갱신을 기다리는 직전 대화이므로 최신 정정과 합의를 읽을 때 함께 본다. recent의 새 명시적 변경을 과거 기억보다 우선한다.', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
+    const interpreted = await analyzerRead;
+    const analysis = interpreted?.analysis;
+    const direction = directorModel ? interpreted?.direction : undefined;
+
     // 홍실당 상담 (loungeConsult.ts): this story card's room runs as a consulting service. Code decides what 한결 does this
     // turn from the member's latest words; a reading is made below by its own call. Nothing happens around them meanwhile.
     const consultRoom = Boolean(messenger && scenario && isLoungeConsultRoom(scenario.id, host.id));
@@ -1014,9 +1073,14 @@ ${photoRule}`;
       ? advanceLoungeConsult(readLoungeConsultState(room.story_state), { opening: body.reason === 'opening' && !lastHuman, said: lastHuman }) : undefined;
     // While a reading is under way (asking, picking, reading) nothing happens around them; plain talk is the usual chat.
     const consulting = Boolean(consult && consult.turn.do !== 'chat');
-    const sceneFound = companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
+    const sceneFound = companionChat && companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
+    const agreedSpeech = companionState ? loungeRoomSpeechLevel(companionState) : undefined;
+    if (turnConditions && agreedSpeech) Object.assign(turnConditions, { speech: agreedSpeech === 'casual'
+      ? '이 방에서 서로 반말하기로 합의했다. 단계의 기본 말투보다 이 합의를 유지한다.'
+      : agreedSpeech === 'polite' ? '이 방에서 서로 존댓말을 쓰기로 합의했다. 이 합의를 유지한다.'
+        : '이 방에서 서로 존댓말과 반말을 자연스럽게 섞기로 합의했다. 이 합의를 유지한다.' });
     // The turns adult mode opens are answered by DeepSeek when its key is set (see deepseekReply).
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
@@ -1094,8 +1158,10 @@ ${photoRule}`;
         timeAway ? loungeTimeAwayInstruction : '',
         story && storyEpisode ? loungeStoryEpisodeInstructions : '',
         phoneCall ? loungePhoneCallRules : '',
+        phoneCall && body.callStart === true && body.reason === 'opening' ? loungeCallGreetingRule : '',
         chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
         memberPersona ? loungeMemberPersonaRule : '',
+        scenario?.id === loungePersonaStoryScenarioId ? loungePersonaStoryRule : '',
         sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
         // A story room with the voice on keeps to the story, in the voice rules.
         !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.${messengerCall ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
@@ -1134,11 +1200,11 @@ memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. 
 photo: photo_subject가 character이고 방금 답에서 캐릭터가 자기 모습이 담긴 사진(셀카, 누가 찍어 준 캐릭터의 사진)을 상대에게 보내는 장면이 있을 때만, 보낸 사진에 담긴 장면을 한국어 한 문장(100자 이내)으로 쓴다. 장소·시간·옷차림·표정·구도를 답과 memory의 장면에 맞게 담는다. 그 밖에는 빈 문자열이다. 캐릭터가 사용자를 찍어 주거나 풍경만 찍는 장면, 사용자의 휴대폰으로 찍는 장면은 보내는 사진이 아니므로 빈 문자열이다. 노출이나 성적인 장면은 쓰지 않는다.
 photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지금 모습을 보여 달라는 부탁이었으면 true다. 사용자 자신이나 풍경을 찍어 달라는 부탁은 false다.` : '',
         // A chat's scene and the turn's record (engine v4), which code keeps in voice_lounge_companion_state.
-        companionStored ? loungeCompanionUpdateInstructions : '',
+        companionStored ? `${loungeCompanionUpdateInstructions}\n${loungeRoomMemoryInstructions}` : '',
       ].filter(Boolean).join('\n'),
       input: JSON.stringify({ character: characterName, reply_medium: chat ? 'chat' : 'voice', ...(phoneCall ? { phone_call: true } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}), ...(story && memberName ? { member_name: memberName } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}), memory: context.memory, ...(context.relationship ? { relationship: context.relationship } : {}),
         ...(analysis && relationship ? { reading: loungeReading(analysis) } : {}),
-        ...(companionStored && companionState ? { scene: companionState.scene ?? null, self_facts: companionState.self_facts.map(item => item.fact), lingering: companionState.lingering?.what ?? '', next_intent: companionState.next_intent?.what ?? '', ...(sceneDecision?.event ? { event: sceneDecision.event.content } : {}) } : {}),
+        ...(companionStored && companionState ? { room_memory: loungeRoomMemoryForPrompt(companionState.room_memory ?? []), scene: companionState.scene ?? null, self_facts: companionState.self_facts.map(item => item.fact), lingering: companionState.lingering?.what ?? '', next_intent: companionState.next_intent?.what ?? '', ...(sceneDecision?.event ? { event: sceneDecision.event.content } : {}) } : {}),
         recent: [...context.recent, (() => { const { reply: said, inner } = splitLoungeInnerVoice(reply); return { kind: 'host', nickname: characterName, text: said, ...(inner ? { inner_voice: inner } : {}) }; })()] }),
       text: { format: { type: 'json_schema', name: 'lounge_after_reply', strict: true, schema: {
         type: 'object', additionalProperties: false,
@@ -1157,7 +1223,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       const bold = analysis ? analysis.intimacy_proposal === 'elegant' && !analysis.is_sincere_refusal
         : Array.isArray(answer?.events) && answer.events.some(event => (event as { type?: unknown })?.type === 'MAKES_BOLD_MOVE' && Number((event as { confidence?: unknown })?.confidence ?? 1) >= 0.6);
       const boldMove = character?.bible?.intimacyProposal && stageNumber && bold ? { stage: stageNumber } : undefined;
-      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, boldMove, emotional: analysis?.is_emotional_moment === true });
+      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, userText: lastHuman, recent: turnMessages.recent, boldMove, emotional: analysis?.is_emotional_moment === true });
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: user.id, character_id: host.id, state, updated_at: new Date().toISOString() }) });
         console.info('[Lounge companion]', JSON.stringify({ host: host.id, saved: response.ok, scene: state.scene?.location ?? null, sceneTurns: state.scene_turns, ...(sceneDecision.event ? { event: sceneDecision.event.id } : {}), reaction: state.reactions.at(-1) ?? null }));
@@ -1209,19 +1275,93 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         return response.ok ? state : undefined;
       } catch (error) { console.warn('[Lounge story] not saved', error instanceof Error ? error.name : 'error'); }
     };
+    const serviceRpc = async <T,>(name: string, args: Record<string, unknown>): Promise<T> => {
+      const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders!, body: JSON.stringify(args) });
+      if (!response.ok) throw await loungeRpcFailure(response, name);
+      return readJson<T>(response, 'lounge');
+    };
+    const prepareTurn = (turn: number, payload: LoungeTurnPayload, ready: boolean) => serviceRpc<boolean>('prepare_voice_lounge_turn', {
+      p_user: user.id, p_character: host.id, p_room: roomId, p_turn: turn, p_payload: payload, p_ready: ready,
+    });
+    let recoveredTurns = 0;
+    const turnStore: LoungeTurnStore = {
+      pending: readPendingTurns,
+      snapshot: async () => {
+        const [stored, statesResponse, moodResponse] = await Promise.all([
+          readRelationship(user.id, host.id),
+          fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(host.id)}&room_id=eq.${encodeURIComponent(roomId)}&select=state,version`, { headers: serviceHeaders! }),
+          fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=ai_mood`, { headers: serviceHeaders! }),
+        ]);
+        if (!stored.ok || !statesResponse.ok || !moodResponse.ok) throw new Error('companion_snapshot_unavailable');
+        const [state] = await readJson<Array<{ state: unknown; version: number }>>(statesResponse, 'lounge');
+        const [freshRoom] = await readJson<Array<{ ai_mood?: unknown }>>(moodResponse, 'lounge');
+        if (!freshRoom) throw new Error('companion_room_deleted');
+        return { relationship: stored.row, state: state?.state, stateVersion: state?.version ?? 0, mood: freshRoom.ai_mood };
+      },
+      commit: value => serviceRpc('commit_voice_lounge_turn', { p_user: user.id, p_character: host.id, p_room: roomId,
+        p_turn: value.turn, p_relationship_version: value.relationshipVersion, p_state_version: value.stateVersion,
+        p_relationship: value.relationship, p_mood: value.mood, p_state: value.state, p_memory: value.memory, p_memory_ops: value.memoryOps }),
+      recover: async job => {
+        // A crashed request leaves a durable marker. Retry at most one old recording per response.
+        if (recoveredTurns++ >= 1) return false;
+        try {
+          const request = job.payload.request ?? { ...afterReplyRequest(job.reply), input: JSON.stringify({ character: characterName,
+            memory: room.memory, room_memory: loungeRoomMemoryForPrompt(companionState?.room_memory ?? []),
+            recent: [{ kind: 'human', text: job.user_text }, { kind: 'host', text: splitLoungeInnerVoice(job.reply).reply }] }) };
+          const result = await readJson<ModelResult>(await openai('responses', JSON.stringify(request), undefined, 40_000), 'openai');
+          const answer = JSON.parse(modelOutputText(result) ?? '') as AfterReply;
+          if (typeof answer.memory !== 'string') return 'failed';
+          return prepareTurn(job.turn, { ...job.payload, answer }, true);
+        } catch (error) { console.warn('[Lounge turn recovery]', JSON.stringify({ turn: job.turn, reason: error instanceof Error ? error.name : 'error' })); return 'failed'; }
+      },
+      // After 3 failed tries a turn is closed unapplied (migration 20261208000100) so the turns after it are not held back.
+      fail: async job => {
+        try {
+          const outcome = await serviceRpc<string>('fail_voice_lounge_turn', { p_user: user.id, p_character: host.id, p_room: roomId, p_turn: job.turn });
+          if (outcome === 'skipped') console.warn('[Lounge turn skipped]', JSON.stringify({ turn: job.turn }));
+          return outcome === 'skipped';
+        } catch { return false; }
+      },
+    };
+    const turnPayload = (request?: Record<string, unknown>): LoungeTurnPayload => ({
+      ...(request ? { request } : {}), analysis, decision: sceneDecision, recent: turnMessages.recent,
+      memoryRefs: [...longMemory?.refs.entries() ?? []], memories: longMemory?.chosen ?? [], companion: companionStored,
+      consult: consultRoom, proposalRule: Boolean(character?.bible?.intimacyProposal),
+      closest: Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship?.config.adultFlirtation && stageNumber && stageNumber >= 4),
+      ...(character?.bible?.intimacyProposal && stageNumber && analysis?.intimacy_proposal === 'elegant' && !analysis.is_sincere_refusal ? { boldMove: { stage: stageNumber } } : {}),
+    });
+    const persistTurn = async (answer: AfterReply | undefined, request?: Record<string, unknown>) => {
+      if (!answer) return;
+      await prepareTurn(companionTurn, { ...turnPayload(request), answer }, true);
+      return drainLoungeTurns(roomId, relationship?.config, turnStore);
+    };
     // Runs once the reply is written, alongside its speech. What it writes is saved only if the reply was (`saved`). A
     // failure loses this turn's summary and events, never the reply. It is not cancelled with the request: the member
     // leaving right after a reply should not lose what the reply changed.
     const afterReply = async (reply: string, saved: Promise<boolean>): Promise<{ answer?: AfterReply; relationship?: { relationship: RelationshipView; change: RelationshipChange }; story?: LoungeStoryState }> => {
       const started = performance.now();
       let answer: AfterReply | undefined;
+      const request = afterReplyRequest(reply);
+      if (durableCompanion && await saved) {
+        try { await prepareTurn(companionTurn, turnPayload(request), false); }
+        catch (error) { console.warn('[Lounge turn prepare]', error instanceof Error ? error.name : 'error'); }
+      }
       try {
-        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify(afterReplyRequest(reply)), undefined, 40_000), 'openai');
+        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify(request), undefined, 40_000), 'openai');
         const usage = modelUsageLog(result, { host: host.id, mode: 'after-reply' }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
         const parsed = JSON.parse(modelOutputText(result) ?? '') as AfterReply;
         if (typeof parsed?.memory === 'string') answer = parsed;
       } catch (error) { console.warn('[Lounge after reply] not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
       if (!await saved) return {};
+      if (durableCompanion) {
+        let relationshipSaved;
+        try { relationshipSaved = await persistTurn(answer, request); }
+        catch (error) { console.warn('[Lounge turn commit]', error instanceof Error ? error.name : 'error'); }
+        const storySaved = await saveStory(answer?.story_checkpoints, answer?.story_facts, answer?.story_choice, answer?.memory);
+        await fillMemoryEmbeddings();
+        console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer), durable: true }));
+        return { answer, relationship: relationshipSaved, story: storySaved };
+      }
       const memory = answer?.memory.trim();
       const [, relationshipSaved, storySaved] = await Promise.all([
         memory ? rpc<boolean>('save_voice_lounge_room_memory', { p_room: roomId, p_memory: memory, p_turn: room.ai_turns ?? 0 })
@@ -1238,7 +1378,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     const fillMemoryEmbeddings = async () => {
       if (!serviceHeaders || !relationship || !writesMemory) return;
       try {
-        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(relationship.config.characterId)}&status=eq.active&embedding=is.null&order=updated_at.desc&limit=10&select=id,summary,follow_up`, { headers: serviceHeaders });
+        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(user.id)}&character_id=eq.${encodeURIComponent(relationship.config.characterId)}&source_room=eq.${encodeURIComponent(roomId)}&status=eq.active&embedding=is.null&order=updated_at.desc&limit=10&select=id,summary,follow_up`, { headers: serviceHeaders });
         // Before the migration there is no embedding column, and the read fails.
         if (!response.ok) return;
         const rows = await readJson<Array<{ id: string; summary: string; follow_up: string | null }>>(response, 'lounge');
@@ -1315,7 +1455,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       // A deployment without the key speaks with the next voice for every reply alike, so it never changes in a call.
       return choice !== 'gemini' && choice !== 'openai' ? planSpeech('gemini') : { engine: 'openai' };
     };
-    let speech = planSpeech(chosenSpeech);
+    const speech = planSpeech(chosenSpeech);
     // A premium engine speaks only while the member's monthly allowance lasts. Past it (or for a guest) the reply stays
     // text with a notice, instead of another voice; an allowance that cannot be read does not stop the voice. It is read
     // while the reply is written.
@@ -1330,6 +1470,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         })
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
+    // Past the month's minutes of calls (LOUNGE_CALL_LIMITS=on) the call's replies stay text, the same way a used premium voice does.
+    const callGate: Promise<void> | undefined = phoneCall && loungeCallLimitsOn(process.env) && !user.is_anonymous
+      ? callService('lounge_call_status', { p_user: user.id }).then(state => {
+        if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
+      }).catch(() => { console.warn('[Lounge call] allowance not read, speaking anyway'); })
+      : undefined;
     let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0, elevenBackupLines = 0;
     // v4 Turbo alone, which was measured to speak every line (30 of 30 and 90 of 90) with the short waits below; Flash v2.5
     // is the backup only when LOUNGE_ELEVEN_BACKUP=on, for the day too many callers make those waits long.
@@ -1429,6 +1575,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     };
     const openSpeech = async (text: string, signal: AbortSignal) => {
       if (premiumSpeech) await speechGate;
+      if (callGate) await callGate;
       if (speechRefused) throw speechRefused;
       const stall = new AbortController();
       const timer = setTimeout(() => stall.abort(new DOMException('speech stalled', 'TimeoutError')), loungeSpeechStall.firstAudioMs);
@@ -1817,7 +1964,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     const saveStarted = performance.now();
     const saved = await rpc<boolean>('finish_voice_lounge_host', { p_room: roomId, p_ticket: ticket, p_text: text, p_memory: answer.memory });
     if (!saved) return json({ skipped: true });
-    const relationshipSaved = saveRelationship(answer);
+    const relationshipSaved = durableCompanion ? persistTurn(answer as AfterReply) : saveRelationship(answer);
     if (body.stream === true) {
       const encoder = new TextEncoder();
       const cancelled = new AbortController();

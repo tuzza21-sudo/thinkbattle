@@ -33,7 +33,7 @@ node scripts/new-lounge-character.mjs seoyeon --name 윤서연 --job "출판 편
    - 1:1 인물 설명(`companion`)에 "사람 자체를 깎아내리지 않는다" 같은 선이 있어야 해요(테스트가 확인해요).
    - 질문으로 끝내지 않고 둘 중 하나를 고르게 하는 질문을 하지 않도록 써요. 인물이 매번 같은 방식으로 끝나는 문제가 이미 한 번 있었어요.
    - 소개 페이지의 `wins`·`losses`는 관계 설정의 반응과 맞아야 해요. 점수가 4 이상 오르는 반응은 모두 소개 페이지에 설명이 있어야 하고, 테스트가 빠진 것을 알려 줘요.
-   - 이 캐릭터만의 점수가 필요하면 `configs/<id>.ts`의 `uniqueMetrics`와 단계 조건을 바꿔요(`seoyeon.ts`가 예시).
+   - 점수는 모든 캐릭터가 같은 세 가지예요: 공감(empathy), 설렘(romance, 로맨틱한 대화가 통할 때만 오름)과 이 캐릭터만의 지표 하나(`uniqueMetrics`, 정확히 하나). 고유 지표의 이름과 설명, 다섯 라벨, 그 지표를 움직이는 이벤트(전용 이벤트는 `NEGOTIATES_BOLDLY` `BOUNCES_BACK` `SHARES_VIEW` `PLANS_TOGETHER`), 단계 조건(`enter.min`에 세 지표를 모두)을 바꿔요(`seoyeon.ts`가 예시). 장면에 들어가기·관심 보이기·질문하기·대답하기 같은 평범한 반응은 점수에 넣지 않아요(`retiredRelationshipEvents`). 자세한 내용은 `docs/lounge-relationship-metrics.md`.
 2. **이미지** — 프롬프트를 `scripts/lounge-character-prompts.json`에 쓴 뒤:
    ```
    node scripts/generate-lounge-character-portraits.mjs --only=<id>

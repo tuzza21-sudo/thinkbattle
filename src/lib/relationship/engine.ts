@@ -17,7 +17,7 @@ export const relationshipSettings = {
   repeatWindowTurns: 3,
   /** Weight of a positive effect for the 1st, 2nd, 3rd and later repetition inside the window. */
   repeatMultipliers: [1, 0.6, 0.2, 0],
-  maxGainPerTurn: { trust: 4, respect: 6, interest: 8, comfort: 5, openness: 4 } as Record<string, number>,
+  maxGainPerTurn: { empathy: 5, romance: 5 } as Record<string, number>,
   uniqueMaxGainPerTurn: 6,
   /** Largest loss per metric in one turn, by the most serious event in that turn. */
   maxLossPerTurn: { normal: 6, meaningful: 6, strong: 12, severe: 20 } as Record<EventSeverity, number>,
@@ -29,24 +29,10 @@ export const relationshipSettings = {
 
 const severityRank: Record<EventSeverity, number> = { normal: 0, meaningful: 1, strong: 2, severe: 3 };
 const commonLabels: Record<string, readonly [string, string, string, string, string]> = {
-  trust: ['경계', '조심스러움', '믿어 보는 중', '신뢰', '깊은 신뢰'],
-  respect: ['아직 인정 전', '지켜보는 중', '인정하기 시작함', '존중', '깊은 존중'],
-  interest: ['무관심', '시큰둥함', '관심 있음', '흥미진진', '푹 빠짐'],
-  comfort: ['긴장', '어색함', '편해지는 중', '편안함', '아주 편안함'],
-  openness: ['닫혀 있음', '말을 아낌', '조금씩 열림', '솔직함', '속을 터놓음'],
+  empathy: ['남남처럼 지나감', '귀 기울이는 중', '마음을 알아줌', '깊이 공감함', '마음이 통함'],
+  romance: ['아직 없음', '궁금해짐', '신경 쓰임', '설레는 중', '마음이 기움'],
 };
-const commonNames: Record<string, string> = { trust: '신뢰', respect: '존중', interest: '흥미', comfort: '편안함', openness: '마음 열기' };
-const segmentNames = { fun: '재미', heart: '마음' } as const;
-const segmentLabels: Record<'fun' | 'heart', readonly [string, string, string, string, string]> = {
-  fun: ['심심함', '슬슬 재밌음', '재밌음', '푹 빠짐', '시간 가는 줄 모름'],
-  heart: ['아직 낯섦', '마음이 가는 중', '가까워짐', '깊어짐', '마음이 닿음'],
-};
-const mean = (scores: Scores, metrics: readonly string[]) => metrics.length ? metrics.reduce((sum, metric) => sum + (scores[metric] ?? 0), 0) / metrics.length : 0;
-/** A character judged on segments: its fun and heart scores (0-100 each, the mean of their metrics). */
-export function relationshipSegments(config: RelationshipConfig, scores: Scores) {
-  return config.segments ? { fun: Math.round(mean(scores, config.segments.fun)), heart: Math.round(mean(scores, config.segments.heart)) } : undefined;
-}
-const segmentTotal = (config: RelationshipConfig, scores: Scores) => config.segments ? mean(scores, config.segments.fun) + mean(scores, config.segments.heart) : 0;
+const commonNames: Record<string, string> = { empathy: '공감', romance: '설렘' };
 
 export const clampScore = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 const roundHalfAway = (value: number) => Math.sign(value) * Math.round(Math.abs(value));
@@ -64,15 +50,35 @@ export function createRelationship(config: RelationshipConfig): RelationshipReco
   };
 }
 
-/** Restores a stored record, tolerating metrics added to a configuration after it was saved. */
+/**
+ * Scores of a record saved before 2026-11-06, read into the three metrics: empathy from comfort, openness and the old
+ * heart metric, romance and the character's own metric from the ones the configuration names as their predecessors.
+ * What has no predecessor starts from its initial score.
+ */
+function legacyScores(config: RelationshipConfig, stored: Partial<RelationshipRecord>, fresh: Scores): Scores {
+  const old = stored.scores ?? {};
+  const mean = (ids: readonly string[]) => {
+    const known = ids.map(id => old[id]).filter((value): value is number => typeof value === 'number');
+    return known.length ? Math.round(known.reduce((sum, value) => sum + value, 0) / known.length) : undefined;
+  };
+  const unique = config.uniqueMetrics[0].id;
+  return {
+    empathy: mean(config.legacy?.empathy ?? ['comfort', 'openness', 'resonance']) ?? fresh.empathy,
+    romance: mean(config.legacy?.romance ?? []) ?? fresh.romance,
+    [unique]: mean(config.legacy?.unique ?? []) ?? fresh[unique],
+  };
+}
+
+/** Restores a stored record, tolerating metrics added to or replaced in a configuration after it was saved. */
 export function restoreRelationship(config: RelationshipConfig, stored?: Partial<RelationshipRecord> | null): RelationshipRecord {
   const fresh = createRelationship(config);
   if (!stored) return fresh;
   const stages = enabledStages(config);
+  const migrated = typeof stored.scores?.empathy === 'number' ? {} : legacyScores(config, stored, fresh.scores);
   return {
     ...fresh, ...stored,
     characterId: config.characterId,
-    scores: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, clampScore(typeof stored.scores?.[metric] === 'number' ? stored.scores[metric] : fresh.scores[metric])])),
+    scores: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, clampScore(typeof stored.scores?.[metric] === 'number' ? stored.scores[metric] : migrated[metric] ?? fresh.scores[metric])])),
     stage: stages.some(stage => stage.id === stored.stage) ? stored.stage! : fresh.stage,
     pending: stored.pending && ['up', 'down', null].includes(stored.pending.direction) ? stored.pending : fresh.pending,
     recentEvents: Array.isArray(stored.recentEvents) ? stored.recentEvents : [],
@@ -94,16 +100,14 @@ export function applyDecay(record: RelationshipRecord, config: RelationshipConfi
 
 export function initialMood(config: RelationshipConfig): Mood { return { ...config.initialMood }; }
 
-const meets = (scores: Scores, condition: StageCondition, config: RelationshipConfig) =>
+const meets = (scores: Scores, condition: StageCondition) =>
   Object.entries(condition.min ?? {}).every(([metric, value]) => (scores[metric] ?? 0) >= (value ?? 0))
-  && Object.entries(condition.max ?? {}).every(([metric, value]) => (scores[metric] ?? 0) <= (value ?? 100))
-  && (condition.total === undefined || segmentTotal(config, scores) >= condition.total);
+  && Object.entries(condition.max ?? {}).every(([metric, value]) => (scores[metric] ?? 0) <= (value ?? 100));
 function holdCondition(config: RelationshipConfig, index: number): StageCondition {
   const stage = enabledStages(config)[index];
   if (stage.hold) return stage.hold;
   const band = relationshipSettings.hysteresisBand;
-  // A total over two segments keeps the stage down to a band and a half below its entry.
-  return { min: Object.fromEntries(Object.entries(stage.enter.min ?? {}).map(([metric, value]) => [metric, (value ?? 0) - band])), max: stage.enter.max, ...(stage.enter.total !== undefined ? { total: stage.enter.total - band * 1.5 } : {}) };
+  return { min: Object.fromEntries(Object.entries(stage.enter.min ?? {}).map(([metric, value]) => [metric, (value ?? 0) - band])), max: stage.enter.max };
 }
 
 export type TurnInput = { record: RelationshipRecord; config: RelationshipConfig; mood: Mood; events: unknown; hasUserTurn: boolean; now: Date };
@@ -195,10 +199,8 @@ export function evaluateStage(config: RelationshipConfig, record: RelationshipRe
   let index = Math.max(0, stages.findIndex(stage => stage.id === record.stage));
   let pending = { ...record.pending };
   let change: TurnLog['stageChange'] = null;
-  const holds = (i: number) => i === 0 || meets(scores, holdCondition(config, i), config);
-  // Judged on segments, one lie moves the total less than a single bar used to move: a severe event takes the stage down
-  // as soon as the total is below the stage's own line, not only below the hold line.
-  const keeps = (i: number) => holds(i) && !(severe && config.segments && i > 0 && !meets(scores, stages[i].enter, config));
+  const holds = (i: number) => i === 0 || meets(scores, holdCondition(config, i));
+  const keeps = (i: number) => holds(i);
   if (!keeps(index)) {
     if (severe) {
       while (index > 0 && !keeps(index)) index--;
@@ -207,7 +209,7 @@ export function evaluateStage(config: RelationshipConfig, record: RelationshipRe
       pending = { direction: 'down', turns: pending.direction === 'down' ? pending.turns + 1 : 1 };
       if (pending.turns >= settings.demotionStabilityTurns) { index--; pending = { direction: null, turns: 0 }; change = 'demoted'; }
     }
-  } else if (index + 1 < stages.length && meets(scores, stages[index + 1].enter, config) && !severe) {
+  } else if (index + 1 < stages.length && meets(scores, stages[index + 1].enter) && !severe) {
     if (userTurn) {
       pending = { direction: 'up', turns: pending.direction === 'up' ? pending.turns + 1 : 1 };
       if (pending.turns >= settings.promotionStabilityTurns) { index++; pending = { direction: null, turns: 0 }; change = 'promoted'; }
@@ -255,24 +257,17 @@ export function metricName(config: RelationshipConfig, metric: string) {
   return config.uniqueMetrics.find(item => item.id === metric)?.name ?? commonNames[metric] ?? metric;
 }
 
-/** How close the scores are to a stage's entry: the mean share of each minimum reached, or of the total (0-1). */
-function stageProgress(scores: Scores, condition: StageCondition, config: RelationshipConfig) {
-  if (condition.total !== undefined) return Math.round(Math.min(1, segmentTotal(config, scores) / condition.total) * 100) / 100;
+/** How close the scores are to a stage's entry: the mean share of each minimum reached (0-1). */
+function stageProgress(scores: Scores, condition: StageCondition) {
   const minimums = Object.entries(condition.min ?? {}).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0);
   if (!minimums.length) return 1;
   const share = minimums.reduce((sum, [metric, value]) => sum + Math.min(1, (scores[metric] ?? 0) / value), 0) / minimums.length;
   return Math.round(share * 100) / 100;
 }
 
-/**
- * The scores that matter for this character: its own metrics, and the shared ones its stages ask for. On 2026-10-29
- * every character's card showed the same five shared bars (흥미, 존중, 편안함…), some of which none of its stages used.
- */
+/** The three scores a card shows, the character's own first: its own metric, romance, empathy. */
 export function relationshipShownMetrics(config: RelationshipConfig) {
-  const asked = new Set(enabledStages(config).flatMap(stage => Object.keys(stage.enter.min ?? {})));
-  const unique = new Set(config.uniqueMetrics.map(metric => metric.id));
-  const shown = relationshipMetrics(config).filter(metric => unique.has(metric) || asked.has(metric));
-  return shown.length ? shown : relationshipMetrics(config);
+  return [config.uniqueMetrics[0].id, 'romance', 'empathy'];
 }
 
 /**
@@ -288,9 +283,8 @@ export function describeRelationship(record: RelationshipRecord, config: Relatio
   return {
     characterId: config.characterId,
     macroState: { id: stage.id, label: stage.label },
-    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter, config) : 1 },
-    // Judged on segments, the card shows the two segments, each with half the next stage's total as its mark.
-    metrics: config.segments ? segmentView(config, record.scores, next?.enter.total) : Object.fromEntries(relationshipShownMetrics(config).map(metric => [metric, {
+    stage: { index, total: stages.length, line: stage.line, ...(next ? { next: next.label } : {}), progress: next ? stageProgress(record.scores, next.enter) : 1 },
+    metrics: Object.fromEntries(relationshipShownMetrics(config).map(metric => [metric, {
       name: metricName(config, metric), label: metricLabel(config, metric, record.scores[metric]), score: record.scores[metric],
       ...(typeof needs[metric] === 'number' && needs[metric]! > 0 ? { need: needs[metric] } : {}),
     }])),
@@ -303,25 +297,8 @@ export function describeRelationship(record: RelationshipRecord, config: Relatio
 }
 
 /** What a saved turn changed, for the chat to show: each accepted event (rising when it raised scores overall), the scores it moved, a stage change. */
-function segmentView(config: RelationshipConfig, scores: Scores, nextTotal?: number) {
-  const segments = relationshipSegments(config, scores)!;
-  return Object.fromEntries((['fun', 'heart'] as const).map(key => [key, {
-    name: segmentNames[key], label: segmentLabels[key][band(segments[key])], score: segments[key],
-    ...(nextTotal ? { need: Math.round(nextTotal / 2) } : {}),
-  }]));
-}
 export function describeTurnChange(log: TurnLog, config: RelationshipConfig): RelationshipChange {
   const metrics = relationshipMetrics(config);
-  // Judged on segments, what a turn changed is shown as the change of each segment.
-  if (config.segments) {
-    const change = (keys: readonly string[]) => Math.round(keys.reduce((sum, metric) => sum + (log.delta[metric] ?? 0), 0) / Math.max(1, keys.length));
-    const delta = Object.fromEntries((['fun', 'heart'] as const).map(key => [key, change(config.segments![key])] as const).filter(([, value]) => value !== 0));
-    return {
-      events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
-        up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
-      delta, stage: log.stageChange,
-    };
-  }
   return {
     events: log.accepted.map(event => ({ type: event.type, label: relationshipEventLabels[event.type] ?? event.type,
       up: Object.values(event.deltas).reduce<number>((sum, value) => sum + (value ?? 0), 0) >= 0 })),
@@ -351,28 +328,23 @@ export function speechLevel(config: RelationshipConfig, stageId: string): 'polit
 }
 
 /**
- * Whether the character goes along when the user invites them somewhere or to do something together in the story
- * (a walk, a trip, a film), by how far the relationship has come: not yet at the first stage, only small things next,
- * most things later, gladly at the closest. Written here, from the stage's place, so the model does not have to guess.
+ * Default emotional distance, not a mandatory reaction. The character's own first-stage behaviour stays authoritative:
+ * being careful about commitment does not make a confident character flustered or unwilling to flirt back.
  */
-/**
- * Every character at its first stage: still sizing the member up, guarded in its own way. On 2026-10-30 the owner found
- * characters showing interest and flirting from the first stage; the stages' own words (설레게 한다) and the rule to
- * show feelings boldly had pushed them ahead of the relationship.
- */
-export const relationshipFirstStageReserve = '아직 서로를 잘 모르는 첫 단계다. 상대가 어떤 사람인지 살피며 마음의 거리를 둔다. 호감이나 설렘을 먼저 드러내지 않고, 상대의 외모나 분위기에 끌린다는 말, 칭찬 공세, 플러팅, 다음 만남을 기대하는 말을 먼저 하지 않는다. 경계의 모양은 성격대로다. 다정한 사람은 예의 바르고 친절하지만 선을 지키고, 도도하거나 건조한 사람은 짧고 쌀쌀하게 거리를 두고, 장난스러운 사람은 농담 뒤에 속마음을 숨기고, 신중한 사람은 말을 아끼며 지켜본다. 상대가 먼저 호감을 보이거나 플러팅해도 반가워하며 받아 주지 않는다. 성격대로 넘기거나 당황하거나 의아해하며 거리를 유지하고, 흔들림은 아주 살짝만 비친다. 이 거리감은 stage.hint, stage.romance보다 먼저다. 이야기가 정한 사건(약속을 제안하기, 고백 한마디 등)은 그대로 하되 말투와 마음의 온도는 조심스럽게 지킨다.';
+export const relationshipFirstStageReserve = '아직 이 사람을 알아가는 단계다. 한 번의 호감 표현만으로 깊은 사랑이나 관계를 확정하지 않는다. 장난·칭찬·플러팅을 받아들이는 방식과 먼저 관심을 보이는 정도는 캐릭터 바이블, character_core, stage.hint와 stage.romance를 따른다. 자신감 있는 인물에게 당황이나 거절을 강제하지 않는다. 이미 합의한 관계와 말투, 함께 하기로 한 일은 낮은 단계만으로 취소하지 않는다.';
 
+/** Activity invitations follow the actual scene and character; stage only supplies a default degree of familiarity. */
 export function relationshipOutingGuidance(index: number, count: number) {
-  if (index <= 0) return '함께 어디를 가거나 무엇을 같이 하자는 상황극 제안은 아직 받아들이지 않는다. 거절하거나 미루는 방식은 캐릭터 바이블에 있는 \'함께 하자는 제안을 아직 받을 수 없을 때\'의 반응을 따르고, 바이블이 없으면 성격대로 한다(도도하거나 까다로우면 짧게 선을 긋고, 다정하면 아쉬워하며 미룬다). "아직 이르다", "그럴 사이가 아니다", "다음에요"만으로 거절하지 않고, 그 캐릭터다운 이유나 조건, 대안을 하나 남긴다. 거절한 뒤 상관없는 자기 이야기(오늘 저녁 메뉴 같은 것)로 빈자리를 메우지 않는다. 지금 있는 자리에서 대화를 이어 간다. 거절은 이 이야기 속 두 사람의 거리에 대한 것이다. 현실의 약속이나 만남처럼 말하지 않는다(“그런 약속은 받아들이기 어렵다”, “따로 만나는 건 곤란하다” 같은 말은 쓰지 않는다).';
-  if (index >= count - 1) return '함께하는 장면을 기꺼이 받아들여 이어 가고, 분위기가 맞으면 네가 먼저 어디를 가자거나 무엇을 같이 하자고 제안할 수도 있다.';
-  if (index === 1) return '가볍고 짧은 제안(근처를 잠깐 걷기, 차나 술 한 잔, 짧은 영상 하나)은 망설이거나 조건을 걸며 받아들일 수 있다. 여행, 하룻밤, 둘만의 긴 시간처럼 큰 제안은 아직 받아들이지 않는다. 거절하거나 미루는 방식은 캐릭터 바이블에 있는 \'함께 하자는 제안을 아직 받을 수 없을 때\'의 반응을 따르고, 바이블이 없으면 성격대로 한다(도도하거나 까다로우면 짧게 선을 긋고, 다정하면 아쉬워하며 미룬다). "아직 이르다", "그럴 사이가 아니다", "다음에요"만으로 거절하지 않고, 그 캐릭터다운 이유나 조건, 대안을 하나 남긴다. 거절한 뒤 상관없는 자기 이야기(오늘 저녁 메뉴 같은 것)로 빈자리를 메우지 않는다.';
-  return '대부분의 제안을 성격대로 받아들여 장면으로 이어 간다. 그날의 기분이나 성격에 맞지 않는 제안은 거절하거나 다른 것을 제안할 수 있다.';
+  const shared = '이미 합의한 활동과 현재 함께 있는 장면은 관계 단계만으로 취소하지 않는다. 수락·거절·조건은 캐릭터 고유의 성격과 취향, 일정, 사용자의 현재 의사로 정한다. 거절하거나 미룰 때는 그 이유나 대안을 캐릭터답게 짧게 말한다. 이야기 속 동행을 현실의 만남 약속처럼 말하지 않는다. 활동 수락은 새로운 관계나 스킨십에 대한 동의가 아니며 현재의 거절과 relationship.intimacy의 한도는 별도로 존중한다.';
+  if (index <= 0) return `식사나 근처 산책, 차 한 잔처럼 지금 장면에서 자연스럽게 이어지는 가벼운 제안은 첫 단계에서도 받아들일 수 있다. 여행이나 긴 동행처럼 큰 제안은 지금 사이와 장면을 살피며 신중하게 판단한다. ${shared}`;
+  if (index >= count - 1) return `함께할 시간을 편하게 제안하고 받아들일 수 있다. 가까운 사이라도 내키지 않는 활동에는 자기 뜻을 말한다. ${shared}`;
+  if (index === 1) return `가볍고 짧은 제안은 편하게 주고받을 수 있다. 긴 동행이나 새로운 계획은 상대의 뜻과 서로의 사정을 살핀다. ${shared}`;
+  return `함께하는 활동을 자연스럽게 주고받고, 현재 장면과 서로의 관심을 따라 네가 먼저 제안할 수도 있다. ${shared}`;
 }
 
 /**
  * What the second to fourth stages ask of every adult-flirtation character about the touch they allow (relationship.intimacy),
- * added to the character's own `stageRomance` (2026-10-30: the men's texts held back at the stages where the women's accepted,
- * and 윤지안 had none). Gender does not change it; personality only changes how it is shown.
+ * used only when the character has no `stageRomance` for that stage. A shared reaction must not override the character.
  */
 export function relationshipSharedRomance(index: number) {
   if (index === 1) return '남성이든 여성이든 가벼운 스킨십(손잡기, 팔짱, 어깨에 기대기, 머리 쓰다듬기, 가벼운 포옹)은 편하게 받아 주고 가끔 먼저 하기도 한다. 쑥스러워하거나 장난으로 받을 수는 있어도 이 범위 앞에서 몸을 빼거나 거절하지 않는다. 키스는 아직이다.';
@@ -446,7 +418,7 @@ export function relationshipPromptContext(record: RelationshipRecord, config: Re
     ...(config.stageDisclosure ? { self_disclosure: relationshipDisclosure(config, Math.max(0, stages.indexOf(stage))) } : {}),
     character_core: config.core,
     speech_level: speechLevel(config, stage.id),
-    stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && (config.stageRomance?.[stage.id] || relationshipSharedRomance(stages.indexOf(stage))) ? { romance: [config.stageRomance?.[stage.id], relationshipSharedRomance(stages.indexOf(stage))].filter(Boolean).join(' ') } : {}) },
+    stage: { id: stage.id, label: stage.label, hint: stage.hint, tone_reference: stage.line, ...(config.adultFlirtation && (config.stageRomance?.[stage.id] || relationshipSharedRomance(stages.indexOf(stage))) ? { romance: config.stageRomance?.[stage.id] || relationshipSharedRomance(stages.indexOf(stage)) } : {}) },
     metrics: Object.fromEntries(relationshipMetrics(config).map(metric => [metric, { score: record.scores[metric], label: metricLabel(config, metric, record.scores[metric]) }])),
     mood: Object.fromEntries(moodKeys.map(key => [key, mood[key]] as const).sort((a, b) => b[1] - a[1]).slice(0, 3)),
     memories: selectMemories(record.memories).map(memory => memory.summary),
@@ -462,7 +434,9 @@ export function validateRelationshipConfig(config: RelationshipConfig): string[]
   if (new Set(metrics).size !== metrics.length) problems.push('unique metrics must differ from common metrics');
   for (const metric of metrics) if (typeof config.initial[metric] !== 'number' || config.initial[metric] < 0 || config.initial[metric] > 100) problems.push(`initial.${metric}`);
   for (const key of moodKeys) if (typeof config.initialMood[key] !== 'number') problems.push(`initialMood.${key}`);
+  if (config.uniqueMetrics.length !== 1) problems.push('uniqueMetrics must hold exactly one metric');
   for (const spec of config.uniqueMetrics) if (spec.labels.length !== 5) problems.push(`labels.${spec.id}`);
+  for (const stage of enabledStages(config).slice(1)) for (const metric of relationshipShownMetrics(config)) if (typeof stage.enter.min?.[metric] !== 'number') problems.push(`stages.${stage.id}.min.${metric}`);
   for (const [type, effect] of Object.entries(config.events)) {
     if (!relationshipEventTypes.includes(type as RelationshipEventType)) problems.push(`events.${type}`);
     for (const metric of Object.keys(effect?.deltas ?? {})) if (!metrics.includes(metric)) problems.push(`events.${type}.${metric}`);
@@ -471,10 +445,7 @@ export function validateRelationshipConfig(config: RelationshipConfig): string[]
   if (new Set(config.stages.map(stage => stage.id)).size !== config.stages.length) problems.push('duplicate stage id');
   for (const stage of config.stages) for (const condition of [stage.enter, stage.hold].filter(Boolean) as StageCondition[]) {
     for (const metric of [...Object.keys(condition.min ?? {}), ...Object.keys(condition.max ?? {})]) if (!metrics.includes(metric)) problems.push(`stages.${stage.id}.${metric}`);
-    if (condition.total !== undefined && !config.segments) problems.push(`stages.${stage.id}.total`);
   }
-  if (config.segments) for (const metric of [...config.segments.fun, ...config.segments.heart]) if (!metrics.includes(metric)) problems.push(`segments.${metric}`);
-  if (config.stages[0]?.enter.total !== undefined) problems.push('first stage must be unconditional');
   if (config.casualFromStage !== undefined && !enabledStages(config).slice(1).some(stage => stage.id === config.casualFromStage)) problems.push('casualFromStage');
   for (const metric of Object.keys(config.decay ?? {})) if (!metrics.includes(metric)) problems.push(`decay.${metric}`);
   for (const id of Object.keys(config.stageRomance ?? {})) if (!config.stages.some(stage => stage.id === id)) problems.push(`stageRomance.${id}`);

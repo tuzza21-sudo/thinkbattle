@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, LoaderCircle, Play, RotateCcw, UserCog } from 'lucide-react';
+import { BookOpen, LoaderCircle, Play, UserCog } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { listLoungeChats, listMyLoungePersonas, startLoungeScenario } from '../lib/loungeApi';
@@ -33,7 +33,7 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
   useEffect(() => {
     if (!member) return;
     let cancelled = false;
-    void listLoungeChats().then(chats => { if (!cancelled) setBegun(new Set(chats.filter(chat => chat.story).map(chat => `${chat.character_id}|${chat.story}`))); }, () => {});
+    void listLoungeChats().then(chats => { if (!cancelled) setBegun(new Set(chats.map(chat => chat.character_id))); }, () => {});
     return () => { cancelled = true; };
   }, [member]);
   // "둘만의 이야기" links here (#stories): the list appears once loaded, so it is scrolled to then.
@@ -65,9 +65,9 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
         <p>{personalizeLoungeStory(scenario.hook, user?.nickname)}</p>
         <small>{personalizeLoungeStory('당신의 역할', user?.nickname)} · {personalizeLoungeStory(scenario.user_role, user?.nickname)}</small>
         {!user ? <Link to="/lounge" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>
-          : begun.has(`${scenario.character_id}|${scenario.title}`) ? <div className="lounge-scenario-actions">
+          : begun.has(scenario.character_id) ? <div className="lounge-scenario-actions">
             <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{spinner(scenario.id, Play)}기존 대화 이어하기</button>
-            <button type="button" className="lounge-character-cta lounge-scenario-restart" disabled={Boolean(busy)} onClick={() => void start(scenario.id, true)}>{spinner(`${scenario.id}|fresh`, RotateCcw)}처음부터 하기</button>
+            <small>새로 시작하려면 기존 채팅을 삭제해 주세요. 기억과 관계도 초기화돼요.</small>
           </div>
           : <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{spinner(scenario.id, Play)}이 이야기로 시작</button>}
       </article>)}

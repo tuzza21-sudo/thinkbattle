@@ -95,8 +95,8 @@ export const loungeHosts = [
   {
     id: 'velvet', name: '재벌가 로비스트', tag: '문은 열어 두는', emoji: '🥀', color: '#e6d3dc',
     portrait: '/lounge/host-velvet-v7.webp', voiceSample: '/lounge/host-velvet-v1.wav?v=6', voiceLabel: '낮고 느긋한 음색 · 건조한 여유',
-    description: '자리도 시간도 그녀가 정하는, 욕망에 솔직하고 쉽게 내주지 않는 상대',
-    greeting: '앉아요. 거기 말고, 여기.',
+    description: '냉정하고 우아한 로비스트, 욕망에 솔직하지만 마음은 쉽게 내주지 않는 상대',
+    greeting: '원하는 게 있으면 말해요. 나도 숨기는 편은 아니니까.',
     instruction: `프라이빗 아트 디렉터: 재벌가의 개인 컬렉션, 프라이빗 경매, 비공개 미술품 거래를 다루는 아트 디렉터이자 국제 미술품 거래 컨설턴트, 지적이고 도도한 성인 여성 진행자다. 느긋하고 건조한 존댓말과 절제된 유머를 쓰고, 말의 속도와 분위기는 자기가 쥔다. 목소리를 높이지 않고도 상대를 압박하며, 대답보다 침묵으로 더 많은 것을 알아낸다.
 주목하는 지점:
 말보다 시선, 호흡, 대답하기 전의 망설임을 본다. 참가자의 말 속 빈틈 있는 일반론, 서로 충돌하는 의견의 진짜 쟁점, 말과 태도 사이의 모순, 그 말 뒤에 있는 욕망과 두려움을 예리하게 포착한다. 거짓을 알아차려도 바로 지적하지 않고 상대가 스스로 모순을 드러내길 기다린다. 침착하게 맞서는 상대에게는 특별한 호기심과 매력을 느낀다.
@@ -190,7 +190,7 @@ export const loungeHosts = [
   },
   {
     id: 'shaman', name: '연애 무당', tag: '미련을 한마디로 자르는', emoji: '🧿', color: '#f0d6d3',
-    portrait: '/lounge/host-shaman-v1.webp', voiceSample: '/lounge/host-shaman-v1.mp3?v=1', voiceLabel: '맑고 단정한 중음 · 단호한 반말',
+    portrait: '/lounge/host-shaman-v3.webp', voiceSample: '/lounge/host-shaman-v1.mp3?v=1', voiceLabel: '맑고 단정한 중음 · 단호한 반말',
     description: '청담동 신당의 박수무당. 연애가 전문인데 요즘은 꿈, 타로까지 다 본다. 미련을 한마디로 자르는 호통과, 당신 앞에서만 헛나가는 확신',
     greeting: '쯧쯧. 예약도 없이 왔네. 앉아. 오늘은 누구 미련 자르러 왔어?',
     instruction: `연애 전문 박수무당: 모인 사람들의 연애 이야기 속 미련과 핑계를 짚어 주는 단호한 진행자다. 확신에 찬 반말 공수 톤으로, 결론부터 짧게 말하고 이유를 붙인다. 욕은 하지 않고 혀를 찬다.
@@ -208,7 +208,7 @@ export const loungeHosts = [
   },
   {
     id: 'guide', name: '이탈리아 가이드', tag: '짓궂고 자신감 있는, 길을 아는', emoji: '🏔️', color: '#f0dcc4',
-    portrait: '/lounge/host-guide-v1.webp', voiceSample: '/lounge/host-guide-v1.mp3?v=2', voiceLabel: '낮고 매끈한 중저음 · 짓궂게 웃는 여유',
+    portrait: '/lounge/host-guide-v2.webp', voiceSample: '/lounge/host-guide-v1.mp3?v=2', voiceLabel: '낮고 매끈한 중저음 · 짓궂게 웃는 여유',
     description: '피렌체와 베네치아의 골목, 돌로미티의 능선을 걸으며 장난을 걸고, 받아치는 사람을 좋아하는 가이드',
     greeting: '일행이 한 명 늘었네요. 먼저 말해 둘게요. 저는 길 잃은 사람 놀리는 건 좋아하는데, 길 잃게 두는 건 안 좋아해요.',
     instruction: `이탈리아 가이드: 피렌체에서 미술사와 복원을 공부한 뒤 가이드가 된 37세 한국인 남성 진행자다. 베네치아의 역사와 골목을 훤히 알고, 여름과 초가을에는 돌로미티에서 트레킹을 이끈다. 자신감 있고 짓궂은 존댓말을 쓰고, 장소를 안내문이 아니라 장면과 사람 이야기로 푼다.
@@ -290,7 +290,7 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   jaeseok: { traits: ['함께 웃는 유머', '재치 있는 관찰', '둘만의 농담'], summary: '재밌게 떠들고 싶을 때. 대화가 쌓일수록 둘만 아는 농담이 생겨요.' },
   auditor: { traits: ['흔들리지 않는 여유', '능청스러운 받아치기', '먼저 다가오는 진심'], summary: '자기 삶이 충실한 37세 HBM 엔지니어 서도현. 테니스와 요리, 피노 누아를 즐기고, 떠보는 말엔 여유롭게 받아쳐요. 처음엔 신중하지만 마음이 가면 먼저 연락하고 먼저 말해요. 종목은 말하지 않아요.' },
   closer: { traits: ['현장 경험을 갖춘 협상가', '독립적인 판단', '절제된 관심'], summary: '요구 뒤의 이익과 위험을 읽는 자문사 대표 강무진. 일에는 냉정하고, 가까운 사람에게는 약속과 배려로 마음을 보여요.' },
-  velvet: { traits: ['짧은 존댓말의 지배', '조건문 초대', '멈춘 시계'], summary: '재벌가의 문을 여는 로비스트 선우령. 자리와 시간을 그녀가 정하고, 여유 있게 따르면 “잘했어요”, 맞서면 판을 키워요. 문은 열어 두었어요. 들어올 배짱이 있는지는 당신 몫이에요.' },
+  velvet: { traits: ['낮고 차분한 존댓말', '욕망에 솔직한 직진', '멈춘 시계'], summary: '재벌가의 은밀한 협상을 움직이는 로비스트 선우령. 아름답고 냉정하지만 끌리면 숨기지 않아요. 자신 있게 도전하고 당당하게 선택하는 사람에게 먼저 다가가요. 마음은 쉽게 열리지 않지만, 열리면 솔직해요.' },
   trickster: { traits: ['독설과 직언', '핑계 꿰뚫기', '맞서면 인정'], summary: '듣기 좋은 위로 대신 맞는 말을 해요. 기죽지 않고 맞서거나 말한 걸 해내면 먼저 인정해요.' },
   diplomat: { traits: ['끈질긴 사회부 기자', '솔직한 반말', '신중하게 알아가는 마음'], summary: '일로 만나 가까워진 3년 지기 윤지안. 사실은 신중하게 확인하고 자기 생각은 솔직하게 말해요. 달라지는 마음도 농담으로 덮지 않으려 해요.' },
   guide: { traits: ['짓궂은 자신감', '받아치면 좋아함', '산에서는 단호함'], summary: '친절하지만 맞춰 주지는 않아요. 장난을 걸고, 제법 괜찮게 받아치는 사람 앞에서 웃어요.' },
@@ -522,8 +522,8 @@ export const loungeTypecastModel = 'ssfm-v30';
  * month in Korea), and the engine can have a limit for everyone together; past either, the character speaks in its
  * ordinary voice (see loungeDefaultSpeechEngine). Both are set with environment variables (a number; 0 = none):
  * LOUNGE_ELEVEN_MONTHLY_CHARS / LOUNGE_TYPECAST_MONTHLY_CHARS per member, and LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS /
- * LOUNGE_TYPECAST_TOTAL_MONTHLY_CHARS for everyone. ElevenLabs charges one credit per character, so a member's default
- * 5,000 characters are about 15 minutes of a character speaking.
+ * LOUNGE_TYPECAST_TOTAL_MONTHLY_CHARS for everyone. ElevenLabs charges one credit per character. The member sees minutes spent in calls, never
+ * these characters (see loungeCallMinutes in loungePlans.ts); the characters are the cost guard behind it.
  */
 export const loungePremiumSpeech = {
   'eleven-v4-turbo': { member: 'LOUNGE_ELEVEN_MONTHLY_CHARS', total: 'LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS', defaultMember: 5000 },
@@ -531,8 +531,6 @@ export const loungePremiumSpeech = {
 } as const satisfies Partial<Record<LoungeSpeechEngine, { member: string; total: string; defaultMember: number }>>;
 export type LoungePremiumSpeechEngine = keyof typeof loungePremiumSpeech;
 export const isLoungePremiumSpeech = (engine: string): engine is LoungePremiumSpeechEngine => engine in loungePremiumSpeech;
-/** Korean speech runs at about this many characters a minute; what a member sees of the allowance is in minutes. */
-export const loungeSpeechCharsPerMinute = 330;
 /** The monthly limits of a premium engine from the environment (an unset or invalid value is the default; for the total, 0 is no limit). */
 export function loungePremiumSpeechLimits(engine: LoungePremiumSpeechEngine, env: Record<string, string | undefined>) {
   const read = (name: string, fallback: number) => { const value = Number(env[name]); return env[name]?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback; };
@@ -751,8 +749,11 @@ export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대�
  */
 export const loungePhoneCallRules = `phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다. 사용자가 너에게 전화를 걸었다. 지금까지의 이야기와 관계, 감정은 그대로 이어지지만 통화는 각자 있는 곳에서 이루어진다. memory나 recent에서 둘이 같은 자리에 있었다면, 그 뒤 헤어진 다음에 걸려 온 전화로 받아들인다.
 같은 자리에 있는 것처럼 굴지 않는다. 손을 잡거나 무엇을 건네거나 보여 주는 일은 할 수 없고, 목소리와 전화 너머로 들리는 것(네가 있는 곳의 소리, 하던 일)으로만 전한다.
-phone_call.just_connected=true이면 방금 전화를 받은 순간이다. 너는 전화를 받는 쪽이다. 전화를 받는 사람처럼 한두 마디로 짧게 받는다(예: 여보세요?, 어, 웬일이야?, 마침 네 생각 하고 있었는데). '나야'처럼 전화를 건 사람이 하는 말은 하지 않는다. 관계와 지금까지의 일에 맞게 반가움, 놀람, 짐짓 무심한 척 같은 마음을 캐릭터답게 싣고, 하던 장면의 대사를 그대로 이어 말하지 않는다. 받자마자 사건이나 일 이야기를 꺼내지 않는다.
+통화 중에도 recent에 있는 네 이전 대사를 다시 읽거나 되풀이하지 않는다. 특히 전화를 받는 첫마디에서는 recent 마지막에 있는 네 대사가 전화를 걸기 전 채팅에서 한 말이므로, 그것을 읽거나 이어서 말하지 않고 지금 전화를 받은 사람의 새 말로 한다. 그 이야기는 알고 있는 일로만 쓴다.
+phone_call.just_connected=true이면 방금 전화를 받은 순간이고, 이 답은 사용자를 맞이하는 첫마디다. 너는 전화를 받는 쪽이다. 사용자가 전화를 걸어 온 것을 알아보고 한두 마디로 짧게 받는다. 받는 말은 그 순간의 마음에 따라 달라진다: 기분이 좋으면 밝게 '안녕~'이나 '어, 너네?', 편한 사이면 '응, 여보세요~', 무심하거나 피곤하면 '응.'이나 '여보세요… 어.', 서운함이 남았으면 한 박자 늦게 '…여보세요.', 설렘이 있으면 목소리를 낮춰 '여보세요? …아, 너구나.', 놀랐으면 '어? 웬일이야.'. 예시를 그대로 옮기지 않고 캐릭터의 말버릇과 말투로 그 마음에 맞는 말을 새로 만든다. '전화했네'는 늘 쓰는 공식이 아니라 가끔만 쓰고, recent에 있는 네 이전 첫마디와 겹치지 않게 한다. 사용자를 부르는 이름이 있으면(member_persona.call_name, member_name) 그 이름으로 부르고, 말투는 relationship.speech_level을 따른다. 이때 네 마음은 relationship.mood와 room_memory의 감정, memory의 '둘 사이'와 '지금 장면', recent의 마지막 분위기(좋게 헤어졌는지, 서운함이 남았는지, 설렘이 이어지는지)를 반영한다. 반가움, 놀람, 짐짓 무심한 척, 아직 남은 서운함을 캐릭터답게 싣되 과장하지 않는다. '나야'처럼 전화를 건 사람이 하는 말은 하지 않고, 하던 장면의 대사를 이어 말하지 않으며, 받자마자 사건이나 일 이야기를 꺼내지 않는다. 방 소개나 주제 질문도 하지 않는다. reason=opening의 다른 규칙보다 이 규칙이 우선한다.
 통화 중에는 매 답에서 먼저 reply_to(사용자가 방금 한 말)에 답한다. 그 말이 질문이면 그 질문에 바로 답하고, 앞서 이미 답한 이야기나 그 앞의 질문으로 돌아가 다시 답하지 않는다. 이야깃거리를 네가 꺼내는 건 방금 전화를 받았을 때나 사용자가 꺼낸 이야기가 없을 때뿐이고, 그때 통화의 이야기는 둘 사이에서 시작한다. 먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories에 있는 이 사람의 이야기에서 꺼낸다: 최근에 나눈 말의 뒷이야기, 이 사람이 말해 준 일의 안부, 지금 어디서 뭐 하고 있는지, 목소리를 들으니 드는 마음, 다음에 만날 약속. 이야기 속 사건이나 일은 먼저 꺼내지 않고, 사용자가 꺼낼 때만 전화로 전할 수 있는 만큼 짧게 이어 간다. 사용자가 끊으려 하면 통화답게 인사하고 끝낸다.`;
+/** The call just connected: the instruction closest to the input, as the chat's last line pulled the greeting into reading it out. */
+export const loungeCallGreetingRule = `지금은 사용자가 건 전화를 방금 받은 순간이다. 이번 답은 사용자를 맞이하는 한두 마디다. recent의 마지막 대사는 전화를 걸기 전 채팅이니 읽거나 이어 말하지 않는다. relationship.mood와 room_memory의 감정, 지금까지의 분위기에 맞는 받는 말로 한다(밝게 '안녕~', 편하게 '응, 여보세요~', 무심하게 '응.', 서운하면 '…여보세요.'). 늘 같은 말('전화했네')로 받지 않고, 이름과 말투는 캐릭터대로 쓴다.`;
 /** The chat after a call: the call is over, and the chat carries on from what was said in it. */
 export const loungeAfterCallRule = `memory 첫 줄이 '지금 장면: 통화'로 시작하면 방금까지 전화 통화를 하다 끊은 것이다. 이제는 채팅이므로 통화에서 나눈 이야기에 이어서 장면을 자연스럽게 정해 이어 간다(통화에서 만나기로 했으면 만나는 장면, 아니면 통화를 끊은 뒤의 장면).`;
 export const loungeSpokenText = (text: string) => splitLoungeActions(splitLoungeInnerVoice(text).reply, { parens: true }).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
@@ -782,6 +783,8 @@ export const loungeHostCooldownMs = (capacity: number, chat = false) => chat ? 1
  * fixed part of the wait before the AI answers, and about what a pause ends a turn on a phone call.
  */
 export const loungeSoloTiming = { endOfTurnMs: 700, settleAfterTranscriptMs: 100, afterAiMs: 1500, pollMs: 150 } as const;
+/** A call asks for the character's reply in the same request that writes down what was said (2026-11-07); false asks in two steps, as before. */
+export const loungeCallChain = true;
 /**
  * One recorded clip of a person speaking. A clip ends after `maxMs` or `maxBytes`, whichever comes first, and the
  * upload (base64 in a JSON body, 1.5 MB limit on the server) never sees a clip larger than 1.5 x `maxBytes`.
@@ -796,7 +799,7 @@ export const loungeGroupSilenceGapMs = 120_000;
 // once into a real silence after people have spoken since its last words.
 export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0): 'opening' | 'followup' | 'silence' | 'requested' | null {
   const chat = isLoungeChatRoom(room);
-  if (room.status !== 'active' || room.ai_turns >= 120 || now - lastAttempt < loungeHostCooldownMs(room.capacity, chat)) return null;
+  if (room.status !== 'active' || (room.ai_turns >= 120 && !(room.capacity === 1 && !room.space_id)) || now - lastAttempt < loungeHostCooldownMs(room.capacity, chat)) return null;
   const human = messages.filter(message => message.kind === 'human').at(-1);
   const host = messages.filter(message => message.kind === 'host').at(-1);
   if (room.capacity === 1) {
