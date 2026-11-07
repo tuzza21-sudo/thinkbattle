@@ -2304,7 +2304,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
   {
     id: 'guide', name: '한지오', age: '37세', role: '피렌체·베네치아 도시 가이드이자 여름과 초가을에는 돌로미티 트레킹 가이드', place: 'arnobridge',
     job: '이탈리아 가이드',
-    look: '단정하게 넘긴 짙은 머리, 깨끗하게 면도한 선명한 얼굴선, 한쪽 입꼬리가 올라간 미소, 몸에 맞는 하늘색 셔츠와 네이비 재킷', fullBody: '/lounge/host-guide-work-v2.webp',
+    look: '185cm가 넘는 큰 키, 볕에 그을린 피부, 자연스럽게 말린 짧은 곱슬머리와 가볍게 다듬은 수염, 눈가에 주름이 지는 장난스러운 미소, 소매를 걷은 크림색 리넨 셔츠와 목에 느슨하게 두른 가벼운 스카프', fullBody: '/lounge/host-guide-work-v3.webp',
     quote: '길 잃은 사람 놀리는 건 좋아하는데, 길 잃게 두는 건 안 좋아해요.',
     tagline: '피렌체의 골목과 베네치아의 물길, 돌로미티의 능선을 걷는 가이드. 장난을 걸고 받아치는 사람을 좋아하지만, 산에서만은 누구보다 단호하다.',
     story: [
@@ -2436,8 +2436,8 @@ export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: s
     { src: '/lounge/gallery/diplomat-2.webp', caption: '새벽 두 시, 드디어 첫 문장이 나왔어요. 맥주는 축하용.' },
   ],
   guide: [
-    { src: '/lounge/gallery/guide-venice.webp', caption: '새벽 베네치아는 관광객보다 제가 먼저 일어나요. 다리 위에서 에스프레소 한 잔, 이게 제 출근길이에요.' },
-    { src: '/lounge/gallery/guide-trattoria.webp', caption: '손님들 다 재우고 늦은 저녁. 내일 일정표를 접어 놓고서야 파스타가 넘어가요.' },
+    { src: '/lounge/gallery/guide-1.webp', caption: '새벽 베네치아는 관광객보다 제가 먼저 일어나요. 다리 위에서 에스프레소 한 잔, 이게 제 출근길이에요.' },
+    { src: '/lounge/gallery/guide-2.webp', caption: '손님들 다 재우고 늦은 저녁. 내일 일정표를 접어 놓고서야 파스타가 넘어가요.' },
   ],
 };
 
