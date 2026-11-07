@@ -2418,6 +2418,11 @@ export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: s
     { src: '/lounge/gallery/closer-1.webp', caption: '계약이 끝난 밤엔 한 잔만. 이긴 날일수록 조용히 마셔요.' },
     { src: '/lounge/gallery/closer-2.webp', caption: '일요일 아침은 조항 없이 보내기로 했어요. 아직 연습 중입니다.' },
   ],
+  // 강혜인, a member's character shown on the home page (id c_...): photos made from the portrait the owner supplied (2026-11-07).
+  c_ba586cab127802ac2eddebf308c507e0: [
+    { src: '/lounge/gallery/hyein-showroom.webp', caption: '오늘은 캠페인 촬영 날. 이 의자는 앉아 보면 제가 왜 반했는지 알아요.' },
+    { src: '/lounge/gallery/hyein-hut.webp', caption: '하산하고 먹는 산장 라면은 반칙이에요. 이 맛에 산악회 2년째 못 빠져요.' },
+  ],
   velvet: [
     { src: '/lounge/gallery/velvet-pool.webp', caption: '수영을 마치고 물가에 앉아 있는 시간. 물속에서만 머리가 조용해져.' },
     { src: '/lounge/gallery/velvet-gallery.webp', caption: '전시 오프닝 날 밤. 유리 진열장 앞에 서면 나도 전시품이 된 기분이야.' },
