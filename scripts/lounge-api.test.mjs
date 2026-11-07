@@ -34,7 +34,8 @@ const consultLib = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', i
 const sajuLib = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
 const turnsLib = loadTs(fileURLToPath(new URL('../src/lib/loungeTurnPersistence.ts', import.meta.url)));
 const plansLib = compile('../src/lib/loungePlans.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungePlans') ? plansLib : path.endsWith('loungeTurnPersistence') ? turnsLib : path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const adminLib = compile('../src/lib/loungeAdmin.ts');
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeAdmin') ? adminLib : path.endsWith('loungePlans') ? plansLib : path.endsWith('loungeTurnPersistence') ? turnsLib : path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -1665,7 +1666,9 @@ test('moderator context follows the stored category instead of a shared film dis
   }
 });
 
-test('host PCM packets arrive before upstream completion and cancelling stops the paid stream', async () => {
+test('host PCM packets arrive before upstream completion and cancelling stops the paid stream', async t => {
+  // The call's minutes are not looked up here: only the streaming is tested.
+  process.env.LOUNGE_CALL_LIMITS = 'off'; t.after(() => { delete process.env.LOUNGE_CALL_LIMITS; });
   let upstream, cancelled = false, paid = 0;
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host' });
@@ -3785,7 +3788,7 @@ test('the speech action tells the picker what each premium voice has left this m
   assert.equal(lounge.loungeSpeechAllowance({ member: 5000, total: 100 }, { member: 0, total: 100 }).reason, 'total');
 });
 
-test('voice calls are timed by the server in minutes, shown against the plan, and stopped past it only with LOUNGE_CALL_LIMITS=on', async () => {
+test('voice calls are timed by the server in minutes, shown against the plan, stopped past it, a beta tester has 30 minutes, and the admin and an earlier member have no limit', async () => {
   const room = (extra = {}) => ({ host_id: 'user-1', capacity: 1, space_id: null, status: 'active', voice_on: true, ...extra });
   const tick = async ({ user = { id: 'user-1' }, roomRow = room(), start = false, state = { seconds: 90, plan: 'plus' } }) => {
     const seen = [];
@@ -3803,11 +3806,17 @@ test('voice calls are timed by the server in minutes, shown against the plan, an
   };
   const started = await tick({ start: true, state: { seconds: 0, plan: 'plus' } });
   assert.deepEqual(started.seen, [{ p_user: 'user-1', p_start: true }]);
-  assert.deepEqual(started.body.call, { usedSeconds: 0, limitMinutes: 60, plan: 'plus', enforced: false, exhausted: false }, 'Plus is 60 minutes, and nothing is enforced yet');
+  assert.deepEqual(started.body.call, { usedSeconds: 0, limitMinutes: 60, plan: 'plus', tester: false, enforced: true, exhausted: false }, 'Plus is 60 minutes');
   const pro = await tick({ state: { seconds: 7300, plan: 'pro' } });
   assert.deepEqual(pro.seen, [{ p_user: 'user-1', p_start: false }]);
-  assert.deepEqual(pro.body.call, { usedSeconds: 7300, limitMinutes: 120, plan: 'pro', enforced: false, exhausted: false }, 'past the 120 minutes of Pro, but only counted');
-  assert.equal((await tick({ state: { seconds: 5, plan: null } })).body.call.limitMinutes, 10, 'a member without a plan');
+  assert.deepEqual(pro.body.call, { usedSeconds: 7300, limitMinutes: 120, plan: 'pro', tester: false, enforced: true, exhausted: true }, 'past the 120 minutes of Pro');
+  assert.equal((await tick({ state: { seconds: 5, plan: null } })).body.call.limitMinutes, 5, 'a new member without a plan has 5 minutes a month');
+  const tester = await tick({ state: { seconds: 31 * 60, plan: null, tester: true } });
+  assert.deepEqual(tester.body.call, { usedSeconds: 1860, limitMinutes: 30, plan: null, tester: true, enforced: true, exhausted: true }, 'a beta tester has 30 minutes a month, not unlimited');
+  assert.equal((await tick({ state: { seconds: 29 * 60, plan: null, tester: true } })).body.call.exhausted, false, 'one minute of the 30 is left');
+  assert.equal((await tick({ state: { seconds: 0, plan: 'pro', tester: true } })).body.call.limitMinutes, 120, 'a tester with a plan has the plan\'s minutes');
+  const exempt = await tick({ state: { seconds: 99999, plan: null, exempt: true } });
+  assert.deepEqual(exempt.body.call, { usedSeconds: 99999, limitMinutes: null, plan: null, enforced: true, exhausted: false, unlimited: true }, 'the admin or an earlier member: no limit');
   for (const [name, options] of [['a chat', { roomRow: room({ voice_on: false }) }], ['someone else room', { roomRow: room({ host_id: 'other' }) }], ['a group room', { roomRow: room({ capacity: 4 }) }], ['an ended room', { roomRow: room({ status: 'ended' }) }], ['a guest', { user: { id: 'user-1', is_anonymous: true } }]]) {
     const outcome = await tick(options);
     assert.deepEqual(outcome.body, { call: null }, name); assert.deepEqual(outcome.seen, [], `${name}: nothing is counted`);
@@ -3820,12 +3829,12 @@ test('voice calls are timed by the server in minutes, shown against the plan, an
       if (url.includes('lounge_call_status')) return result({ seconds: 1830, plan: null });
       if (url.includes('lounge_speech_usage_status')) return result({ member: 0, total: 0 });
       throw new Error('Unexpected call ' + url);
-    }, async () => { const body = await (await handler(request({ action: 'speech', roomId }))).json(); assert.deepEqual(body.call, { usedSeconds: 1830, limitMinutes: 10, plan: null, enforced: false, exhausted: false }); });
+    }, async () => { const body = await (await handler(request({ action: 'speech', roomId }))).json(); assert.deepEqual(body.call, { usedSeconds: 1830, limitMinutes: 5, plan: null, tester: false, enforced: true, exhausted: true }); });
   } finally { delete process.env.SUPABASE_SERVICE_ROLE_KEY; }
 
-  // A call reply past the month's minutes stays text with a notice, only when the limit is switched on.
-  const reply = async ({ state, limits, voiceOn = true }) => {
-    Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ...(limits ? { LOUNGE_CALL_LIMITS: 'on' } : {}) });
+  // A call reply past the month's minutes stays text with a notice, unless the limit is switched off (LOUNGE_CALL_LIMITS=off).
+  const reply = async ({ state, limits = true, voiceOn = true }) => {
+    Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ...(limits ? {} : { LOUNGE_CALL_LIMITS: 'off' }) });
     const calls = { openai: 0, status: 0 };
     try {
       let events;
@@ -3851,12 +3860,46 @@ test('voice calls are timed by the server in minutes, shown against the plan, an
   const used = await reply({ state: { seconds: 60 * 60, plan: 'plus' }, limits: true });
   assert.ok(!spoke(used.events), 'the 60 minutes are used'); assert.equal(used.events.at(-1).code, 'lounge_speech_allowance');
   assert.match(used.events.at(-1).error, /이번 달 통화 시간을 다 썼어요.*글로/); assert.ok(used.events.some(event => event.type === 'host'), 'the reply itself is there, as text');
-  const free = await reply({ state: { seconds: 10 * 60, plan: null }, limits: true });
-  assert.match(free.events.at(-1).error, /무료 통화 시간.*Plus·Pro/);
+  const free = await reply({ state: { seconds: 5 * 60, plan: null } });
+  assert.match(free.events.at(-1).error, /무료 통화 시간.*Plus·Pro/, 'a new member\'s 5 minutes are used');
+  assert.ok(spoke((await reply({ state: { seconds: 4 * 60, plan: null } })).events), 'one minute of the 5 is left');
+  const testerReply = await reply({ state: { seconds: 30 * 60, plan: null, tester: true } });
+  assert.match(testerReply.events.at(-1).error, /베타테스터 통화 시간을 다 썼어요.*글로/, 'a tester\'s 30 minutes are used');
+  assert.ok(spoke((await reply({ state: { seconds: 29 * 60, plan: null, tester: true } })).events), 'one minute of the 30 is left');
+  const exemptReply = await reply({ state: { seconds: 999 * 60, plan: null, exempt: true } });
+  assert.ok(spoke(exemptReply.events) && exemptReply.events.at(-1).type === 'done', 'no limit for the admin or an earlier member');
   const off = await reply({ state: { seconds: 999 * 60, plan: null }, limits: false });
-  assert.ok(spoke(off.events), 'no limit unless it is switched on'); assert.equal(off.calls.status, 0, 'and nothing is looked up');
+  assert.ok(spoke(off.events), 'no limit when it is switched off'); assert.equal(off.calls.status, 0, 'and nothing is looked up');
   const chat = await reply({ state: { seconds: 999 * 60, plan: null }, limits: true, voiceOn: false });
   assert.equal(chat.calls.status, 0, 'a chat is not a call');
+});
+
+test('the premium voice of the super admin has no limit, on the email account and on the Kakao account', async () => {
+  for (const user of [{ id: 'user-9', email: 'Piorne@Naver.com' }, { id: 'D8771E72-7AE4-4402-B8CC-DC52E13BEBFF' }]) {
+    Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ELEVENLABS_API_KEY: 'el-key' });
+    try {
+      await run(async url => {
+        if (url.includes('/auth/')) return result(user);
+        if (url.includes('lounge_speech_usage_status')) return result({ member: 999999, total: 999999 });
+        if (url.includes('lounge_call_status')) return result({ seconds: 0, plan: null, exempt: true });
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const { engines, call } = await (await handler(request({ action: 'speech', roomId }))).json();
+        assert.equal(engines['eleven-v4-turbo'].allowed, true, `${user.id}: used far past any allowance, still allowed`); assert.equal(engines['eleven-v4-turbo'].unlimited, true);
+        assert.equal(call.unlimited, true);
+      });
+    } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ELEVENLABS_API_KEY']) delete process.env[key]; }
+  }
+  // Anyone else past the allowance is not allowed.
+  Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ELEVENLABS_API_KEY: 'el-key' });
+  try {
+    await run(async url => {
+      if (url.includes('/auth/')) return result({ id: 'user-9', email: 'someone@example.com' });
+      if (url.includes('lounge_speech_usage_status')) return result({ member: 999999, total: 999999 });
+      if (url.includes('lounge_call_status')) return result({ seconds: 0, plan: null });
+      throw new Error('Unexpected call ' + url);
+    }, async () => { const { engines } = await (await handler(request({ action: 'speech', roomId }))).json(); assert.equal(engines['eleven-v4-turbo'].allowed, false); });
+  } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ELEVENLABS_API_KEY']) delete process.env[key]; }
 });
 
 test('a voice reply starts speaking its first sentence while the rest is still being written, and never says it twice', async () => {

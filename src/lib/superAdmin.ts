@@ -158,7 +158,7 @@ export const deleteLoungeScenario = async (id: string) => {
 };
 
 /** One member's month in the lounge: minutes in calls (as timed by the server) and premium-voice credits (characters spoken). */
-export type LoungeUsageMember = { user_id: string; nickname: string | null; email: string | null; plan: 'plus' | 'pro' | null; seconds: number; credits: number };
+export type LoungeUsageMember = { user_id: string; nickname: string | null; email: string | null; plan: 'plus' | 'pro' | null; exempt?: boolean; tester?: boolean; seconds: number; credits: number };
 export const listLoungeUsage = async (month?: string): Promise<{ month: string; members: LoungeUsageMember[] }> => {
   const { data, error } = await supabase.rpc('admin_list_lounge_usage', { p_month: month ?? null });
   if (error) throw new Error(error.message.includes('not authorized') ? '슈퍼 관리자 권한을 확인하지 못했습니다.' : '이용량을 불러오지 못했습니다. 통화 이용량 마이그레이션이 적용됐는지 확인해 주세요.');

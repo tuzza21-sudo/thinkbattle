@@ -10,6 +10,7 @@ import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loun
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn } from '../src/lib/loungePlans';
+import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeCallGreetingRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
@@ -493,8 +494,10 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const serviceHeaders = service ? { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' } : undefined;
     // What a member has left in a premium voice engine this month. A guest has none, and an allowance that cannot be read
     // (the table is missing, the server role is not set) counts as used, so a premium voice is never spent unchecked.
-    const readSpeechAllowance = async (engine: LoungePremiumSpeechEngine, user: { id: string; is_anonymous?: boolean }) => {
+    const readSpeechAllowance = async (engine: LoungePremiumSpeechEngine, user: { id: string; email?: string; is_anonymous?: boolean }) => {
       const limits = loungePremiumSpeechLimits(engine, process.env), available = Boolean(engine === 'typecast' ? process.env.TYPECAST_API_KEY : process.env.ELEVENLABS_API_KEY);
+      // The super admin's premium voice has no limit (2026-11-07); the characters are still counted.
+      if (!user.is_anonymous && isLoungeSuperAdmin(user)) return { available, member: true, allowed: true, used: 0, left: 1_000_000_000, limit: 1_000_000_000, unlimited: true };
       // A guest hears the same voice for a short trial (LOUNGE_ELEVEN_GUEST_CHARS, 1500 characters, about 4 minutes; 0 for
       // members only), counted under the guest's own id, so the voice does not change or fall silent for someone who has not signed up.
       const guest = Boolean(user.is_anonymous), guestChars = Number(process.env.LOUNGE_ELEVEN_GUEST_CHARS?.trim() ? process.env.LOUNGE_ELEVEN_GUEST_CHARS : 1500);
@@ -509,14 +512,17 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       return { available, member: !guest, allowed: allowance.allowed, used: used.member, left: allowance.left, limit: yours, ...(allowance.reason ? { reason: allowance.reason } : {}) };
     };
     // This month's seconds of calls and the member's plan (the database counts them, see tick_lounge_call), with what the
-    // plan allows. The limit is applied only with LOUNGE_CALL_LIMITS=on; before that calls are timed and shown, never stopped.
+    // plan allows. The limit is applied unless LOUNGE_CALL_LIMITS=off (then calls are timed and shown, never stopped).
     const callService = async (name: 'lounge_call_status' | 'tick_lounge_call', params: Record<string, unknown>) => {
       if (!serviceHeaders) return null;
       const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify(params) }, 4_000);
       if (!response.ok) { console.warn('[Lounge call] usage not read', name, response.status); return null; }
-      const state = await readJson<{ seconds: number; plan: string | null }>(response, 'lounge');
-      const limitMinutes = loungeCallLimitMinutes(state.plan, process.env), enforced = loungeCallLimitsOn(process.env);
-      return { usedSeconds: state.seconds, limitMinutes, plan: state.plan, enforced, exhausted: enforced && state.seconds >= limitMinutes * 60 };
+      const state = await readJson<{ seconds: number; plan: string | null; exempt?: boolean; tester?: boolean }>(response, 'lounge');
+      const enforced = loungeCallLimitsOn(process.env);
+      // No limit for the super admin or a member from before the limit began (lounge_call_exempt); a beta tester has 30 minutes.
+      if (state.exempt) return { usedSeconds: state.seconds, limitMinutes: null, plan: state.plan, enforced, exhausted: false, unlimited: true };
+      const limitMinutes = loungeCallLimitMinutes(state.plan, process.env, Boolean(state.tester));
+      return { usedSeconds: state.seconds, limitMinutes, plan: state.plan, tester: Boolean(state.tester), enforced, exhausted: enforced && state.seconds >= limitMinutes * 60 };
     };
     const readRelationship = async (userId: string, characterId: string) => {
       if (!serviceHeaders) return { ok: false as const };
@@ -1470,10 +1476,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         })
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
-    // Past the month's minutes of calls (LOUNGE_CALL_LIMITS=on) the call's replies stay text, the same way a used premium voice does.
+    // Past the month's minutes of calls (unless LOUNGE_CALL_LIMITS=off) the call's replies stay text, the same way a used premium voice does.
     const callGate: Promise<void> | undefined = phoneCall && loungeCallLimitsOn(process.env) && !user.is_anonymous
       ? callService('lounge_call_status', { p_user: user.id }).then(state => {
-        if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
+        if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.tester ? '이번 달 베타테스터 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
       }).catch(() => { console.warn('[Lounge call] allowance not read, speaking anyway'); })
       : undefined;
     let speechProvider = 'openai', spentChars = 0, elevenBusyRetries = 0, elevenBackupLines = 0;
