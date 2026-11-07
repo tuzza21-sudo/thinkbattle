@@ -466,3 +466,20 @@ export async function createLoungePayment(plan: string, device: 'pc' | 'mobile')
   if (!response.ok) throw new LoungeApiError(body.error || '결제를 준비하지 못했어요.', body.code || 'lounge_payment_failed', false);
   return body;
 }
+
+/** The plan the member has now (the latest paid one that has not ended) and whether it can be cancelled with a refund. */
+export type LoungePlanStatus = { oid: string; plan: string; amount: number; paidAt: string | null; periodEnd: string; refundable: boolean; reason?: 'late' | 'used'; message?: string; canCancel: boolean };
+export async function getLoungePlanStatus(): Promise<LoungePlanStatus | null> {
+  const response = await loungeAuthorizedFetch('/api/payments?action=status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, '결제 서버');
+  const body = await response.json().catch(() => ({})) as { order?: LoungePlanStatus | null; error?: string; code?: string };
+  if (!response.ok) throw new LoungeApiError(body.error || '이용권을 불러오지 못했어요.', body.code || 'lounge_plan_status_failed', false);
+  return body.order ?? null;
+}
+
+/** Cancels the plan and refunds the card; the server checks the refund terms again and refuses when they are not met. */
+export async function cancelLoungePlan(oid: string): Promise<{ amount: number }> {
+  const response = await loungeAuthorizedFetch('/api/payments?action=cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oid }) }, '결제 서버');
+  const body = await response.json().catch(() => ({})) as { amount?: number; error?: string; code?: string };
+  if (!response.ok) throw new LoungeApiError(body.error || '이용권을 취소하지 못했어요.', body.code || 'lounge_plan_cancel_failed', false);
+  return { amount: body.amount ?? 0 };
+}

@@ -1117,7 +1117,7 @@ test('in a one-to-one stream one embedding finds memories by what was just said,
   const unit = Array.from({ length: 256 }, (_, index) => index === 0 ? 1 : 0);
   const memory = (id, summary, importance, extra = {}) => ({ id, character_id: 'velvet', kind: 'preference', summary, follow_up: null, importance, status: 'active', mention_count: 1, updated_at: '2026-10-07T00:00:00Z', last_confirmed_at: '2026-10-07T00:00:00Z', ...extra });
   const jazz = memory('55555555-5555-4555-8555-555555555555', '사용자는 재즈 바를 좋아한다.', 0.55);
-  const rows = [memoryRows[0], ...Array.from({ length: 9 }, (_, index) => memory(`4444444${index}-4444-4444-8444-444444444444`, `다른 중요한 이야기 ${index}`, 0.95)), jazz];
+  const rows = [memoryRows[0], ...Array.from({ length: 14 }, (_, index) => memory(`4444444${index}-4444-4444-8444-444444444444`, `다른 중요한 이야기 ${index}`, 0.95)), jazz];
   const embedded = [], applied = []; let reply, after, stored;
   await withServiceKey(() => run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'user-1' });
@@ -1145,7 +1145,7 @@ test('in a one-to-one stream one embedding finds memories by what was just said,
     throw new Error('Unexpected fetch ' + url);
   }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
   const shown = JSON.parse(reply.input).relationship.user_memories;
-  assert.equal(shown.length, relationshipLib.memorySettings.relevantPromptLimit, 'more memories fit once they are chosen by relevance');
+  assert.equal(shown.length, plansLib.loungeMemoryLimits.relevant, 'more memories fit once they are chosen by relevance (12, for every member)');
   assert.equal(shown[0].follow_up, '인터뷰 결과', 'the open thread is always shown');
   assert.equal(shown[1].summary, jazz.summary, 'the memory that fits what was just said comes before more important ones');
   assert.deepEqual(embedded[0], '오늘 재즈 듣고 싶다.', 'one embedding of the question serves the knowledge and the memories');
@@ -2502,15 +2502,16 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
   assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
 });
 
-test('a chat prompt puts what stays the same first, so the provider can cache it, and keeps the last 16 messages', async () => {
+test('a chat prompt puts what stays the same first, so the provider can cache it, and keeps the last 20 messages', async () => {
   // Cache writes were the largest cost of a chat (2026-11-01): the summary, rewritten after every reply, came before the
   // relationship's long stage texts, so those were written to the cache again on every turn.
   const messages = Array.from({ length: 24 }, (_, index) => ({ id: 100 - index, user_id: index % 2 ? null : 'host', nickname: index % 2 ? '한지오' : '지수', kind: index % 2 ? 'host' : 'human', text: `말 ${24 - index}`, created_at: '2026-11-01T00:00:00Z' }));
-  const { input, instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide', messages });
+  const { input, instructions, after } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide', messages });
   const keys = Object.keys(input);
   assert.ok(keys.indexOf('scenario') < 0 || keys.indexOf('scenario') < keys.indexOf('memory'));
   assert.equal(keys.at(-1) === 'recent' || keys.indexOf('recent') > keys.indexOf('memory'), true, 'the messages come after the summary');
-  assert.equal(input.recent.length, 16);
+  assert.equal(input.recent.length, 20, 'the latest 20 messages, the same for every member');
+  assert.match(after.instructions, /900자 이내/, 'the summary may be 900 characters');
   assert.equal(input.recent.at(-1).text, '말 24');
   // The character's own instruction (rules, bible) comes before the instructions that depend on the turn.
   assert.ok(instructions.indexOf('정해진 줄거리 없이 주고받는 1:1 대화') >= 0);

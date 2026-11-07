@@ -2,6 +2,7 @@ import { isLoungeCustomCharacterId, loungeThemes } from '../src/lib/lounge.js';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios.js';
 import { loungeStoryEpisodeAt, loungeStoryEpisodesOn, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin.js';
+import { loungePhotoMonthly, loungePhotoMonthlyFor } from '../src/lib/loungePlans.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
 import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
@@ -139,26 +140,33 @@ async function upload(context: Context, bucket: string, path: string, bytes: Uin
 }
 
 /**
- * Whether the member may be sent a photo the character sends first (2026-11-07): a Plus or Pro member, or the super admin.
- * A photo the member asked for is for every member; the page asks with source 'character' only for one sent first.
+ * The plan the photo limits go by (2026-11-07): 'admin' for the super admin, 'plus' or 'pro', null for a member without a
+ * plan, and 'unknown' when the plan could not be read (then a photo the member asked for counts as Plus, and none is
+ * sent first). A photo the character sends first is for Plus, Pro and the admin; one the member asked for is for every
+ * member, within the month's number (loungePhotoMonthlyFor).
  */
-async function mayBeSentFirst(context: Context, user: { id: string; email?: string }) {
-  if (isLoungeSuperAdmin(user)) return true;
+async function photoPlan(context: Context, user: { id: string; email?: string }): Promise<string | null> {
+  if (isLoungeSuperAdmin(user)) return 'admin';
   try {
     const response = await timed(`${context.base}/rest/v1/rpc/lounge_active_plan`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_user: user.id }) }, 5_000);
-    return response.ok && Boolean(await response.json());
-  } catch { return false; }
+    if (!response.ok) return 'unknown';
+    const plan = await response.json();
+    return typeof plan === 'string' && plan ? plan : null;
+  } catch { return 'unknown'; }
 }
 
 /** A photo for a member in their own one-to-one conversation. */
-async function memberPhoto(context: Context, authorization: string, anon: string, userId: string, roomId: string, source: 'request' | 'character', request: string, model: LoungeImageModel) {
+async function memberPhoto(context: Context, authorization: string, anon: string, userId: string, roomId: string, source: 'request' | 'character', request: string, model: LoungeImageModel, plan: string | null) {
   const rpc = async <T,>(name: string, args: Record<string, unknown>) => {
     const response = await timed(`${context.base}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify(args) });
     if (!response.ok) throw new LoungePhotoError('사진 요청을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_rpc');
     return await response.json() as T;
   };
-  const claim = await rpc<{ state: string; id?: string; character?: string; left?: number; daily?: number }>('claim_lounge_character_photo', { p_user: userId, p_room: roomId, p_source: source, p_scene: request });
-  if (claim.state === 'character_limit') return json({ skipped: true });
+  // The month's number by plan; none for the super admin.
+  const monthly = plan === 'admin' ? null : plan === 'unknown' ? loungePhotoMonthly.plus : loungePhotoMonthlyFor(plan);
+  const claim = await rpc<{ state: string; id?: string; character?: string; left?: number; daily?: number; monthly?: number }>('claim_lounge_character_photo', { p_user: userId, p_room: roomId, p_source: source, p_scene: request, p_monthly: monthly });
+  if (claim.state === 'character_limit' || (claim.state === 'month_limit' && source === 'character')) return json({ skipped: true });
+  if (claim.state === 'month_limit') return json({ error: `이번 달 받을 수 있는 사진 ${claim.monthly ?? monthly ?? 0}장을 모두 받았어요. 다음 달에 다시 부탁하거나, 요금제에서 더 많은 장수를 확인해 보세요.`, code: 'lounge_photo_month_limit', retryable: false }, 429);
   if (claim.state === 'limit') return json({ error: `오늘 받을 수 있는 사진 ${claim.daily ?? 0}장을 모두 받았어요. 내일 다시 부탁해 주세요.`, code: 'lounge_photo_limit', retryable: false }, 429);
   if (claim.state !== 'claimed' || !claim.id || !claim.character) {
     const [message, status, code] = claimRefusals[claim.state] ?? claimRefusals.denied;
@@ -392,8 +400,9 @@ async function handle(req: Request) {
     if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
     if (background) return await memberBackground(context, user.id, roomId, request, model);
     // A photo the character sends first is for Plus and Pro: for anyone else the page's ask is quietly dropped.
-    if (body.source === 'character' && !await mayBeSentFirst(context, user)) return json({ skipped: true });
-    return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request, model);
+    const plan = await photoPlan(context, user);
+    if (body.source === 'character' && (!plan || plan === 'unknown')) return json({ skipped: true });
+    return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request, model, plan);
   } catch (error) {
     if (error instanceof LoungePhotoError) return json({ error: error.message, code: error.code, retryable: error.status >= 500 || error.status === 429 }, error.status);
     console.error('[Lounge photo] failed', error instanceof Error ? `${error.name}: ${error.message.slice(0, 120)}` : 'error');

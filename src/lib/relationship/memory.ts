@@ -51,12 +51,12 @@ export function similarity(a: string, b: string) {
  * (memory id to its closeness to what was just said) the rest are chosen mostly by that, so a memory that fits the
  * conversation is shown even among many; a memory with no closeness yet (not embedded) counts as unrelated.
  */
-export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId: string, now: Date, relevance?: ReadonlyMap<string, number>) {
+export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId: string, now: Date, relevance?: ReadonlyMap<string, number>, limits?: { prompt: number; relevant: number }) {
   const active = rows.filter(row => row.character_id === characterId && (row.status ?? 'active') === 'active');
   const threads = active.filter(row => row.kind === 'open_thread')
     .sort((a, b) => Date.parse(b.updated_at ?? '') - Date.parse(a.updated_at ?? ''))
     .slice(0, memorySettings.openThreadLimit);
-  const limit = relevance?.size ? memorySettings.relevantPromptLimit : memorySettings.promptLimit;
+  const limit = relevance?.size ? limits?.relevant ?? memorySettings.relevantPromptLimit : limits?.prompt ?? memorySettings.promptLimit;
   const score = (row: MemoryRow) => Number(row.importance) + 0.3 * Math.exp(-days(row.last_confirmed_at ?? row.updated_at, now) / 30) + 0.05 * Math.log(row.mention_count ?? 1)
     + memorySettings.relevanceWeight * Math.max(0, relevance?.get(row.id) ?? 0);
   const rest = active.filter(row => !threads.includes(row)).sort((a, b) => score(b) - score(a)).slice(0, limit - threads.length);

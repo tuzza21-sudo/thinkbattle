@@ -96,3 +96,22 @@
 .lounge-navy .lounge-guide-card li svg { color:var(--n-gold); }
 .lounge-navy .lounge-introduction { --i-night:#140d09; --i-night-2:#261913; --i-green:#e3c08c; }
 .lounge-navy .lounge-intro-characters { background:radial-gradient(900px 400px at 50% -10%,#4a3022 0%,transparent 70%),var(--i-night); }
+
+/* character pages (and the maker): the same warm brown for every character, the night variant included */
+.lounge-navy .lounge-character,.lounge-navy .lounge-character.night { --c-bg:transparent; --c-card:#261913; --c-line:#4a3427; --c-ink:#f3e7da; --c-muted:#c4b19c; --c-soft:#33231a; --c-accent:#dba96a; --c-up:#dba96a; --c-down:#e69a86; }
+.lounge-page.lounge-navy:has(.lounge-character.night) { background:#1a110d; }
+.lounge-page.lounge-navy:has(.lounge-character.night) .lounge-header { border-color:#4a3427; }
+.lounge-navy .lounge-character .lounge-character-cta,.lounge-navy .lounge-character-step,.lounge-navy .lounge-creator-step>h2 span,.lounge-navy .lounge-character.night .lounge-character-cta,.lounge-navy .lounge-character.night .lounge-character-step { color:#2a1a10; }
+.lounge-navy .lounge-character-stages li.beyond .lounge-character-step { color:var(--c-accent); }
+.lounge-navy .lounge-character .lounge-scenario-restart { color:var(--c-accent); }
+.lounge-navy .lounge-character.night .lounge-character-story,.lounge-navy .lounge-character-story { background:linear-gradient(160deg,#2c1d14,#20150f); }
+.lounge-navy .lounge-creator-field :is(input,select,textarea),.lounge-navy .lounge-creator-choices button,.lounge-navy .lounge-creator-voice-card,.lounge-navy .lounge-scenario-note,.lounge-navy .lounge-creator-voice button { background:var(--c-card); color:var(--c-ink); }
+.lounge-navy .lounge-creator-voice-play { background:var(--c-soft); }
+.lounge-navy .lounge-creator-notice.done { background:#2c3a22; color:#d8e6c4; }
+.lounge-navy .lounge-creator-notice.error { background:#4a2a22; color:#ffc9b6; }
+
+/* the introduction's step cards ("세 걸음", "원하는 캐릭터"): cream cards read badly on brown */
+.lounge-navy .lounge-intro-how li { background:linear-gradient(160deg,#2c1d14,#20150f); border-color:var(--n-line); }
+.lounge-navy .lounge-intro-how .num { color:#e3c08c26; }
+.lounge-navy .lounge-intro-how h3 { color:var(--n-text); }
+.lounge-navy .lounge-intro-how p { color:var(--n-text-2); }

@@ -163,3 +163,20 @@
 .lounge-persona-count { justify-self:end; color:#9fae98; font-size:11px; }
 .lounge-persona-warning { color:#ffc48f !important; }
 .lounge-persona-list .lounge-persona-story-tag { width:fit-content; padding:1px 7px; border-radius:999px; background:#dbc28e26; color:#e6c994; font-size:10.5px; }
+
+/* 계정 관리 › 이용권 (2026-11-07) */
+.lounge-subscription { display:grid; gap:12px; }
+.lounge-subscription-summary { display:grid; gap:8px; margin:0; padding:14px; border:1px solid #ffffff1f; border-radius:12px; background:#ffffff08; }
+.lounge-subscription-summary div { display:flex; justify-content:space-between; gap:12px; font-size:13px; }
+.lounge-subscription-summary dt { color:#b9c2b1; }
+.lounge-subscription-summary dd { margin:0; color:#f3e7da; font-weight:650; text-align:right; word-break:break-all; }
+.lounge-subscription .lounge-persona-note svg { vertical-align:-2px; }
+.lounge-subscription .lounge-persona-note a { color:#e6c994; }
+.lounge-subscription button.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; width:fit-content; padding:11px 16px; border-radius:12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+.lounge-subscription-cancel { border:1px solid #e6c99466; background:transparent; color:#e6c994; }
+.lounge-subscription-cancel:disabled { opacity:.45; cursor:not-allowed; }
+.lounge-subscription-confirm { display:grid; gap:12px; padding:14px; border:1px solid #e69a8666; border-radius:12px; background:#e69a860f; }
+.lounge-subscription-confirm p { margin:0; color:#f3e7da; font-size:13px; line-height:1.6; }
+.lounge-subscription-confirm div { display:flex; flex-wrap:wrap; gap:8px; }
+.lounge-subscription-danger { border:0; background:#c8553d; color:#fff; }
+.lounge-subscription-back { border:1px solid #ffffff2e; background:transparent; color:#d9c6b2; }

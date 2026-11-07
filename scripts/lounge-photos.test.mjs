@@ -31,7 +31,7 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
     // Every file of the relationship folder, so a character added later is part of the graph without editing this list.
     const relationship = [...['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates'].map(name => `src/lib/relationship/${name}.ts`), ...readdirSync(resolve(workspace, 'src/lib/relationship/configs')).filter(name => name.endsWith('.ts')).map(name => `src/lib/relationship/configs/${name}`)];
-    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', 'src/lib/loungeAdmin.ts', ...relationship]) {
+    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', 'src/lib/loungeAdmin.ts', 'src/lib/loungePlans.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(target, ts.transpileModule(readFileSync(resolve(workspace, file), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText);
@@ -190,5 +190,26 @@ test('a photo the character sends first (source character) is for Plus, Pro and 
   assert.equal((await ask({ source: 'character', plan: 'plus' })).claimed, 1, 'Plus');
   assert.equal((await ask({ source: 'character', plan: 'pro' })).claimed, 1, 'Pro');
   assert.equal((await ask({ source: 'character', email: 'Piorne@Naver.com' })).claimed, 1, 'the super admin');
-  assert.equal((await ask({ source: 'request' })).claimed, 1, 'one the member asked for: for everyone, and no plan is looked up');
+  assert.equal((await ask({ source: 'request' })).claimed, 1, 'one the member asked for: for everyone');
+});
+
+test('photos are counted by the month by plan: Plus 10, Pro 30, no plan 3, the admin none; a used-up month stops a request with a message and drops one sent first', async () => {
+  const ask = async ({ source = 'request', plan = null, email, planDown = false, state = 'character_limit' }) => {
+    const calls = { monthly: 'unset' };
+    await run(async (url, init) => {
+      if (url.includes('/auth/v1/user')) return result({ id: userId, ...(email ? { email } : {}) });
+      if (url.includes('lounge_active_plan')) return planDown ? { ok: false, status: 500, json: async () => ({}) } : result(plan);
+      if (url.includes('claim_lounge_character_photo')) { calls.monthly = JSON.parse(init.body).p_monthly; return result({ state, monthly: calls.monthly }); }
+      throw new Error('Unexpected call ' + url);
+    }, async () => { const response = await handler(request({ action: 'photo', roomId, source })); calls.status = response.status; calls.body = await response.json(); });
+    return calls;
+  };
+  assert.equal((await ask({})).monthly, 3, 'no plan');
+  assert.equal((await ask({ plan: 'plus' })).monthly, 10, 'Plus');
+  assert.equal((await ask({ plan: 'pro' })).monthly, 30, 'Pro');
+  assert.equal((await ask({ email: 'piorne@naver.com' })).monthly, null, 'the super admin has no monthly limit');
+  assert.equal((await ask({ planDown: true })).monthly, 10, 'a plan that cannot be read counts as Plus for a request');
+  const stopped = await ask({ plan: 'plus', state: 'month_limit' });
+  assert.equal(stopped.status, 429); assert.equal(stopped.body.code, 'lounge_photo_month_limit'); assert.match(stopped.body.error, /이번 달 받을 수 있는 사진 10장/);
+  assert.deepEqual((await ask({ source: 'character', plan: 'plus', state: 'month_limit' })).body, { skipped: true }, 'one sent first is dropped quietly');
 });
