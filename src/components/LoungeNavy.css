@@ -109,3 +109,9 @@
 .lounge-navy .lounge-creator-voice-play { background:var(--c-soft); }
 .lounge-navy .lounge-creator-notice.done { background:#2c3a22; color:#d8e6c4; }
 .lounge-navy .lounge-creator-notice.error { background:#4a2a22; color:#ffc9b6; }
+
+/* the introduction's step cards ("세 걸음", "원하는 캐릭터"): cream cards read badly on brown */
+.lounge-navy .lounge-intro-how li { background:linear-gradient(160deg,#2c1d14,#20150f); border-color:var(--n-line); }
+.lounge-navy .lounge-intro-how .num { color:#e3c08c26; }
+.lounge-navy .lounge-intro-how h3 { color:var(--n-text); }
+.lounge-navy .lounge-intro-how p { color:var(--n-text-2); }
