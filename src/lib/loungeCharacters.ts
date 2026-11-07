@@ -2419,8 +2419,8 @@ export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: s
     { src: '/lounge/gallery/closer-2.webp', caption: '일요일 아침은 조항 없이 보내기로 했어요. 아직 연습 중입니다.' },
   ],
   velvet: [
-    { src: '/lounge/gallery/velvet-1.webp', caption: '문 닫은 갤러리에 혼자 남는 시간. 그림은 사람보다 솔직하거든.' },
-    { src: '/lounge/gallery/velvet-2.webp', caption: '이 도시는 밤에 더 정직해 보여. 시계는 여전히 멈춰 있고.' },
+    { src: '/lounge/gallery/velvet-pool.webp', caption: '수영을 마치고 물가에 앉아 있는 시간. 물속에서만 머리가 조용해져.' },
+    { src: '/lounge/gallery/velvet-gallery.webp', caption: '전시 오프닝 날 밤. 유리 진열장 앞에 서면 나도 전시품이 된 기분이야.' },
   ],
   trickster: [
     { src: '/lounge/gallery/trickster-1.webp', caption: '녹화 끝나고 편의점. 야간 알바하던 자리라 괜히 오래 서 있게 돼.' },

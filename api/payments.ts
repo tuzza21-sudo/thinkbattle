@@ -1,4 +1,4 @@
-import { getLoungePlan, loungePlanGoodName, type LoungePlan } from '../src/lib/loungePlans';
+import { getLoungePlan, loungeCallLimitMinutes, loungePhotoMonthly, loungePlanGoodName, type LoungePlan } from '../src/lib/loungePlans';
 
 export const config = { runtime: 'edge' };
 
@@ -7,6 +7,8 @@ export const config = { runtime: 'edge' };
 //   POST ?action=return          (Inicis, PC INIStdPay)       -> approve, record, redirect to /lounge/payment
 //   POST ?action=mobile-return   (Inicis, mobile smart pay)   -> the same for phones
 //   GET  ?action=close           (Inicis, PC window closed)   -> the page that closes the overlay
+//   POST ?action=status          (member)                     -> the plan running now and whether it can be cancelled with a refund
+//   POST ?action=cancel          (member, JSON {oid})         -> cancels the plan and refunds the card when the refund terms are met
 // The amount always comes from loungePlans on the server, and an order counts as paid only when Inicis approves that
 // exact amount for that exact order. Without INICIS_* variables the Inicis test merchant is used: test card payments
 // are approved and cancelled again by Inicis the same night.
@@ -33,7 +35,7 @@ const sha512Base64 = async (value: string) => btoa(String.fromCharCode(...await 
 const supabaseBase = () => (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const serviceKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-type PaymentRow = { id: string; user_id: string; plan: string; amount: number; oid: string; device: string; status: string; period_end: string | null };
+type PaymentRow = { id: string; user_id: string; plan: string; amount: number; oid: string; device: string; status: string; period_end: string | null; period_start?: string | null; paid_at?: string | null; tid?: string | null };
 
 async function db<T>(path: string, init: RequestInit = {}): Promise<T> {
   const key = serviceKey();
@@ -253,6 +255,114 @@ async function mobileReturn(req: Request) {
   return redirect(resultUrl(req, { result: 'success', oid }));
 }
 
+// ---- Cancelling a plan from the account (2026-11-07) ----
+// The terms (청약철회): within 7 days of paying, with none of the paid features used, the plan is cancelled and the whole
+// amount refunded. The member does it from the account; any other case (7 days passed, or a paid feature used) is the
+// prorated refund the terms promise by e-mail, which a person decides. The refund is Inicis's INIAPI card cancellation
+// (needs INICIS_API_KEY, and the server's address registered with Inicis; INICIS_API_CLIENT_IP names it). Without the
+// key nothing is cancelled and the member is told to write.
+const REFUND_DAYS = 7;
+const INIAPI_REFUND_URL = 'https://iniapi.inicis.com/v2/pg/refund';
+const inicisApiKey = () => process.env.INICIS_API_KEY || (MID === TEST_MID ? 'ItEQKi3rY7uvDS8l' : '');
+
+type Refundable = { ok: true } | { ok: false; reason: 'late' | 'used'; message: string };
+
+/** Whether the order meets the refund terms: 7 days from paying and no paid feature used since (or a month not begun yet). */
+async function refundable(order: PaymentRow, now = Date.now()): Promise<Refundable> {
+  const paidAt = order.paid_at ? Date.parse(order.paid_at) : NaN;
+  if (!Number.isFinite(paidAt) || now - paidAt > REFUND_DAYS * 86_400_000) return { ok: false, reason: 'late', message: `결제한 지 ${REFUND_DAYS}일이 지나서 바로 취소할 수 없어요.` };
+  // A month bought ahead (it begins after the running one ends) has not been used yet.
+  if (order.period_start && Date.parse(order.period_start) > now) return { ok: true };
+  // What the plan adds over the free use: calls beyond the free minutes, any photo a character sent first, photos beyond the free few.
+  const kst = new Date(paidAt + 9 * 3_600_000);
+  const month = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-01`;
+  const [calls, photos] = await Promise.all([
+    db<Array<{ seconds: number }>>(`lounge_call_usage?user_id=eq.${order.user_id}&month=gte.${month}&select=seconds`),
+    db<Array<{ source: string }>>(`lounge_character_posts?user_id=eq.${order.user_id}&created_at=gte.${encodeURIComponent(order.paid_at as string)}&select=source`),
+  ]);
+  const seconds = calls.reduce((sum, row) => sum + Number(row.seconds || 0), 0);
+  const used = seconds > loungeCallLimitMinutes(null, process.env) * 60 || photos.some(photo => photo.source === 'character') || photos.length > loungePhotoMonthly.free;
+  return used ? { ok: false, reason: 'used', message: '이용권으로 늘어난 기능(통화 시간, 사진)을 이미 사용해서 바로 취소할 수 없어요.' } : { ok: true };
+}
+
+async function authMember(req: Request): Promise<{ id: string } | Response> {
+  const origin = req.headers.get('origin');
+  const self = new URL(req.url).origin;
+  if (origin && origin !== self && !(process.env.APP_ORIGIN || '').split(',').map(value => value.trim()).includes(origin)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
+  const authorization = req.headers.get('authorization') || '';
+  if (!/^Bearer \S+$/i.test(authorization)) return json({ error: '로그인이 필요해요.' }, 401);
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  const auth = await fetch(`${supabaseBase()}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization }, signal: AbortSignal.timeout(10_000) });
+  if (!auth.ok) return json({ error: '다시 로그인해 주세요.' }, 401);
+  const user = await auth.json() as { id?: string; is_anonymous?: boolean };
+  return user.id && !user.is_anonymous ? { id: user.id } : json({ error: '다시 로그인해 주세요.' }, 401);
+}
+
+/** The member's latest paid plan that has not ended: the one the account can cancel. */
+async function runningOrder(userId: string) {
+  return (await db<PaymentRow[]>(`lounge_payments?user_id=eq.${userId}&status=eq.paid&period_end=gt.${encodeURIComponent(new Date().toISOString())}&order=period_end.desc&limit=1&select=*`))[0];
+}
+
+async function planStatus(req: Request) {
+  const member = await authMember(req);
+  if (member instanceof Response) return member;
+  const order = await runningOrder(member.id);
+  if (!order) return json({ order: null });
+  const check = await refundable(order);
+  return json({ order: { oid: order.oid, plan: order.plan, amount: order.amount, paidAt: order.paid_at ?? null, periodEnd: order.period_end, refundable: check.ok, ...(check.ok ? {} : { reason: check.reason, message: check.message }), canCancel: Boolean(inicisApiKey() && order.tid) } });
+}
+
+const kstStamp = (time = Date.now()) => new Date(time + 9 * 3_600_000).toISOString().replace(/\D/g, '').slice(0, 14);
+
+/** Asks Inicis to cancel the whole card approval. */
+async function inicisRefund(order: PaymentRow): Promise<{ ok: boolean; code: string; message: string }> {
+  const type = 'Refund', paymethod = 'Card', timestamp = kstStamp(), clientIp = process.env.INICIS_API_CLIENT_IP || '127.0.0.1', tid = String(order.tid);
+  const hashData = hex(await digest('SHA-512', `${inicisApiKey()}${type}${paymethod}${timestamp}${clientIp}${MID}${tid}`));
+  const response = await fetch(INIAPI_REFUND_URL, {
+    method: 'POST', headers: { 'Content-Type': 'application/json;charset=utf-8' }, signal: AbortSignal.timeout(20_000),
+    body: JSON.stringify({ type, paymethod, timestamp, clientIp, mid: MID, tid, msg: '회원 요청 이용권 취소(7일 이내)', hashData }),
+  });
+  const body = await response.json().catch(() => ({})) as { resultCode?: string; resultMsg?: string };
+  return { ok: body.resultCode === '00', code: String(body.resultCode ?? response.status), message: String(body.resultMsg ?? '') };
+}
+
+async function cancelPlan(req: Request) {
+  const member = await authMember(req);
+  if (member instanceof Response) return member;
+  let body: { oid?: unknown };
+  try { body = JSON.parse(await req.text()); } catch { return json({ error: '요청 형식이 올바르지 않아요.' }, 400); }
+  const order = typeof body.oid === 'string' ? await findOrder(body.oid) : undefined;
+  if (!order || order.user_id !== member.id) return json({ error: '취소할 이용권을 찾지 못했어요.' }, 404);
+  if (order.status === 'cancelled') return json({ error: '이미 취소된 이용권이에요.', code: 'already_cancelled' }, 409);
+  const latest = order.status === 'paid' ? await runningOrder(member.id) : undefined;
+  if (order.status !== 'paid' || !latest) return json({ error: '지금 이용 중인 이용권이 아니에요.' }, 409);
+  if (latest.oid !== order.oid) return json({ error: '나중에 결제한 이용권부터 취소해 주세요.', code: 'cancel_later_first' }, 409);
+  if (!order.tid || !inicisApiKey()) return json({ error: '자동 취소 설정이 아직 끝나지 않았어요. ask.saseok@gmail.com으로 문의해 주세요.', code: 'cancel_unavailable' }, 503);
+  const check = await refundable(order);
+  if (!check.ok) return json({ error: `${check.message} 남은 기간만큼의 환불은 ask.saseok@gmail.com으로 문의해 주세요.`, code: 'not_refundable', reason: check.reason }, 409);
+
+  // The plan ends first (only one request can do this), then the card is refunded; a refund that fails puts the plan back.
+  const claimed = await db<PaymentRow[]>(`lounge_payments?oid=eq.${order.oid}&status=eq.paid`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled', result_code: 'cancel', result_message: '회원 요청 취소(7일 이내)', updated_at: new Date().toISOString() }) });
+  if (claimed.length !== 1) return json({ error: '이미 처리된 요청이에요.', code: 'already_cancelled' }, 409);
+  const restore = async (message: string) => {
+    try { await db(`lounge_payments?oid=eq.${order.oid}&status=eq.cancelled`, { method: 'PATCH', body: JSON.stringify({ status: 'paid', result_code: '0000', result_message: message.slice(0, 300), updated_at: new Date().toISOString() }) }); }
+    catch (error) { console.error('[payments] could not restore the plan after a failed refund', order.oid, error instanceof Error ? error.message : error); }
+  };
+  try {
+    const refund = await inicisRefund(order);
+    if (!refund.ok) {
+      console.error('[payments] refund refused', order.oid, refund.code, refund.message);
+      await restore(`cancel refused ${refund.code}`);
+      return json({ error: '카드 취소가 처리되지 않았어요. 이용권은 그대로예요. 잠시 뒤 다시 시도하거나 ask.saseok@gmail.com으로 문의해 주세요.', code: 'refund_failed' }, 502);
+    }
+  } catch (error) {
+    console.error('[payments] refund request failed', order.oid, error instanceof Error ? error.message : error);
+    await restore('cancel request failed');
+    return json({ error: '카드 취소를 요청하지 못했어요. 이용권은 그대로예요. 카드 취소가 이미 됐는지 확인하려면 ask.saseok@gmail.com으로 문의해 주세요.', code: 'refund_failed' }, 502);
+  }
+  return json({ ok: true, oid: order.oid, amount: order.amount });
+}
+
 export default async function handler(req: Request): Promise<Response> {
   const action = new URL(req.url).searchParams.get('action');
   if (!supabaseBase() || !serviceKey()) return json({ error: '결제 설정이 아직 끝나지 않았어요.' }, 503);
@@ -260,6 +370,8 @@ export default async function handler(req: Request): Promise<Response> {
     if (action === 'close') return html(`<!doctype html><html><head><meta charset="utf-8"><script src="${STD_HOST}/stdjs/INIStdPay_close.js" charset="UTF-8"></script></head><body></body></html>`);
     if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
     if (action === 'create') return await createOrder(req);
+    if (action === 'status') return await planStatus(req);
+    if (action === 'cancel') return await cancelPlan(req);
     if (action === 'return') return await pcReturn(req);
     if (action === 'mobile-return') return await mobileReturn(req);
     return json({ error: '알 수 없는 요청이에요.' }, 404);

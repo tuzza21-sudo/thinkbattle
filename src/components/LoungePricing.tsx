@@ -56,8 +56,9 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   };
   return <section className="lounge-home-section lounge-pricing" id="pricing" aria-labelledby="lounge-pricing-title">
     <header className="lounge-home-subhead">
-      <h2 id="lounge-pricing-title">요금제</h2>
+      <h2 id="lounge-pricing-title">요금제(안)</h2>
       <p>더 오래 통화하고, 캐릭터가 나를 더 잘 알게 하고 싶다면 골라 보세요.</p>
+      <p className="lounge-pricing-draft">지금 보이는 요금제는 안이에요. 테스트 오픈 중에는 요금과 이용 한도가 바뀔 수 있고, 바뀌면 서비스 화면으로 미리 알려 드려요.</p>
     </header>
     <ul className="lounge-pricing-grid">
       {loungePlans.map(plan => <li key={plan.id} className={`lounge-pricing-card${plan.featured ? ' featured' : ''}`}>
@@ -76,7 +77,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
       </li>)}
     </ul>
     {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}
-    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 1개월 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 KG이니시스에서 안전하게 처리돼요. 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
+    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 1개월 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
   </section>;
 }
 

@@ -6,11 +6,11 @@ export type LoungePlan = { id: LoungePlanId; name: string; price: number; taglin
 export const loungePlans: LoungePlan[] = [
   {
     id: 'plus', name: 'Plus', price: 20_000, tagline: '매일 조금씩, 꾸준히 이야기하고 싶다면',
-    features: ['음성 통화 월 60분', '채팅 무제한', '내 프로필 설정 최대 1,500자', '이미지 전송 하루 10장', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 5개', '페르소나 5개'],
+    features: ['음성 통화 월 60분', '채팅 무제한', '내 페르소나 설정(서사 포함) 최대 1,500자', '이미지 전송 월 10장(캐릭터가 보낸 사진·직접 만든 사진 포함)', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 5개', '페르소나 5개'],
   },
   {
     id: 'pro', name: 'Pro', price: 30_000, tagline: '더 길게, 더 깊게 이야기하고 싶다면', featured: true,
-    features: ['음성 통화 월 120분', '채팅 무제한', '내 프로필 설정 최대 3,000자', '이미지 전송 하루 30장', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 10개', '페르소나 10개', '새 캐릭터와 기능 먼저 만나기'],
+    features: ['음성 통화 월 120분', '채팅 무제한', '내 페르소나 설정(서사 포함) 최대 3,000자', '이미지 전송 월 30장(캐릭터가 보낸 사진·직접 만든 사진 포함)', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 10개', '페르소나 10개', '새 캐릭터와 기능 먼저 만나기'],
   },
 ];
 
@@ -63,6 +63,23 @@ export function loungeFirstPhotoMoment(change?: { stage?: string | null; events?
 }
 /** What the photo is asked for (the character writes the scene and its own caption from the talk). */
 export const loungeFirstPhotoRequest = { stage: '둘의 사이가 한 걸음 가까워진 지금, 캐릭터가 먼저 보내는 사진. 방금 장면과 이어지게.', event: '방금 일어난 일 뒤에 캐릭터가 먼저 보내는 사진. 방금 장면과 이어지게.' } as const;
+
+/**
+ * What a character remembers in a reply (2026-11-07). The same for every member, whatever the plan: this is a beta that
+ * tests whether the talk is worth coming back to, so the plans differ only in what costs money (calls, photos,
+ * characters). A conversation keeps up to 40 long-term memories per character; each reply is shown `prompt` of them
+ * (`relevant` when they can be picked by what is being talked about), the latest `recent` messages as they were written
+ * (in a one-to-one chat), and a running summary of the whole conversation of at most `summary` characters.
+ */
+export const loungeMemoryLimits = { prompt: 8, relevant: 12, recent: 20, summary: 900 } as const;
+
+/**
+ * Photos a member may receive in a month (the month in Korea), counting the ones a character sends first and the ones
+ * the member asks for: Plus 10, Pro 30, a member without a plan 3, the super admin no limit. The database counts them
+ * (claim_lounge_character_photo); the daily number the admin sets stays on top as a ceiling.
+ */
+export const loungePhotoMonthly: Record<'free' | LoungePlanId, number> = { free: 3, plus: 10, pro: 30 };
+export const loungePhotoMonthlyFor = (plan: unknown): number => loungePhotoMonthly[plan === 'pro' ? 'pro' : plan === 'plus' ? 'plus' : 'free'];
 
 export const getLoungePlan = (id: unknown) => loungePlans.find(plan => plan.id === id);
 

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { AppUser } from '../types';
 import { Link } from 'react-router-dom';
 import { LoungeAccountDialog } from './LoungeAccountDialog';
+import { LoungeSubscription } from './LoungeSubscription';
 import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 import { saveLoungeProfile } from '../lib/auth';
 
@@ -111,6 +112,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
       <span className="lounge-account-section-label">03 · 대화 속 나 (페르소나)</span>
       <p className="lounge-persona-note">캐릭터와 1:1로 대화할 때의 나(이름, 직업, 성격)는 전용 페이지에서 대화 전에 만들고 고쳐요. 기본 페르소나는 새 대화마다 자동으로 쓰여요.</p>
       <Link to="/lounge/personas" className="btn lounge-persona-open" onClick={onClose}><UserCog size={16} />내 페르소나 관리하기</Link>
+      {serviceName === '사석' && <>
+        <span className="lounge-account-section-label">04 · 이용권</span>
+        <LoungeSubscription onNavigate={onClose} />
+      </>}
     </>}
   </LoungeAccountDialog>;
 };
