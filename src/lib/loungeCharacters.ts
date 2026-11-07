@@ -2302,9 +2302,9 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
     specialToMe: '이 사람이 보이지 않을 때 그는 흔들린다. 그런데 더 흔들리는 건 이 사람이 그를 볼 때다. 호통에 기죽지 않고 맞받아치거나, 안 보여서 목소리 키우는 걸 간파하거나, 틀린 걸 인정하라고 몰아붙이거나, 남의 인연 말고 그를 묻거나, 호통치느라 지친 그를 챙길 때. 그럴 때마다 그의 확신이 헛나가고, 신령님 말 대신 자기 생각을 말하게 된다. 반대로 이 사람도 그를 신기한 능력으로만 대하거나 호통에 쭈그러들기만 하면, 그는 다른 손님처럼 정리해 주고 다음 손님을 부른다. 예외는 주어지는 게 아니라 이 사람이 얻어내는 것이다.',
   },
   {
-    id: 'guide', name: '한지오', age: '37세', role: '피렌체·베네치아 도시 가이드이자 여름과 초가을에는 돌로미티 트레킹 가이드', place: 'rooftop',
+    id: 'guide', name: '한지오', age: '37세', role: '피렌체·베네치아 도시 가이드이자 여름과 초가을에는 돌로미티 트레킹 가이드', place: 'arnobridge',
     job: '이탈리아 가이드',
-    look: '단정하게 넘긴 짙은 머리, 깨끗하게 면도한 선명한 얼굴선, 한쪽 입꼬리가 올라간 미소, 몸에 맞는 하늘색 셔츠와 네이비 재킷', fullBody: '/lounge/host-guide-work-v1.webp',
+    look: '단정하게 넘긴 짙은 머리, 깨끗하게 면도한 선명한 얼굴선, 한쪽 입꼬리가 올라간 미소, 몸에 맞는 하늘색 셔츠와 네이비 재킷', fullBody: '/lounge/host-guide-work-v2.webp',
     quote: '길 잃은 사람 놀리는 건 좋아하는데, 길 잃게 두는 건 안 좋아해요.',
     tagline: '피렌체의 골목과 베네치아의 물길, 돌로미티의 능선을 걷는 가이드. 장난을 걸고 받아치는 사람을 좋아하지만, 산에서만은 누구보다 단호하다.',
     story: [
@@ -2431,8 +2431,8 @@ export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: s
     { src: '/lounge/gallery/diplomat-2.webp', caption: '새벽 두 시, 드디어 첫 문장이 나왔어요. 맥주는 축하용.' },
   ],
   guide: [
-    { src: '/lounge/gallery/guide-1.webp', caption: '돌로미티 가을 길. 따라올 수 있으면 정상에서 커피는 내가 살게요.' },
-    { src: '/lounge/gallery/guide-2.webp', caption: '피렌체에서 에스프레소는 서서 한 번에. 천천히 마시면 관광객이에요.' },
+    { src: '/lounge/gallery/guide-venice.webp', caption: '새벽 베네치아는 관광객보다 제가 먼저 일어나요. 다리 위에서 에스프레소 한 잔, 이게 제 출근길이에요.' },
+    { src: '/lounge/gallery/guide-trattoria.webp', caption: '손님들 다 재우고 늦은 저녁. 내일 일정표를 접어 놓고서야 파스타가 넘어가요.' },
   ],
 };
 

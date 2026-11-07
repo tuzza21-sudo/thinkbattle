@@ -38,7 +38,7 @@ export type LoungeCustomCharacterRow = {
 };
 
 /** Places a character can live in: the scenes of one-to-one rooms (the database accepts these themes for a new room). */
-export const loungeCustomThemes = loungeThemes.filter(theme => ['rooftop', 'river', 'forest', 'hotellobby', 'hotel', 'cafe', 'seaside', 'embassy', 'lawlibrary', 'boardroom', 'cocktailbar', 'theater'].includes(theme.id));
+export const loungeCustomThemes = loungeThemes.filter(theme => ['rooftop', 'river', 'forest', 'hotellobby', 'hotel', 'cafe', 'seaside', 'embassy', 'lawlibrary', 'boardroom', 'cocktailbar', 'theater', 'arnobridge'].includes(theme.id));
 
 /**
  * Voices to choose from (2026-10-27): three women and three men, each the ElevenLabs voice of a house character (or the

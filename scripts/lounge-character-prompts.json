@@ -11,8 +11,8 @@
     },
     "work": {
       "portrait": "host-guide-v1.webp",
-      "file": "host-guide-work-v1.webp",
-      "prompt": "{{common}} He is at work as a mountain trekking guide in the Italian Dolomites: well groomed and clean-shaven, wearing a sleek fitted technical hiking jacket in slate blue over a t-shirt, tailored trekking trousers, clean hiking boots and a small backpack, he stands on a high alpine trail on a clear morning, one arm pointing toward jagged pale limestone peaks with a confident smirk, a small group of hikers seen from behind, green meadows and a small wooden mountain hut far below. Natural bright mountain light. Nothing readable on any sign."
+      "file": "host-guide-work-v2.webp",
+      "prompt": "{{common}} He is at work as a city guide in Florence: well groomed and clean-shaven, wearing the same crisp light-blue shirt with the sleeves rolled and a tailored navy linen jacket, a printed name list in one hand, he stands in a sunlit old-town piazza raising his other hand to lead a small group of tourists seen from behind, the red-tiled cathedral dome far behind him, warm late-morning light, a confident teasing smirk. Nothing readable on any sign or paper."
     }
   },
   "shaman": {
