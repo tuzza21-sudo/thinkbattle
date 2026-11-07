@@ -384,6 +384,7 @@ export const loungeThemes = [
   { id: 'seaside', name: '바다 테라스', subtitle: '푸른 수평선과 햇살이 머무는 자리', tag: 'A SLOW MORNING BY THE SEA', caption: '넓은 바다를 바라보며, 마음에도 여유를 더해요.', image: '/lounge/seaside-terrace-v1.webp', accent: '#c4dfdd', surface: '#253536' },
   { id: 'embassy', name: '신문사 옥상 휴게 정원', subtitle: '마감 뒤 옥상 벤치, 커피 한 잔과 도시의 불빛', tag: 'ROOFTOP AFTER THE DEADLINE', caption: '마감이 끝난 저녁, 이상하고 재밌는 이야기라면 뭐든 좋아요.', image: '/lounge/newsroom-rooftop-v1.webp', accent: '#d9c79f', surface: '#1e2230' },
   { id: 'boardroom', name: '중역 회의실', subtitle: '고층에서 내려다보는 도시, 긴 월넛 테이블', tag: 'THE ROOM WHERE DEALS END WELL', caption: '긴 테이블 위에서 조건을 하나씩 맞춰 가요. 서두를 필요는 없어요.', image: '/lounge/boardroom-v1.webp', accent: '#e0c690', surface: '#14192a' },
+  { id: 'arnobridge', name: '아르노강 다리', subtitle: '피렌체의 노을이 내려앉는 돌다리 위', tag: 'THE ARNO AT GOLDEN HOUR', caption: '강물에 번지는 노을, 다리 위에서 천천히 이야기해요.', image: '/lounge/arno-bridge-v1.webp', accent: '#f0a860', surface: '#2a1a12' },
   { id: 'cocktailbar', name: '고급 칵테일바', subtitle: '바 자리에 앉아 마주하는 한 잔의 칵테일', tag: 'A SEAT AT THE BAR AFTER ELEVEN', caption: '잔 너머로 흐르는 호박빛 조명, 천천히 마음을 열어 봐요.', image: '/lounge/cocktail-bar-v1.webp', accent: '#e8b98a', surface: '#2a1612' },
   { id: 'theater', name: '심야 토크쇼 무대', subtitle: '불이 켜진 호스트 데스크와 빈 게스트 의자', tag: 'THE STAGE BEFORE THE SHOW', caption: '대본은 없어요. 받아치다 보면 이야기가 만들어져요.', image: '/lounge/talkshow-stage-v1.webp', accent: '#f0c27a', surface: '#25141a' },
   // The 'lawlibrary' id is kept for existing rooms and the database lists of places; since 2026-11-03 the place is the shrine 홍실당.
@@ -395,7 +396,7 @@ export const getLoungeTheme = (id?: string | null) => loungeThemes.find(theme =>
 export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
   jaeseok: ['hotel'], ina: ['cafe'], auditor: ['hotellobby'], closer: ['boardroom'],
   velvet: ['cocktailbar'], trickster: ['theater'], diplomat: ['embassy'],
-  guide: ['rooftop'],
+  guide: ['arnobridge'],
   shaman: ['lawlibrary'],
 };
 /**

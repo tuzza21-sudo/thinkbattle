@@ -14,6 +14,11 @@ if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in 
 
 const common = 'Use case: photorealistic-natural. Asset type: wide 3:2 background photograph for a voice conversation app, an empty, inviting interior with no people. Premium editorial interior photography, warm cinematic lighting, realistic materials, shallow depth of field with the foreground softly out of focus, the centre of the frame calm and uncluttered. No people, no text, no logos, no watermark, no readable signs.';
 const scenes = {
+  // 한지오's story starts in Florence (2026-11-07): the Arno at golden hour from a stone bridge.
+  arnobridge: {
+    file: 'arno-bridge-v1.webp',
+    prompt: `${common} The Arno river in Florence at golden hour, seen from an old stone arch bridge: a worn stone parapet in the foreground, the calm river reflecting a warm orange and pink sky, terracotta-roofed buildings and a distant medieval bridge with small shops along the water, a few swallows in the sky, soft haze. Warm, peaceful, no people, no cars. Nothing readable on any sign.`,
+  },
   // The 'embassy' theme id is kept for existing rooms; the place is now the reporter's rooftop rest garden on top of a newspaper building
   // (the old diplomatic reception scene is embassy-reception-v1.webp, kept with the shelved diplomat).
   embassy: {

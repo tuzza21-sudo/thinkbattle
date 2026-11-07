@@ -45,8 +45,8 @@ const scenes = {
     `${common} Late at night she sits on the floor of her apartment with her back against the sofa, a laptop on her knees and a can of beer beside her, glasses pushed up into her hair, smirking at the screen as if she just found the perfect sentence. Warm desk lamp, city lights through the window.`,
   ] },
   guide: { portrait: 'host-guide-v1.webp', shots: [
-    `${common} High in the Dolomites in early autumn, he stands on a rocky trail in a technical hiking jacket with a backpack and trekking poles, turning back toward the camera with a teasing grin as if daring you to keep up. Jagged pale peaks and golden larches behind him, crisp clear light.`,
-    `${common} An evening espresso at a tiny counter bar in Florence, he leans on the marble counter in a light-blue shirt with the sleeves rolled, holding a small espresso cup and raising it toward the camera with a mischievous half-smile. Warm golden light, old stone and wooden shelves.`,
+    `${common} At dawn on a small stone bridge over a quiet Venice canal, he stands in a light-blue shirt with the sleeves rolled and a navy jacket slung over one shoulder, holding a paper cup of espresso and glancing at the camera with a sleepy, teasing half-smile. Pastel pink morning light on old brick houses, a moored gondola, an empty street. No readable signs.`,
+    `${common} A late evening in a tiny Florence trattoria after his group has gone to bed, he sits alone at a small wooden table with his navy jacket on the chair, a plate of pasta and a glass of water in front of him and a small notebook with tomorrow's plan beside it, looking up at the camera with a tired but warm grin. Warm lamp light, old brick walls. Nothing readable on the notebook or on any sign.`,
   ] },
 };
 
