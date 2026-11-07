@@ -6,11 +6,11 @@ export type LoungePlan = { id: LoungePlanId; name: string; price: number; taglin
 export const loungePlans: LoungePlan[] = [
   {
     id: 'plus', name: 'Plus', price: 20_000, tagline: '매일 조금씩, 꾸준히 이야기하고 싶다면',
-    features: ['음성 통화 월 60분', '채팅 무제한', '내 프로필 설정 최대 1,500자', '이미지 전송 하루 10장', '나만의 캐릭터 5개', '페르소나 5개'],
+    features: ['음성 통화 월 60분', '채팅 무제한', '내 프로필 설정 최대 1,500자', '이미지 전송 하루 10장', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 5개', '페르소나 5개'],
   },
   {
     id: 'pro', name: 'Pro', price: 30_000, tagline: '더 길게, 더 깊게 이야기하고 싶다면', featured: true,
-    features: ['음성 통화 월 120분', '채팅 무제한', '내 프로필 설정 최대 3,000자', '이미지 전송 하루 30장', '나만의 캐릭터 10개', '페르소나 10개', '새 캐릭터와 기능 먼저 만나기'],
+    features: ['음성 통화 월 120분', '채팅 무제한', '내 프로필 설정 최대 3,000자', '이미지 전송 하루 30장', '관계가 깊어지면 캐릭터가 먼저 사진 보내기', '나만의 캐릭터 10개', '페르소나 10개', '새 캐릭터와 기능 먼저 만나기'],
   },
 ];
 
@@ -46,6 +46,23 @@ export function loungeCallAllowanceText(call?: { usedSeconds: number; limitMinut
   const used = loungeCallDuration(call.usedSeconds + extraSeconds);
   return call.limitMinutes !== null && (call.plan || call.enforced) ? `이번 달 통화 ${used} / ${call.limitMinutes}분` : `이번 달 통화 ${used}`;
 }
+
+/**
+ * The photo a character sends first, unasked (2026-11-07), is for Plus and Pro. It comes at a moment the relationship
+ * marks: a step closer (the stage went up), or something that mattered went well (a promise kept, a plan carried out, a
+ * deep thing shared). The reply model is never left to find the moment: a one-to-one chat (messenger) did not tell it
+ * about photos at all, so none came first. A step closer always sends one; the other moments at most once in
+ * `loungeFirstPhotoCooldownHours`; the day's limit of unasked photos (2) is the database's.
+ */
+export const loungeFirstPhotoEvents = ['KEEPS_PROMISE', 'FOLLOWS_THROUGH', 'SHARES_VULNERABILITY'] as const;
+export const loungeFirstPhotoCooldownHours = 12;
+export function loungeFirstPhotoMoment(change?: { stage?: string | null; events?: ReadonlyArray<{ type: string; up?: boolean }> } | null): 'stage' | 'event' | undefined {
+  if (!change) return undefined;
+  if (change.stage === 'promoted') return 'stage';
+  return change.events?.some(event => event.up !== false && (loungeFirstPhotoEvents as readonly string[]).includes(event.type)) ? 'event' : undefined;
+}
+/** What the photo is asked for (the character writes the scene and its own caption from the talk). */
+export const loungeFirstPhotoRequest = { stage: '둘의 사이가 한 걸음 가까워진 지금, 캐릭터가 먼저 보내는 사진. 방금 장면과 이어지게.', event: '방금 일어난 일 뒤에 캐릭터가 먼저 보내는 사진. 방금 장면과 이어지게.' } as const;
 
 export const getLoungePlan = (id: unknown) => loungePlans.find(plan => plan.id === id);
 

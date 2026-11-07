@@ -9,7 +9,7 @@ import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalize
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
-import { loungeCallLimitMinutes, loungeCallLimitsOn } from '../src/lib/loungePlans';
+import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeCallGreetingRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
@@ -523,6 +523,15 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (state.exempt) return { usedSeconds: state.seconds, limitMinutes: null, plan: state.plan, enforced, exhausted: false, unlimited: true };
       const limitMinutes = loungeCallLimitMinutes(state.plan, process.env, Boolean(state.tester));
       return { usedSeconds: state.seconds, limitMinutes, plan: state.plan, tester: Boolean(state.tester), enforced, exhausted: enforced && state.seconds >= limitMinutes * 60 };
+    };
+    // Whether a photo the character sent first was made for this member lately (the moments other than a step closer wait).
+    const firstPhotoRecently = async (userId: string) => {
+      if (!serviceHeaders) return true;
+      const since = new Date(Date.now() - loungeFirstPhotoCooldownHours * 3_600_000).toISOString();
+      try {
+        const response = await fetchTimed(`${url}/rest/v1/lounge_character_posts?user_id=eq.${encodeURIComponent(userId)}&source=eq.character&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`, { headers: serviceHeaders }, 4_000);
+        return !response.ok || (await readJson<unknown[]>(response, 'lounge')).length > 0;
+      } catch { return true; }
     };
     const readRelationship = async (userId: string, characterId: string) => {
       if (!serviceHeaders) return { ok: false as const };
@@ -1941,7 +1950,17 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // Only a photo of the character can be made (from their reference photos): on 2026-11-01 a member asked 한지오
             // to take their picture and got his, twice. So the call names who is in it, and anything else makes none.
             const photo = chatPhotos && answer?.photo_subject === 'character' && typeof answer?.photo === 'string' && !loungeEmptyWord(answer.photo) ? answer.photo.trim().slice(0, 200) : '';
-            if (photo) send({ type: 'photo', scene: photo, asked: answer?.photo_asked === true });
+            // A photo the character sends first is for Plus and Pro (and the super admin): one the member asked for goes to
+            // everyone. It comes when the reply showed one, or at a moment of the relationship (loungeFirstPhotoMoment).
+            const askedPhoto = answer?.photo_asked === true;
+            const moment = chatPhotos && !photo ? loungeFirstPhotoMoment(relationshipSaved?.change) : undefined;
+            if (chatPhotos && ((photo && !askedPhoto) || moment)) {
+              const plan = isLoungeSuperAdmin(user) ? 'admin' : (await callService('lounge_call_status', { p_user: user.id }).catch(() => null))?.plan;
+              if (plan) {
+                if (photo) send({ type: 'photo', scene: photo, asked: false });
+                else if (moment === 'stage' || !(await firstPhotoRecently(user.id))) send({ type: 'photo', scene: loungeFirstPhotoRequest[moment!], asked: false });
+              }
+            } else if (photo) send({ type: 'photo', scene: photo, asked: askedPhoto });
             send(speechError ? streamFailure(speechError, '사회자 음성을 준비하지 못했어요. 글로 대화를 이어갈게요.') : { type: 'done' });
           } catch (error) {
             console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined }));

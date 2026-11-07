@@ -2173,6 +2173,54 @@ test('a chat reply can come with a photo: the scene goes to the browser after th
   }
 });
 
+test('a photo the character sends first is for Plus, Pro and the admin (a step closer, something that went well, or the reply showed one); one the member asked for is for everyone', async () => {
+  const turn = async ({ user = { id: 'user-1' }, plan = null, photo = {}, events = [], recent = false }) => {
+    let sent;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result(user);
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('lounge_call_status')) return result({ seconds: 0, plan });
+      if (url.includes('lounge_character_posts?')) return result(recent ? [{ id: 'p1' }] : []);
+      if (url.includes('voice_lounge_relationships?')) return result([velvetRow]);
+      if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+      if (url.includes('voice_lounge_rooms?')) return result([relationshipRoom({ voice_on: false, space_id: null })]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '약속한 대로 자료 가져왔어요.' }]);
+      if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+      if (url.endsWith('/embeddings') || url.includes('lounge_character_knowledge')) return result({ data: [] });
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 바', events, photo_subject: 'none', photo: '', photo_asked: false, ...photo });
+      if (url.endsWith('/responses')) return modelAnswer({ text: '고마워요. 약속은 지키는 사람이군요.' });
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory') || url.includes('save_voice_lounge_relationship')) return result(true);
+      return result([]);
+    }, async () => {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      sent = (await response.text()).trim().split('\n').map(line => JSON.parse(line)).filter(event => event.type === 'photo');
+    }));
+    return sent;
+  };
+  const kept = [{ type: 'KEEPS_PROMISE', confidence: 0.9, note: '약속한 자료를 가져옴' }];
+  const shown = { photo_subject: 'character', photo: '바 카운터에서 찍은 셀카', photo_asked: false };
+  // Something that went well (a promise kept): a photo comes first, for a plan member.
+  const plus = await turn({ plan: 'plus', events: kept });
+  assert.equal(plus.length, 1, 'a promise kept: Plus is sent a photo'); assert.equal(plus[0].asked, false); assert.match(plus[0].scene, /방금 일어난 일 뒤에 캐릭터가 먼저 보내는 사진/);
+  assert.equal((await turn({ plan: 'pro', events: kept })).length, 1, 'Pro too');
+  assert.equal((await turn({ user: { id: 'user-9', email: 'piorne@naver.com' }, plan: null, events: kept })).length, 1, 'the super admin');
+  assert.equal((await turn({ plan: null, events: kept })).length, 0, 'a member without a plan is not sent one first');
+  assert.equal((await turn({ plan: 'plus', events: kept, recent: true })).length, 0, 'not again within the hours between such photos');
+  assert.equal((await turn({ plan: 'plus', events: [{ type: 'FLATTERS_CHARACTER', confidence: 0.9, note: '' }] })).length, 0, 'an ordinary turn sends none');
+  // The reply showed a photo being sent, unasked: the same rule.
+  assert.deepEqual((await turn({ plan: 'plus', photo: shown })).map(event => [event.scene, event.asked]), [['바 카운터에서 찍은 셀카', false]]);
+  assert.equal((await turn({ plan: null, photo: shown })).length, 0, 'a photo shown unasked is for Plus and Pro');
+  // One the member asked for goes to everyone.
+  assert.deepEqual((await turn({ plan: null, photo: { ...shown, photo_asked: true } })).map(event => event.asked), [true]);
+  // The moments, by name.
+  const moment = plans => plans.loungeFirstPhotoMoment;
+  assert.equal(moment(plansLib)({ stage: 'promoted', events: [] }), 'stage');
+  assert.equal(moment(plansLib)({ stage: null, events: [{ type: 'SHARES_VULNERABILITY', up: true }] }), 'event');
+  assert.equal(moment(plansLib)({ stage: null, events: [{ type: 'KEEPS_PROMISE', up: false }] }), undefined);
+  assert.equal(moment(plansLib)({ stage: 'demoted', events: [] }), undefined);
+  assert.equal(moment(plansLib)(undefined), undefined);
+});
+
 test('a chat started from a story is told as a story; with the voice on it stays in the story under the voice rules', async t => {
   storyLayer(t);
   const scenario = { id: 'velvet-review', title: '혹평의 밤', prologue: '선우령이 연출한 전시의 오프닝 파티. 당신은 이 전시를 혹평한 평론가다.', user_role: '전시를 혹평한 미술 평론가', relationship: '서로를 의식하는 앙숙', place: '갤러리 홀' };
