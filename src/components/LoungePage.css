@@ -107,3 +107,7 @@
 /* The brand in the header: "사석에서" in Cafe24 Ssurround (2026-11-07), a free font of Cafe24, from the distributor's CDN. */
 @font-face { font-family:'Cafe24 Ssurround'; src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff'); font-weight:400; font-style:normal; font-display:swap; }
 .lounge-brand-name { font-family:'Cafe24 Ssurround','Pretendard','Noto Sans KR',sans-serif; font-style:normal; font-weight:400; letter-spacing:-.01em; }
+/* The wordmark is the lettering of the lounge's banner (2026-11-08), a transparent PNG, not a font. It is cream, made for the dark pages; on a light page it is darkened. */
+.lounge-brand-name { display:inline-flex; align-items:center; vertical-align:middle; }
+.lounge-brand-name img { display:block; height:1.55em; width:auto; }
+.lounge-page:not(.lounge-navy):not(.has-room) .lounge-brand-name img { filter:brightness(.28) sepia(.5); }
