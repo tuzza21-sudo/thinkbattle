@@ -173,7 +173,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
       <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
           {loungeGroupRoomsEnabled ? <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2> : <h1 id="lounge-cast-title">누구와 이야기할까요?</h1>}
-          <p>{loungeGroupRoomsEnabled ? '대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.' : '캐릭터를 골라 둘만의 이야기를 시작해요. 채팅으로도, 목소리로도 이어 갈 수 있어요.'}</p>
+          {loungeGroupRoomsEnabled && <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>}
         </div>
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
@@ -239,7 +239,6 @@ function LoungeNewCast({ topics }: { topics: Record<string, string[]> }) {
   return <section className="lounge-home-section" aria-labelledby="lounge-new-cast-title">
     <header className="lounge-home-subhead">
       <h2 id="lounge-new-cast-title">신규 캐릭터</h2>
-      <p>새로 온 캐릭터예요. 카드를 누르면 이야기를 고를 수 있어요.</p>
     </header>
     <LoungeRow label="신규 캐릭터" className="lounge-cast-row lounge-new-row">
       {cards.map(card => <li key={card.id}>
@@ -248,7 +247,6 @@ function LoungeNewCast({ topics }: { topics: Record<string, string[]> }) {
           <b className="lounge-new-badge">NEW</b>
           <span><strong>{card.name}</strong><small>{card.job}</small><TopicPill titles={card.titles} /></span>
         </Link>
-        <p className="lounge-cast-count">{card.headline}</p>
       </li>)}
     </LoungeRow>
   </section>;

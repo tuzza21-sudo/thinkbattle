@@ -54,7 +54,8 @@
 .lounge-theme-options small { font-size:10px; color:var(--l-muted); line-height:1.5; }
 .lounge-theme-options i { display:grid; place-items:center; position:absolute; top:9px; right:9px; width:25px; height:25px; color:white; background:var(--l-green); border-radius:50%; }
 .lounge-builder-theme { display:flex; align-items:center; gap:7px; color:var(--l-muted); font-size:12px; margin:-4px 0 23px; }
-.lounge-header-end { display:flex; align-items:center; justify-content:flex-end; gap:22px; min-width:0; }
+.lounge-header-end { display:flex; align-items:center; justify-content:flex-end; gap:12px; min-width:0; }
+.lounge-header-end .lounge-account { margin-left:0; gap:12px; }
 .lounge-account { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
 .lounge-account button { display:inline-flex; align-items:center; justify-content:center; gap:9px; border:1px solid var(--l-line); border-radius:10px; background:var(--l-paper); color:var(--l-ink); padding:10px 14px; font-size:12px; }
 .lounge-account button:hover { border-color:#9caa8a; background:#f0f3e7; }
@@ -72,7 +73,8 @@
 .lounge-account-error { max-width:1232px; margin:16px auto!important; padding:12px 20px; color:#914f27; background:#fff0e5; font-size:12px; }
 @media(max-width:760px) {
   .lounge-page:not(.has-room) .lounge-header { height:auto; min-height:77px; flex-wrap:wrap; padding-block:16px; gap:15px; }
-  .lounge-page:not(.has-room) .lounge-header-end { gap:10px; margin-left:auto; }
+  .lounge-page:not(.has-room) .lounge-header-end { gap:8px; margin-left:auto; flex-wrap:wrap; row-gap:8px; }
+  .lounge-header-end .lounge-account { margin-left:0; gap:8px; }
   .lounge-account button { padding:9px 11px; font-size:11px; }
   .lounge-account-name strong { max-width:110px; }
   .lounge-guest-label { flex-basis:100%; text-align:right; }
@@ -101,3 +103,7 @@
 .lounge-topic-description h3 { font-size: 12px; margin: 14px 0 4px; }
 .lounge-topic-description p { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 560px) { .lounge-work-fields { grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 10px; } .lounge-work-type { grid-column: 1 / -1; max-width: 150px; } .lounge-style-section { margin-top: 28px; } }
+
+/* The brand in the header: "사석에서" in Cafe24 Ssurround (2026-11-07), a free font of Cafe24, from the distributor's CDN. */
+@font-face { font-family:'Cafe24 Ssurround'; src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff'); font-weight:400; font-style:normal; font-display:swap; }
+.lounge-brand-name { font-family:'Cafe24 Ssurround','Pretendard','Noto Sans KR',sans-serif; font-style:normal; font-weight:400; letter-spacing:-.01em; }

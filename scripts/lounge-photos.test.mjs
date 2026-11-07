@@ -31,7 +31,7 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
     // Every file of the relationship folder, so a character added later is part of the graph without editing this list.
     const relationship = [...['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates'].map(name => `src/lib/relationship/${name}.ts`), ...readdirSync(resolve(workspace, 'src/lib/relationship/configs')).filter(name => name.endsWith('.ts')).map(name => `src/lib/relationship/configs/${name}`)];
-    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', ...relationship]) {
+    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', 'src/lib/loungeAdmin.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(target, ts.transpileModule(readFileSync(resolve(workspace, file), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText);
@@ -172,4 +172,23 @@ test('a background that follows the place (automatic): a place that fits is save
   assert.equal(none.patched, null, 'no place fits: the background stays as it is, not the empty space'); assert.equal(none.images, 0, 'and nothing is made'); assert.equal(none.response.background, null);
   const off = await ask({ choice: 'cafe', env: { LOUNGE_AUTO_SCENE: 'off' } });
   assert.equal(off.matched, 0); assert.equal(off.patched, null);
+});
+
+test('a photo the character sends first (source character) is for Plus, Pro and the admin; a photo the member asked for is for everyone', async () => {
+  const ask = async ({ source, plan = null, email }) => {
+    const calls = { claimed: 0 };
+    await run(async (url, init) => {
+      if (url.includes('/auth/v1/user')) return result({ id: userId, ...(email ? { email } : {}) });
+      if (url.includes('lounge_active_plan')) return result(plan);
+      if (url.includes('claim_lounge_character_photo')) { calls.claimed++; return result({ state: 'character_limit' }); }
+      throw new Error('Unexpected call ' + url);
+    }, async () => { const response = await handler(request({ action: 'photo', roomId, source })); calls.status = response.status; calls.body = await response.json(); });
+    return calls;
+  };
+  const free = await ask({ source: 'character' });
+  assert.deepEqual([free.claimed, free.body], [0, { skipped: true }], 'no plan: dropped quietly, before anything is claimed');
+  assert.equal((await ask({ source: 'character', plan: 'plus' })).claimed, 1, 'Plus');
+  assert.equal((await ask({ source: 'character', plan: 'pro' })).claimed, 1, 'Pro');
+  assert.equal((await ask({ source: 'character', email: 'Piorne@Naver.com' })).claimed, 1, 'the super admin');
+  assert.equal((await ask({ source: 'request' })).claimed, 1, 'one the member asked for: for everyone, and no plan is looked up');
 });

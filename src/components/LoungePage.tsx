@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, BookHeart, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, Ticket, UserCog, Users, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookHeart, BookOpen, Camera, Coffee, Copy, Hand, Headphones, Heart, LoaderCircle, LogOut, MessageCircle, Mic, MicOff, Pause, Phone, Play, RefreshCw, Sparkles, Ticket, UserCog, Users, X, Image as ImageIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
@@ -38,6 +38,7 @@ import { ProfileModal } from './ProfileModal';
 import { LoungeIntroduction } from './LoungeIntroduction';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import { LoungePricingPage } from './LoungePricing';
+import { LoungeGuide } from './LoungeGuide';
 import { trackMetaOnce } from '../lib/metaPixel';
 import { LoungeReplyButton, LoungeReplyPanel, LoungeStoryChoicePanel, useLoungeReplies } from './LoungeReplySuggestions';
 import { isLoungeConsultRoom, loungeConsultPickCount, readLoungeConsultState, type LoungeConsultState } from '../lib/loungeConsult';
@@ -49,15 +50,19 @@ import { LoungeCharacterCreator } from './LoungeCharacterCreator';
 import { useLoungeAudio } from '../lib/useLoungeAudio';
 import './LoungePage.css';
 import './LoungeRoom.css';
+import './LoungeNavy.css';
+
+/** The pages outside a conversation are navy (2026-11-07). Set to false to go back to the light pages. */
+const loungeNavyTheme = true;
 
 type Props = { user: AppUser | null; onGuestRequest: () => Promise<void>; onLoginRequest: () => void; onSignupRequest?: () => void; onUserUpdate?: (user: AppUser) => void; onLogout?: () => Promise<void> };
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 // The profile is edited from the 설정 tab, so the header has no profile button (2026-11-03).
-function LoungeHeader({ user, inRoom, introduction, pricing, onLoginRequest, onSignupRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; pricing: boolean; loggingOut: boolean; unread: number }) {
+function LoungeHeader({ user, inRoom, introduction, pricing, guide, onLoginRequest, onSignupRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; pricing: boolean; guide: boolean; loggingOut: boolean; unread: number }) {
   return <header className="lounge-header">
     {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 사석</Link>}
-    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong>사석<b className="lounge-beta">Beta 테스트</b><span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
-    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && <Link to="/lounge/pricing" className="lounge-about-link lounge-pricing-link" aria-current={pricing ? 'page' : undefined}><Ticket size={14} />요금제</Link>}{!inRoom && <nav className="lounge-account" aria-label="내 계정">
+    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong><i className="lounge-brand-name">사석에서</i><b className="lounge-beta">Beta 테스트</b><span>진짜 대화는 사석에서 · Off the record</span></strong></Link>
+    <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && <Link to="/lounge/guide" className="lounge-about-link lounge-guide-link" aria-current={guide ? 'page' : undefined}><BookOpen size={14} />플레이 가이드</Link>}{!inRoom && <Link to="/lounge/pricing" className="lounge-about-link lounge-pricing-link" aria-current={pricing ? 'page' : undefined}><Ticket size={14} />요금제</Link>}{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
         <Link to="/lounge/personas" className="lounge-persona-link" title="대화 속 나(페르소나)를 만들고 고쳐요"><UserCog size={15} aria-hidden="true" />페르소나</Link>
         {onLogout && <button type="button" className="lounge-account-logout" disabled={loggingOut} onClick={() => void onLogout()} aria-label="로그아웃" title="로그아웃"><LogOut size={17} /></button>}
@@ -115,7 +120,8 @@ export function LoungePage(props: Props) {
   const chatsPage = roomId === 'chats';
   const settingsPage = roomId === 'settings';
   const pricingPage = roomId === 'pricing';
-  const inRoom = Boolean(roomId && !introduction && !friendsPage && !chatsPage && !settingsPage && !pricingPage);
+  const guidePage = roomId === 'guide';
+  const inRoom = Boolean(roomId && !introduction && !friendsPage && !chatsPage && !settingsPage && !pricingPage && !guidePage);
   const social = useLoungeSocialStatus(props.user);
   const navigate = useNavigate();
   // After leaving a conversation with other people, members rate them and pick friends back in the lounge.
@@ -128,7 +134,7 @@ export function LoungePage(props: Props) {
     setLoggingOut(true); setAccountError('');
     try { await props.onLogout(); setShowProfile(false); } catch (error) { setAccountError(errorText(error)); } finally { setLoggingOut(false); }
   };
-  return <><div className={`lounge-page ${inRoom ? 'has-room' : introduction ? 'has-introduction' : ''} ${inRoom ? '' : 'has-tabs'}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} pricing={pricingPage} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{creating ? <LoungeCharacterCreator key={editId ?? 'new'} user={props.user} editId={editId} onLoginRequest={props.onLoginRequest} /> : characterId ? <LoungeCharacterPage key={characterId} id={characterId} user={props.user} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : pricingPage ? <LoungePricingPage user={props.user} onLoginRequest={props.onLoginRequest} /> : chatsPage ? <LoungeChatsPage user={props.user} onLoginRequest={props.onLoginRequest} /> : settingsPage ? <LoungeSettingsPage user={props.user} onProfileRequest={() => setShowProfile(true)} onLoginRequest={props.onLoginRequest} onSignupRequest={props.onSignupRequest} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}{!inRoom && <LoungeTabBar unread={social.unread} />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
+  return <><div className={`lounge-page ${loungeNavyTheme ? 'lounge-navy' : ''} ${inRoom ? 'has-room' : introduction ? 'has-introduction' : guidePage ? 'has-guide' : ''} ${inRoom ? '' : 'has-tabs'}`}><LoungeHeader {...props} inRoom={inRoom} introduction={introduction} pricing={pricingPage} guide={guidePage} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} unread={social.unread} />{accountError && <p className="lounge-account-error" role="alert">{accountError}</p>}{creating ? <LoungeCharacterCreator key={editId ?? 'new'} user={props.user} editId={editId} onLoginRequest={props.onLoginRequest} /> : characterId ? <LoungeCharacterPage key={characterId} id={characterId} user={props.user} /> : spaceId && entry ? <LoungeSpaceEntry key={location.key} spaceId={spaceId} entry={entry} user={props.user} onGuestRequest={props.onGuestRequest} onLoginRequest={props.onLoginRequest} /> : spaceId ? <LoungeSpacePage key={spaceId} spaceId={spaceId} user={props.user} onGuestRequest={props.onGuestRequest} /> : introduction ? <LoungeIntroduction /> : guidePage ? <LoungeGuide /> : pricingPage ? <LoungePricingPage user={props.user} onLoginRequest={props.onLoginRequest} /> : chatsPage ? <LoungeChatsPage user={props.user} onLoginRequest={props.onLoginRequest} /> : settingsPage ? <LoungeSettingsPage user={props.user} onProfileRequest={() => setShowProfile(true)} onLoginRequest={props.onLoginRequest} onSignupRequest={props.onSignupRequest} onLogout={props.onLogout ? logout : undefined} loggingOut={loggingOut} /> : friendsPage ? <LoungeFriendsPage user={props.user} onLoginRequest={props.onLoginRequest} onNotesRead={social.refresh} onProfileRequest={() => setShowProfile(true)} /> : roomId === 'preview' ? <LoungePreview /> : roomId ? <LoungeRoomPage key={roomId} roomId={roomId} {...props} /> : <LoungeHome user={props.user} onGuestRequest={props.onGuestRequest} />}{!inRoom && roomId !== 'preview' && <LoungeBusinessFooter />}{!inRoom && <LoungeTabBar unread={social.unread} />}</div>{afterTalk && !inRoom && props.user && !props.user.isAnonymous && <LoungeAfterTalk roomId={afterTalk} onDone={() => navigate(location.pathname, { replace: true, state: null })} />}<LoungeWaitWatcher user={props.user} />{showProfile && !inRoom && props.user && !props.user.isAnonymous && props.onUserUpdate && <ProfileModal key={props.user.id} user={props.user} onClose={() => setShowProfile(false)} onProfileUpdated={props.onUserUpdate} serviceName="사석" />}</>;
 }
 
 // The preview shows the picker with an example month: ElevenLabs partly used, Typecast not open yet.

@@ -1,0 +1,98 @@
+/*
+ * The dark warm-brown theme of the lounge's pages outside a conversation (2026-11-07): the colours of the lounge's evening photo, not black.
+ * (It began as navy the same day; the class and file keep the name `navy`.)
+ * To go back to the light pages: set `loungeNavyTheme` to false in LoungePage.tsx (this file is then not applied).
+ * Everything is scoped to `.lounge-page.lounge-navy:not(.has-room)`; the conversation screens are not touched.
+ */
+.lounge-page.lounge-navy:not(.has-room) {
+  --l-ink:#f3e7da; --l-muted:#b39d88; --l-paper:#261913; --l-line:#4a3427; --l-green:#a8723f;
+  --n-bg:#1a110d; --n-surface:#261913; --n-surface-2:#33231a; --n-surface-3:#402c20; --n-line:#4a3427; --n-line-2:#5e4535;
+  --n-text:#f3e7da; --n-text-2:#dccab7; --n-muted:#b39d88; --n-gold:#e8c999; --n-green:#e3c08c;
+  background:var(--n-bg); color:var(--n-text); color-scheme:dark;
+}
+.lounge-page.lounge-navy.has-introduction:not(.has-room),
+.lounge-page.lounge-navy.has-guide:not(.has-room) { background:var(--n-bg); --l-ink:#f3e7da; }
+
+/* header */
+.lounge-navy:not(.has-room) .lounge-header { border-bottom-color:var(--n-line); }
+.lounge-navy:not(.has-room) .lounge-brand,.lounge-navy:not(.has-room) .lounge-brand strong { color:var(--n-text); }
+.lounge-navy:not(.has-room) .lounge-brand strong span { color:var(--n-muted); }
+.lounge-navy:not(.has-room) .lounge-beta { background:var(--n-surface-3); color:var(--n-text-2); }
+.lounge-navy:not(.has-room) .lounge-about-link { border-color:var(--n-line-2); background:var(--n-surface); color:var(--n-text-2)!important; }
+.lounge-navy:not(.has-room) .lounge-about-link:hover,.lounge-navy:not(.has-room) .lounge-about-link[aria-current=page] { background:var(--n-surface-3); border-color:#8a6a50; color:#fff!important; }
+.lounge-navy:not(.has-room) .lounge-account button,.lounge-navy:not(.has-room) .lounge-account a { border-color:var(--n-line-2); background:var(--n-surface); color:var(--n-text-2); }
+.lounge-navy:not(.has-room) .lounge-account button:hover,.lounge-navy:not(.has-room) .lounge-account a.lounge-persona-link:hover { border-color:#8a6a50; background:var(--n-surface-3); color:#fff; }
+.lounge-navy:not(.has-room) .lounge-account-avatar { background:var(--n-surface-3); color:var(--n-text); }
+.lounge-navy:not(.has-room) .lounge-account-error { background:#4a2a22; color:#ffb9a1; }
+
+/* headings and text the pages colour on their own */
+.lounge-navy:not(.has-room) :is(h1,h2,h3,h4) { color:var(--n-text); }
+.lounge-navy:not(.has-room) .lounge-home-subhead p,.lounge-navy:not(.has-room) .lounge-home-intro p { color:var(--n-muted); }
+
+/* home: buttons, empty states, row arrows */
+.lounge-navy:not(.has-room) .lounge-home-create { background:#9a6a3f; border-color:#9a6a3f; color:#fff; }
+.lounge-navy:not(.has-room) .lounge-home-create:hover { background:#a8723f; }
+.lounge-navy:not(.has-room) .lounge-home .lounge-rooms-empty,.lounge-navy:not(.has-room) .lounge-space-tables-empty,.lounge-navy:not(.has-room) .lounge-space-first { border-color:var(--n-line-2); background:var(--n-surface); color:var(--n-text-2); }
+.lounge-navy:not(.has-room) .lounge-home .lounge-rooms-empty button { border-color:var(--n-line-2); background:var(--n-surface-2); color:var(--n-text); }
+.lounge-navy:not(.has-room) .lounge-row-arrow { background:#402c20cc; border-color:#ffffff33; }
+.lounge-navy:not(.has-room) .lounge-row-arrow:hover { background:#5e4535; }
+
+/* cards and panels that sit on --l-paper or a light fill */
+.lounge-navy:not(.has-room) :is(.lounge-sheet-traits li,.lounge-sheet-status,.lounge-space-option h2 span,.lounge-people li,.lounge-create-places label,.lounge-create-hosts label,.lounge-create-ages label,.lounge-create-ideas button,.lounge-headcount .age) { background:var(--n-surface-2); color:var(--n-text-2); border-color:var(--n-line-2); }
+.lounge-navy:not(.has-room) :is(.lounge-create-places label.selected,.lounge-create-hosts label.selected,.lounge-create-ages label.selected,.lounge-create-place,.lounge-space-waiting) { background:var(--n-surface-3); border-color:var(--n-green); color:var(--n-text); }
+.lounge-navy:not(.has-room) :is(.lounge-page .lounge-sheet-solo,.lounge-space-option.solo,.lounge-space-choice) { background:var(--n-surface-2); border-color:var(--n-line-2); color:var(--n-text-2); }
+.lounge-navy:not(.has-room) :is(.lounge-create-field legend em,.lounge-topic-required-label span) { background:var(--n-surface-3); color:var(--n-green); }
+.lounge-navy:not(.has-room) :is(.lounge-theme-options button,.lounge-chat-panel) { background:var(--n-surface); color:var(--n-text); }
+.lounge-navy:not(.has-room) :is(.lounge-sheet,.lounge-space-option,.lounge-create-panel) { background:var(--n-surface); border-color:var(--n-line); color:var(--n-text); }
+
+/* chats and settings tabs */
+.lounge-navy:not(.has-room) .lounge-tabbar { background:#1d130ef2; border-top-color:var(--n-line); backdrop-filter:blur(12px); }
+.lounge-navy:not(.has-room) .lounge-tabbar a { color:#9a826c!important; }
+.lounge-navy:not(.has-room) .lounge-tabbar a.active { color:#fff!important; }
+.lounge-navy:not(.has-room) .lounge-chat-list button:hover { background:var(--n-surface-2); }
+.lounge-navy:not(.has-room) .lounge-chat-portrait,.lounge-navy:not(.has-room) .lounge-settings-avatar { background:var(--n-surface-3); }
+.lounge-navy:not(.has-room) :is(.lounge-chat-list,.lounge-settings-list) :is(li,a,button) { border-color:var(--n-line); color:var(--n-text); }
+
+/* pricing */
+.lounge-navy:not(.has-room) .lounge-pricing-card { background:var(--n-surface); border-color:var(--n-line); }
+.lounge-navy:not(.has-room) .lounge-pricing-card.featured { border-color:var(--n-green); box-shadow:0 10px 28px #e3c08c24; }
+.lounge-navy:not(.has-room) .lounge-pricing-badge { background:#9a6a3f; color:#fff; }
+
+/* pricing buttons: the outline one reads on navy */
+.lounge-navy:not(.has-room) .lounge-pricing-cta { border-color:#c89a63; color:var(--n-green); }
+.lounge-navy:not(.has-room) .lounge-pricing-card.featured .lounge-pricing-cta,.lounge-navy:not(.has-room) .lounge-pricing-cta.solid,.lounge-navy:not(.has-room) .lounge-pricing-cta:hover { background:#9a6a3f; border-color:#9a6a3f; color:#fff; }
+.lounge-navy:not(.has-room) .lounge-pricing-tagline { color:var(--n-muted); }
+
+/* business footer */
+.lounge-navy:not(.has-room) .lounge-business-footer { border-top-color:var(--n-line); color:var(--n-muted); }
+.lounge-navy:not(.has-room) .lounge-business-info strong { color:var(--n-text); }
+.lounge-navy:not(.has-room) .lounge-business-info p span,.lounge-navy:not(.has-room) .lounge-business-links small { color:#9a826c; }
+.lounge-navy:not(.has-room) .lounge-business-info i { background:var(--n-line-2); }
+.lounge-navy:not(.has-room) .lounge-business-links a { color:var(--n-text-2); }
+.lounge-navy:not(.has-room) .lounge-business-info a:hover,.lounge-navy:not(.has-room) .lounge-business-links a:hover { color:#fff; }
+
+/* the guide (page, cards) */
+.lounge-navy .lounge-guide { --g-ink:#f3e7da; --g-muted:#c4b19c; --g-line:#4a3427; --g-gold:#e8c999; --g-gold-deep:#e8c999; --g-green:#e3c08c; --g-night:#140d09; }
+.lounge-navy .lounge-guide-card { background:var(--n-surface); border-color:var(--n-line); box-shadow:none; }
+.lounge-navy .lounge-guide-card h2,.lounge-navy .lounge-guide-card h3 { color:var(--n-text); }
+.lounge-navy .lounge-guide-points li,.lounge-navy .lounge-guide-card li { color:var(--n-text-2); }
+.lounge-navy .lounge-guide-tip { background:var(--n-surface-2); color:var(--n-text-2); border-color:var(--n-line-2); }
+.lounge-navy .lounge-guide-cta { border-color:var(--n-line-2); color:var(--n-text)!important; background:var(--n-surface-2); }
+.lounge-navy .lounge-guide-cta.primary { background:#e8c999; color:#2a1a10!important; }
+.lounge-navy .lounge-guide-end>p { color:var(--n-muted); }
+
+/* the introduction (page, cards) */
+.lounge-navy .lounge-introduction { --i-ink:#f3e7da; --i-muted:#c4b19c; --i-line:#4a3427; --i-gold-deep:#e8c999; }
+.lounge-navy .lounge-intro-footer a { color:var(--n-green); }
+.lounge-navy .lounge-intro-chat small { color:#7b6a42; }
+.lounge-navy .lounge-intro-bond-who,.lounge-navy .lounge-intro-ladder li,.lounge-navy .lounge-intro-remember article,.lounge-navy .lounge-intro-trust-grid article { background:var(--n-surface); color:var(--n-text-2); border-color:var(--n-line); box-shadow:none; }
+.lounge-navy .lounge-intro-ladder li *,.lounge-navy .lounge-intro-remember article *,.lounge-navy .lounge-intro-trust-grid article * { border-color:var(--n-line); }
+.lounge-navy .lounge-intro-ladder li :is(strong,b,h3),.lounge-navy .lounge-intro-remember article :is(strong,b,h3),.lounge-navy .lounge-intro-trust-grid article :is(strong,b,h3),.lounge-navy .lounge-intro-bond-who :is(strong,b) { color:var(--n-text); }
+
+/* brown instead of the greens of the light pages */
+.lounge-navy .lounge-guide-hero { background:radial-gradient(120% 140% at 85% 0%, #5a3a24 0%, var(--g-night) 62%); }
+.lounge-navy .lounge-guide-bars { background:#140d09; border:1px solid var(--n-line); }
+.lounge-navy .lounge-guide-icon { background:var(--n-surface-3); color:var(--n-gold); }
+.lounge-navy .lounge-guide-card li svg { color:var(--n-gold); }
+.lounge-navy .lounge-introduction { --i-night:#140d09; --i-night-2:#261913; --i-green:#e3c08c; }
+.lounge-navy .lounge-intro-characters { background:radial-gradient(900px 400px at 50% -10%,#4a3022 0%,transparent 70%),var(--i-night); }

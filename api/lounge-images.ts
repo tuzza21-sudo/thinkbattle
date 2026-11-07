@@ -1,6 +1,7 @@
 import { isLoungeCustomCharacterId, loungeThemes } from '../src/lib/lounge.js';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios.js';
 import { loungeStoryEpisodeAt, loungeStoryEpisodesOn, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
+import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
 import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
@@ -135,6 +136,18 @@ async function makeImage(context: Context, characterId: string, scene: string, m
 async function upload(context: Context, bucket: string, path: string, bytes: Uint8Array<ArrayBuffer>, type = 'image/webp') {
   const response = await timed(`${context.base}/storage/v1/object/${bucket}/${path}`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': type, 'x-upsert': 'true' }), body: new Blob([bytes], { type }) }, 30_000);
   if (!response.ok) throw new LoungePhotoError('사진을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_storage');
+}
+
+/**
+ * Whether the member may be sent a photo the character sends first (2026-11-07): a Plus or Pro member, or the super admin.
+ * A photo the member asked for is for every member; the page asks with source 'character' only for one sent first.
+ */
+async function mayBeSentFirst(context: Context, user: { id: string; email?: string }) {
+  if (isLoungeSuperAdmin(user)) return true;
+  try {
+    const response = await timed(`${context.base}/rest/v1/rpc/lounge_active_plan`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_user: user.id }) }, 5_000);
+    return response.ok && Boolean(await response.json());
+  } catch { return false; }
 }
 
 /** A photo for a member in their own one-to-one conversation. */
@@ -371,13 +384,15 @@ async function handle(req: Request) {
     if ((body.action !== 'photo' && !background) || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || (!background && !['request', 'character'].includes(body.source ?? ''))) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
     const auth = await timed(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization } });
     if (!auth.ok) return json({ error: '로그인 세션이 만료됐어요.' }, 401);
-    const user = await auth.json() as { id: string; is_anonymous?: boolean };
+    const user = await auth.json() as { id: string; email?: string; is_anonymous?: boolean };
     // Photos are kept per member, so a guest without an account cannot receive them.
     if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
     const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
     const model: LoungeImageModel = isLoungeImageModel(body.imageModel) ? body.imageModel : 'gpt';
     if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
     if (background) return await memberBackground(context, user.id, roomId, request, model);
+    // A photo the character sends first is for Plus and Pro: for anyone else the page's ask is quietly dropped.
+    if (body.source === 'character' && !await mayBeSentFirst(context, user)) return json({ skipped: true });
     return await memberPhoto(context, authorization, anon, user.id, roomId, body.source as 'request' | 'character', request, model);
   } catch (error) {
     if (error instanceof LoungePhotoError) return json({ error: error.message, code: error.code, retryable: error.status >= 500 || error.status === 429 }, error.status);
