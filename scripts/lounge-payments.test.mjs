@@ -91,3 +91,39 @@ test('the account asks which plan runs now and whether it can be cancelled', asy
   const none = await ask('status', {}, { latest: [] , row: undefined });
   assert.deepEqual(none.body, { order: null });
 });
+
+// ---- One paid plan, by the month or the year (2026-11-08) ----
+async function create(body, world = {}) {
+  const inserted = [];
+  const previous = { ...process.env }, fetch = globalThis.fetch;
+  Object.assign(process.env, { SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'private-service' });
+  globalThis.fetch = async (url, init = {}) => {
+    url = String(url);
+    if (url.includes('/auth/v1/user')) return result({ id: userId, email: 'member@example.com', is_anonymous: false, user_metadata: { nickname: '멤버' } });
+    if (url.endsWith('/rest/v1/lounge_payments') && init.method === 'POST') { inserted.push(JSON.parse(init.body)); return result([]); }
+    throw new Error('Unexpected call ' + url);
+  };
+  try {
+    const response = await handler(request('create', { device: 'pc', ...body }));
+    return { response, body: await response.json(), inserted };
+  } finally { globalThis.fetch = fetch; for (const name of ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
+}
+
+test('Pro is sold by the month (20,000) and by the year (150,000); the server sets the price and the order id says which', async () => {
+  const month = await create({ plan: 'pro', term: 'month', price: 1 });
+  assert.equal(month.response.status, 200);
+  assert.equal(month.inserted[0].plan, 'pro'); assert.equal(month.inserted[0].amount, 20_000); assert.match(month.inserted[0].oid, /^SS/);
+  assert.equal(month.body.fields.price, '20000', 'a price sent by the browser is ignored');
+  const year = await create({ plan: 'pro', term: 'year' });
+  assert.equal(year.inserted[0].plan, 'pro'); assert.equal(year.inserted[0].amount, 150_000); assert.match(year.inserted[0].oid, /^SY/);
+  assert.equal(year.body.fields.price, '150000'); assert.match(year.body.fields.goodname, /1년/);
+  const none = await create({ plan: 'pro' });
+  assert.equal(none.inserted[0].amount, 20_000, 'no term is the month');
+});
+
+test('Plus is no longer sold, and an unknown plan is refused', async () => {
+  for (const plan of ['plus', 'max', undefined]) {
+    const refused = await create({ plan, term: 'month' });
+    assert.equal(refused.response.status, 400); assert.equal(refused.inserted.length, 0);
+  }
+});
