@@ -16,6 +16,12 @@ Capacitor 8로 만든 안드로이드 앱이다. 설정은 `capacitor.config.ts`
 
 1. [Android Studio](https://developer.android.com/studio)를 설치한다. JDK와 Android SDK가 함께 설치된다.
 2. Android Studio를 처음 실행할 때 기본 SDK 설치(Standard)를 끝까지 진행한다.
+3. **JDK 21을 준비한다.** Android Studio에 들어 있는 JDK 25로는 Gradle 8.14가 돌지 않는다("Unsupported class file major version 69").
+   - `android/gradle/gradle-daemon-jvm.properties`가 Gradle을 JDK 21로 돌리게 하고, Gradle은 `~/.jdks`에 있는 JDK 21을 찾아 쓴다.
+   - Android Studio에서는 Settings → Build, Execution, Deployment → Build Tools → Gradle → Gradle JDK에서 21을 고르거나 Download JDK → 21로 받는다.
+   - 명령줄 빌드: `cd android && JAVA_HOME=~/.jdks/jdk-21.0.13+9 ./gradlew assembleDebug` → `android/app/build/outputs/apk/debug/app-debug.apk`
+4. `android/local.properties`에 `sdk.dir=C:/Users/<사용자>/AppData/Local/Android/Sdk`가 있어야 한다. Android Studio로 열면 자동으로 만들어지고, 저장소에는 올라가지 않는다.
+5. 에뮬레이터를 쓰려면 SDK Manager → SDK Tools → **Android Emulator hypervisor driver**를 설치해야 한다(관리자 권한, BIOS의 가상화 VT-x가 켜져 있어야 함). 없으면 "x86_64 emulation currently requires hardware acceleration" 오류가 난다.
 
 ## 빌드와 실행
 
