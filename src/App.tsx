@@ -5,6 +5,7 @@ import './components/HomeStudio.css';
 import './components/ServiceStudio.css';
 import { AuthModal } from './components/AuthModal';
 import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
+import { BetaRecruitPopup } from './components/BetaRecruitPopup';
 import { captureMetaClickId, initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
 import { captureFirstTouch, saveFirstTouch } from './lib/attribution';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
@@ -231,6 +232,9 @@ function App() {
       {user && !user.isAnonymous && !showAuthModal && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user) && (
         <ProfileCompletionDialog user={user} onSaved={setUser} onLogout={handleLogout} />
       )}
+
+      {/* The beta tester call: on the lounge's front pages only, never over a sign-in or a conversation. */}
+      <BetaRecruitPopup blocked={showAuthModal || !['/', '/lounge', '/lounge/about', '/lounge/guide', '/lounge/pricing'].includes(normalizedPath) || Boolean(user && !user.isAnonymous && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user))} />
 
       {showAuthModal && (
         <AuthModal
