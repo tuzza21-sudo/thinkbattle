@@ -373,7 +373,9 @@ function RoomView(props: RoomViewProps) {
     blocked: props.pending || props.aiSpeaking || restricted, restricted, onAction: props.onSessionAction,
   } : null;
   const helpDisabled = props.pending || props.aiSpeaking || ended || restricted || (!props.preview && (props.status !== 'active' || (!props.chat && (!props.connected || !props.audioReady))));
-  const assistanceControl = props.status !== 'lobby' && (solo
+  // In a one-to-one chat the message box's send button asks for the next turn when nothing is typed (it took the place of the topic button).
+  const composerShown = Boolean(solo && !ended && (!props.preview || props.chat) && props.replySuggest);
+  const assistanceControl = props.status !== 'lobby' && (solo && composerShown ? null : solo
     ? <button type="button" className="lounge-ask-button" onClick={() => props.onAsk('topic')} disabled={helpDisabled}><Sparkles size={17} /><span className="lounge-label-full">화제 하나 던져줘</span><span className="lounge-label-short">화제 던지기</span></button>
     : <div className="lounge-help" onKeyDown={event => { if (event.key === 'Escape' && helpOpen) { event.stopPropagation(); setHelpOpen(false); } }}>
       <button type="button" className={`lounge-ask-button ${props.helpRequested ? 'requested' : ''}`} aria-expanded={helpOpen} aria-controls={helpMenuId} onClick={() => setHelpOpen(value => !value)} disabled={helpDisabled && !helpOpen}><Sparkles size={17} />{props.helpRequested ? 'AI 도움 요청됨' : 'AI 도움'}</button>
@@ -472,7 +474,7 @@ function RoomView(props: RoomViewProps) {
           {solo && !ended && !props.preview && props.replySuggest && props.consult && loungeConsultPickCount(props.consult) > 0 && props.messages.at(-1)?.kind === 'host' && <LoungeTarotPicker dealKey={`${props.consult.turn}-${props.consult.deck?.[0]}`} count={loungeConsultPickCount(props.consult)} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
           {solo && !ended && !props.preview && props.replySuggest && props.storyChoice && !reply.replies && props.messages.at(-1)?.kind === 'host' && <LoungeStoryChoicePanel choice={props.storyChoice} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} logRef={participantLog} followRef={followParticipantLog} />}
           {solo && !ended && !props.preview && props.replySuggest && props.consult && <LoungeHongsilBar key={props.consult.turn} birth={props.consult.birth} hint={Boolean(props.consult.hint) && props.messages.at(-1)?.kind === 'host'} send={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
-          {solo && !ended && (!props.preview || props.chat) && props.replySuggest && <LoungeChatComposer onSend={props.replySuggest.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} placeholder={props.chat ? '메시지 입력' : '말하거나 글로 입력해요'} />}
+          {solo && !ended && (!props.preview || props.chat) && props.replySuggest && <LoungeChatComposer onSend={props.replySuggest.send} onNext={() => props.onAsk('topic')} nextDisabled={helpDisabled} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} placeholder={props.chat ? '메시지 입력' : '말하거나 글로 입력해요'} />}
           <div className="lounge-voice-controls"><div className="lounge-room-controls">
             {!sessionProps && !ended && props.topicPicker && <LoungeTopicPicker {...props.topicPicker} disabled={props.topicPicker.disabled || restricted} />}
             {!sessionProps && ((solo && !props.chat) || ended || space) && microphoneControl}

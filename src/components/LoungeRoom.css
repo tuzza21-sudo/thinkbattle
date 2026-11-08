@@ -1007,11 +1007,11 @@
 .lounge-chat-composer .lounge-chat-action { width:auto; height:30px; padding:0 10px; border:1px solid #ffffff40; border-radius:15px; background:#ffffff14; color:#fff5e9; font-size:12px; font-style:italic; font-weight:600; white-space:nowrap; }
 .lounge-chat-composer .lounge-chat-action:hover:not(:disabled) { background:#ffffff26; }
 
-/* Phone: the bottom bar of a one-to-one room is a three-column grid, so its buttons fit in two rows, with short labels. */
+/* Phone: the bottom bar of a one-to-one room is one row, however many buttons it has, with short labels (2026-11-08; it was a three-column grid that wrapped to two rows). */
 @media (max-width:760px) {
   .has-room .lounge-one-to-one .lounge-label-full { display:none; }
   .has-room .lounge-one-to-one .lounge-label-short { display:inline; }
-  .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:100%; }
+  .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:6px; width:100%; }
   .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls>*,
   .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls .lounge-model-picker>button { width:100%; min-width:0; }
   .has-room .lounge-one-to-one .lounge-participant-controls .lounge-room-controls button:not([role=menuitemradio]) { justify-content:center; min-height:36px; padding:6px 6px; gap:4px; font-size:11.5px; font-weight:600; border-radius:18px; white-space:nowrap; overflow:hidden; }
@@ -1208,3 +1208,6 @@
 .lounge-relationship-panel .lounge-relationship-bars small { line-height:1.4; }
 .lounge-relationship-panel .lounge-relationship-memory-note { margin:18px 0 0; line-height:1.6; }
 .lounge-relationship-panel .lounge-relationship-debug { margin-top:14px; }
+
+/* The send button with nothing typed asks for the next turn (2026-11-08): the same accent, a different mark. */
+.lounge-chat-composer button.is-next:not(:disabled) { box-shadow:0 0 0 2px color-mix(in srgb, var(--lounge-accent) 35%, transparent); }

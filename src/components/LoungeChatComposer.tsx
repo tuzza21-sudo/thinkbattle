@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { LoaderCircle, Send } from 'lucide-react';
+import { LoaderCircle, Send, Sparkles } from 'lucide-react';
 import { splitLoungeActions, splitLoungeInnerVoice } from '../lib/lounge';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -66,7 +66,7 @@ export function LoungeTypewriterText({ text: message, fromStart = false, innerVo
 }
 
 /** The message box of a one-to-one conversation. What is typed stays while the character is answering; it is sent after. */
-export function LoungeChatComposer({ onSend, disabled, placeholder }: { onSend: (text: string) => Promise<void>; disabled: boolean; placeholder: string }) {
+export function LoungeChatComposer({ onSend, disabled, placeholder, onNext, nextDisabled }: { onSend: (text: string) => Promise<void>; disabled: boolean; placeholder: string; /** What the send button does when nothing is typed: asks the character to carry the talk on (it was the topic button). */ onNext?: () => void; nextDisabled?: boolean }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -77,6 +77,8 @@ export function LoungeChatComposer({ onSend, disabled, placeholder }: { onSend: 
     element.style.height = 'auto';
     element.style.height = `${Math.min(element.scrollHeight, 132)}px`;
   }, [text]);
+  const empty = !text.trim();
+  const canNext = empty && Boolean(onNext) && !nextDisabled;
   const send = async () => {
     const value = text.trim();
     if (!value || sending || disabled) return;
@@ -97,12 +99,12 @@ export function LoungeChatComposer({ onSend, disabled, placeholder }: { onSend: 
   };
   return <>
     {error && <p className="lounge-chat-composer-error" role="alert">{error}</p>}
-    <form className="lounge-chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}>
+    <form className="lounge-chat-composer" onSubmit={event => { event.preventDefault(); if (empty) { if (canNext && !sending) onNext?.(); return; } void send(); }}>
       <button type="button" className="lounge-chat-action" onClick={insertAction} disabled={disabled} title="*행동*을 넣어요" aria-label="행동 넣기">*행동*</button>
       <textarea ref={area} rows={1} value={text} maxLength={1200} placeholder={placeholder} aria-label="메시지 입력"
         onChange={event => setText(event.target.value)}
         onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && enterSends()) { event.preventDefault(); void send(); } }} />
-      <button type="submit" disabled={!text.trim() || sending || disabled} aria-label="보내기">{sending ? <LoaderCircle size={17} className="lounge-spin" /> : <Send size={17} />}</button>
+      <button type="submit" className={empty && onNext ? 'is-next' : undefined} disabled={sending || (empty ? !canNext : disabled)} aria-label={empty && onNext ? '다음 이야기로 이어가기' : '보내기'} title={empty && onNext ? '다음 이야기로 이어가기' : undefined}>{sending ? <LoaderCircle size={17} className="lounge-spin" /> : empty && onNext ? <Sparkles size={17} /> : <Send size={17} />}</button>
     </form>
   </>;
 }
