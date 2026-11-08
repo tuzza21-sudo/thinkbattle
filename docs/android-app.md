@@ -11,6 +11,9 @@ Capacitor 8로 만든 안드로이드 앱이다. 설정은 `capacitor.config.ts`
 - 앱에서는 성인 모드가 항상 꺼진다(스토어 정책).
 - 앱의 요금제 화면에는 구매 버튼이 없다. 인앱결제는 2단계에서 붙인다.
 - 로그인(Supabase, 카카오)과 이니시스 결제창 주소는 앱 안에서 열리고, 나머지 외부 주소는 휴대폰 브라우저로 열린다(`allowNavigation`).
+- **구글 로그인**: 구글은 웹뷰 로그인을 막는다. 그래서 앱에서는 브라우저 탭(Custom Tab)으로 열고, `kr.saseok.app://auth?code=...`로 앱에 돌아와 페이지에서 PKCE 코드를 세션으로 바꾼다(`src/lib/nativeApp.ts`, 매니페스트 intent filter).
+  - Supabase → Authentication → URL Configuration → Redirect URLs에 `kr.saseok.app://auth`가 있어야 한다(2026-11-08 등록, 동작 확인).
+  - 카카오는 웹뷰 안에서 그대로 동작한다.
 
 ## 처음 한 번: 개발 환경
 
@@ -40,9 +43,9 @@ Android Studio에서 할 일:
 
 ## 다음 단계
 
-- [ ] 앱 아이콘과 스플래시 (지금은 Capacitor 기본값)
+- [x] 앱 아이콘과 스플래시 (`python scripts/generate-app-icons.py`)
 - [ ] 푸시 알림 (@capacitor/push-notifications + Firebase `google-services.json`)
-- [ ] 구글 로그인: 구글은 앱 내부 웹뷰 로그인을 막는다. 시스템 브라우저 + 딥링크로 바꿔야 한다. 카카오는 지금 방식으로 동작한다.
+- [x] 구글 로그인 (브라우저 탭 + 딥링크)
 - [ ] 화면을 꺼도 통화가 이어지게 (포그라운드 서비스)
 - [ ] AI 답변 신고 기능, 앱 안 계정 삭제 (스토어 요건)
 - [ ] Google Play Console 등록, 비공개 테스트
