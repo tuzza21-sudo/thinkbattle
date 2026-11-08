@@ -1,3 +1,4 @@
 # Gradle wrapper scripts keep their own line endings so the Android build runs on any machine (2026-11-08).
 android/gradlew text eol=lf
 android/gradlew.bat text eol=crlf
+android/**/*.gradle text eol=lf
