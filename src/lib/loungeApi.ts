@@ -477,6 +477,28 @@ export async function getLoungePlanStatus(): Promise<LoungePlanStatus | null> {
 }
 
 /** Cancels the plan and refunds the card; the server checks the refund terms again and refuses when they are not met. */
+/** Reasons a member can give when reporting a character's reply (the keys are what the database accepts). */
+export const loungeReportReasons = [
+  { key: 'sexual', label: '불쾌한 성적 표현' }, { key: 'violence', label: '폭력·자해' }, { key: 'hate', label: '혐오·괴롭힘' },
+  { key: 'false_info', label: '사실과 다른 정보' }, { key: 'other', label: '기타' },
+] as const;
+export type LoungeReportReason = typeof loungeReportReasons[number]['key'];
+
+/** Reports a character's reply (migration 20261212000000: report_lounge_message). */
+export async function reportLoungeMessage(messageId: number, reason: LoungeReportReason, detail: string): Promise<void> {
+  const { error } = await supabase.rpc('report_lounge_message', { p_message_id: messageId, p_reason: reason, p_detail: detail.trim().slice(0, 500) });
+  if (!error) return;
+  const missing = /report_lounge_message|schema cache|could not find/i.test(error.message);
+  throw new LoungeApiError(missing ? '신고 기능을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message || '신고를 접수하지 못했어요.', 'lounge_report_failed', false);
+}
+
+/** Deletes the member's own account and everything with it; a running paid plan must be accepted (acceptPaid). */
+export async function deleteLoungeAccount(acceptPaid: boolean): Promise<void> {
+  const response = await loungeAuthorizedFetch('/api/account?action=delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acceptPaid }) }, '계정 서버');
+  const body = await response.json().catch(() => ({})) as { error?: string; code?: string };
+  if (!response.ok) throw new LoungeApiError(body.error || '계정을 삭제하지 못했어요.', body.code || 'lounge_account_delete_failed', false);
+}
+
 export async function cancelLoungePlan(oid: string): Promise<{ amount: number }> {
   const response = await loungeAuthorizedFetch('/api/payments?action=cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oid }) }, '결제 서버');
   const body = await response.json().catch(() => ({})) as { amount?: number; error?: string; code?: string };
