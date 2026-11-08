@@ -3858,12 +3858,12 @@ test('voice calls are timed by the server in minutes, shown against the plan, st
   assert.deepEqual(started.body.call, { usedSeconds: 0, limitMinutes: 60, plan: 'plus', tester: false, enforced: true, exhausted: false }, 'Plus is 60 minutes');
   const pro = await tick({ state: { seconds: 7300, plan: 'pro' } });
   assert.deepEqual(pro.seen, [{ p_user: 'user-1', p_start: false }]);
-  assert.deepEqual(pro.body.call, { usedSeconds: 7300, limitMinutes: 120, plan: 'pro', tester: false, enforced: true, exhausted: true }, 'past the 120 minutes of Pro');
+  assert.deepEqual(pro.body.call, { usedSeconds: 7300, limitMinutes: 100, plan: 'pro', tester: false, enforced: true, exhausted: true }, 'past the 100 minutes of Pro');
   assert.equal((await tick({ state: { seconds: 5, plan: null } })).body.call.limitMinutes, 5, 'a new member without a plan has 5 minutes a month');
   const tester = await tick({ state: { seconds: 31 * 60, plan: null, tester: true } });
   assert.deepEqual(tester.body.call, { usedSeconds: 1860, limitMinutes: 30, plan: null, tester: true, enforced: true, exhausted: true }, 'a beta tester has 30 minutes a month, not unlimited');
   assert.equal((await tick({ state: { seconds: 29 * 60, plan: null, tester: true } })).body.call.exhausted, false, 'one minute of the 30 is left');
-  assert.equal((await tick({ state: { seconds: 0, plan: 'pro', tester: true } })).body.call.limitMinutes, 120, 'a tester with a plan has the plan\'s minutes');
+  assert.equal((await tick({ state: { seconds: 0, plan: 'pro', tester: true } })).body.call.limitMinutes, 100, 'a tester with a plan has the plan\'s minutes');
   const exempt = await tick({ state: { seconds: 99999, plan: null, exempt: true } });
   assert.deepEqual(exempt.body.call, { usedSeconds: 99999, limitMinutes: null, plan: null, enforced: true, exhausted: false, unlimited: true }, 'the admin or an earlier member: no limit');
   for (const [name, options] of [['a chat', { roomRow: room({ voice_on: false }) }], ['someone else room', { roomRow: room({ host_id: 'other' }) }], ['a group room', { roomRow: room({ capacity: 4 }) }], ['an ended room', { roomRow: room({ status: 'ended' }) }], ['a guest', { user: { id: 'user-1', is_anonymous: true } }]]) {

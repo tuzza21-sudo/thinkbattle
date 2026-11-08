@@ -3,7 +3,7 @@ import { Check, CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { createLoungePayment, type LoungePaymentOrder } from '../lib/loungeApi';
-import { getLoungePlan, loungePlans, type LoungePlan } from '../lib/loungePlans';
+import { loungeFreePlan, loungePlanReceiptName, loungePlans, loungeTermLabel, type LoungePlan } from '../lib/loungePlans';
 import { supabase } from '../lib/supabase';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import './LoungePricing.css';
@@ -42,42 +42,52 @@ async function openPaymentWindow(order: LoungePaymentOrder) {
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '결제를 시작하지 못했어요.';
 
-/** The paid plans, shown at the bottom of the lounge home. */
+/** The free plan and the paid plan by the month and by the year, shown at the bottom of the lounge home. */
 export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest?: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const start = async (plan: LoungePlan) => {
     setNotice(null);
     if (!user || user.isAnonymous) { setNotice('회원가입 또는 로그인 후 결제할 수 있어요.'); onLoginRequest?.(); return; }
-    setBusy(plan.id);
-    try { await openPaymentWindow(await createLoungePayment(plan.id, isMobile() ? 'mobile' : 'pc')); }
+    setBusy(plan.key);
+    try { await openPaymentWindow(await createLoungePayment(plan.id, plan.term, isMobile() ? 'mobile' : 'pc')); }
     catch (error) { setNotice(errorText(error)); }
     finally { setBusy(null); }
   };
   return <section className="lounge-home-section lounge-pricing" id="pricing" aria-labelledby="lounge-pricing-title">
     <header className="lounge-home-subhead">
       <h2 id="lounge-pricing-title">요금제(안)</h2>
-      <p>더 오래 통화하고, 캐릭터가 나를 더 잘 알게 하고 싶다면 골라 보세요.</p>
+      <p>무료로 시작하고, 더 오래 통화하고 캐릭터가 나를 더 잘 알게 하고 싶다면 Pro를 골라 보세요.</p>
       <p className="lounge-pricing-draft">지금 보이는 요금제는 안이에요. 테스트 오픈 중에는 요금과 이용 한도가 바뀔 수 있고, 바뀌면 서비스 화면으로 미리 알려 드려요.</p>
     </header>
     <ul className="lounge-pricing-grid">
-      {loungePlans.map(plan => <li key={plan.id} className={`lounge-pricing-card${plan.featured ? ' featured' : ''}`}>
+      <li className="lounge-pricing-card free">
+        <div className="lounge-pricing-head"><strong>{loungeFreePlan.name}</strong></div>
+        <p className="lounge-pricing-tagline">{loungeFreePlan.tagline}</p>
+        <p className="lounge-pricing-price"><b>0원</b></p>
+        <ul className="lounge-pricing-features">
+          {loungeFreePlan.features.map(feature => <li key={feature}><Check size={15} aria-hidden="true" />{feature}</li>)}
+        </ul>
+        <p className="lounge-pricing-included">가입하면 바로 이용할 수 있어요</p>
+      </li>
+      {loungePlans.map(plan => <li key={plan.key} className={`lounge-pricing-card${plan.featured ? ' featured' : ''}`}>
         <div className="lounge-pricing-head">
           <strong>{plan.name}</strong>
-          {plan.featured && <span className="lounge-pricing-badge">추천</span>}
+          {plan.badge && <span className="lounge-pricing-badge">{plan.badge}</span>}
         </div>
         <p className="lounge-pricing-tagline">{plan.tagline}</p>
-        <p className="lounge-pricing-price"><b>{plan.price.toLocaleString('ko-KR')}원</b><span>/ 1개월</span></p>
+        <p className="lounge-pricing-price"><b>{plan.price.toLocaleString('ko-KR')}원</b><span>/ {loungeTermLabel(plan.term)}</span></p>
+        {plan.perMonth && <p className="lounge-pricing-permonth">{plan.perMonth}</p>}
         <ul className="lounge-pricing-features">
           {plan.features.map(feature => <li key={feature}><Check size={15} aria-hidden="true" />{feature}</li>)}
         </ul>
         <button type="button" className="lounge-pricing-cta" disabled={busy !== null} onClick={() => void start(plan)}>
-          {busy === plan.id ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : `${plan.name} 시작하기`}
+          {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : `${plan.name} 시작하기`}
         </button>
       </li>)}
     </ul>
     {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}
-    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 1개월 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
+    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
   </section>;
 }
 
@@ -102,7 +112,7 @@ export function LoungePaymentResult() {
       .then(({ data }) => { if (!cancelled) setRecord((data as PaymentRecord | null) ?? null); });
     return () => { cancelled = true; };
   }, [success, oid]);
-  const plan = record ? getLoungePlan(record.plan) : undefined;
+  const plan = record ? loungePlanReceiptName(record.plan, oid) : undefined;
   return <div className="lounge-page lounge-payment-page">
     <main className="lounge-payment-result">
       {success ? <>
@@ -110,7 +120,7 @@ export function LoungePaymentResult() {
         <h1>결제가 완료됐어요</h1>
         {record === undefined ? <p><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제 내역을 불러오는 중이에요.</p>
           : record && plan ? <dl className="lounge-payment-summary">
-            <div><dt>요금제</dt><dd>{plan.name} 1개월 이용권</dd></div>
+            <div><dt>요금제</dt><dd>{plan}</dd></div>
             <div><dt>결제 금액</dt><dd>{record.amount.toLocaleString('ko-KR')}원</dd></div>
             {record.period_end && <div><dt>이용 기간</dt><dd>{dateText(record.period_end)}까지</dd></div>}
             <div><dt>주문번호</dt><dd>{oid}</dd></div>

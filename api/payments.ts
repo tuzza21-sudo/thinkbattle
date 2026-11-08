@@ -1,9 +1,9 @@
-import { getLoungePlan, loungeCallLimitMinutes, loungePhotoMonthly, loungePlanGoodName, type LoungePlan } from '../src/lib/loungePlans';
+import { getLoungePlan, loungeCallLimitMinutes, loungeOrderPrefix, loungeOrderTerm, loungePhotoMonthly, loungePlanGoodName, type LoungePlan } from '../src/lib/loungePlans';
 
 export const config = { runtime: 'edge' };
 
-// KG Inicis card payments for the paid plans. One order is one month of a plan, with no automatic renewal.
-//   POST ?action=create          (member, JSON {plan, device}) -> a pending order and the fields for the payment window
+// KG Inicis card payments for the paid plan (Pro, by the month or by the year). One order is one month or one year, with no automatic renewal.
+//   POST ?action=create          (member, JSON {plan, term, device}) -> a pending order and the fields for the payment window
 //   POST ?action=return          (Inicis, PC INIStdPay)       -> approve, record, redirect to /lounge/payment
 //   POST ?action=mobile-return   (Inicis, mobile smart pay)   -> the same for phones
 //   GET  ?action=close           (Inicis, PC window closed)   -> the page that closes the overlay
@@ -59,13 +59,13 @@ async function markFailed(oid: string, code: string, message: string) {
   } catch (error) { console.warn('[payments] could not mark failed', oid, error instanceof Error ? error.message : error); }
 }
 
-/** One month of the plan; paying again for the same plan while a month is running adds the month after it. */
+/** One month (one year for an order id that starts with SY) of the plan; paying again for the same plan while a period is running adds the one after it. */
 async function periodFor(order: PaymentRow) {
   const now = new Date();
   const active = await db<Array<{ period_end: string }>>(`lounge_payments?user_id=eq.${order.user_id}&plan=eq.${order.plan}&status=eq.paid&period_end=gt.${now.toISOString()}&order=period_end.desc&limit=1&select=period_end`);
   const start = active[0] ? new Date(active[0].period_end) : now;
   const end = new Date(start);
-  end.setMonth(end.getMonth() + 1);
+  end.setMonth(end.getMonth() + (loungeOrderTerm(order.oid) === 'year' ? 12 : 1));
   return { start, end };
 }
 
@@ -125,13 +125,13 @@ async function createOrder(req: Request) {
   if (!user.id) return json({ error: '다시 로그인해 주세요.' }, 401);
   if (user.is_anonymous || !user.email) return json({ error: '회원가입 후 결제할 수 있어요.', code: 'signup_required' }, 403);
 
-  let body: { plan?: unknown; device?: unknown };
+  let body: { plan?: unknown; term?: unknown; device?: unknown };
   try { body = JSON.parse(await req.text()); } catch { return json({ error: '요청 형식이 올바르지 않아요.' }, 400); }
-  const plan = getLoungePlan(body.plan);
+  const plan = getLoungePlan(body.plan, body.term);
   if (!plan) return json({ error: '요금제를 다시 골라 주세요.' }, 400);
   const device = body.device === 'mobile' ? 'mobile' : 'pc';
 
-  const oid = `SS${Date.now()}${crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase()}`.slice(0, 40);
+  const oid = `${loungeOrderPrefix[plan.term]}${Date.now()}${crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase()}`.slice(0, 40);
   await db('lounge_payments', { method: 'POST', body: JSON.stringify({ user_id: user.id, plan: plan.id, amount: plan.price, oid, device }) });
 
   const buyerName = (user.user_metadata?.nickname || user.user_metadata?.name || user.email.split('@')[0]).slice(0, 15);

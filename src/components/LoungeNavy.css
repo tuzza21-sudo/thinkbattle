@@ -62,6 +62,8 @@
 .lounge-navy:not(.has-room) .lounge-pricing-cta { border-color:#c89a63; color:var(--n-green); }
 .lounge-navy:not(.has-room) .lounge-pricing-card.featured .lounge-pricing-cta,.lounge-navy:not(.has-room) .lounge-pricing-cta.solid,.lounge-navy:not(.has-room) .lounge-pricing-cta:hover { background:#9a6a3f; border-color:#9a6a3f; color:#fff; }
 .lounge-navy:not(.has-room) .lounge-pricing-tagline { color:var(--n-muted); }
+.lounge-navy:not(.has-room) .lounge-pricing-permonth { color:var(--n-green); }
+.lounge-navy:not(.has-room) .lounge-pricing-included { border-color:var(--n-line-2); color:var(--n-muted); }
 
 /* business footer */
 .lounge-navy:not(.has-room) .lounge-business-footer { border-top-color:var(--n-line); color:var(--n-muted); }

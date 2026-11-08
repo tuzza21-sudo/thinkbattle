@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CircleAlert, LoaderCircle, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cancelLoungePlan, getLoungePlanStatus, type LoungePlanStatus } from '../lib/loungeApi';
-import { getLoungePlan } from '../lib/loungePlans';
+import { loungePlanReceiptName } from '../lib/loungePlans';
 
 const dateText = (value: string) => new Date(value).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 const errorText = (error: unknown) => error instanceof Error ? error.message : '이용권을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
@@ -42,10 +42,10 @@ export function LoungeSubscription({ onNavigate }: { onNavigate?: () => void }) 
     </>}
     {state.status === 'ready' && state.order && (() => {
       const order = state.order;
-      const plan = getLoungePlan(order.plan);
+      
       return <>
         <dl className="lounge-subscription-summary">
-          <div><dt>이용권</dt><dd>{plan ? `${plan.name} 1개월 이용권` : order.plan}</dd></div>
+          <div><dt>이용권</dt><dd>{loungePlanReceiptName(order.plan, order.oid)}</dd></div>
           <div><dt>이용 기간</dt><dd>{dateText(order.periodEnd)}까지</dd></div>
           <div><dt>결제 금액</dt><dd>{order.amount.toLocaleString('ko-KR')}원</dd></div>
           <div><dt>주문번호</dt><dd>{order.oid}</dd></div>
