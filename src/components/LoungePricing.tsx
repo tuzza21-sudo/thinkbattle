@@ -5,6 +5,7 @@ import type { AppUser } from '../types';
 import { createLoungePayment, type LoungePaymentOrder } from '../lib/loungeApi';
 import { loungeFreePlan, loungePlanReceiptName, loungePlans, loungeTermLabel, type LoungePlan } from '../lib/loungePlans';
 import { supabase } from '../lib/supabase';
+import { isSaseokApp } from '../lib/nativeApp';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import './LoungePricing.css';
 
@@ -46,6 +47,8 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest?: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // In the store app a pass is not sold yet (the stores require their own in-app billing for it): the plans show, without a buy button.
+  const inApp = isSaseokApp();
   const start = async (plan: LoungePlan) => {
     setNotice(null);
     if (!user || user.isAnonymous) { setNotice('회원가입 또는 로그인 후 결제할 수 있어요.'); onLoginRequest?.(); return; }
@@ -81,9 +84,9 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
         <ul className="lounge-pricing-features">
           {plan.features.map(feature => <li key={feature}><Check size={15} aria-hidden="true" />{feature}</li>)}
         </ul>
-        <button type="button" className="lounge-pricing-cta" disabled={busy !== null} onClick={() => void start(plan)}>
+        {inApp ? <p className="lounge-pricing-included">앱에서는 아직 이용권을 구매할 수 없어요</p> : <button type="button" className="lounge-pricing-cta" disabled={busy !== null} onClick={() => void start(plan)}>
           {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : `${plan.name} 시작하기`}
-        </button>
+        </button>}
       </li>)}
     </ul>
     {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}

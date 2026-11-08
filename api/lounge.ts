@@ -303,10 +303,15 @@ export function replyTextPartial(output: string): string | undefined {
  * every built-in character with adult flirtation (2026-11-03; not a character a member made), in a one-to-one chat. There
  * is no age verification yet, so no member has it.
  */
-function hasLoungeAdultMode(user: { id: string; email?: string }) {
+function hasLoungeAdultMode(user: { id: string; email?: string }, req?: Request) {
+  // Never in the store app (2026-11-08): the stores do not allow sexually explicit content.
+  if (req && isSaseokAppRequest(req)) return false;
   const allowed = (process.env.LOUNGE_ADULT_MODE_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
   return allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
 }
+
+/** A request from the 사석 app: its user agent carries "SaseokApp" (capacitor.config.ts). */
+const isSaseokAppRequest = (req: Request) => (req.headers.get('user-agent') || '').includes('SaseokApp');
 
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
 function isRelationshipDeveloper(user: { id: string; email?: string }) {
@@ -838,7 +843,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
     // Every built-in character with adult flirtation has it; a character a member made does not (nobody can check its age).
     // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
-    const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && !isLoungeCustomCharacterId(host.id) && hasLoungeAdultMode(user));
+    const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && !isLoungeCustomCharacterId(host.id) && hasLoungeAdultMode(user, req));
     // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
     const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
