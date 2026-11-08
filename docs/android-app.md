@@ -41,6 +41,15 @@ Android Studio에서 할 일:
   - 키를 잃으면 같은 앱으로 업데이트를 올릴 수 없다.
   - `*.jks`, `*.keystore`, `keystore.properties`는 `android/.gitignore`에 들어 있다.
 
+## 출시용 서명과 AAB
+
+- 업로드 키: `C:\Users\<사용자>\saseok-keys\saseok-upload.jks` (별칭 `saseok-upload`, 유효기간 약 27년). 저장소 밖에 있고, 비밀번호는 `android/keystore.properties`(저장소에 올라가지 않음)와 같은 폴더의 `keystore.properties.backup`에 있다.
+- **키 파일과 비밀번호는 PC 밖(클라우드 드라이브, USB 등)에 따로 백업해 둔다.** Play 앱 서명을 쓰면 이 키는 업로드용이라 잃어버려도 Play 지원에 요청해 재설정할 수 있지만, 번거롭다.
+- 빌드: `npm run android:sync` 후 `cd android && JAVA_HOME=~/.jdks/jdk-21.0.13+9 ./gradlew bundleRelease` → `android/app/build/outputs/bundle/release/app-release.aab`
+- `keystore.properties`가 없으면 release는 서명 없이 만들어진다(디버그 빌드는 영향 없음).
+- 새 버전을 올릴 때마다 `android/app/build.gradle`의 `versionCode`를 1씩 올린다(`versionName`은 사람이 보는 이름).
+- Play Console에 처음 올릴 때 **Play 앱 서명**에 등록하면, Google이 앱 서명 키를 보관하고 이 키는 업로드 확인용으로만 쓴다.
+
 ## 다음 단계
 
 - [x] 앱 아이콘과 스플래시 (`python scripts/generate-app-icons.py`)
