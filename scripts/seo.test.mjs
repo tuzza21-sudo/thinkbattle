@@ -10,7 +10,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'
 
 test('the sitemap lists the lounge home, every character page and the legal pages', () => {
   const sitemap = read('public/sitemap.xml');
-  for (const path of ['/lounge', '/terms', '/privacy', ...loungeCharacters.map(character => `/lounge/characters/${character.id}`)]) {
+  for (const path of ['/lounge', '/terms', '/privacy', '/account-deletion', ...loungeCharacters.map(character => `/lounge/characters/${character.id}`)]) {
     assert.ok(sitemap.includes(`<loc>https://saseok.kr${path}</loc>`), `${path} is in the sitemap`);
     assert.equal(seoFor(path)?.noindex, false, `${path} can be indexed`);
   }

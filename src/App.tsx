@@ -77,6 +77,7 @@ function App() {
       '/about': '서비스 소개',
       '/privacy': '개인정보 처리 안내',
       '/terms': '이용약관',
+      '/account-deletion': '계정·데이터 삭제 안내',
       '/institution': '기관 게시판',
       '/institution/marketing': '기관 도입 안내',
       '/institution/marketing-v2': '기관 도입 안내',
@@ -225,6 +226,7 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/account-deletion" element={<LegalPage kind="deletion" />} />
         <Route path="/institution" element={requireAuth(<InstitutionTopicsPage user={user} onLoginRequest={requestLogin} />, false)} />
         <Route path="/institution/marketing" element={<B2BMarketingPage />} />
         <Route path="/institution/marketing-v2" element={<B2BMarketingV2Page />} />
