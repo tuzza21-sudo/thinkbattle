@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import './LoungeLegal.css';
 
-type LegalPageProps = { kind: 'privacy' | 'terms' };
+type LegalPageProps = { kind: 'privacy' | 'terms' | 'deletion' };
 
 const privacySections = [
   ['처리 목적', '사석 회원·게스트 식별과 계정 운영, 대화방 입장과 인원·연령대 안내, 캐릭터와의 텍스트·음성 대화 제공, 음성 전달과 전사, 캐릭터가 이전 대화를 기억하는 기능, 대화방 안전 관리(경고·발언 제한), 신고·분쟁 처리, 문의 대응을 위해 개인정보를 처리합니다.'],
@@ -18,7 +18,7 @@ const privacySections = [
   ['외부 처리', '서비스 제공을 위해 인증과 데이터 보관(Supabase), AI 답변 생성·음성 전사·음성 합성(OpenAI), 소셜 로그인(카카오·구글), 결제 처리(KG이니시스), 서비스 호스팅 업무의 일부를 국내외 전문 서비스 제공자에게 위탁할 수 있습니다. 이 경우 필요한 범위의 정보만 처리하고 계약과 접근 통제를 통해 보호하며, 법령상 별도 공개 또는 동의가 필요한 사항은 해당 화면이나 정책을 통해 안내합니다.'],
   ['이용자의 권리', '이용자는 자신의 개인정보 열람·정정·삭제·처리정지 및 동의 철회를 요청할 수 있습니다. 프로필 사진은 언제든 바꾸거나 지울 수 있습니다. 계정 관리의 ‘계정 삭제’에서 직접 계정을 삭제할 수 있으며, 삭제하면 대화 기록, 캐릭터 기억·관계 기록, 내가 만든 캐릭터와 페르소나, 프로필 사진이 지워집니다. 전자상거래 등에서의 소비자보호에 관한 법률에 따라 결제 기록은 계정과 분리해 이름 없이 5년간 보관합니다. AI 답변이 부적절하다면 답변 아래의 ‘신고’로 알릴 수 있고, 신고한 답변은 확인과 서비스 개선을 위해 보관합니다.'],
   ['안전성 확보', '개인정보에 대한 접근 권한 제한, 비공개 저장, 전송 구간 보호와 사용량 제한 등 필요한 안전조치를 적용합니다.'],
-  ['광고 성과 측정', '사석은 광고 성과를 측정하기 위해 메타(Meta Platforms)의 픽셀과 전환 API를 사용합니다. 방문한 화면, 가입 완료·첫 대화·일정 시간 이상 이어진 대화 같은 이용 행동, 광고 클릭 정보와 브라우저 식별값(쿠키), 가입한 회원의 경우 처음 방문한 경로(광고 캠페인 태그, 연결한 사이트, 첫 화면)와 암호화(해시)한 이메일과 계정 식별값이 메타로 전송됩니다. 대화 내용, 음성, 프로필 소개는 전송하지 않습니다. 브라우저의 "추적 안 함" 설정으로 거부할 수 있고, 메타의 광고 설정에서 맞춤 광고를 끌 수 있습니다.'],
+  ['광고 성과 측정', '(안드로이드 앱에서는 이 측정을 쓰지 않습니다.) 사석은 광고 성과를 측정하기 위해 메타(Meta Platforms)의 픽셀과 전환 API를 사용합니다. 방문한 화면, 가입 완료·첫 대화·일정 시간 이상 이어진 대화 같은 이용 행동, 광고 클릭 정보와 브라우저 식별값(쿠키), 가입한 회원의 경우 처음 방문한 경로(광고 캠페인 태그, 연결한 사이트, 첫 화면)와 암호화(해시)한 이메일과 계정 식별값이 메타로 전송됩니다. 대화 내용, 음성, 프로필 소개는 전송하지 않습니다. 브라우저의 "추적 안 함" 설정으로 거부할 수 있고, 메타의 광고 설정에서 맞춤 광고를 끌 수 있습니다.'],
   ['개인정보 문의', '개인정보 보호 담당자: 최석빈 · 문의: ask.saseok@gmail.com · 주소: 서울시 서초구 사임당로8길 13, 4층 402-331A호'],
 ];
 
@@ -71,13 +71,23 @@ const englishTerms = [
   ['Changes and contact', 'The service is in a test opening and may change as needed for safety and operation. Important changes are announced in the service. Service enquiries: ask.saseok@gmail.com'],
 ];
 
+/** How to delete the account and what happens to the data (2026-11-08): the web page the app stores ask for. */
+const deletionSections = [
+  ['앱이나 웹에서 직접 삭제', '사석에 로그인한 뒤 ‘설정’(또는 계정 관리)을 열고 맨 아래 ‘05 · 계정’의 ‘계정 삭제’를 누르세요. 확인을 위해 ‘삭제’를 입력하면 계정이 바로 삭제됩니다. 안드로이드 앱과 웹사이트(saseok.kr) 모두 같은 방법입니다.'],
+  ['함께 삭제되는 데이터', '대화 기록, 캐릭터가 기억하는 내용과 관계 기록, 내가 만든 캐릭터와 페르소나, 프로필 사진과 프로필 정보, 친구 목록·별점·차단 목록·쪽지, 로그인 정보가 삭제되며 되돌릴 수 없습니다.'],
+  ['삭제 후에도 보관되는 정보', '「전자상거래 등에서의 소비자보호에 관한 법률」에 따라 결제 기록(주문번호, 이용권 종류, 금액, 결제·취소 일시)은 계정과 분리해 이름 없이 5년간 보관합니다. 이미 접수된 AI 답변 신고는 안전 관리를 위해 신고자 정보 없이 보관합니다.'],
+  ['이용권이 남아 있는 경우', '삭제하면 남은 이용 기간은 사라지고 삭제 화면에서 환불되지 않습니다. 환불이 필요하면 삭제하기 전에 이용약관의 환불 기준에 따라 ask.saseok@gmail.com으로 문의해 주세요.'],
+  ['로그인할 수 없을 때', '계정에 접속할 수 없다면 가입한 이메일로 ask.saseok@gmail.com에 ‘계정 삭제 요청’이라고 보내 주세요. 본인 확인 뒤 삭제하고 결과를 이메일로 알려 드립니다.'],
+  ['Delete your account (English)', 'Sign in to Saseok (the Android app or saseok.kr), open Settings (account), scroll to “05 · 계정” and press “계정 삭제” (Delete account), then type 삭제 to confirm. Your conversations, character memories and relationship records, characters and personas you made, profile photo and profile, friends, ratings, blocks and messages are deleted and cannot be restored. Payment records are kept for 5 years without your name, as Korean e-commerce law requires. If you cannot sign in, e-mail ask.saseok@gmail.com with “Account deletion request” from the e-mail address you signed up with.'],
+];
+
 export const LegalPage = ({ kind }: LegalPageProps) => {
   const navigate = useNavigate();
   const isEnglish = localStorage.getItem('app-language') === 'en';
-  const sections = isEnglish
+  const sections = kind === 'deletion' ? deletionSections : isEnglish
     ? kind === 'privacy' ? englishPrivacy : englishTerms
     : kind === 'privacy' ? privacySections : termsSections;
-  const title = isEnglish
+  const title = kind === 'deletion' ? (isEnglish ? 'Account and data deletion' : '계정·데이터 삭제 안내') : isEnglish
     ? kind === 'privacy' ? 'Privacy notice' : 'Terms of service'
     : kind === 'privacy' ? '개인정보 처리 안내' : '서비스 이용약관';
   const jump = (index: number) => document.getElementById(`legal-section-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -96,6 +106,7 @@ export const LegalPage = ({ kind }: LegalPageProps) => {
           <nav className="lounge-legal-tabs" aria-label={isEnglish ? 'Documents' : '문서 선택'}>
             <Link to="/terms" aria-current={kind === 'terms' ? 'page' : undefined}>{isEnglish ? 'Terms of service' : '이용약관'}</Link>
             <Link to="/privacy" aria-current={kind === 'privacy' ? 'page' : undefined}>{isEnglish ? 'Privacy notice' : '개인정보 처리 안내'}</Link>
+            <Link to="/account-deletion" aria-current={kind === 'deletion' ? 'page' : undefined}>{isEnglish ? 'Account deletion' : '계정 삭제 안내'}</Link>
           </nav>
         </section>
         <section className="lounge-legal-intro">

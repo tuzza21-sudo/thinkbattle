@@ -25,6 +25,7 @@ export function seoFor(pathname: string): PageSeo | null {
     };
   }
   if (path === '/terms') return { title: '이용약관 · 사석', description: '사석 이용약관. 대화방 이용 규칙, 안전 관리, 베타 기간 이용 시간 안내.', path, noindex: false };
+  if (path === '/account-deletion') return { title: '계정·데이터 삭제 안내 · 사석', description: '사석 계정을 삭제하는 방법과 삭제되는 데이터, 보관되는 정보 안내.', path, noindex: false };
   if (path === '/privacy') return { title: '개인정보 처리 안내 · 사석', description: '사석이 처리하는 개인정보와 대화 데이터, 보관 기간, 이용자의 권리 안내.', path, noindex: false };
   // Rooms and places keep the lounge title; the staff and login-only screens of the other service keep their own, so only the no-index tag is set.
   if (path === '/lounge/spaces' || path.startsWith('/lounge/')) return { title: HOME_TITLE, description: HOME_DESCRIPTION, path, noindex: true };

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isSaseokApp } from './nativeApp';
 
 /** The Meta pixel (a public id) and the key actions that tell the ad account which visitors became members and talked. */
 const PIXEL_ID = (import.meta.env.VITE_META_PIXEL_ID as string | undefined) || '2860857600965753';
@@ -12,7 +13,7 @@ export type MetaEventName = 'CompleteRegistration' | 'FirstConversation' | 'Conv
  * A browser that sends "Do Not Track" or the Global Privacy Control signal is not measured at all, and neither is the
  * local development server: it has no /api/meta-events (a 404 on every conversation) and its visits are not real ones.
  */
-export const metaTrackingAllowed = () => !import.meta.env.DEV && typeof window !== 'undefined' && navigator.doNotTrack !== '1' && !(navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl;
+export const metaTrackingAllowed = () => !import.meta.env.DEV && !isSaseokApp() && typeof window !== 'undefined' && navigator.doNotTrack !== '1' && !(navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl;
 
 let started = false;
 export function initMetaPixel() {
