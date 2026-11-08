@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { AppUser, AppUserAgeGroup, AppUserGender } from '../types';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { loadLoungeAvatar } from './loungeAvatar';
+import { isSaseokApp, signInInAppBrowser } from './nativeApp';
 
 export class EmailConfirmationRequiredError extends Error {
   constructor() { super('가입 확인 메일을 보냈어요. 이메일 인증 후 로그인해 프로필에서 사진을 변환해 주세요.'); }
@@ -292,6 +293,11 @@ export const signOut = async () => {
 };
 
 const signInWithOAuth = async (provider: OAuthProvider): Promise<void> => {
+  // Google refuses sign-in inside an app's web view, so the app opens it in a browser tab and comes back (nativeApp.ts).
+  if (provider === 'google' && isSaseokApp()) {
+    await signInInAppBrowser(provider);
+    return;
+  }
   const { error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {

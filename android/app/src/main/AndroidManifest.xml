@@ -22,6 +22,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Sign-in in a browser tab comes back here: kr.saseok.app://auth?code=... (src/lib/nativeApp.ts). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="kr.saseok.app" android:host="auth" />
+            </intent-filter>
+
         </activity>
 
         <provider
