@@ -177,13 +177,18 @@ function App() {
     </AuthenticatedRoute>
   );
 
+  // The lounge (and the app, which opens it) waits on its own dark brown, so the start is one colour from the splash on (2026-11-08).
+  const loungeRoute = normalizedPath === '/' || normalizedPath.startsWith('/lounge');
+  const loungeWaiting = <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100dvh', background: '#1a110d', color: '#b39d88', fontSize: 14 }}>화면을 준비하고 있습니다...</div>;
+
   if (authLoading) {
+    if (loungeRoute) return loungeWaiting;
     return <div className={isHomeRoute ? 'thinkfit-home home-route' : undefined} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--text-muted)' }}>화면을 준비하고 있습니다...</div>;
   }
 
   return (
     <div className={isHomeRoute ? 'thinkfit-home home-route' : undefined} style={isHomeRoute ? undefined : { display: 'contents' }}>
-      <Suspense fallback={<div className="app-container live-login-gate">화면을 준비하고 있습니다...</div>}>
+      <Suspense fallback={loungeRoute ? loungeWaiting : <div className="app-container live-login-gate">화면을 준비하고 있습니다...</div>}>
       <Routes>
         <Route
           path="/"
