@@ -13,6 +13,8 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- The site's dark background shows behind the status and navigation bars (the page sits between them). -->
+        <item name="android:windowBackground">#FF1A110D</item>
     </style>
 
 

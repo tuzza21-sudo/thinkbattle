@@ -19,6 +19,10 @@ const config: CapacitorConfig = {
     // the app; any other address opens in the phone's browser.
     allowNavigation: ['saseok.kr', '*.saseok.kr', '*.supabase.co', 'kauth.kakao.com', 'accounts.kakao.com', 'logins.daum.net', '*.inicis.com'],
   },
+  plugins: {
+    // The pages are dark: light status-bar and navigation-bar icons on the dark window behind them.
+    SystemBars: { style: 'DARK' },
+  },
   android: {
     appendUserAgent: 'SaseokApp/1',
     allowMixedContent: false,
