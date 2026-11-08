@@ -12,6 +12,8 @@ const config: CapacitorConfig = {
   appId: 'kr.saseok.app',
   appName: '사석에서',
   webDir: 'dist',
+  // The web view's colour before the site paints: the site's dark background, not a white flash after the splash.
+  backgroundColor: '#1a110d',
   server: {
     url: 'https://saseok.kr',
     androidScheme: 'https',
