@@ -13,9 +13,13 @@
     "test:lounge-companion-sql": "node scripts/lounge-companion-state-sql-check.mjs",
     "simulate:relationship": "node scripts/lounge-relationship-simulation.mjs",
     "test:livekit": "node scripts/livekit-smoke-test.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:sync": "vite build && cap sync android",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
     "@supabase/supabase-js": "^2.110.0",
     "dotenv": "^17.4.2",
     "livekit-client": "^2.21.0",
@@ -28,6 +32,7 @@
     "react-router-dom": "^7.15.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
