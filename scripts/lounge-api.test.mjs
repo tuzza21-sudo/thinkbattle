@@ -800,6 +800,94 @@ test('lounge client preserves non-retryable billing errors for the host schedule
   });
 });
 
+// Run the page's real scheduler and refresh error handler with a clock and API failures, without a browser or LLM.
+function roomRecoveryFixture(failure, { chat = true, group = false } = {}) {
+  const client = compile('../src/lib/loungeApi.ts', () => ({}));
+  const streaming = compile('../src/lib/loungeStream.ts', () => client);
+  const source = ts.createSourceFile('LoungePage.tsx', readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const callbacks = new Map();
+  const visit = node => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ['hostTurn', 'reportRoomError'].includes(node.name.text)) callbacks.set(node.name.text, node.initializer.arguments[0]);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  const ref = current => ({ current });
+  const notices = [], diagnostics = [];
+  let now = 1_000_000, nextResponse, calls = 0;
+  const scope = {
+    LoungeApiError: client.LoungeApiError, isLoungeChatRoom: lounge.isLoungeChatRoom,
+    loungeSoloTiming: lounge.loungeSoloTiming, loungeHostCooldownMs: lounge.loungeHostCooldownMs,
+    readLoungeStream: streaming.readLoungeStream, roomId,
+    Date: { now: () => now }, console: { warn: (...args) => diagnostics.push(args), info: () => {} },
+    current: ref({ room: { id: roomId, host_id: 'me', capacity: group ? 4 : 1, space_id: group ? 'table' : null, voice_on: !chat, status: 'active' },
+      messages: [{ id: 1, kind: 'human' }], restrictedIds: [], isHost: true,
+      audio: { connected: true, audioReady: true, speakers: [], getSpeechActivity: () => ({ lastVoiceAt: 0 }) } }),
+    busy: ref(false), transcribing: ref(0), lastActivity: ref(0), inputReadyAt: ref(0), lastHostEnded: ref(0),
+    lastAttempt: ref(0), lastModeratorRequest: ref(null), hostBlocked: ref(false), audioBlocked: ref(false),
+    nextHostAttempt: ref(0), failedAtMessage: ref(0), hostRequest: ref(null), quietFailures: ref(0),
+    mounted: ref(true), activeRoomId: ref(roomId), roomNetworkError: ref(null),
+    setError: message => notices.push(message), errorText: error => error.message,
+    setPending: () => {}, setChatHostText: () => {}, setRoom: () => {}, setSession: () => {},
+    stopRingback: () => {}, disconnectUnavailableRoom: () => {}, refreshAfterMessage: async () => {},
+    requestLoungeHost: async () => { calls++; if (nextResponse) return nextResponse; throw failure(client.LoungeApiError); },
+  };
+  const load = name => {
+    assert.ok(callbacks.has(name), `the page still declares ${name}`);
+    const code = ts.transpileModule(`const callback = ${callbacks.get(name).getText(source)};`, { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText;
+    return new Function(...Object.keys(scope), `${code}\nreturn callback;`)(...Object.values(scope));
+  };
+  const hostTurn = load('hostTurn');
+  return { scope, notices, diagnostics, client, calls: () => calls, reportRoomError: load('reportRoomError'),
+    attempt: async () => { now = Math.max(now + 10_000, scope.nextHostAttempt.current); await hostTurn('followup'); },
+    reply: response => { nextResponse = response; },
+  };
+}
+
+test('one-to-one reply failures stay silent after repeated failures and timeouts, then recover', async () => {
+  for (const chat of [true, false]) {
+    for (const code of ['lounge_internal_error', 'lounge_http_502', 'lounge_reply_timeout', 'lounge_stream_timeout', 'lounge_upstream_timeout', 'lounge_network_error', 'lounge_stream_interrupted', 'lounge_invalid_stream']) {
+      const fixture = roomRecoveryFixture(ErrorClass => new ErrorClass('사회자 연결이 끊겼거나 서버 응답이 늦어지고 있어요.', code, true, 3), { chat });
+      for (let i = 0; i < 8; i++) await fixture.attempt();
+      assert.equal(fixture.calls(), 8, `${code} keeps retrying`);
+      assert.equal(fixture.scope.hostBlocked.current, false);
+      assert.equal(fixture.scope.busy.current, false, 'a failed request releases the scheduler');
+      assert.deepEqual(fixture.notices, [], `${code} never becomes a notice at any failure count`);
+      assert.equal(fixture.diagnostics.length, 8, 'failures remain available to diagnostics');
+    }
+  }
+  const fixture = roomRecoveryFixture(ErrorClass => new ErrorClass('서버 응답이 늦어지고 있어요.', 'lounge_reply_timeout', true, 3));
+  await fixture.attempt();
+  const events = [{ type: 'text', text: '다시 이어서 이야기해요.' }, { type: 'host', text: '다시 이어서 이야기해요.', timings: {} }, { type: 'saved' }, { type: 'done' }];
+  fixture.reply({ stream: new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(events.map(event => JSON.stringify(event)).join('\n') + '\n')); controller.close(); } }) });
+  await fixture.attempt();
+  assert.equal(fixture.scope.quietFailures.current, 0, 'a successful reply resets the failure count');
+  assert.ok(fixture.notices.every(message => message === ''), 'recovery clears notices without showing a failure');
+});
+
+test('one-to-one polling keeps the conversation open without transient error notices', () => {
+  const fixture = roomRecoveryFixture(() => new Error('unused'));
+  for (const error of [new fixture.client.LoungeApiError('대화방 상태 서버 연결이 끊겼어요.', 'lounge_network_error', true), new Error('방의 이야기를 불러오지 못했어요.')]) {
+    for (let i = 0; i < 5; i++) fixture.reportRoomError(error);
+  }
+  assert.deepEqual(fixture.notices, []);
+  assert.equal(fixture.diagnostics.length, 10);
+  assert.ok(fixture.scope.current.current.room, 'the current conversation stays available');
+  fixture.reportRoomError(new fixture.client.LoungeApiError('로그인 세션이 끝났어요.', 'lounge_session_expired', false));
+  assert.deepEqual(fixture.notices, ['로그인 세션이 끝났어요.']);
+});
+
+test('login, permission and allowance failures still explain the action needed', async () => {
+  for (const code of ['lounge_session_expired', 'lounge_access_denied', 'lounge_speech_allowance']) {
+    const fixture = roomRecoveryFixture(ErrorClass => new ErrorClass('이용 상태를 확인해 주세요.', code, false));
+    await fixture.attempt();
+    assert.deepEqual(fixture.notices, ['이용 상태를 확인해 주세요.']);
+    if (code !== 'lounge_speech_allowance') assert.equal(fixture.scope.hostBlocked.current, true);
+  }
+  const group = roomRecoveryFixture(ErrorClass => new ErrorClass('서버 연결이 끊겼어요.', 'lounge_network_error', true), { chat: false, group: true });
+  await group.attempt();
+  assert.deepEqual(group.notices, ['서버 연결이 끊겼어요.'], 'the shared-room behavior is unchanged');
+});
+
 test('browser network failures are retryable while deliberate cancellation is preserved', async () => {
   const client = compile('../src/lib/loungeApi.ts', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test-session' } } }) } } }));
   for (const message of ['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.']) {
