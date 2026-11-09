@@ -63,14 +63,21 @@ test('without an explicit move the background changes only after the scene has s
   assert.equal(decide({ scene: next, sceneTurns: 5, change: { turn: 3, at: now - 3 * minute, explicit: false }, follow: was(5) }).action, 'keep');
 });
 
-test('a place on the way is left at once: the corridor gives way to the room, other places still wait', () => {
-  const corridor = { key: follow.sceneFollowKey(scene('호텔 복도', '이동'), '호텔 복도'), at: now - 2 * minute, place: '호텔 복도' };
+test('a place on the way is never shown, and arriving from it is followed at once, other places still wait', () => {
+  const pool = { key: follow.sceneFollowKey(scene('호텔 수영장', '수영장'), '호텔 수영장'), at: now - 2 * minute, place: '호텔 수영장' };
   const room = scene('호텔 객실', '집');
-  assert.equal(follow.onTheWay(corridor), true);
-  assert.equal(follow.onTheWay({ key: '집|호텔객실', at: 0, place: '호텔 객실' }), false);
-  assert.equal(follow.onTheWay({ key: '기타|엘리베이터앞', at: 0, place: '엘리베이터 앞' }), true);
-  const arrived = decide({ scene: room, sceneTurns: 0, follow: corridor });
-  assert.equal(arrived.action, 'apply'); assert.equal(arrived.reason, 'moved'); assert.equal(arrived.place, '호텔 객실');
+  assert.equal(follow.isTransitPlace('호텔 복도'), true); assert.equal(follow.isTransitPlace('엘리베이터 안'), true); assert.equal(follow.isTransitPlace('호텔 객실'), false);
+  assert.equal(follow.isTransitPlace('자동차 안'), false, 'a car is a place of its own');
+  // the corridor is never shown, even when the member asked to go and the last change was long ago
+  const corridor = scene('호텔 복도', '이동');
+  assert.deepEqual({ ...decide({ scene: corridor, sceneTurns: 0, change: { turn: 5, at: now - 1000, explicit: true }, follow: { ...pool, at: now - 60 * minute } }) }, { action: 'keep', reason: 'on_the_way' });
+  assert.equal(decide({ scene: corridor, sceneTurns: 9, follow: undefined }).action, 'keep');
+  // ...and arriving in the room from it is a move that is followed at once
+  const arrived = decide({ scene: room, sceneTurns: 0, change: { turn: 6, at: now - 1000, explicit: true }, follow: pool });
+  assert.equal(arrived.action, 'apply'); assert.equal(arrived.reason, 'explicit'); assert.equal(arrived.place, '호텔 객실');
+  const messengerState = (location) => ({ ...messenger.normalizeLoungeCompanionState({}, 'r'), scene: { ...scene(location, '이동'), season: '', objects: [] }, scene_turns: 1 });
+  const stepped = messenger.nextLoungeCompanionState({ state: messengerState('호텔 복도'), update: { scene: { ...scene('호텔 객실', '집'), season: '', objects: [] } }, decision: { progress: 'stay' }, turn: 8, reply: '들어와요', inner: '', now: 8000 });
+  assert.deepEqual({ ...stepped.scene_change }, { turn: 8, at: 8000, explicit: true }, 'leaving a corridor is an arrival');
   const resting = { key: follow.sceneFollowKey(scene('식당', '식당'), '식당'), at: now - 2 * minute, place: '식당' };
   assert.equal(decide({ scene: room, sceneTurns: 1, follow: resting }).reason, 'too_soon', 'a real place is kept for a while');
 });
