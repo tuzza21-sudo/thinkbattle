@@ -545,7 +545,11 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
   // A change of place or of kind of place is a change of scene; it is the member's own when they asked for it this turn or just before.
   const changed = Boolean(moved || (scene && state.scene && scene.scene_type !== state.scene.scene_type));
   const askedRecently = state.scene_move_asked !== undefined && turn - state.scene_move_asked <= 2;
-  const explicit = Boolean(decision.target) || askedRecently;
+  // The same list of ways as loungeSceneFollow.ts (kept apart: this file is loaded alone by the engine's tests).
+  const isTransitPlace = (place: string | undefined) => /복도|엘리베이터|계단|통로|에스컬레이터|이동\s*중|가는\s*길|오는\s*길/.test(place ?? '');
+  // Arriving from a corridor or an elevator is the end of a move the two were making: the background follows it at once.
+  const arrived = Boolean(scene && state.scene && isTransitPlace(state.scene.location) && !isTransitPlace(scene.location));
+  const explicit = Boolean(decision.target) || askedRecently || arrived;
   const reaction = loungeReactionKinds.find(kind => kind === update?.reaction_type);
   const facts = strings(update?.self_facts, 2, 40).filter(fact => !state.self_facts.some(item => item.fact === fact));
   const shared = clip(update?.shared_experience, 60);

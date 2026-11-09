@@ -55,22 +55,24 @@ export type SceneFollowInput = {
   now: number;
 };
 export type SceneFollowDecision =
-  | { action: 'keep'; reason: 'manual' | 'no_place' | 'same' | 'too_soon' }
+  | { action: 'keep'; reason: 'manual' | 'no_place' | 'same' | 'too_soon' | 'on_the_way' }
   | { action: 'apply'; reason: 'first' | 'explicit' | 'moved'; key: string; place: string };
 
 export function sceneFollowKey(scene: SceneForFollow | undefined, place: string) {
   return `${scene?.scene_type ?? ''}|${normalized(place).slice(0, 30)}`;
 }
 
-/** A place that is only passed through on the way to another: the background it had is replaced without waiting. */
+/** A place that is only passed through on the way to another (a corridor, an elevator, stairs): it never gets a background of its own. */
 const wayPlace = /복도|엘리베이터|계단|통로|에스컬레이터|이동\s*중|가는\s*길|오는\s*길/;
-export const onTheWay = (follow: SceneFollow) => follow.key.startsWith('이동|') || wayPlace.test(follow.place);
+export const isTransitPlace = (place: string | undefined) => wayPlace.test(place ?? '');
 
 export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision {
   if (input.manual) return { action: 'keep', reason: 'manual' };
   const fromEngine = stateScenePlace(input.scene);
   const place = fromEngine ?? placeFromSceneLine(input.memoryLine);
   if (!place) return { action: 'keep', reason: 'no_place' };
+  // The way from one place to another is not shown (the owner, 2026-11-09): the background waits for where the two arrive.
+  if (isTransitPlace(place)) return { action: 'keep', reason: 'on_the_way' };
   const key = sceneFollowKey(fromEngine ? input.scene : undefined, place);
   const { follow, change, now } = input;
   // The start: the place is stated and nothing was decided for this chat yet.
@@ -78,9 +80,6 @@ export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision 
   if (follow.key === key) return { action: 'keep', reason: 'same' };
   // An explicit move, made after the last decision, changes it at once, however recently the last change was.
   if (fromEngine && change?.explicit && change.at > follow.at) return { action: 'apply', reason: 'explicit', key, place };
-  // A place on the way (a corridor, an elevator) is left as soon as the engine's scene is somewhere else: the member asked to go to
-  // the room, the corridor showed, and the room should follow it at once, not twenty minutes later.
-  if (fromEngine && onTheWay(follow)) return { action: 'apply', reason: 'moved', key, place };
   // Otherwise not often: the new place has held for a few turns, and the last change was a while ago.
   const stable = fromEngine ? input.sceneTurns >= sceneFollowRules.stableTurns : true;
   if (stable && now - follow.at >= sceneFollowRules.minIntervalMs) return { action: 'apply', reason: 'moved', key, place };
