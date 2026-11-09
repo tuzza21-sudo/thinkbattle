@@ -77,8 +77,8 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, onMa
         {shared.length > 0 && <>
           <p className="lounge-background-label">다른 대화에서 만들어진 장면</p>
           <div className="lounge-background-grid" role="radiogroup" aria-label="함께 쓰는 장면 고르기">
-            {shared.map(scene => <button key={scene.id} type="button" role="radio" aria-checked={selected === `scene:${scene.id}`} disabled={Boolean(busy)} onClick={() => void pick({ scene: scene.id })} style={tile(scene.url)} title={scene.description}>
-              <span>{scene.description.length > 28 ? `${scene.description.slice(0, 27)}…` : scene.description}</span>{selected === `scene:${scene.id}` && <Check size={16} />}
+            {shared.map(scene => <button key={scene.id} type="button" role="radio" aria-checked={selected === `scene:${scene.id}`} disabled={Boolean(busy)} onClick={() => void pick({ scene: scene.id })} style={tile(scene.url)} title={scene.name ? `${scene.name} — ${scene.description}` : scene.description}>
+              <span>{(() => { const label = scene.name || scene.description; return label.length > 28 ? `${label.slice(0, 27)}…` : label; })()}</span>{selected === `scene:${scene.id}` && <Check size={16} />}
             </button>)}
           </div>
         </>}

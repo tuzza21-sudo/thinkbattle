@@ -6,6 +6,7 @@ import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin.js';
 import { loungePhotoMonthly, loungePhotoMonthlyFor } from '../src/lib/loungePlans.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
+import { cleanSceneName, loungeSceneDailyTotal, loungeSceneImagePath, loungeSceneLibraryTarget, sceneLibraryLine, shortlistSceneBackgrounds, type SceneLibraryRow } from '../src/lib/loungePhotos.js';
 import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
 
@@ -324,24 +325,36 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     return json({ background: value });
   };
   // The background stays as it is, but what it was decided for is kept, so the same scene is not asked about again.
-  const unchanged = async () => {
-    if (followNote) {
-      const kept = room.background && typeof room.background === 'object' ? room.background : {};
-      await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: { ...kept, auto: true, follow: followNote } }) }).catch(() => undefined);
-    }
-    return json({ background: null });
+  const recordFollow = async () => {
+    if (!followNote) return;
+    const kept = room.background && typeof room.background === 'object' ? room.background : {};
+    await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: { ...kept, auto: true, follow: followNote } }) }).catch(() => undefined);
   };
-  type SceneRow = { id: string; scene_key: string | null; description: string; image_path: string };
-  const sharedScene = (row: SceneRow) => saveOnRoom({ scene: row.id, image: row.image_path, prompt: row.description });
+  const unchanged = async () => { await recordFollow(); return json({ background: null }); };
+  type SceneRow = SceneLibraryRow & { scene_key: string | null };
+  // A background taken from the library counts as one more use (so the most used come first); the member sees its name and
+  // description, and the name and tags (migration 20261216) are for finding it.
+  const sharedScene = async (row: SceneRow) => {
+    await timed(`${context.base}/rest/v1/rpc/bump_lounge_scene_use`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_id: row.id }) }).catch(() => undefined);
+    return saveOnRoom({ scene: row.id, image: row.image_path, prompt: row.name ? `${row.name} — ${row.description}`.slice(0, 300) : row.description });
+  };
+  // The library is read with its names and tags once the migration is in; before it, without them.
+  const library = async (filter: string, order: string, limit: number): Promise<SceneRow[]> => {
+    for (const columns of ['id,scene_key,description,image_path,uses,name,tags', 'id,scene_key,description,image_path,uses']) {
+      const response = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?select=${columns}${filter}${order ? `&order=${order}` : ''}&limit=${limit}`, { headers: serviceHeaders(context) });
+      if (response.ok) return await response.json() as SceneRow[];
+    }
+    return [];
+  };
   if (key) {
-    const known = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?scene_key=eq.${encodeURIComponent(key)}&select=id,scene_key,description,image_path`, { headers: serviceHeaders(context) });
-    const [row] = known.ok ? await known.json() as SceneRow[] : [];
+    const [row] = await library(`&scene_key=eq.${encodeURIComponent(key)}`, '', 1);
     if (row) return sharedScene(row);
   }
-  // The places, and the shared scenes most used and most recent, for the model to choose from.
-  const listed = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?select=id,scene_key,description,image_path&order=uses.desc,created_at.desc&limit=40`, { headers: serviceHeaders(context) });
-  const shared = listed.ok ? await listed.json() as SceneRow[] : [];
-  const places = [...loungeThemes.map(theme => ({ id: theme.id, description: `${theme.name}: ${theme.subtitle}` })), ...shared.map(row => ({ id: row.id, description: row.description }))];
+  // The places, and the scenes of the library that share the most with this one (the library is narrowed here, in code, since it
+  // grows past what a prompt holds), for the model to choose from.
+  const everything = await library('', 'uses.desc,created_at.desc', 400);
+  const shared = shortlistSceneBackgrounds(everything, scene, 30);
+  const places = [...loungeThemes.map(theme => ({ id: theme.id, description: `${theme.name}: ${theme.subtitle}` })), ...shared.map(row => ({ id: row.id, description: sceneLibraryLine(row) }))];
   let match: ReturnType<typeof readLoungeSceneMatch>;
   try {
     const response = await timed('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${context.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -362,31 +375,47 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     if (row && automatic && room.background?.scene === row.id) return unchanged();
     if (row) return sharedScene(row);
   }
-  if (automatic && autoMode !== 'make') return match ? unchanged() : json({ background: null });
+  if (automatic && !match) return json({ background: null });
   const place = match && 'place' in match ? match.place : scene;
-  // A new scene, within the member's allowance for the day; past it (or when it fails) the empty space.
+  const fresh = match && 'place' in match ? match : { place, name: cleanSceneName(undefined, place), slug: 'place', tags: [] as string[] };
+  // A new scene, within the member's allowance for the day. An automatic one is made only while the library is still small (the
+  // owner's rule: until enough backgrounds are saved), within a limit for everyone together, and never blanks the room: past a
+  // limit, or when it fails, the background stays as it is.
   const kst = new Date(Date.now() + 9 * 3_600_000);
   const todayStart = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3_600_000).toISOString();
+  if (automatic && autoMode !== 'make') {
+    const target = Number(process.env.LOUNGE_SCENE_LIBRARY_TARGET) || loungeSceneLibraryTarget, dailyTotal = Number(process.env.LOUNGE_SCENE_DAILY_TOTAL) || loungeSceneDailyTotal;
+    const counted = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?select=id`, { headers: serviceHeaders(context, { Prefer: 'count=exact', Range: '0-0' }) });
+    const total = Number((counted.headers.get('content-range') || '').split('/')[1]);
+    if (!counted.ok || !Number.isFinite(total) || total >= target) return unchanged();
+    const today = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?created_at=gte.${encodeURIComponent(todayStart)}&select=id`, { headers: serviceHeaders(context, { Prefer: 'count=exact', Range: '0-0' }) });
+    if (!today.ok || Number((today.headers.get('content-range') || '').split('/')[1]) >= dailyTotal) return unchanged();
+  }
+  // The member's own allowance for the day, after the cheaper checks above.
   const made = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?created_by=eq.${userId}&created_at=gte.${encodeURIComponent(todayStart)}&select=id`, { headers: serviceHeaders(context) });
-  if (!made.ok || (await made.json() as unknown[]).length >= loungeSceneDaily) return saveOnRoom({ blank: true });
+  if (!made.ok || (await made.json() as unknown[]).length >= loungeSceneDaily) return automatic ? unchanged() : saveOnRoom({ blank: true });
+  // The page asks twice per reply: the decision is kept before the picture is made, so the second ask does not make another one.
+  if (automatic && followNote) await recordFollow();
   try {
     const image = await gptBackground(context, place, 'gpt-low');
-    const path = `scenes/${crypto.randomUUID()}.${image.ext}`;
+    const path = loungeSceneImagePath(fresh.slug, crypto.randomUUID(), image.ext);
     await upload(context, loungePhotoBuckets.public, path, image.bytes, image.type);
-    const inserted = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?on_conflict=scene_key`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify({ scene_key: key ?? null, description: place, image_path: path, created_by: userId }) });
+    const sceneKey = key ?? (automatic && followNote ? `auto:${followNote.key}`.slice(0, 120) : undefined);
+    const insertScene = (withNames: boolean) => timed(`${context.base}/rest/v1/lounge_scene_backgrounds?on_conflict=scene_key`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify({ scene_key: sceneKey, description: place.slice(0, 400), image_path: path, created_by: userId, ...(withNames ? { name: fresh.name, tags: fresh.tags } : {}) }) });
+    let inserted = await insertScene(true);
+    if (!inserted.ok && inserted.status === 400) inserted = await insertScene(false);
     const [row] = inserted.ok ? await inserted.json() as SceneRow[] : [];
-    if (row) return sharedScene(row);
-    // Another member's conversation made this episode's scene at the same time: theirs is used.
-    if (key) {
-      const again = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?scene_key=eq.${encodeURIComponent(key)}&select=id,scene_key,description,image_path`, { headers: serviceHeaders(context) });
-      const [other] = again.ok ? await again.json() as SceneRow[] : [];
+    if (row) return sharedScene({ ...row, name: row.name ?? fresh.name, tags: row.tags ?? fresh.tags });
+    // Another conversation made this scene at the same time: that one is used.
+    if (sceneKey) {
+      const [other] = await library(`&scene_key=eq.${encodeURIComponent(sceneKey)}`, '', 1);
       if (other) return sharedScene(other);
     }
     console.warn('[Lounge scene] not shared', inserted.status);
   } catch (error) {
     console.warn('[Lounge scene] not made', error instanceof LoungePhotoError ? error.code : error instanceof Error ? error.name : 'error');
   }
-  return saveOnRoom({ blank: true });
+  return automatic ? unchanged() : saveOnRoom({ blank: true });
 }
 
 /** Once a day, one post from each character's own day to their public gallery. */

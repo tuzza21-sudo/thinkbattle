@@ -35,12 +35,15 @@ export async function signLoungeBackground(path: string) {
 }
 
 /** A background made for a scene and shared by every member (lounge_scene_backgrounds). */
-export type LoungeSharedScene = { id: string; description: string; image_path: string; url: string };
+export type LoungeSharedScene = { id: string; description: string; image_path: string; url: string; name?: string | null };
 /** The shared scenes, most picked and newest first; empty before migration 20261129. */
 export async function loadLoungeSharedScenes(limit = 30): Promise<LoungeSharedScene[]> {
-  const { data, error } = await supabase.from('lounge_scene_backgrounds').select('id,description,image_path').order('uses', { ascending: false }).order('created_at', { ascending: false }).limit(limit);
+  // With the name (migration 20261216); before it, without.
+  const read = (columns: string) => supabase.from('lounge_scene_backgrounds').select(columns).order('uses', { ascending: false }).order('created_at', { ascending: false }).limit(limit);
+  let { data, error } = await read('id,description,image_path,name');
+  if (error) ({ data, error } = await read('id,description,image_path'));
   if (error) return [];
-  return ((data ?? []) as Array<Omit<LoungeSharedScene, 'url'>>).filter(row => isLoungeSceneImage(row.image_path))
+  return ((data ?? []) as unknown as Array<Omit<LoungeSharedScene, 'url'>>).filter(row => isLoungeSceneImage(row.image_path))
     .map(row => ({ ...row, url: supabase.storage.from(loungePhotoBuckets.public).getPublicUrl(row.image_path).data.publicUrl }));
 }
 

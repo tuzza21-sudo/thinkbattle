@@ -271,6 +271,83 @@ test('the member can turn the automatic follow of the scene off for a chat, and 
   }
 });
 
+test('the library of backgrounds: reuse first, make only while it is small, name what is made, never blank the room', async () => {
+  const minute = 60_000;
+  const living = { location: '집 거실', scene_type: '집', activity: '소파에서 이야기하는 중', time_of_day: '밤', season: '', objects: [] };
+  const ask = async ({ choice = 'new', total = 10, today = 0, memberToday = 0, imageStatus = 200, library = [], env = {}, name = '비 오는 밤 자동차 안', slug = 'Car Interior, Night Rain!', tags = ['자동차', '밤', '비', '실내', '#이동'] }) => {
+    const calls = { patched: [], images: 0, uploaded: [], inserted: null, bumped: [], matchedPlaces: null };
+    Object.assign(process.env, env);
+    try {
+      await run(async (url, init) => {
+        if (url.includes('/auth/v1/user')) return result({ id: userId });
+        if (url.includes('voice_lounge_rooms?id=eq.') && (init?.method ?? 'GET') === 'GET') return result([{ scenario: null, story_state: null, memory: '', host_persona: 'guide', background: { auto: true } }]);
+        if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { calls.patched.push(JSON.parse(init.body).background); return result([]); }
+        if (url.includes('voice_lounge_companion_state')) return result([{ state: { room_id: roomId, scene: living, scene_turns: 5 } }]);
+        if (url.includes('rpc/bump_lounge_scene_use')) { calls.bumped.push(JSON.parse(init.body).p_id); return result(null); }
+        if (url.includes('lounge_scene_backgrounds?') && url.includes('created_by=eq.')) return result(Array.from({ length: memberToday }, (_, i) => ({ id: String(i) })));
+        if (url.includes('lounge_scene_backgrounds?') && init?.headers?.Range) { const n = url.includes('created_at=gte') ? today : total; return new Response('[]', { status: 200, headers: { 'content-range': `0-0/${n}` } }); }
+        if (url.includes('lounge_scene_backgrounds?on_conflict') && init?.method === 'POST') { calls.inserted = JSON.parse(init.body); return result([{ id: '22222222-2222-4222-8222-222222222222', scene_key: calls.inserted.scene_key, description: calls.inserted.description, image_path: calls.inserted.image_path, name: calls.inserted.name, tags: calls.inserted.tags }], 201); }
+        if (url.includes('lounge_scene_backgrounds?')) return result(library);
+        if (url.endsWith('/responses')) { const input = JSON.parse(init.body).input; calls.matchedPlaces = JSON.parse(input).places; return result(sceneOutput({ choice, place: '비 내린 밤, 가로등 불빛이 번지는 자동차 안', name, slug, tags })); }
+        if (url.includes('/images/generations')) { calls.images++; return imageStatus === 200 ? result({ data: [{ b64_json: 'AAAA' }] }) : result({ error: { code: 'server_error' } }, imageStatus); }
+        if (url.includes('/storage/v1/object/')) { calls.uploaded.push(url); return result({}); }
+        throw new Error('Unexpected call ' + url);
+      }, async () => { calls.response = await (await handler(request({ action: 'scene', roomId, auto: true }))).json(); });
+    } finally { for (const key of Object.keys(env)) delete process.env[key]; }
+    return calls;
+  };
+  // while the library is small a scene nothing fits is made, named, saved under a descriptive file name and used
+  const made = await ask({});
+  assert.equal(made.images, 1);
+  assert.match(made.inserted.image_path, /^scenes\/car-interior-night-rain-[a-z0-9]{1,8}\.webp$/, 'a descriptive, ASCII file name');
+  assert.equal(made.inserted.name, '비 오는 밤 자동차 안'); assert.deepEqual(made.inserted.tags, ['자동차', '밤', '비', '실내', '이동']);
+  assert.match(made.inserted.scene_key, /^auto:/); assert.equal(made.response.background.scene, '22222222-2222-4222-8222-222222222222');
+  assert.ok(made.patched.some(value => value.follow), 'the decision is kept before the picture is made, so a second ask does not make another');
+  // the library is full: only what there is is used, and nothing is made
+  const full = await ask({ total: 60 });
+  assert.equal(full.images, 0); assert.equal(full.response.background, null);
+  // a limit for everyone together
+  const cap = await ask({ today: 20 });
+  assert.equal(cap.images, 0);
+  // the member's own limit
+  const memberCap = await ask({ memberToday: 6 });
+  assert.equal(memberCap.images, 0); assert.ok(!memberCap.patched.some(value => value.blank), 'the room is never blanked by an automatic ask');
+  // a failure to make it leaves the background as it is
+  const failed = await ask({ imageStatus: 500 });
+  assert.equal(failed.response.background, null); assert.ok(!failed.patched.some(value => value.blank));
+  // the limits can be set
+  const wider = await ask({ total: 60, env: { LOUNGE_SCENE_LIBRARY_TARGET: '100' } });
+  assert.equal(wider.images, 1);
+  // a scene of the library that fits is used, and counted as one more use
+  const row = { id: '33333333-3333-4333-8333-333333333333', scene_key: null, description: '밤, 비 내린 도시의 자동차 안', image_path: 'scenes/car-interior-night-rain-ab12cd34.webp', name: '비 오는 밤 자동차 안', tags: ['자동차', '밤'], uses: 3 };
+  const reused = await ask({ choice: row.id, library: [row] });
+  assert.equal(reused.images, 0); assert.deepEqual(reused.bumped, [row.id]);
+  assert.match(reused.patched.at(-1).prompt, /^비 오는 밤 자동차 안 — /);
+  assert.ok(reused.matchedPlaces.some(place => place.id === row.id && place.description.startsWith('비 오는 밤 자동차 안 · 자동차, 밤 · ')), 'the model reads name, tags, then the description');
+});
+
+test('the library is narrowed by what a background shares with the scene, and what is made is named safely', async () => {
+  const photos = loadTs(fileURLToPath(new URL('../src/lib/loungePhotos.ts', import.meta.url)));
+  const row = (id, name, tags, description, uses = 0) => ({ id, name, tags, description, image_path: `scenes/${id}.webp`, uses });
+  const rows = [
+    row('a', '노을 지는 주방', ['주방', '저녁', '실내'], '해 질 녘 창으로 노을이 들어오는 아늑한 주방'),
+    row('b', '비 오는 밤 자동차 안', ['자동차', '밤', '비'], '비 내린 밤의 자동차 안', 1),
+    row('c', '호텔 연회장', ['호텔', '연회장'], '화려한 조명의 호텔 그랜드볼룸', 9),
+    row('d', '낮의 공원', ['공원', '실외', '낮'], '햇살이 드는 공원 벤치'),
+  ];
+  assert.equal(photos.shortlistSceneBackgrounds(rows, '자동차 안, 비 내리는 밤', 2)[0].id, 'b', 'the tags and name count most');
+  assert.equal(photos.shortlistSceneBackgrounds(rows, '아무 관련 없는 말', 4)[0].id, 'c', 'with nothing shared, the most used come first');
+  assert.equal(photos.shortlistSceneBackgrounds(rows, '주방', 1).length, 1);
+  assert.equal(photos.cleanSceneSlug('Car Interior, Night Rain!'), 'car-interior-night-rain');
+  assert.equal(photos.cleanSceneSlug('한글만'), 'place');
+  assert.equal(photos.cleanSceneSlug('../../etc/passwd'), 'etc-passwd');
+  assert.ok(photos.cleanSceneSlug('a'.repeat(200)).length <= 48);
+  assert.match(photos.loungeSceneImagePath('Rooftop Bar', 'a1b2c3d4-e5f6', 'webp'), /^scenes\/rooftop-bar-a1b2c3d4\.webp$/);
+  assert.deepEqual(photos.cleanSceneTags(['자동차', '자동차', '#밤', '', 5, '아주아주아주아주아주아주긴태그입니다']).slice(0, 2), ['자동차', '밤']);
+  assert.equal(photos.cleanSceneTags(Array.from({ length: 20 }, (_, i) => `태그${i}`)).length, 8);
+  assert.equal(photos.cleanSceneName('  ', '비 내린 밤의 자동차 안, 가로등이 번진다'), '비 내린 밤의 자동차 안, 가로등이 번진다'.slice(0, 24).trim());
+});
+
 test('a photo the character sends first (source character) is for Plus, Pro and the admin; a photo the member asked for is for everyone', async () => {
   const ask = async ({ source, plan = null, email }) => {
     const calls = { claimed: 0 };
