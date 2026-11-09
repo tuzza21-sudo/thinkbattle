@@ -36,6 +36,8 @@
         <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_saseok" />
         <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/saseok_notification_color" />
 
+        <service android:name=".CallForegroundService" android:exported="false" android:foregroundServiceType="microphone|mediaPlayback" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -54,5 +56,10 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Android 13+: notifications are shown only after the member allows them (src/lib/appPush.ts). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A call keeps going with the screen off: a foreground service of type microphone (CallForegroundService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
