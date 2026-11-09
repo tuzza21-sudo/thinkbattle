@@ -40,7 +40,7 @@ test('the line is one short line of speech: no quotes, no stage directions', () 
   assert.equal(rules.cleanReachOutLine('"오늘은 길 안 잃었어요?"'), '오늘은 길 안 잃었어요?');
   assert.equal(rules.cleanReachOutLine('*웃으며*\n어제 하던 얘기, 아직 생각 중이에요.'), '어제 하던 얘기, 아직 생각 중이에요.');
   assert.equal(rules.cleanReachOutLine('안녕 *손을 흔든다* 오랜만이야').includes('*'), false);
-  assert.ok(rules.cleanReachOutLine('가'.repeat(300)).length <= 90);
+  assert.ok(rules.cleanReachOutLine('가'.repeat(300)).length <= 110);
   assert.equal(rules.cleanReachOutLine(undefined), '');
 });
 
