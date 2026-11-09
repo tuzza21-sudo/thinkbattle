@@ -8,6 +8,7 @@ import { ProfileCompletionDialog } from './components/ProfileCompletionDialog';
 import { BetaRecruitPopup } from './components/BetaRecruitPopup';
 import { listenForAppAuthReturn } from './lib/nativeApp';
 import { listenForPushTaps } from './lib/appPush';
+import { AppPushBanner } from './components/AppPushBanner';
 import { captureMetaClickId, initMetaPixel, trackMetaOnce, trackMetaPageView } from './lib/metaPixel';
 import { captureFirstTouch, saveFirstTouch } from './lib/attribution';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
@@ -245,6 +246,7 @@ function App() {
       )}
 
       {/* The beta tester call: on the lounge's front pages only, never over a sign-in or a conversation. */}
+      <AppPushBanner />
       <BetaRecruitPopup blocked={showAuthModal || !['/', '/lounge', '/lounge/about', '/lounge/guide', '/lounge/pricing'].includes(normalizedPath) || Boolean(user && !user.isAnonymous && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user))} />
 
       {showAuthModal && (
