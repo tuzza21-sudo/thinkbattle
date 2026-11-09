@@ -1131,6 +1131,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [personaBusy, setPersonaBusy] = useState(false);
+  // Declared with the other state, above the early returns: a hook after them changes the hook count when the room loads (React error 310).
+  const [sceneAutoBusy, setSceneAutoBusy] = useState(false);
   const [imageModel, setImageModel] = useState(loadLoungeImageModel);
   const [innerVoice, setInnerVoice] = useState(loadLoungeInnerVoice);
   const ownMemberChat = Boolean(soloRoom && room && user && !user.isAnonymous && room.host_id === user.id);
@@ -1564,7 +1566,6 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const innerVoiceChoice = chatSettings ? <LoungeSettingsChoice title="속마음" value={innerVoice} onChange={value => { const next = value === 'off' ? 'off' : 'on'; setInnerVoice(next); saveLoungeInnerVoice(next); }}
     options={[{ value: 'on', label: '보기', hint: '대사 아래에 캐릭터의 속마음이 보여요' }, { value: 'off', label: '숨기기', hint: '속마음 대신 말과 행동에 마음이 묻어나요' }]} /> : null;
   // The member's switch for the background following the scene (default on); a background they pick by hand turns it off.
-  const [sceneAutoBusy, setSceneAutoBusy] = useState(false);
   const sceneAutoChoice = chatSettings && !storyState ? <LoungeSettingsChoice title="배경 자동 전환" busy={sceneAutoBusy} value={loungeSceneAutoOn(room.background) ? 'on' : 'off'}
     onChange={async value => {
       if (sceneAutoBusy) return;
