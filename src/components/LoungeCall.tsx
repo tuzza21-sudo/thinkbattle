@@ -6,6 +6,7 @@ import { useScreenWakeLock } from '../lib/useScreenWakeLock';
 import { loungeCallAllowanceText } from '../lib/loungePlans';
 import type { LoungeCallUsage } from '../lib/loungeApi';
 import './LoungeCall.css';
+import { startCallKeepAlive, stopCallKeepAlive } from '../lib/appCall';
 
 export type LoungeCallProps = {
   hostId: LoungeHostId; name: string; job?: string; place: string;
@@ -31,6 +32,12 @@ const clock = (ms: number) => { const seconds = Math.max(0, Math.floor(ms / 1000
  * call buttons. Nothing of what is said is written on the screen; the conversation is kept and can be read in the chat.
  */
 export function LoungeCall(props: LoungeCallProps) {
+  // In the app the call goes on with the screen off: a foreground service runs while this screen is open (appCall.ts).
+  useEffect(() => {
+    if (props.preview) return;
+    void startCallKeepAlive();
+    return () => { void stopCallKeepAlive(); };
+  }, [props.preview]);
   // A call keeps the screen on, as a phone call does: a screen turning off stopped the page and dropped the call.
   useScreenWakeLock(!props.preview);
   const live = !props.preview && !props.lobby && !props.needsConnection;
