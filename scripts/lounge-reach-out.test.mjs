@@ -45,7 +45,7 @@ test('the line is one short line of speech: no quotes, no stage directions', () 
 });
 
 async function run(world = {}, options = {}) {
-  const calls = { messages: [], pushes: [], states: [], openai: 0 };
+  const calls = { messages: [], pushes: [], states: [], openai: 0, humanQueries: [] };
   const w = { reach: true, on: true, enabled: true, lastSent: null, lastHuman: new Date(noonKst - 30 * hour).toISOString(), count: 12, line: '어제 얘기하던 거, 아직 생각 중이에요.', persona: 'guide', ...world };
   const previous = { ...process.env }, fetch = globalThis.fetch;
   Object.assign(process.env, { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'private-service', OPENAI_API_KEY: 'sk-test', FIREBASE_SERVICE_ACCOUNT: JSON.stringify(account) });
@@ -56,10 +56,9 @@ async function run(world = {}, options = {}) {
     if (url.includes('/rest/v1/lounge_reach_out?select=user_id')) return w.table === false ? result({ message: 'no table' }, 404) : result([]);
     if (url.includes('/rest/v1/lounge_reach_out?user_id=')) return result(w.state === undefined ? [{ enabled: w.enabled, last_sent_at: w.lastSent }] : w.state);
     if (url.includes('/rest/v1/lounge_reach_out?on_conflict')) { calls.states.push(JSON.parse(init.body)); return result([], 201); }
-    if (url.includes('/rest/v1/voice_lounge_rooms')) return result([{ id: 'room-1', host_persona: w.persona, memory: '피렌체 여행 이야기' }]);
+    if (url.includes('/rest/v1/voice_lounge_rooms')) return result(w.rooms ?? [{ id: 'room-1', host_persona: w.persona, memory: '피렌체 여행 이야기', status: 'active', created_at: '2026-11-01T00:00:00Z' }]);
     if (url.includes('/rest/v1/voice_lounge_messages') && init.method === 'POST') { calls.messages.push(JSON.parse(init.body)); return result([], 201); }
-    if (url.includes('/rest/v1/voice_lounge_messages') && url.includes('kind=eq.human') && init.headers?.Range) return result([], 200, { 'content-range': `0-0/${w.count}` });
-    if (url.includes('/rest/v1/voice_lounge_messages') && url.includes('kind=eq.human')) return result(w.lastHuman ? [{ created_at: w.lastHuman }] : []);
+    if (url.includes('/rest/v1/voice_lounge_messages') && url.includes('kind=eq.human')) { calls.humanQueries.push(decodeURIComponent(url)); return result(w.lastHuman ? Array.from({ length: w.count }, () => ({ created_at: w.lastHuman })) : []); }
     if (url.includes('/rest/v1/voice_lounge_messages')) return result([{ kind: 'human', text: '안녕', created_at: w.lastHuman }, { kind: 'host', text: '어서 와요', created_at: w.lastHuman }]);
     if (url.includes('api.openai.com')) { calls.openai += 1; return result({ output_text: w.line }); }
     if (url.includes('oauth2.googleapis.com')) return result({ access_token: 'access-1', expires_in: 3600 });
@@ -88,6 +87,23 @@ test('nothing is sent to a member who turned it off, was reached today, is not s
     const skipped = await run(world);
     assert.equal(skipped.out.reached.length, 0, JSON.stringify(world)); assert.equal(skipped.messages.length, 0); assert.equal(skipped.pushes.length, 0);
   }
+});
+
+test('the line goes to the current (active) room, and what was said counts across the older rooms of the same character', async () => {
+  const rooms = [
+    { id: 'room-new', host_persona: 'guide', memory: '', status: 'active', created_at: '2026-11-05T00:00:00Z' },
+    { id: 'room-old', host_persona: 'guide', memory: '', status: 'ended', created_at: '2026-10-20T00:00:00Z' },
+  ];
+  // The messages of both rooms come back from one query (the member said 8 things in all, more than the 6 asked).
+  const done = await run({ rooms, count: 8 });
+  assert.equal(done.out.reached.length, 1);
+  assert.equal(done.messages[0].room_id, 'room-new'); assert.equal(done.pushes[0].data.url, '/lounge/room-new');
+  assert.ok(done.humanQueries[0].includes('room-new') && done.humanQueries[0].includes('room-old'));
+});
+
+test('a character whose rooms are all ended is not reached out from', async () => {
+  const ended = await run({ rooms: [{ id: 'room-old', host_persona: 'guide', memory: '', status: 'ended', created_at: '2026-10-20T00:00:00Z' }] });
+  assert.equal(ended.out.reached.length, 0); assert.equal(ended.messages.length, 0); assert.equal(ended.pushes.length, 0);
 });
 
 test('without the table nothing is sent', async () => {

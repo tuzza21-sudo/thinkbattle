@@ -27,18 +27,26 @@ export const reachOutRunLimit = 40;
 type Room = { id: string; host_persona: string; memory: string | null };
 type Message = { kind: string; text: string; created_at: string };
 
-/** The chat of this member that qualifies today, the one they wrote in most recently. */
+/**
+ * The chat of this member that qualifies today, the one they wrote in most recently. A chat with a character is one
+ * conversation that may be spread over several rooms (the older ones are kept as ended records), so what was said counts
+ * across them, but the line is left in the member's current room, the active one, which is the one they see.
+ */
 async function chatToReach(userId: string, now: number) {
-  const rooms = await rows<Room>(`/rest/v1/voice_lounge_rooms?host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=id,host_persona,memory`);
-  let best: { room: Room; lastHumanAt: number } | undefined;
+  const rooms = await rows<Room & { status: string }>(`/rest/v1/voice_lounge_rooms?host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=id,host_persona,memory,status,created_at&order=created_at.desc`);
+  const byCharacter = new Map<string, Array<Room & { status: string }>>();
   for (const room of rooms) {
     if (!loungeHosts.some(host => host.id === room.host_persona) || !loungeCharacters.some(character => character.id === room.host_persona)) continue; // a member's own character is not reached out from
-    const last = (await rows<{ created_at: string }>(`/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(room.id)}&kind=eq.human&order=id.desc&limit=1&select=created_at`))[0];
-    if (!last) continue;
-    const counted = await service(`/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(room.id)}&kind=eq.human&select=id`, { headers: { Prefer: 'count=exact', Range: '0-0' } });
-    const humanMessages = Number((counted.headers.get('content-range') || '').split('/')[1]) || 0;
-    const lastHumanAt = Date.parse(last.created_at);
-    if (reachOutQualifies({ policy: reachOutPolicyFor(room.host_persona), lastHumanAt, humanMessages }, now) && (!best || lastHumanAt > best.lastHumanAt)) best = { room, lastHumanAt };
+    byCharacter.set(room.host_persona, [...(byCharacter.get(room.host_persona) ?? []), room]);
+  }
+  let best: { room: Room; lastHumanAt: number } | undefined;
+  for (const [character, own] of byCharacter) {
+    const current = own.find(room => room.status === 'active');
+    if (!current) continue;
+    const said = await rows<{ created_at: string }>(`/rest/v1/voice_lounge_messages?room_id=in.(${own.map(room => encodeURIComponent(room.id)).join(',')})&kind=eq.human&order=id.desc&limit=200&select=created_at`);
+    if (!said.length) continue;
+    const lastHumanAt = Date.parse(said[0].created_at);
+    if (reachOutQualifies({ policy: reachOutPolicyFor(character), lastHumanAt, humanMessages: said.length }, now) && (!best || lastHumanAt > best.lastHumanAt)) best = { room: current, lastHumanAt };
   }
   return best?.room;
 }
