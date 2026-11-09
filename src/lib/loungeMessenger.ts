@@ -306,6 +306,10 @@ export type LoungeCompanionState = {
    */
   lingering?: { what: string; turn: number };
   next_intent?: { what: string; turn: number };
+  /** The last change of scene (2026-11-09): when, and whether the member asked for it; the background follows it (loungeSceneFollow.ts). */
+  scene_change?: { turn: number; at: number; explicit: boolean };
+  /** The last turn the member asked to go somewhere else: the move itself may come a turn or two later. */
+  scene_move_asked?: number;
 };
 const strings = (value: unknown, max: number, length = 80) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim().slice(0, length)).slice(-max) : [];
 const turnNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -337,7 +341,14 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(readBoost(value.intimacy_boost) ? { intimacy_boost: readBoost(value.intimacy_boost) } : {}),
     ...(readCarry(value.lingering) ? { lingering: readCarry(value.lingering) } : {}),
     ...(readCarry(value.next_intent) ? { next_intent: readCarry(value.next_intent) } : {}),
+    ...(readSceneChange(value.scene_change) ? { scene_change: readSceneChange(value.scene_change) } : {}),
+    ...(turnNumber(value.scene_move_asked) !== undefined ? { scene_move_asked: turnNumber(value.scene_move_asked) } : {}),
   };
+}
+function readSceneChange(value: unknown) {
+  const item = value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
+  const turn = turnNumber(item?.turn), at = turnNumber(item?.at);
+  return turn !== undefined && at !== undefined ? { turn, at, explicit: item?.explicit === true } : undefined;
 }
 function readBoost(value: unknown) {
   const boost = value && typeof value === 'object' ? value as Record<string, unknown> : undefined;
@@ -522,7 +533,7 @@ const uniqueTail = (items: readonly string[], max: number) => [...new Set([...it
 export const loungeEndsOnQuestion = (reply: string) => /[?？]\s*$/.test(reply.split('\n').map(line => line.trim()).filter(line => line && !actionLine.test(line)).at(-1) ?? '');
 const carried = (value: unknown, turn: number) => { const what = clip(value, 60); return what ? { what, turn } : undefined; };
 /** The state after a turn: the scene the call after the reply wrote, the event that came, what was used. */
-export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[] }): LoungeCompanionState {
+export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number }): LoungeCompanionState {
   const { state, update, decision, turn } = input;
   if (state.source_turn !== undefined && turn <= state.source_turn) return state;
   const scene = readScene(update?.scene);
@@ -531,6 +542,10 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
   const held = activeBoost(state, turn) && place === state.intimacy_boost?.location ? state.intimacy_boost : undefined;
   const boost = held ?? (input.boldMove && place && input.boldMove.stage < 4 ? { level: input.boldMove.stage + 1, turn, location: place } : undefined);
   const moved = scene && (!state.scene || scene.location !== state.scene.location);
+  // A change of place or of kind of place is a change of scene; it is the member's own when they asked for it this turn or just before.
+  const changed = Boolean(moved || (scene && state.scene && scene.scene_type !== state.scene.scene_type));
+  const askedRecently = state.scene_move_asked !== undefined && turn - state.scene_move_asked <= 2;
+  const explicit = Boolean(decision.target) || askedRecently;
   const reaction = loungeReactionKinds.find(kind => kind === update?.reaction_type);
   const facts = strings(update?.self_facts, 2, 40).filter(fact => !state.self_facts.some(item => item.fact === fact));
   const shared = clip(update?.shared_experience, 60);
@@ -552,6 +567,8 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     shared: shared ? [...state.shared, { what: shared, turn }].slice(-12) : state.shared,
     self_facts: [...state.self_facts, ...facts.map(fact => ({ fact, turn }))].slice(-20),
     intimacy_boost: boost,
+    ...(changed ? { scene_change: { turn, at: input.now ?? Date.now(), explicit } } : {}),
+    ...(decision.target ? { scene_move_asked: turn } : askedRecently || (state.scene_move_asked !== undefined && turn - state.scene_move_asked <= 6) ? { scene_move_asked: state.scene_move_asked } : {}),
     // Written again after every reply (an empty line lets it go); without the call after the reply the last one stays
     // until loungeCarryTurns have passed.
     lingering: update && 'lingering' in update ? carried(update.lingering, turn) : state.lingering,

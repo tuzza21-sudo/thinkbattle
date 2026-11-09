@@ -389,7 +389,16 @@ export const loungeThemes = [
   { id: 'theater', name: '심야 토크쇼 무대', subtitle: '불이 켜진 호스트 데스크와 빈 게스트 의자', tag: 'THE STAGE BEFORE THE SHOW', caption: '대본은 없어요. 받아치다 보면 이야기가 만들어져요.', image: '/lounge/talkshow-stage-v1.webp', accent: '#f0c27a', surface: '#25141a' },
   // The 'lawlibrary' id is kept for existing rooms and the database lists of places; since 2026-11-03 the place is the shrine 홍실당.
   { id: 'lawlibrary', name: '청담동 신당 홍실당', subtitle: '붉은 실이 드리운 촛불 아래, 마주 앉는 상담 자리', tag: 'THE SHRINE ABOVE THE CITY', caption: '미련은 한마디로 잘라 드려요. 붉은 실이 흔들리는 밤의 신당에서 연애 이야기를 들려줘요.', image: '/lounge/shrine-v1.webp', accent: '#c4443c', surface: '#1b1214' },
+  // Everyday places a chat moves to (2026-11-09). They are backgrounds only: a room, a space or a scenario is not made with
+  // them (the database lists of places for those do not include them; see loungePlaceBackgroundIds).
+  { id: 'car', name: '자동차 안', subtitle: '비 갠 밤길, 뒷좌석에서 보는 앞유리와 번지는 신호등', tag: 'ON THE ROAD AT NIGHT', caption: '창밖으로 불빛이 지나가는 동안, 이야기는 계속돼요.', image: '/lounge/car-night-v1.webp', accent: '#f0b878', surface: '#1b1511' },
+  { id: 'livingroom', name: '집 거실', subtitle: '소파 위의 담요, 스탠드 조명과 창밖의 도시 불빛', tag: 'AN EVENING AT HOME', caption: '불빛이 낮은 저녁, 편하게 기대어 이야기해요.', image: '/lounge/living-room-v1.webp', accent: '#e8c28d', surface: '#2a211a' },
+  { id: 'bedroom', name: '집 침실', subtitle: '조용한 밤, 침대 곁 스탠드와 커튼 너머의 야경', tag: 'A QUIET NIGHT IN', caption: '조명을 낮추고, 조용히 나누는 이야기.', image: '/lounge/bedroom-v1.webp', accent: '#e6c9a0', surface: '#211c1b' },
+  { id: 'restaurant', name: '아늑한 식당', subtitle: '둘이 마주 앉은 테이블 위의 촛불과 열린 주방', tag: 'A TABLE FOR TWO', caption: '촛불이 흔들리는 테이블에서 천천히 먹으며 이야기해요.', image: '/lounge/restaurant-warm-v1.webp', accent: '#e9bf84', surface: '#2a1f18' },
+  { id: 'street', name: '비 갠 밤거리', subtitle: '젖은 길 위에 번진 가게 불빛과 가로등', tag: 'AFTER THE RAIN', caption: '비가 그친 거리를 걸으며 나누는 이야기.', image: '/lounge/street-night-v1.webp', accent: '#e8b87a', surface: '#1c1815' },
 ] as const;
+/** The backgrounds that are places only (the five added 2026-11-09): not for rooms, spaces or scenarios, whose database lists of places do not include them. */
+export const loungePlaceBackgroundIds = ['car', 'livingroom', 'bedroom', 'restaurant', 'street'] as const;
 export type LoungeThemeId = typeof loungeThemes[number]['id'];
 export const getLoungeTheme = (id?: string | null) => loungeThemes.find(theme => theme.id === id) ?? loungeThemes[0];
 /** The backgrounds each character's conversations can use. A room picks one of its character's list. */

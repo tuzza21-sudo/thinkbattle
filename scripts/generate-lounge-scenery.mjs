@@ -14,6 +14,27 @@ if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required in 
 
 const common = 'Use case: photorealistic-natural. Asset type: wide 3:2 background photograph for a voice conversation app, an empty, inviting interior with no people. Premium editorial interior photography, warm cinematic lighting, realistic materials, shallow depth of field with the foreground softly out of focus, the centre of the frame calm and uncluttered. No people, no text, no logos, no watermark, no readable signs.';
 const scenes = {
+  // Everyday places a chat moves to (2026-11-09): the background follows the place, and these were missing. Empty, no people.
+  car: {
+    file: 'car-night-v1.webp',
+    prompt: `${common} The inside of a parked car at night seen from the back seat between the two front seats, looking out through the windshield: a dark calm interior with the soft amber glow of the dashboard, a leather steering wheel and rear-view mirror slightly out of focus, wet city street and out-of-focus bokeh of street lamps, traffic lights and shop windows beyond the glass with fine raindrops on the windshield. No people, no readable signs.`,
+  },
+  livingroom: {
+    file: 'living-room-v1.webp',
+    prompt: `${common} A cosy apartment living room in the evening: a deep linen sofa with a knitted blanket and two cushions, a low wooden coffee table with two mugs and a small candle, a floor lamp and a table lamp giving warm light, a bookshelf with books and a green plant, a large window with the city lights beyond and sheer curtains. Lived-in, tidy, intimate, warm tones. No people.`,
+  },
+  bedroom: {
+    file: 'bedroom-v1.webp',
+    prompt: `${common} A quiet apartment bedroom at night: a bed with soft white and grey linen and a heavy blanket, a bedside lamp glowing warm, a small wooden nightstand with a glass of water and a paperback, a large window with sheer curtains and a blurred city skyline far below, calm and intimate, dim warm light with deep soft shadows. No people.`,
+  },
+  restaurant: {
+    file: 'restaurant-warm-v1.webp',
+    prompt: `${common} A small warm restaurant interior in the evening, seen from a corner table for two: a wooden table set with two plates, glasses and a small candle in the foreground softly out of focus, other tables empty behind, pendant lamps with warm bulbs, brick or plaster walls, an open kitchen glowing in the background. Welcoming, a little romantic, relaxed. No people, no readable menus or signs.`,
+  },
+  street: {
+    file: 'street-night-v1.webp',
+    prompt: `${common} Wide 3:2 photograph of a quiet city side street at night just after rain, empty of people: wet asphalt and pavement reflecting warm shop-window light and street lamps, a few small shops with their lights on and blurred neon glow with no readable text, a tree-lined pavement with a bench, light mist, cinematic and calm.`,
+  },
   // 한지오's story starts in Florence (2026-11-07): the Arno at golden hour from a stone bridge.
   arnobridge: {
     file: 'arno-bridge-v1.webp',

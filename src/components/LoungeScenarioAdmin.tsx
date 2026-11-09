@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BookOpen, CircleCheck, Plus, Save, Trash2 } from 'lucide-react';
 import { deleteLoungeScenario, listLoungeScenariosForAdmin, saveLoungeScenario } from '../lib/superAdmin';
 import { loungeScenarioLimits, type LoungeScenarioRow } from '../lib/loungeScenarios';
-import { loungeHosts, loungeThemes } from '../lib/lounge';
+import { loungeHosts, loungePlaceBackgroundIds, loungeThemes } from '../lib/lounge';
 import { loungeCharacters } from '../lib/loungeCharacters';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
@@ -50,7 +50,7 @@ export const LoungeScenarioAdmin = () => {
       <strong>{draft.id ? '시나리오 고치기' : '새 시나리오'}</strong>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10 }}>
         <label style={field}>캐릭터<select value={draft.character_id} onChange={event => set('character_id', event.target.value as Draft['character_id'])}>{loungeHosts.map(host => <option key={host.id} value={host.id}>{nameOf(host.id)}</option>)}</select></label>
-        <label style={field}>배경<select value={draft.theme} onChange={event => set('theme', event.target.value as Draft['theme'])}>{loungeThemes.map(theme => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select></label>
+        <label style={field}>배경<select value={draft.theme} onChange={event => set('theme', event.target.value as Draft['theme'])}>{loungeThemes.filter(theme => !(loungePlaceBackgroundIds as readonly string[]).includes(theme.id)).map(theme => <option key={theme.id} value={theme.id}>{theme.name}</option>)}</select></label>
         <label style={field}>순서<input type="number" value={draft.sort} onChange={event => set('sort', Number(event.target.value) || 0)} /></label>
         <label style={{ ...field, alignContent: 'end' }}><span><input type="checkbox" checked={draft.active} onChange={event => set('active', event.target.checked)} /> 회원에게 보이기</span></label>
       </div>

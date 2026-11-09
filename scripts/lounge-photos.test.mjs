@@ -31,7 +31,7 @@ test('the deployed ESM function loads with real Node resolution (Vercel compiles
     writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ type: 'module' }));
     // Every file of the relationship folder, so a character added later is part of the graph without editing this list.
     const relationship = [...['index', 'events', 'types', 'engine', 'persistence', 'memory', 'templates'].map(name => `src/lib/relationship/${name}.ts`), ...readdirSync(resolve(workspace, 'src/lib/relationship/configs')).filter(name => name.endsWith('.ts')).map(name => `src/lib/relationship/configs/${name}`)];
-    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', 'src/lib/loungeAdmin.ts', 'src/lib/loungePlans.ts', ...relationship]) {
+    for (const file of ['api/lounge-images.ts', 'src/lib/lounge.ts', 'src/lib/loungeCharacters.ts', 'src/lib/loungePhotos.ts', 'src/lib/loungeSceneFollow.ts', 'src/lib/loungeCustomCharacters.ts', 'src/lib/loungeScenarios.ts', 'src/lib/loungeStory.ts', 'src/lib/loungeAdmin.ts', 'src/lib/loungePlans.ts', ...relationship]) {
       const target = resolve(directory, file.replace(/\.ts$/, '.js'));
       mkdirSync(resolve(target, '..'), { recursive: true });
       writeFileSync(target, ts.transpileModule(readFileSync(resolve(workspace, file), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ESNext } }).outputText);
@@ -160,18 +160,64 @@ test('a background that follows the place (automatic): a place that fits is save
   };
   const sharedRoom = { id: '11111111-1111-4111-8111-111111111111', scene_key: null, description: '밤의 호텔 객실, 창가의 낮은 조명', image_path: 'scenes/room.webp' };
   const fits = await ask({ choice: sharedRoom.id, shared: [sharedRoom] });
-  assert.deepEqual(fits.patched, { scene: sharedRoom.id, image: 'scenes/room.webp', prompt: sharedRoom.description, auto: true }, 'the shared scene for a hotel room is used');
+  const { follow: fitsNote, ...fitsSaved } = fits.patched;
+  assert.deepEqual(fitsSaved, { scene: sharedRoom.id, image: 'scenes/room.webp', prompt: sharedRoom.description, auto: true }, 'the shared scene for a hotel room is used');
+  assert.equal(fitsNote.place, '호텔 객실', 'and what it was decided for is kept (the stated place of the summary line)');
   assert.equal(fits.response.background.scene, sharedRoom.id);
   const theme = await ask({ choice: 'cafe' });
-  assert.deepEqual(theme.patched, { theme: 'cafe', auto: true }, 'one of the places');
+  const { follow: themeNote, ...themeSaved } = theme.patched;
+  assert.deepEqual(themeSaved, { theme: 'cafe', auto: true }, 'one of the places'); assert.ok(themeNote.key);
   const same = await ask({ choice: 'cafe', background: { theme: 'cafe', auto: true } });
-  assert.equal(same.patched, null, 'a background that already fits is not written again'); assert.equal(same.response.background, null);
+  assert.equal(same.response.background, null, 'a background that already fits is not changed');
+  assert.deepEqual({ theme: same.patched.theme, auto: same.patched.auto, hasFollow: Boolean(same.patched.follow) }, { theme: 'cafe', auto: true, hasFollow: true }, 'only what it was decided for is kept, so it is not asked again');
   const chosen = await ask({ choice: 'cafe', background: { theme: 'river' } });
   assert.equal(chosen.matched, 0, 'a background the member chose is left alone (no model call)'); assert.equal(chosen.patched, null);
   const none = await ask({ choice: 'new' });
-  assert.equal(none.patched, null, 'no place fits: the background stays as it is, not the empty space'); assert.equal(none.images, 0, 'and nothing is made'); assert.equal(none.response.background, null);
+  assert.deepEqual(Object.keys(none.patched).sort(), ['auto', 'follow'], 'no place fits: the background stays as it is, not the empty space (only the decision is kept)'); assert.equal(none.images, 0, 'and nothing is made'); assert.equal(none.response.background, null);
   const off = await ask({ choice: 'cafe', env: { LOUNGE_AUTO_SCENE: 'off' } });
   assert.equal(off.matched, 0); assert.equal(off.patched, null);
+});
+
+test('the background follows the v4 engine\'s scene: the start, an explicit move at once, otherwise not often', async () => {
+  const minute = 60_000;
+  const ask = async ({ scene, sceneTurns = 5, change, follow, background = { auto: true }, choice = 'livingroom' }) => {
+    const calls = { patched: null, matched: 0 };
+    const state = { room_id: roomId, scene, scene_turns: sceneTurns, ...(change ? { scene_change: change } : {}) };
+    await run(async (url, init) => {
+      if (url.includes('/auth/v1/user')) return result({ id: userId });
+      if (url.includes('voice_lounge_rooms?id=eq.') && (init?.method ?? 'GET') === 'GET') return result([{ scenario: null, story_state: null, memory: '', host_persona: 'guide', background: { ...background, ...(follow ? { follow } : {}) } }]);
+      if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { calls.patched = JSON.parse(init.body).background; return result([]); }
+      if (url.includes('voice_lounge_companion_state')) return result([{ state }]);
+      if (url.includes('lounge_scene_backgrounds?select=')) return result([]);
+      if (url.endsWith('/responses')) { calls.matched++; return result(sceneOutput({ choice, place: '' })); }
+      throw new Error('Unexpected call ' + url);
+    }, async () => { calls.response = await (await handler(request({ action: 'scene', roomId, auto: true }))).json(); });
+    return calls;
+  };
+  const living = { location: '집 거실', scene_type: '집', activity: '소파에서 이야기하는 중', time_of_day: '밤', season: '', objects: [] };
+  const key = (type, place) => `${type}|${place.replace(/\s/g, '')}`;
+  // the start: nothing decided yet, a stated place -> applied
+  const start = await ask({ scene: living });
+  assert.equal(start.matched, 1); assert.equal(start.patched.theme, 'livingroom'); assert.equal(start.patched.follow.place, '집 거실');
+  // the same place again (every later reply asks): no model call, nothing written
+  const same = await ask({ scene: living, background: { theme: 'livingroom', auto: true }, follow: { key: key('집', '집 거실'), at: Date.now() - 60 * minute, place: '집 거실' } });
+  assert.equal(same.matched, 0); assert.equal(same.patched, null); assert.equal(same.response.background, null);
+  const was = { key: key('식당', '식당'), at: Date.now() - 2 * minute, place: '식당' };
+  // an explicit move, two minutes after the last change: at once
+  const explicit = await ask({ scene: living, sceneTurns: 0, change: { turn: 8, at: Date.now() - 30_000, explicit: true }, follow: was, background: { theme: 'restaurant', auto: true } });
+  assert.equal(explicit.matched, 1); assert.equal(explicit.patched.theme, 'livingroom');
+  // a drift nobody asked for, two minutes after the last change: not
+  const drift = await ask({ scene: living, sceneTurns: 5, change: { turn: 8, at: Date.now() - 30_000, explicit: false }, follow: was, background: { theme: 'restaurant', auto: true } });
+  assert.equal(drift.matched, 0); assert.equal(drift.patched, null);
+  // a settled change after a long while: yes
+  const settled = await ask({ scene: living, sceneTurns: 6, follow: { ...was, at: Date.now() - 45 * minute }, background: { theme: 'restaurant', auto: true } });
+  assert.equal(settled.matched, 1); assert.equal(settled.patched.theme, 'livingroom');
+  // a place the engine does not know ("where each is"): nothing to follow
+  const vague = await ask({ scene: { ...living, location: '각자 있는 곳에서 전화 통화', scene_type: '기타' } });
+  assert.equal(vague.matched, 0); assert.equal(vague.patched, null);
+  // a background the member chose is never touched
+  const chosen = await ask({ scene: living, background: { theme: 'river' } });
+  assert.equal(chosen.matched, 0); assert.equal(chosen.patched, null);
 });
 
 test('a photo the character sends first (source character) is for Plus, Pro and the admin; a photo the member asked for is for everyone', async () => {

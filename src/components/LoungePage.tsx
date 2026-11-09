@@ -14,7 +14,7 @@ import { LoungeBackgroundPicker } from './LoungeBackgroundPicker';
 import { LoungeChatSettings, LoungeSettingsChoice, type LoungeSettingsItem } from './LoungeChatSettings';
 import { LoungeMemorySheet } from './LoungeMemorySheet';
 import { listMyLoungePersonas, loadEarlierLoungeMessages, loungeHistoryPage, loadLoungeImageModel, loadLoungeInnerVoice, saveLoungeImageModel, saveLoungeInnerVoice, setLoungeRoomPersona, type LoungeMemoryBook } from '../lib/loungeApi';
-import { isLoungeImageModel, loungeImageModelLabel, loungeImageModels, loungeSceneFromMemory, loungeScenePlace } from '../lib/loungePhotos';
+import { isLoungeImageModel, loungeImageModelLabel, loungeImageModels } from '../lib/loungePhotos';
 import { loungePersonaStoryScenario, loungeRoomPersonaRow, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../lib/loungePersonas';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { getLoungeChatModel } from '../lib/loungeModels';
@@ -774,24 +774,29 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   // keepBackground only writes state; the room and episode decide when to ask.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneWanted, sceneEpisode, roomId]);
-  // The background follows the place (2026-11-07): when the scene the chat's summary keeps moves to another place (a
-  // restaurant, a hotel room, a kitchen), the server is asked for a background that fits among the places and the shared
-  // scenes. It only reuses one that exists, and leaves a background the member chose, so a failure or no match changes
-  // nothing. The place the page opens with is only remembered, not asked for.
-  const scenePlace = loungeScenePlace(loungeSceneFromMemory(room?.memory) ?? '');
-  const placeFollowed = useRef<{ room: string; place: string } | null>(null);
+  // The background follows the place (2026-11-07), on the v4 engine's scene since 2026-11-09: the server is asked when the
+  // room is opened and again after each reply, and it decides (loungeSceneFollow.ts): at the start the stated place, at once on
+  // an explicit move, otherwise only when the scene has settled somewhere else for a while. It only reuses a background that
+  // exists and leaves one the member chose, so most asks change nothing. The reply's scene is saved a moment after the reply
+  // itself, so each reply is asked about twice, a few seconds apart.
+  const latestHostId = messages.filter(message => message.kind === 'host').at(-1)?.id;
+  const placeFollowed = useRef<{ room: string; at: number } | null>(null);
   const followsPlace = Boolean(room && user && !user.isAnonymous && room.capacity === 1 && !room.space_id && room.host_id === user.id && !storyState);
   useEffect(() => {
-    if (!followsPlace || !scenePlace) return;
-    const seen = placeFollowed.current;
-    if (!seen || seen.room !== roomId) { placeFollowed.current = { room: roomId, place: scenePlace }; return; }
-    if (seen.place === scenePlace) return;
-    placeFollowed.current = { room: roomId, place: scenePlace };
-    void matchLoungeSceneBackground(roomId, true).then(result => { const picked = readLoungeRoomBackground(result.background); if (picked && mounted.current) keepBackground(picked); })
-      .catch(err => console.warn('[Lounge scene] not followed', err instanceof Error ? err.message.slice(0, 80) : 'error'));
-  // keepBackground only writes state; the place decides when to ask.
+    if (!followsPlace) return;
+    const ask = () => {
+      if (!mounted.current || document.visibilityState === 'hidden') return;
+      const last = placeFollowed.current;
+      if (last && last.room === roomId && Date.now() - last.at < 2000) return;
+      placeFollowed.current = { room: roomId, at: Date.now() };
+      void matchLoungeSceneBackground(roomId, true).then(result => { const picked = readLoungeRoomBackground(result.background); if (picked && mounted.current) keepBackground(picked); })
+        .catch(err => console.warn('[Lounge scene] not followed', err instanceof Error ? err.message.slice(0, 80) : 'error'));
+    };
+    const timers = [window.setTimeout(ask, 2500), window.setTimeout(ask, 9000)];
+    return () => timers.forEach(window.clearTimeout);
+  // keepBackground only writes state; the room and its latest reply decide when to ask.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followsPlace, scenePlace, roomId]);
+  }, [followsPlace, latestHostId, roomId]);
   const chat = isLoungeChatRoom(room);
   // A member's character is read and registered before the room is drawn with it.
   const customCharacter = useLoungeCustomCharacter(room?.host_persona);
