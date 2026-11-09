@@ -50,6 +50,13 @@ Android Studio에서 할 일:
 - 서버: `api/push.ts`(테스트 알림), `src/lib/pushServer.ts`(Firebase HTTP v1로 보내기). 캐릭터가 먼저 연락하는 기능은 이 `sendPushToToken`을 쓴다.
 - 알림을 누르면 데이터의 `url`(기본 `/lounge`)이 열린다.
 
+## 화면이 꺼져도 이어지는 통화
+
+- 안드로이드는 화면에 없는 앱의 마이크를 막는다. 그래서 통화 화면(`LoungeCall`)이 열려 있는 동안 포그라운드 서비스(`CallForegroundService`, 유형 마이크+미디어 재생)와 부분 웨이크락(최대 4시간)을 쓴다. "통화 중이에요" 알림이 하나 보인다.
+- 웹에서 `src/lib/appCall.ts`가 `CallKeepAlive` 플러그인(`CallKeepAlivePlugin.java`, `MainActivity`에서 등록)을 부른다. 앱 밖에서는 아무 일도 하지 않고, 서비스를 못 시작해도 화면이 켜진 동안의 통화는 그대로 된다.
+- 확인(2026-11-09, 갤럭시 S22+): 통화 중 화면을 끄고 잠근 채 1분 넘게 지나도 통화 시간이 흘렀고 마이크는 `not silenced`였다. 통화를 끊으면 서비스, 웨이크락, 마이크 사용이 모두 풀린다.
+- 새 앱 파일(APK/AAB)을 만들어야 반영된다(네이티브 코드). 이전 빌드는 플러그인이 없어도 오류 없이 넘어간다.
+
 ## 출시용 서명과 AAB
 
 - 업로드 키: `C:\Users\<사용자>\saseok-keys\saseok-upload.jks` (별칭 `saseok-upload`, 유효기간 약 27년). 저장소 밖에 있고, 비밀번호는 `android/keystore.properties`(저장소에 올라가지 않음)와 같은 폴더의 `keystore.properties.backup`에 있다.
