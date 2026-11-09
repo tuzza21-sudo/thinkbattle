@@ -1,5 +1,6 @@
 import { isLoungeCustomCharacterId, loungeThemes } from '../src/lib/lounge.js';
 import { normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios.js';
+import { decideSceneFollow, readEngineScene, readSceneFollow, sceneForMatch } from '../src/lib/loungeSceneFollow.js';
 import { loungeStoryEpisodeAt, loungeStoryEpisodesOn, normalizeLoungeStoryState } from '../src/lib/loungeStory.js';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin.js';
 import { loungePhotoMonthly, loungePhotoMonthlyFor } from '../src/lib/loungePlans.js';
@@ -266,8 +267,8 @@ async function gptBackground(context: Context, request: string, model: LoungeIma
  * place or a shared scene that fits, the background stays as it is.
  */
 async function sceneBackground(context: Context, userId: string, roomId: string, automatic = false) {
-  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory,background`, { headers: serviceHeaders(context) });
-  const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown; background?: Record<string, unknown> | null }> : [];
+  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory,background,host_persona`, { headers: serviceHeaders(context) });
+  const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown; background?: Record<string, unknown> | null; host_persona?: string }> : [];
   if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
   const autoMode = process.env.LOUNGE_AUTO_SCENE === 'off' ? 'off' : process.env.LOUNGE_AUTO_SCENE === 'make' ? 'make' : 'reuse';
   if (automatic && (autoMode === 'off' || (room.background && room.background.auto !== true))) return json({ background: null });
@@ -275,14 +276,36 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   const episodes = loungeStoryEpisodesOn ? scenario?.episodes ?? [] : [];
   const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
   const episode = state ? loungeStoryEpisodeAt(episodes, state) : undefined;
-  const scene = automatic ? loungeSceneFromMemory(room.memory) : episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;
+  // An automatic ask (the page after a reply, or on opening) follows the v4 engine's scene (loungeSceneFollow.ts): at the start
+  // the stated place, at once on an explicit move, otherwise only when the scene has settled somewhere else for a while.
+  let followNote: { key: string; at: number; place: string } | undefined;
+  let scene = automatic ? undefined : episode?.scene || loungeSceneFromMemory(room.memory) || scenario?.place;
+  if (automatic) {
+    const stateRows = room.host_persona ? await timed(`${context.base}/rest/v1/voice_lounge_companion_state?user_id=eq.${userId}&character_id=eq.${encodeURIComponent(room.host_persona)}&room_id=eq.${encodeURIComponent(roomId)}&select=state`, { headers: serviceHeaders(context) }) : undefined;
+    const [stateRow] = stateRows?.ok ? await stateRows.json() as Array<{ state: unknown }> : [];
+    const engine = readEngineScene(stateRow?.state);
+    const now = Date.now();
+    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory), sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), now });
+    if (decision.action === 'keep') return json({ background: null });
+    followNote = { key: decision.key, at: now, place: decision.place };
+    scene = sceneForMatch(engine.scene, decision.place);
+    console.info('[Lounge scene]', JSON.stringify({ follow: decision.reason, place: decision.place }));
+  }
   if (!scene) return json({ background: null });
   const key = scenario && episode ? loungeSceneKey(scenario.id, episode.number, state?.adapted ? episode.scene : undefined) : undefined;
   const saveOnRoom = async (background: Record<string, unknown>) => {
-    const value = { ...background, auto: true, ...(episode ? { episode: episode.number } : {}) };
+    const value = { ...background, auto: true, ...(episode ? { episode: episode.number } : {}), ...(followNote ? { follow: followNote } : {}) };
     const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: value }) }).catch(() => null);
     console.info('[Lounge scene]', JSON.stringify({ key, chosen: background.theme ?? (background.scene ? 'shared' : 'blank'), saved: Boolean(saved?.ok) }));
     return json({ background: value });
+  };
+  // The background stays as it is, but what it was decided for is kept, so the same scene is not asked about again.
+  const unchanged = async () => {
+    if (followNote) {
+      const kept = room.background && typeof room.background === 'object' ? room.background : {};
+      await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: { ...kept, auto: true, follow: followNote } }) }).catch(() => undefined);
+    }
+    return json({ background: null });
   };
   type SceneRow = { id: string; scene_key: string | null; description: string; image_path: string };
   const sharedScene = (row: SceneRow) => saveOnRoom({ scene: row.id, image: row.image_path, prompt: row.description });
@@ -309,13 +332,13 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     const chosen = match.id;
     const theme = loungeThemes.find(item => item.id === chosen);
     // An automatic ask that finds the background already there changes nothing.
-    if (theme && automatic && room.background?.theme === theme.id) return json({ background: null });
+    if (theme && automatic && room.background?.theme === theme.id) return unchanged();
     if (theme) return saveOnRoom({ theme: theme.id });
     const row = shared.find(item => item.id === chosen);
-    if (row && automatic && room.background?.scene === row.id) return json({ background: null });
+    if (row && automatic && room.background?.scene === row.id) return unchanged();
     if (row) return sharedScene(row);
   }
-  if (automatic && autoMode !== 'make') return json({ background: null });
+  if (automatic && autoMode !== 'make') return match ? unchanged() : json({ background: null });
   const place = match && 'place' in match ? match.place : scene;
   // A new scene, within the member's allowance for the day; past it (or when it fails) the empty space.
   const kst = new Date(Date.now() + 9 * 3_600_000);
