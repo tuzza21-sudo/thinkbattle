@@ -12,12 +12,17 @@ const tokenKey = 'saseok-push-token';
 const readToken = () => { try { return window.localStorage.getItem(tokenKey) ?? ''; } catch { return ''; } };
 const writeToken = (token: string) => { try { if (token) window.localStorage.setItem(tokenKey, token); else window.localStorage.removeItem(tokenKey); } catch { /* the token is registered again next time */ } };
 
-async function plugin() { return (await import('@capacitor/push-notifications')).PushNotifications; }
+/**
+ * The plugin is returned inside an object on purpose: a Capacitor plugin proxy answers to `then`, so an async function that
+ * returned it (or an await on it) never finished and the settings block stayed empty (found on the phone, 2026-11-09).
+ */
+async function plugin() { const { PushNotifications } = await import('@capacitor/push-notifications'); return { push: PushNotifications }; }
 
 /** Whether this phone is registered for the member: the permission, and a token that was saved. */
 export async function pushState(): Promise<PushState> {
   if (!isSaseokApp()) return 'unsupported';
-  const permission = (await (await plugin()).checkPermissions()).receive;
+  const { push } = await plugin();
+  const permission = (await push.checkPermissions()).receive;
   if (permission === 'denied') return 'blocked';
   return permission === 'granted' && readToken() ? 'on' : 'off';
 }
@@ -25,7 +30,7 @@ export async function pushState(): Promise<PushState> {
 /** Asks for the permission when needed, gets the phone's token and registers it; resolves with the new state. */
 export async function turnOnPush(): Promise<PushState> {
   if (!isSaseokApp()) return 'unsupported';
-  const push = await plugin();
+  const { push } = await plugin();
   let permission = (await push.checkPermissions()).receive;
   if (permission === 'prompt' || permission === 'prompt-with-rationale') permission = (await push.requestPermissions()).receive;
   if (permission !== 'granted') return permission === 'denied' ? 'blocked' : 'off';
@@ -55,7 +60,7 @@ let listening = false;
 export async function listenForPushTaps() {
   if (!isSaseokApp() || listening) return;
   listening = true;
-  const push = await plugin();
+  const { push } = await plugin();
   await push.addListener('pushNotificationActionPerformed', action => {
     const url = String(action.notification.data?.url ?? '/lounge');
     if (url.startsWith('/') && !url.startsWith('//')) window.location.assign(url);
