@@ -53,9 +53,9 @@ async function writeLine(room: Room) {
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25_000),
     body: JSON.stringify({
-      model: process.env.LOUNGE_REACH_OUT_MODEL || 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 160, store: false,
+      model: process.env.LOUNGE_REACH_OUT_MODEL || 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 200, store: false,
       instructions: reachOutInstructions,
-      input: JSON.stringify({ character: { name: character.name, role: character.role, how_to_talk: String((host as { instruction?: string }).instruction ?? '').slice(0, 700) }, memory: (room.memory ?? '').slice(0, 900), recent }),
+      input: JSON.stringify({ character: { name: character.name, job: character.role, tagline: character.tagline, life: character.story.slice(0, 2).join(' ').slice(0, 700), how_to_talk: String((host as { instruction?: string }).instruction ?? '').slice(0, 500) }, memory: (room.memory ?? '').slice(0, 900), recent }),
     }),
   });
   if (!response.ok) return undefined;
