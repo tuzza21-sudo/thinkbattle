@@ -56,11 +56,19 @@ export async function turnOffPush(): Promise<PushState> {
 }
 
 let listening = false;
-/** In the app: a tap on a notification opens the page it names. */
+/** A push that arrives while the app is open is not put in the tray by Android; the page shows it as a banner (AppPushBanner). */
+export const pushForegroundEvent = 'saseok-push-foreground';
+export type PushForeground = { title: string; body: string; url: string };
+
+/** In the app: a tap on a notification opens the page it names, and a push that arrives in the open app is handed to the banner. */
 export async function listenForPushTaps() {
   if (!isSaseokApp() || listening) return;
   listening = true;
   const { push } = await plugin();
+  await push.addListener('pushNotificationReceived', notification => {
+    const detail: PushForeground = { title: String(notification.title ?? ''), body: String(notification.body ?? ''), url: String(notification.data?.url ?? '/lounge') };
+    if (detail.title || detail.body) window.dispatchEvent(new CustomEvent<PushForeground>(pushForegroundEvent, { detail }));
+  });
   await push.addListener('pushNotificationActionPerformed', action => {
     const url = String(action.notification.data?.url ?? '/lounge');
     if (url.startsWith('/') && !url.startsWith('//')) window.location.assign(url);

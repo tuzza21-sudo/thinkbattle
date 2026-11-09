@@ -1,0 +1,11 @@
+/* A push that arrives while the app is open: a card at the top, under the status bar. */
+.app-push-banner { position:fixed; top:max(10px, env(safe-area-inset-top, 0px)); left:12px; right:12px; z-index:300; display:flex; align-items:stretch; gap:4px; max-width:480px; margin:0 auto; border:1px solid #5e4535; border-radius:16px; background:#261913f2; color:#f3e7da; box-shadow:0 14px 40px #000a; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); animation:app-push-in .25s ease-out; }
+.app-push-open { flex:1; min-width:0; display:flex; align-items:center; gap:12px; padding:12px 6px 12px 14px; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.app-push-icon { flex-shrink:0; display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#c89a63; color:#1a110d; }
+.app-push-text { display:grid; gap:2px; min-width:0; }
+.app-push-text strong { font-size:14px; font-weight:800; color:#f8efe2; }
+.app-push-text span { font-size:13px; line-height:1.5; color:#dccab7; word-break:keep-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.app-push-close { flex-shrink:0; display:grid; place-items:center; width:40px; border:0; border-radius:0 16px 16px 0; background:none; color:#b39d88; cursor:pointer; }
+.app-push-open:focus-visible,.app-push-close:focus-visible { outline:2px solid #e8c999; outline-offset:-2px; }
+@keyframes app-push-in { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion:reduce) { .app-push-banner { animation:none; } }
