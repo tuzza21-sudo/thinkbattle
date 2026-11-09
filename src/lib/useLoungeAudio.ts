@@ -6,6 +6,7 @@ import { LoungeApiError, loungeConnectionError, requestLoungeVoiceToken } from '
 import { loungeRecording, loungeSpeechPauseMs } from './lounge';
 import { loadLoungeAvatar, safeLoungeAvatarUrl } from './loungeAvatar';
 import { createLoungeTranscriptionQueue } from './loungeTranscription';
+import { isSaseokApp } from './nativeApp';
 
 export type VoiceParticipant = { id: string; name: string; muted: boolean; avatarIndex?: number; avatarUrl?: string };
 // A person's sustained voice stops the AI. The device that plays the AI locally
@@ -127,10 +128,21 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
     // hide a mobile autoplay failure on a remote participant's audio element.
     void Promise.allSettled([context.resume(), room?.startAudio()]).then(results => {
       if (outputContext.current !== context || roomRef.current !== room) return;
-      remotePlaybackBlocked.current = results.some(result => result.status === 'rejected') || room?.canPlaybackAudio === false;
+      // The app's web view lets a page play without a tap (Capacitor turns the gesture rule off), so there a running
+      // context is a ready one: LiveKit's own flag can lag behind it, which left the 소리 켜기 button up and the microphone off.
+      remotePlaybackBlocked.current = isSaseokApp() ? context.state !== 'running' : results.some(result => result.status === 'rejected') || room?.canPlaybackAudio === false;
       setAudioReady(context.state === 'running' && !remotePlaybackBlocked.current);
     });
   }, []);
+
+  // Until the sound is ready the page asks again by itself (twice a second, for 20 seconds), so nobody has to press
+  // 소리 켜기: the first resume can come before the context is allowed to run.
+  useEffect(() => {
+    if (!connected || audioReady) return;
+    let tries = 0;
+    const timer = window.setInterval(() => { tries += 1; if (tries > 40) window.clearInterval(timer); else enableAudio(); }, 500);
+    return () => window.clearInterval(timer);
+  }, [connected, audioReady, enableAudio]);
 
   const connect = useCallback(async () => {
     if (pending.current || roomRef.current) return;
@@ -174,8 +186,8 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       room.on(RoomEvent.LocalTrackPublished, sync); room.on(RoomEvent.LocalTrackUnpublished, sync);
       room.on(RoomEvent.AudioPlaybackStatusChanged, permitted => {
         if (roomRef.current !== room) return;
-        remotePlaybackBlocked.current = !permitted;
-        setAudioReady(Boolean(permitted) && context.state === 'running');
+        remotePlaybackBlocked.current = isSaseokApp() ? context.state !== 'running' : !permitted;
+        setAudioReady((isSaseokApp() || Boolean(permitted)) && context.state === 'running');
       });
       room.on(RoomEvent.ActiveSpeakersChanged, active => setSpeakers(active.map(participant => participant.identity)));
       room.on(RoomEvent.DataReceived, (payload, participant) => {
@@ -237,6 +249,9 @@ export function useLoungeAudio(roomId: string, hostId: string, onUtterance: (aud
       audioContext.current = context; enableAudio();
       // Level detection reads zeros while the context is suspended, which looks like a dead microphone on a phone.
       await context.resume().catch(() => {});
+      if (roomRef.current !== room || microphone.current !== track) return;
+      // On a phone the context may need a moment to start running: wait up to three seconds before asking for a tap.
+      for (let waited = 0; context.state !== 'running' && waited < 6; waited += 1) { await new Promise(resolve => window.setTimeout(resolve, 500)); await context.resume().catch(() => {}); }
       if (roomRef.current !== room || microphone.current !== track) return;
       if (context.state !== 'running') throw new Error('소리 켜기를 눌러 마이크를 사용해 주세요.');
       const stream = new MediaStream([track.mediaStreamTrack]);

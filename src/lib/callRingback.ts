@@ -5,7 +5,8 @@
  * browser lets a page make sound.
  */
 
-const ringSeconds = 1, quietSeconds = 2, failsafeMs = 20_000, level = 0.07, fadeSeconds = 0.25;
+// The level was 0.07, which a phone speaker barely showed; 0.2 is clearly heard at a normal volume (2026-11-09).
+const ringSeconds = 1, quietSeconds = 2, failsafeMs = 20_000, level = 0.2, fadeSeconds = 0.25;
 
 export function startCallRingback(onEnd?: () => void): () => void {
   let audio: AudioContext;
