@@ -295,7 +295,12 @@ test('a reply ends when it has said its piece: no hooks, forced questions or tur
   assert.equal(messenger.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(shown)), 'r').last_inner_turn, 10);
   assert.equal(messenger.nextLoungeCompanionState({ state: shown, decision: { progress: 'stay' }, turn: 11, reply: '네.', inner: '' }).last_inner_turn, 10, 'a turn without one keeps the last');
   assert.deepEqual([11, 12, 13].map(turn => messenger.loungeInnerVoiceDue(shown, turn)), [false, false, true]);
-  assert.deepEqual([11, 12].map(turn => messenger.loungeInnerVoiceDue(shown, turn, true)), [false, true]);
+  assert.deepEqual([11, 12].map(turn => messenger.loungeInnerVoiceDue(shown, turn, true)), [true, true], 'a turn that matters is never held back');
+  const calm = { is_emotional_moment: false, moves_character: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
+  assert.equal(messenger.loungeInnerVoiceMatters(calm), false);
+  for (const key of [{ is_emotional_moment: true }, { moves_character: true }, { is_sincere_refusal: true }, { intimacy_proposal: 'elegant' }]) assert.equal(messenger.loungeInnerVoiceMatters({ ...calm, ...key }), true, JSON.stringify(key));
+  assert.equal(messenger.loungeInnerVoiceMatters(calm, { event: { id: 'x' } }), true);
+  assert.equal(messenger.loungeInnerVoiceMatters(undefined), true, 'without a reading nothing is held back');
   assert.equal(messenger.loungeInnerVoiceDue(base, 1), true);
   const resting = messenger.loungeTurnConditions({ state: shown, turn: 11, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: false });
   assert.equal(resting.inner_voice_rest, true);

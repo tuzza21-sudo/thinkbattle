@@ -83,6 +83,8 @@ export type LoungeAnalysis = {
   scene_change_request: string; activity_finished: boolean; topic_stale: boolean; is_emotional_moment: boolean;
   /** Corrections and complaints need a repair, never a new distraction. Optional for older analyzer fixtures. */
   is_repair_request?: boolean;
+  /** The member's words or deed touch the character's own heart (2026-11-09): a confession, a sincere kindness, a hurt touched. Optional for older fixtures. */
+  moves_character?: boolean;
   /** The member really said no or drew a line, tired or uncomfortable (2026-11-02): the reply backs off at once. */
   is_sincere_refusal: boolean;
   /** The member asking first to be closer, or answering an invitation (2026-11-02): with grace, crudely, or not at all. */
@@ -91,11 +93,11 @@ export type LoungeAnalysis = {
 const analysisText = ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request'] as const;
 export const loungeAnalyzerSchema = {
   type: 'object', additionalProperties: false,
-  required: ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_repair_request', 'is_sincere_refusal', 'intimacy_proposal'],
+  required: ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_repair_request', 'moves_character', 'is_sincere_refusal', 'intimacy_proposal'],
   properties: {
     subtext: { type: 'string' }, quote_hook: { type: 'string' }, user_action: { type: 'string' }, request: { type: 'string' },
     references_memory: { type: 'string' },
-    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_repair_request: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' }, intimacy_proposal: { type: 'string', enum: [...proposals] },
+    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_repair_request: { type: 'boolean' }, moves_character: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' }, intimacy_proposal: { type: 'string', enum: [...proposals] },
   },
 } as const;
 /** The same for every character, so one cache serves them all; who the character is goes in the input. */
@@ -112,6 +114,7 @@ latest는 이 기록 위에서 읽는다. 사용자의 성격과 설정(member)�
 - topic_stale: recent의 마지막 4~5번 주고받기가 같은 화제나 같은 주고받기를 되풀이하면 true.
 - is_emotional_moment: 사용자가 힘들거나 진지한 이야기를 하는 중이면 true.
 - is_repair_request: 사용자가 답변·말투·설정·장소·시간의 오류를 지적하거나 불만을 말하며 고치라고 하면 true. 반복된 정정을 대화가 지루하다는 신호로 해석하지 않는다.
+- moves_character: 사용자의 말이나 행동이 캐릭터 본인의 마음을 크게 흔들 만하면 true(고백이나 진심 어린 칭찬·위로, 예상 밖의 다정함, 캐릭터가 감추던 것을 들킴, 상처나 약한 곳을 건드림, 관계의 첫 약속·첫 접촉). 가벼운 인사, 정보 교환, 평범한 칭찬과 농담은 false.
 - is_sincere_refusal: 사용자가 캐릭터의 제안이나 압박을 진심으로 거절하거나, 지치거나 불편해서 선을 그었으면 true(예: "진짜 피곤해요", "그만해요", "오늘은 싫어요"). 장난으로 튕기거나 버티는 말, 캐릭터의 허세에 맞서는 말은 false다.
 - intimacy_proposal: 사용자가 더 가까운 관계, 스킨십, 캐릭터가 이끄는 놀이를 먼저 제안하거나 캐릭터의 초대에 응한 방식. 정중하고 자신 있게 제안하거나 응하면 elegant다(캐릭터의 초대가 없었어도 사용자가 먼저 품위 있게 제안하면 elegant). 몸을 품평하거나 저급한 말로 요구하면 crude다. 가벼운 플러팅, 농담, 칭찬, 제안이 없는 말이면 none이다.
 칸에 없는 설명은 쓰지 않는다.`;
@@ -122,7 +125,7 @@ export function readLoungeAnalysis(raw: unknown): LoungeAnalysis | undefined {
   const value = raw as Record<string, unknown>;
   if (typeof value.subtext !== 'string') return undefined;
   const text = Object.fromEntries(analysisText.map(key => [key, clip(value[key], key === 'quote_hook' ? 40 : key === 'subtext' ? 120 : 80)])) as Record<typeof analysisText[number], string>;
-  return { ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_repair_request: value.is_repair_request === true, is_sincere_refusal: value.is_sincere_refusal === true, intimacy_proposal: proposals.find(item => item === value.intimacy_proposal) ?? 'none' };
+  return { ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_repair_request: value.is_repair_request === true, moves_character: value.moves_character === true, is_sincere_refusal: value.is_sincere_refusal === true, intimacy_proposal: proposals.find(item => item === value.intimacy_proposal) ?? 'none' };
 }
 export type LoungeTurnMessage = { kind: string; text: string };
 type AnalyzerMessage = LoungeTurnMessage;
@@ -313,9 +316,16 @@ export type LoungeCompanionState = {
   /** The last turn whose reply carried an inner voice (2026-11-09): it is paced by code, not left to the model. */
   last_inner_turn?: number;
 };
-/** Whether this turn may carry an inner voice: not in two turns running, and a serious moment from the second turn after the last. */
-export const loungeInnerVoiceDue = (state: Pick<LoungeCompanionState, 'last_inner_turn'>, turn: number, emotional = false) =>
-  turn - (state.last_inner_turn ?? -99) >= (emotional ? 2 : 3);
+/**
+ * Whether this turn may carry an inner voice (2026-11-09). Ordinary turns carry one at most every third turn; a turn that matters
+ * (a serious moment, a confession, an event, a line drawn) always may: the model chose them too often, and a flat gap alone
+ * would have taken the thought away at the very moment it belongs.
+ */
+export const loungeInnerVoiceDue = (state: Pick<LoungeCompanionState, 'last_inner_turn'>, turn: number, important = false) =>
+  important || turn - (state.last_inner_turn ?? -99) >= 3;
+/** What makes a turn matter for the inner voice: read by the analyzer and the scene engine before the reply is written. */
+export const loungeInnerVoiceMatters = (analysis: LoungeAnalysis | undefined, decision?: Pick<LoungeSceneDecision, 'event'>) =>
+  !analysis || analysis.is_emotional_moment || analysis.moves_character === true || analysis.is_sincere_refusal || analysis.intimacy_proposal !== 'none' || Boolean(decision?.event);
 const strings = (value: unknown, max: number, length = 80) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim().slice(0, length)).slice(-max) : [];
 const turnNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 function readScene(value: unknown): LoungeScene | undefined {
