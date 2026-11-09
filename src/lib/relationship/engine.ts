@@ -22,7 +22,16 @@ export const relationshipSettings = {
   /** Largest loss per metric in one turn, by the most serious event in that turn. */
   maxLossPerTurn: { normal: 6, meaningful: 6, strong: 12, severe: 20 } as Record<EventSeverity, number>,
   moodDecay: 0.25,
+  /**
+   * What the sheet's 중요한 순간 keeps (2026-11-09): nearly every turn of a flirting or testing talk left a line there (half of the
+   * event catalog scores over the threshold), so the list filled with ordinary exchanges. The same kind of moment is not
+   * written again for ten turns, and one moment after another waits six turns unless it is a turning point (0.8 and up:
+   * a broken promise, a boundary crossed). The list is thinned by the same rules each time it is written.
+   */
   memoryThreshold: 0.55,
+  memoryRepeatTurns: 10,
+  memoryGapTurns: 6,
+  memoryTurningPoint: 0.8,
   memoryLimit: 12,
   recentEventLimit: 30,
 } as const;
@@ -220,13 +229,28 @@ export function evaluateStage(config: RelationshipConfig, record: RelationshipRe
 
 function rememberEvents(memories: RelationshipMemory[], accepted: AppliedEvent[], chosen: DetectedEvent[], turn: number, at: string) {
   const settings = relationshipSettings;
-  const added = accepted.flatMap(event => {
-    const importance = Math.round(relationshipEventCatalog[event.type].importance * event.confidence * 100) / 100;
-    if (importance < settings.memoryThreshold) return [];
+  // Earlier lines written under looser rules are let go by the same rules: weighty enough, and one of a kind within the repeat window.
+  const kept: RelationshipMemory[] = [];
+  for (const memory of [...memories].sort((a, b) => a.turn - b.turn)) {
+    if (memory.importance < settings.memoryThreshold) continue;
+    const same = kept.findIndex(item => item.type === memory.type && memory.turn - item.turn < settings.memoryRepeatTurns);
+    if (same >= 0) { if (memory.importance > kept[same].importance) kept[same] = memory; continue; }
+    kept.push(memory);
+  }
+  let lastTurn = kept.reduce((latest, item) => Math.max(latest, item.turn), -99);
+  const added: RelationshipMemory[] = [];
+  const candidates = accepted.map(event => ({ event, importance: Math.round(relationshipEventCatalog[event.type].importance * event.confidence * 100) / 100 }))
+    .filter(item => item.importance >= settings.memoryThreshold).sort((a, b) => b.importance - a.importance);
+  for (const { event, importance } of candidates) {
+    if (kept.some(item => item.type === event.type && turn - item.turn < settings.memoryRepeatTurns && item.importance >= importance)) continue;
+    if (importance < settings.memoryTurningPoint && turn - lastTurn < settings.memoryGapTurns) continue;
     const note = chosen.find(item => item.type === event.type)?.note?.trim();
-    return [{ type: event.type, summary: (note || relationshipEventCatalog[event.type].description).slice(0, 80), at, importance, turn }];
-  });
-  return [...memories, ...added].sort((a, b) => b.importance - a.importance || b.turn - a.turn).slice(0, settings.memoryLimit);
+    added.push({ type: event.type, summary: (note || relationshipEventCatalog[event.type].description).slice(0, 80), at, importance, turn });
+    lastTurn = turn;
+  }
+  const addedTypes = new Set(added.map(item => item.type));
+  return [...kept.filter(item => !(addedTypes.has(item.type) && turn - item.turn < settings.memoryRepeatTurns)), ...added]
+    .sort((a, b) => b.importance - a.importance || b.turn - a.turn).slice(0, settings.memoryLimit);
 }
 
 /** A few important memories and the latest ones, instead of the whole history. */

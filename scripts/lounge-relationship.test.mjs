@@ -288,6 +288,19 @@ test('only confident, real user events count; replies without a new user turn ch
   assert.equal(many.logs[0].accepted.length, 2, 'at most two events per turn (three until 2026-11-02)');
 });
 
+test('the moments list is not filled by a long talk of ordinary exchanges, and an old flood is thinned', () => {
+  const config = configs.closer;
+  const kinds = ['SHARES_FEELING', 'REMEMBERS_DETAIL', 'SHOWS_CARE', 'APPRECIATES_SINCERELY'];
+  const { record } = run(config, Array.from({ length: 40 }, (_, index) => [event(kinds[index % kinds.length], 0.95)]));
+  assert.ok(record.memories.length >= 1 && record.memories.length <= 7, `${record.memories.length} moments in 40 turns`);
+  const turns = record.memories.map(memory => memory.turn).sort((a, b) => a - b);
+  assert.ok(turns.every((turn, index) => index === 0 || turn - turns[index - 1] >= 1));
+  // A list written under the old rule (a line nearly every turn) is cut down the next time it is written.
+  const flood = { ...createRelationship(config), turnCount: 20, memories: Array.from({ length: 12 }, (_, index) => ({ type: 'SHARES_FEELING', summary: `감정 ${index}`, at: now.toISOString(), importance: 0.6, turn: index + 1 })) };
+  const thinned = processTurn({ record: flood, config, mood: initialMood(config), events: [], hasUserTurn: true, now });
+  assert.ok(thinned.record.memories.length <= 2, `${thinned.record.memories.length} left of 12`);
+});
+
 test('important events become memories; the prompt receives a small selection without numbers being required', () => {
   const config = configs.closer;
   const { record, mood } = run(config, [[event('KEEPS_PROMISE', 0.9, '이직 자료를 약속대로 가져옴')], [event('FLIRTS_PLAYFULLY')], [event('BREAKS_PROMISE', 0.95, '약속한 연봉 자료를 안 가져옴')], ...Array.from({ length: 8 }, () => [event('SHARES_FEELING', 0.85)])]);
