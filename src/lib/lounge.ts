@@ -426,6 +426,14 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
  * chosen in, and `auto` marks one chosen for the scene rather than by the member.
  */
 export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string; scene?: string; blank?: true; episode?: number; auto?: true };
+/**
+ * Whether a chat's background follows the scene by itself (2026-11-09): on unless the member turned it off, and not while the
+ * background is one they chose. Read from the room's raw background, which can hold only the switch (no picture yet).
+ */
+export function loungeSceneAutoOn(raw: unknown) {
+  const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
+  return !value || (value.auto === true && value.auto_off !== true);
+}
 export const isLoungeSceneImage = (path?: string | null) => /^scenes\/[\w.-]{1,120}\.(webp|jpg)$/.test(path ?? '');
 export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | null {
   if (!raw || typeof raw !== 'object') return null;

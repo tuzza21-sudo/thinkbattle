@@ -83,6 +83,15 @@ test('the engine notes a change of scene, and whether the member asked for it, e
   assert.equal(drift.scene_change.explicit, false);
 });
 
+test('the switch for the follow is on until the member turns it off, and off for a background they chose', () => {
+  const { loungeSceneAutoOn } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+  assert.equal(loungeSceneAutoOn(null), true);
+  assert.equal(loungeSceneAutoOn({ theme: 'cafe', auto: true }), true);
+  assert.equal(loungeSceneAutoOn({ theme: 'cafe', auto: true, auto_off: true }), false);
+  assert.equal(loungeSceneAutoOn({ auto: true, auto_off: true }), false);
+  assert.equal(loungeSceneAutoOn({ theme: 'river' }), false, 'a background the member chose');
+});
+
 test('the five new places are backgrounds with images, and the scene text for the model carries the activity', () => {
   for (const id of loungePlaceBackgroundIds) {
     const theme = loungeThemes.find(item => item.id === id);
