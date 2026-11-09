@@ -2388,7 +2388,7 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   // Actions in brackets, only when they say something; the inner voice only when it differs from what is said.
   assert.match(instructions, /필요할 때만 네 짧은 행동을 괄호 안에 한 줄로 따로 넣는다/);
   assert.match(instructions, /행동은 한 답에 0~2개이고 너 자신의 동작만이다/);
-  assert.match(instructions, /inner_voice: 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다/);
+  assert.match(instructions, /inner_voice: turn.inner_voice_rest가 true이면 이번 답의 inner_voice는 빈 문자열이다.*아니면 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다/);
   assert.match(instructions, /대사를 되풀이하거나 요약하지 않는다/);
   assert.match(instructions, /행동도 속마음도 억지로 채우지 않는다/);
   assert.match(instructions, /별표\(\*\)로 지문을 쓰지 않는다/);

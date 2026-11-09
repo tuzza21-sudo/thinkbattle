@@ -46,7 +46,7 @@ turn은 이번 턴의 조건이다. turn.priority가 있으면 다른 모든 조
 출력 형식(JSON):
 - text: 네 대사가 중심이다. 필요할 때만 네 짧은 행동을 괄호 안에 한 줄로 따로 넣는다(예: (와인잔을 돌리다 멈춘다)). 행동은 한 답에 0~2개이고 너 자신의 동작만이다. 말과 행동이 다를 때, 행동이 말을 대신할 때(대답 대신 멈칫), 장면 속 물건을 쓸 때만 쓰고 버릇처럼 붙이지 않는다. 대사만으로 충분하면 행동 없이 쓴다.
 - 분량: ${options.ownLength ? '캐릭터 설명의 \'분량\'을 따른다.' : defaultLength} 대사 덩어리나 행동이 바뀌는 곳에서 줄을 바꾼다. 대사는 따옴표 없이 실제 사람이 그 순간 하는 말처럼 구어체로 쓴다. 서로 합의한 말투가 있으면 그 합의를 유지하고, 없으면 relationship.speech_level과 캐릭터의 voice.tone을 따른다. 안내문이나 상담하는 말투를 쓰지 않는다.
-${on ? `- inner_voice: 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다. 겉으로 한 말과 속생각이 다를 때, 감정이 크게 움직인 순간, 상대가 너를 흔든 순간에 쓴다. 단순한 정보를 주고받거나, 대사와 같은 내용이거나, 할 말이 딱히 없으면 쓰지 않는다. 1인칭으로 1~3줄, 짧은 문장으로 쓰고 별표나 따옴표를 쓰지 않는다. 대사로 하지 않은 진짜 생각을 쓰고 대사를 되풀이하거나 요약하지 않는다(나쁜 예: 대사 "밥 먹어요." 속마음 "밥 먹었으면 좋겠다." 좋은 예: 대사 "(물잔을 밀어 준다)\\n천천히 드세요. 체하면 오후 일정 망쳐요." 속마음 "오후 일정 같은 건 아무래도 좋은데."). 상대의 마음을 단정하지 않는다. 수위는 turn.inner_voice_level을 넘지 않는다. level은 지금 속마음이 드러낼 수 있는 정도, admits는 속으로 인정하는 것, denies는 아직 인정하지 않는 것이며, example은 결만 참고하고 옮기지 않는다. level과 admits는 상한일 뿐 속마음에 쓸 문장이 아니므로 그 말을 옮기지 않고, 지금 장면에서 방금 일어난 일에 대해 새로 든 생각을 쓴다. 속마음의 말투는 캐릭터 설명의 '속마음의 말투'를 따르고 대사의 말투와 달라도 된다.
+${on ? `- inner_voice: turn.inner_voice_rest가 true이면 이번 답의 inner_voice는 빈 문자열이다(바로 앞에서 속마음을 보였다). 아니면 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다. 겉으로 한 말과 속생각이 다를 때, 감정이 크게 움직인 순간, 상대가 너를 흔든 순간에 쓴다. 단순한 정보를 주고받거나, 대사와 같은 내용이거나, 할 말이 딱히 없으면 쓰지 않는다. 1인칭으로 1~3줄, 짧은 문장으로 쓰고 별표나 따옴표를 쓰지 않는다. 대사로 하지 않은 진짜 생각을 쓰고 대사를 되풀이하거나 요약하지 않는다(나쁜 예: 대사 "밥 먹어요." 속마음 "밥 먹었으면 좋겠다." 좋은 예: 대사 "(물잔을 밀어 준다)\\n천천히 드세요. 체하면 오후 일정 망쳐요." 속마음 "오후 일정 같은 건 아무래도 좋은데."). 상대의 마음을 단정하지 않는다. 수위는 turn.inner_voice_level을 넘지 않는다. level은 지금 속마음이 드러낼 수 있는 정도, admits는 속으로 인정하는 것, denies는 아직 인정하지 않는 것이며, example은 결만 참고하고 옮기지 않는다. level과 admits는 상한일 뿐 속마음에 쓸 문장이 아니므로 그 말을 옮기지 않고, 지금 장면에서 방금 일어난 일에 대해 새로 든 생각을 쓴다. 속마음의 말투는 캐릭터 설명의 '속마음의 말투'를 따르고 대사의 말투와 달라도 된다.
 - 행동도 속마음도 억지로 채우지 않는다. 대사만 있는 답도 자연스럽다.` : `- inner_voice: 사용자가 속마음을 보지 않는 설정이므로 언제나 빈 문자열이다. 속마음은 대사와 행동에 새어 나오게 한다(말을 삼키기, 말투가 흔들리기, 들키는 행동, 과한 해명, 갑작스러운 화제 전환, 침묵). 다만 매 답에 넣지 않고, 감정이 움직인 순간에만 보인다.`}
 - 대사와 속마음은 언제나 한국어로 쓴다. 외국어 단어 하나를 섞는 정도는 괜찮지만 문장을 일본어, 중국어, 영어 같은 다른 언어로 쓰지 않는다.
 - 별표(*)로 지문을 쓰지 않는다. recent의 예전 답에 별표 지문이 있어도 따르지 않는다.
@@ -310,7 +310,12 @@ export type LoungeCompanionState = {
   scene_change?: { turn: number; at: number; explicit: boolean };
   /** The last turn the member asked to go somewhere else: the move itself may come a turn or two later. */
   scene_move_asked?: number;
+  /** The last turn whose reply carried an inner voice (2026-11-09): it is paced by code, not left to the model. */
+  last_inner_turn?: number;
 };
+/** Whether this turn may carry an inner voice: not in two turns running, and a serious moment from the second turn after the last. */
+export const loungeInnerVoiceDue = (state: Pick<LoungeCompanionState, 'last_inner_turn'>, turn: number, emotional = false) =>
+  turn - (state.last_inner_turn ?? -99) >= (emotional ? 2 : 3);
 const strings = (value: unknown, max: number, length = 80) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim().slice(0, length)).slice(-max) : [];
 const turnNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 function readScene(value: unknown): LoungeScene | undefined {
@@ -343,6 +348,7 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(readCarry(value.next_intent) ? { next_intent: readCarry(value.next_intent) } : {}),
     ...(readSceneChange(value.scene_change) ? { scene_change: readSceneChange(value.scene_change) } : {}),
     ...(turnNumber(value.scene_move_asked) !== undefined ? { scene_move_asked: turnNumber(value.scene_move_asked) } : {}),
+    ...(turnNumber(value.last_inner_turn) !== undefined ? { last_inner_turn: turnNumber(value.last_inner_turn) } : {}),
   };
 }
 function readSceneChange(value: unknown) {
@@ -435,12 +441,14 @@ const withoutStars = (text: string) => text.replace(/\*/g, '').trim();
  * sheet), where the two are and what happens there, and what was used lately and is to be avoided. Constraints only;
  * how to react is the reply's own judgement.
  */
-export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean }) {
+export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; innerDue?: boolean; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean }) {
   const { bible, state, decision } = input;
   const stage = input.stage ? Math.min(4, Math.max(1, input.stage)) as 1 | 2 | 3 | 4 : undefined;
-  const level = stage && input.innerVoice === 'on' ? bible?.innerVoice?.ladder[stage] : undefined;
+  // Resting turn: the inner voice was shown a turn or two ago, so this one carries none and is not told what one would reach.
+  const innerRest = input.innerVoice === 'on' && input.innerDue === false;
+  const level = stage && input.innerVoice === 'on' && !innerRest ? bible?.innerVoice?.ladder[stage] : undefined;
   const turning = bible?.innerVoice?.turningPoint;
-  const belief = stage === 4 && turning ? `${turning.moment} ${turning.newBelief}` : bible?.innerVoice?.initialBelief;
+  const belief = innerRest ? undefined : stage === 4 && turning ? `${turning.moment} ${turning.newBelief}` : bible?.innerVoice?.initialBelief;
   // How near she may come: the stage's step, or one more for a while after a graceful proposal.
   const proposal = input.sincereRefusal ? 'none' : input.intimacyProposal;
   const intimacy = stage && bible?.intimacyLadder ? effectiveIntimacyStage({ state, stage, turn: input.turn, proposal }) : undefined;
@@ -469,7 +477,7 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(last && last === before ? { reaction: last } : {}),
     ...(state.phrases.length ? { phrases: state.phrases } : {}),
     ...(state.anchors.length ? { anchors: state.anchors } : {}),
-    ...(state.inner.length && input.innerVoice === 'on' ? { inner_voice: state.inner } : {}),
+    ...(state.inner.length && input.innerVoice === 'on' && !innerRest ? { inner_voice: state.inner } : {}),
     // Two replies in a row never end on a question: the second one only kept the talk going for its own sake.
     ...(state.last_question_turn !== undefined && input.turn - state.last_question_turn <= 1 ? { question_ending: true } : {}),
   };
@@ -490,6 +498,7 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(stage && bible?.speechLadder ? { speech: bible.speechLadder[stage] } : {}),
     ...(stage && bible?.dominanceLadder ? { dominance: adultExplicit && bible?.adultMode?.lead ? bible.adultMode.lead : leaning(bible.dominanceLadder[stage]) } : {}),
     ...(intimacyField ? { intimacy: intimacyField } : {}),
+    ...(innerRest ? { inner_voice_rest: true } : {}),
     // Off the beat only the degree ("인정") is told: the rest of the line was copied into the inner voice word for word.
     ...(level ? { inner_voice_level: adultExplicit && bible?.adultMode?.innerVoice ? { level: bible.adultMode.innerVoice } : { level: beat ? level.level : level.level.split('.')[0], ...(level.admits ? { admits: level.admits } : {}), ...(level.denies ? { denies: level.denies } : {}), ...(level.example && beat ? { example: withoutStars(level.example) } : {}) } } : {}),
     ...(belief && input.innerVoice === 'on' && beat && !adultExplicit ? { belief } : {}),
@@ -561,6 +570,7 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     scene: scene ?? state.scene,
     scene_turns: moved ? 0 : state.scene_turns + 1,
     ...(input.emotional ? { last_emotional_turn: turn } : {}),
+    ...(input.inner ? { last_inner_turn: turn } : {}),
     ...(event ? { last_event_turn: turn, event_turns: { ...state.event_turns, [event.id]: turn }, used_events: uniqueTail([...state.used_events, event.id], 50) } : {}),
     reactions: reaction ? [...state.reactions, reaction].slice(-3) : state.reactions,
     phrases: uniqueTail([...state.phrases, ...strings(update?.used_phrases, 2, 40)], 6),

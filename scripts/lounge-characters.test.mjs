@@ -289,4 +289,16 @@ test('a reply ends when it has said its piece: no hooks, forced questions or tur
   assert.equal(conditions(5).avoid?.question_ending, true, 'the next reply does not end on a question');
   assert.equal(conditions(6).avoid?.question_ending, undefined, 'after that it may, when it really asks something');
   assert.equal(messenger.nextLoungeCompanionState({ state: asked, decision: { progress: 'stay' }, turn: 5, reply: '저는 테니스 쳐요.', inner: '' }).last_question_turn, 4);
+  // The inner voice is paced by code (2026-11-09): after one is shown the next turns rest, a serious moment sooner.
+  const shown = messenger.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 10, reply: '네.', inner: '괜히 신경 쓰이네.' });
+  assert.equal(shown.last_inner_turn, 10);
+  assert.equal(messenger.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(shown)), 'r').last_inner_turn, 10);
+  assert.equal(messenger.nextLoungeCompanionState({ state: shown, decision: { progress: 'stay' }, turn: 11, reply: '네.', inner: '' }).last_inner_turn, 10, 'a turn without one keeps the last');
+  assert.deepEqual([11, 12, 13].map(turn => messenger.loungeInnerVoiceDue(shown, turn)), [false, false, true]);
+  assert.deepEqual([11, 12].map(turn => messenger.loungeInnerVoiceDue(shown, turn, true)), [false, true]);
+  assert.equal(messenger.loungeInnerVoiceDue(base, 1), true);
+  const resting = messenger.loungeTurnConditions({ state: shown, turn: 11, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: false });
+  assert.equal(resting.inner_voice_rest, true);
+  assert.equal(resting.avoid?.inner_voice, undefined, 'a resting turn is not shown the earlier ones to follow');
+  assert.equal(messenger.loungeTurnConditions({ state: shown, turn: 13, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: true }).inner_voice_rest, undefined);
 });
