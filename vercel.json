@@ -3,10 +3,12 @@
     "api/lounge-interaction.ts": { "maxDuration": 60 },
     "api/lounge-images.ts": { "maxDuration": 300 },
     "api/lounge-characters.ts": { "maxDuration": 180 },
-    "api/payments.ts": { "maxDuration": 60 }
+    "api/payments.ts": { "maxDuration": 60 },
+    "api/lounge-reach-out.ts": { "maxDuration": 120 }
   },
   "crons": [
-    { "path": "/api/lounge-images", "schedule": "0 3 * * *" }
+    { "path": "/api/lounge-images", "schedule": "0 3 * * *" },
+    { "path": "/api/lounge-reach-out", "schedule": "0 10 * * *" }
   ],
   "rewrites": [
     {

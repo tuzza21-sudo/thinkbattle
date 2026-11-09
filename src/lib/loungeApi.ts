@@ -492,6 +492,17 @@ export async function reportLoungeMessage(messageId: number, reason: LoungeRepor
   throw new LoungeApiError(missing ? '신고 기능을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message || '신고를 접수하지 못했어요.', 'lounge_report_failed', false);
 }
 
+/** Whether characters may reach out first to this member (migration 20261214000000); on until the member turns it off. */
+export async function getLoungeReachOut(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('get_reach_out');
+  if (error) throw new LoungeApiError(error.message, 'lounge_reach_out_failed', false);
+  return data !== false;
+}
+export async function setLoungeReachOut(enabled: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_reach_out', { p_enabled: enabled });
+  if (error) throw new LoungeApiError(/set_reach_out|schema cache|could not find/i.test(error.message) ? '설정을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message, 'lounge_reach_out_failed', false);
+}
+
 /** Deletes the member's own account and everything with it; a running paid plan must be accepted (acceptPaid). */
 export async function deleteLoungeAccount(acceptPaid: boolean): Promise<void> {
   const response = await loungeAuthorizedFetch('/api/account?action=delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acceptPaid }) }, '계정 서버');

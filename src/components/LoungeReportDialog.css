@@ -26,3 +26,7 @@
 .lounge-delete-type { display:grid; gap:6px; margin:10px 0; font-size:13px; }
 .lounge-delete-type input { width:100%; padding:10px 12px; border:1px solid #5e4535; border-radius:10px; background:transparent; color:inherit; font:inherit; font-size:15px; }
 .lounge-delete-open { display:inline-flex; align-items:center; gap:6px; }
+/* the switch for characters reaching out first (account > notifications, in the app) */
+.lounge-app-notifications-switch { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; font-size:14px; line-height:1.5; cursor:pointer; }
+.lounge-app-notifications-switch input { width:18px; height:18px; accent-color:#c89a63; }
+.lounge-app-notifications-switch small { flex-basis:100%; color:#b39d88; font-size:12px; padding-left:26px; }
