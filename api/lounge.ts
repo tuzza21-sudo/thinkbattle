@@ -364,6 +364,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
   };
   // The AI's turn this request claimed and has not handed on to the reply stream: a failure before that releases it, or the room waits out the ticket's 60 seconds before the AI may speak again.
   let claimedTicket: string | null = null, requestAction = '', requestRoom = '';
+  // Where a failing turn stopped (it is in the failure log): a bare "internal error" on 2026-11-09 said nothing else.
+  let requestPhase = 'start';
   try {
     const raw = await req.text();
     if (new TextEncoder().encode(raw).length > MAX_BYTES) return json({ error: '음성이 너무 길어요.' }, 413);
@@ -688,7 +690,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     queryEmbedding.catch(() => {});
     const ticket = await rpc<string | null>('claim_voice_lounge_host', { p_room: roomId, p_reason: body.reason }).catch(error => { lookupGiveUp.abort(); throw error; });
     if (!ticket) { lookupGiveUp.abort(); return json({ skipped: true }); }
-    claimedTicket = ticket;
+    claimedTicket = ticket; requestPhase = 'claimed';
     const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
     // Read in parallel with the room so a relationship adds no round trip; a failure only disables it.
     const relationshipRows = serviceHeaders
@@ -1110,9 +1112,12 @@ ${photoRule}`;
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
+    requestPhase = 'knowledge-wait';
     const knowledge = await withinLookupWait(knowledgeRead) ?? [];
-    // Whatever is still running is no longer waited for.
-    lookupGiveUp.abort();
+    // Whatever is still running is no longer waited for. Cutting a lookup off is a courtesy and never a reason to fail the turn.
+    requestPhase = 'lookup-give-up';
+    try { lookupGiveUp.abort(); } catch (error) { console.warn('[Lounge lookup] give up failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); }
+    requestPhase = 'knowledge-done';
     if (knowledgeAttempted) console.info('[Lounge knowledge wait]', JSON.stringify({ host: host.id, waitedMs: Math.round(performance.now() - knowledgeWaitStarted) }));
     const knowledgeText = loungeKnowledgePrompt(knowledge);
     if (consult?.interpret) {
@@ -1683,6 +1688,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
 
     // One-to-one conversation: the reply is shown or spoken as it is written and saved the moment it is complete; the
     // summary, relationship events, memories and photo are written by the call after it.
+    requestPhase = 'reply-start';
     if (split) {
       const encoder = new TextEncoder();
       const cancelled = new AbortController();
@@ -2044,8 +2050,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     // Server-side diagnostics: a 502 should always leave a cause in the logs. No request bodies or keys.
     if (claimedTicket) await rpc<void>('release_voice_lounge_host', { p_room: requestRoom, p_ticket: claimedTicket }, true).catch(() => {});
     console.error('[Lounge API] request failed', JSON.stringify(error instanceof LoungeUpstreamError
-      ? { action: requestAction, released: Boolean(claimedTicket), code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
-      : { action: requestAction, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code,
+      ? { action: requestAction, phase: requestPhase, released: Boolean(claimedTicket), code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
+      : { action: requestAction, phase: requestPhase, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code,
         // On 2026-10-29 a turn failed with a bare "internal error" and nothing said where it came from.
         stack: error instanceof Error ? error.stack?.split('\n').slice(1, 6).map(line => line.trim()).join(' | ').slice(0, 600) : undefined }));
     if (error instanceof LoungeUpstreamError) return json({ error: error.message, code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds, databaseCode: error.databaseCode, rpc: error.rpc, upstreamStatus: error.upstreamStatus }, error.status);
