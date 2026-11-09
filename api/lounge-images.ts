@@ -266,12 +266,35 @@ async function gptBackground(context: Context, request: string, model: LoungeIma
  * is not written again, and nothing is made (LOUNGE_AUTO_SCENE=make allows it, =off stops the whole thing): without a
  * place or a shared scene that fits, the background stays as it is.
  */
+/**
+ * The member's switch for the automatic follow of the scene, per chat (2026-11-09). Off keeps the background as it is and
+ * stops every automatic change (auto_off in the room's background). On hands the background back to the follow: a background the
+ * member chose becomes an automatic one, and what was decided is forgotten, so the stated place is looked at again.
+ */
+async function setSceneAuto(context: Context, userId: string, roomId: string, enabled: boolean) {
+  const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=background`, { headers: serviceHeaders(context) });
+  const [room] = rooms.ok ? await rooms.json() as Array<{ background?: Record<string, unknown> | null }> : [];
+  if (!room) return json({ error: '내 1:1 대화에서만 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
+  const current = room.background && typeof room.background === 'object' ? room.background : null;
+  let next: Record<string, unknown> | null;
+  if (enabled) {
+    const { auto_off: _off, follow: _follow, auto: _auto, ...kept } = current ?? {};
+    next = Object.keys(kept).length ? { ...kept, auto: true } : null;
+  } else {
+    next = current && current.auto !== true ? { ...current, auto_off: true } : { ...(current ?? {}), auto: true, auto_off: true };
+  }
+  const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: next }) });
+  if (!saved?.ok) return json({ error: '설정을 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.', code: 'lounge_scene_auto_failed', retryable: true }, 502);
+  return json({ background: next, autoFollow: enabled });
+}
+
 async function sceneBackground(context: Context, userId: string, roomId: string, automatic = false) {
   const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=scenario,story_state,memory,background,host_persona`, { headers: serviceHeaders(context) });
   const [room] = rooms.ok ? await rooms.json() as Array<{ scenario: unknown; story_state: unknown; memory: unknown; background?: Record<string, unknown> | null; host_persona?: string }> : [];
   if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
   const autoMode = process.env.LOUNGE_AUTO_SCENE === 'off' ? 'off' : process.env.LOUNGE_AUTO_SCENE === 'make' ? 'make' : 'reuse';
-  if (automatic && (autoMode === 'off' || (room.background && room.background.auto !== true))) return json({ background: null });
+  // The member can turn the automatic follow off for this chat (auto_off, set by the scene_auto action): then no automatic ask changes anything.
+  if (automatic && (autoMode === 'off' || room.background?.auto_off === true || (room.background && room.background.auto !== true))) return json({ background: null });
   const scenario = normalizeLoungeRoomScenario(room.scenario);
   const episodes = loungeStoryEpisodesOn ? scenario?.episodes ?? [] : [];
   const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
@@ -294,7 +317,8 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   if (!scene) return json({ background: null });
   const key = scenario && episode ? loungeSceneKey(scenario.id, episode.number, state?.adapted ? episode.scene : undefined) : undefined;
   const saveOnRoom = async (background: Record<string, unknown>) => {
-    const value = { ...background, auto: true, ...(episode ? { episode: episode.number } : {}), ...(followNote ? { follow: followNote } : {}) };
+    // A one-off "fit it to the scene" while the follow is off keeps it off.
+    const value = { ...background, auto: true, ...(room.background?.auto_off === true ? { auto_off: true } : {}), ...(episode ? { episode: episode.number } : {}), ...(followNote ? { follow: followNote } : {}) };
     const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: value }) }).catch(() => null);
     console.info('[Lounge scene]', JSON.stringify({ key, chosen: background.theme ?? (background.scene ? 'shared' : 'blank'), saved: Boolean(saved?.ok) }));
     return json({ background: value });
@@ -408,10 +432,10 @@ async function handle(req: Request) {
     if (!authorization?.startsWith('Bearer ')) return json({ error: '로그인이 필요합니다.' }, 401);
     const raw = await req.text();
     if (raw.length > 2000) return json({ error: '요청이 너무 큽니다.' }, 413);
-    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown; auto?: unknown };
+    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown; auto?: unknown; enabled?: unknown };
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     const roomId = body.roomId;
-    const background = body.action === 'background' || body.action === 'scene';
+    const background = body.action === 'background' || body.action === 'scene' || body.action === 'scene_auto';
     if ((body.action !== 'photo' && !background) || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || (!background && !['request', 'character'].includes(body.source ?? ''))) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
     const auth = await timed(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization } });
     if (!auth.ok) return json({ error: '로그인 세션이 만료됐어요.' }, 401);
@@ -421,6 +445,7 @@ async function handle(req: Request) {
     const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
     const model: LoungeImageModel = isLoungeImageModel(body.imageModel) ? body.imageModel : 'gpt';
     if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
+    if (body.action === 'scene_auto') return await setSceneAuto(context, user.id, roomId, body.enabled !== false);
     if (background) return await memberBackground(context, user.id, roomId, request, model);
     // A photo the character sends first is for Plus and Pro: for anyone else the page's ask is quietly dropped.
     const plan = await photoPlan(context, user);

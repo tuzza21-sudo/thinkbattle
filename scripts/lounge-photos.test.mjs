@@ -220,6 +220,57 @@ test('the background follows the v4 engine\'s scene: the start, an explicit move
   assert.equal(chosen.matched, 0); assert.equal(chosen.patched, null);
 });
 
+test('the member can turn the automatic follow of the scene off for a chat, and on again', async () => {
+  const act = async ({ enabled, background, auto }) => {
+    const calls = { patched: undefined, matched: 0, state: 0 };
+    await run(async (url, init) => {
+      if (url.includes('/auth/v1/user')) return result({ id: userId });
+      if (url.includes('voice_lounge_rooms?id=eq.') && (init?.method ?? 'GET') === 'GET') return result([{ scenario: null, story_state: null, memory: '지금 장면: 호텔 객실 — 와인을 따르는 중', host_persona: 'guide', background }]);
+      if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { calls.patched = JSON.parse(init.body).background; return result([]); }
+      if (url.includes('voice_lounge_companion_state')) { calls.state++; return result([]); }
+      if (url.endsWith('/responses')) { calls.matched++; return result(sceneOutput({ choice: 'cafe', place: '' })); }
+      throw new Error('Unexpected call ' + url);
+    }, async () => { const response = await handler(request(auto ? { action: 'scene', roomId, auto: true } : { action: 'scene_auto', roomId, enabled })); calls.status = response.status; calls.response = await response.json(); });
+    return calls;
+  };
+  // off on an automatic background: the picture stays, the switch is kept
+  const off = await act({ enabled: false, background: { theme: 'cafe', auto: true, follow: { key: 'a', at: 1, place: 'x' } } });
+  assert.equal(off.status, 200); assert.equal(off.patched.theme, 'cafe'); assert.equal(off.patched.auto_off, true); assert.equal(off.patched.auto, true);
+  // off with no background yet: only the switch is kept
+  const offBare = await act({ enabled: false, background: null });
+  assert.deepEqual(offBare.patched, { auto: true, auto_off: true });
+  // off on a background the member chose: it stays theirs, with the switch
+  const offManual = await act({ enabled: false, background: { theme: 'river' } });
+  assert.deepEqual(offManual.patched, { theme: 'river', auto_off: true });
+  // while it is off, an automatic ask changes nothing and calls no model
+  const asked = await act({ auto: true, background: { theme: 'cafe', auto: true, auto_off: true } });
+  assert.equal(asked.matched, 0); assert.equal(asked.patched, undefined); assert.equal(asked.response.background, null);
+  // on again: the picture stays, the switch and what was decided are forgotten
+  const on = await act({ enabled: true, background: { theme: 'cafe', auto: true, auto_off: true, follow: { key: 'a', at: 1, place: 'x' } } });
+  assert.deepEqual(on.patched, { theme: 'cafe', auto: true });
+  // on over a background the member chose: it becomes an automatic one
+  const onManual = await act({ enabled: true, background: { theme: 'river' } });
+  assert.deepEqual(onManual.patched, { theme: 'river', auto: true });
+  // on with only the switch kept: nothing is left, the follow starts from scratch
+  const onBare = await act({ enabled: true, background: { auto: true, auto_off: true } });
+  assert.equal(onBare.patched, null);
+  // a one-off "fit it to the scene" while it is off keeps it off
+  const oneOff = await ask1();
+  assert.equal(oneOff.auto_off, true);
+  async function ask1() {
+    let saved;
+    await run(async (url, init) => {
+      if (url.includes('/auth/v1/user')) return result({ id: userId });
+      if (url.includes('voice_lounge_rooms?id=eq.') && (init?.method ?? 'GET') === 'GET') return result([{ scenario: null, story_state: null, memory: '지금 장면: 호텔 객실 — 와인을 따르는 중', background: { theme: 'river', auto: true, auto_off: true } }]);
+      if (url.includes('voice_lounge_rooms?id=eq.') && init?.method === 'PATCH') { saved = JSON.parse(init.body).background; return result([]); }
+      if (url.includes('lounge_scene_backgrounds?select=')) return result([]);
+      if (url.endsWith('/responses')) return result(sceneOutput({ choice: 'cafe', place: '' }));
+      throw new Error('Unexpected call ' + url);
+    }, async () => { await handler(request({ action: 'scene', roomId })); });
+    return saved;
+  }
+});
+
 test('a photo the character sends first (source character) is for Plus, Pro and the admin; a photo the member asked for is for everyone', async () => {
   const ask = async ({ source, plan = null, email }) => {
     const calls = { claimed: 0 };

@@ -319,6 +319,13 @@ export async function matchLoungeSceneBackground(roomId: string, automatic = fal
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '장면에 맞는 배경을 찾지 못했어요.', typeof payload?.code === 'string' ? payload.code : `lounge_scene_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { background: unknown };
 }
+/** The switch for the automatic follow of the scene in this chat (on until the member turns it off). */
+export async function setLoungeSceneAuto(roomId: string, enabled: boolean) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'scene_auto', roomId, enabled }) }, '배경 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '설정을 바꾸지 못했어요.', typeof payload?.code === 'string' ? payload.code : `lounge_scene_auto_http_${response.status}`, false);
+  return payload as { background: unknown; autoFollow: boolean };
+}
 /** A background made from the member's description (20 to 60 seconds). Returns the stored image and its signed address. */
 export async function makeLoungeRoomBackground(roomId: string, prompt: string) {
   const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, imageModel: loadLoungeImageModel(), request: prompt.slice(0, 300) }) }, '배경 서버');
