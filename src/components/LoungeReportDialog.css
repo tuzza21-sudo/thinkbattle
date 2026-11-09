@@ -16,10 +16,6 @@
 .lounge-report-primary { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:13px; border:0; border-radius:12px; background:#c89a63; color:#1a110d; font:inherit; font-size:15px; font-weight:800; cursor:pointer; }
 .lounge-report-primary:disabled { opacity:.5; cursor:default; }
 .lounge-report-reasons button:focus-visible,.lounge-report-primary:focus-visible,.lounge-report-close:focus-visible { outline:2px solid #e8c999; outline-offset:3px; }
-/* the flag under a character's reply */
-.lounge-host-message .lounge-report-flag { display:inline-flex; align-items:center; gap:4px; margin-top:4px; padding:3px 8px; border:0; border-radius:999px; background:transparent; color:#fff5e980; font-size:11px; cursor:pointer; }
-.lounge-host-message .lounge-report-flag:hover { color:#fff5e9; background:#ffffff14; }
-.lounge-host-message .lounge-report-flag:focus-visible { outline:2px solid #e8c999; outline-offset:2px; }
 /* the account deletion panel in the account dialog */
 .lounge-delete-confirm p { display:flex; gap:7px; align-items:flex-start; }
 .lounge-delete-paid { color:#ffc9bf; }

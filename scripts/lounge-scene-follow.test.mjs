@@ -63,6 +63,18 @@ test('without an explicit move the background changes only after the scene has s
   assert.equal(decide({ scene: next, sceneTurns: 5, change: { turn: 3, at: now - 3 * minute, explicit: false }, follow: was(5) }).action, 'keep');
 });
 
+test('a place on the way is left at once: the corridor gives way to the room, other places still wait', () => {
+  const corridor = { key: follow.sceneFollowKey(scene('호텔 복도', '이동'), '호텔 복도'), at: now - 2 * minute, place: '호텔 복도' };
+  const room = scene('호텔 객실', '집');
+  assert.equal(follow.onTheWay(corridor), true);
+  assert.equal(follow.onTheWay({ key: '집|호텔객실', at: 0, place: '호텔 객실' }), false);
+  assert.equal(follow.onTheWay({ key: '기타|엘리베이터앞', at: 0, place: '엘리베이터 앞' }), true);
+  const arrived = decide({ scene: room, sceneTurns: 0, follow: corridor });
+  assert.equal(arrived.action, 'apply'); assert.equal(arrived.reason, 'moved'); assert.equal(arrived.place, '호텔 객실');
+  const resting = { key: follow.sceneFollowKey(scene('식당', '식당'), '식당'), at: now - 2 * minute, place: '식당' };
+  assert.equal(decide({ scene: room, sceneTurns: 1, follow: resting }).reason, 'too_soon', 'a real place is kept for a while');
+});
+
 test('the engine notes a change of scene, and whether the member asked for it, even when the move comes a turn later', () => {
   const base = messenger.normalizeLoungeCompanionState({}, 'room-1');
   const scene1 = { location: '식당', scene_type: '식당', activity: '저녁', time_of_day: '저녁', season: '', objects: [] };
