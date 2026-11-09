@@ -50,9 +50,19 @@ export function LoungeCall(props: LoungeCallProps) {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+  // 소리 켜기 shows only when a tap is really needed: the line is down, or the sound has stayed blocked for a few seconds
+  // (the page keeps trying by itself before that, and the status line says what is going on).
+  const [soundBlockedLong, setSoundBlockedLong] = useState(false);
+  const soundBlocked = props.needsConnection && props.connected && !props.audioReady && !props.connecting;
+  useEffect(() => {
+    if (!soundBlocked) { setSoundBlockedLong(false); return; }
+    const timer = window.setTimeout(() => setSoundBlockedLong(true), 6000);
+    return () => window.clearTimeout(timer);
+  }, [soundBlocked]);
+  const showConnect = props.needsConnection && !props.connecting && !props.starting && (!props.connected || soundBlockedLong || (props.connected && props.audioReady));
   const status = props.ringing && !props.preview ? '전화 거는 중…'
     : props.connecting ? '연결 중…'
-    : props.needsConnection ? !props.connected ? '연결이 끊겼어요' : !props.audioReady ? '소리를 켜면 통화가 시작돼요' : props.lobby ? '전화 거는 중…' : '통화가 잠시 멈췄어요'
+    : props.needsConnection ? !props.connected ? '연결이 끊겼어요' : !props.audioReady ? (soundBlockedLong ? '소리를 켜면 통화가 시작돼요' : '연결 중…') : props.lobby ? '전화 거는 중…' : '통화가 잠시 멈췄어요'
     : props.lobby ? '전화 거는 중…'
     : props.hostSpeaking ? '말하는 중'
     : props.userSpeaking ? '듣고 있어요'
@@ -75,7 +85,7 @@ export function LoungeCall(props: LoungeCallProps) {
       {props.job && <p className="lounge-call-job">{props.job}</p>}
       <p className="lounge-call-time">{startedAt.current !== null && !props.lobby ? clock(now - startedAt.current) : ' '}</p>
       <p className="lounge-call-status" role="status" aria-live="polite">{status || ' '}</p>
-      {props.needsConnection && <button type="button" className="lounge-call-connect" onClick={props.onConnect} disabled={props.connecting || (props.connected && props.audioReady && props.starting)}>{props.connecting || props.starting ? <LoaderCircle size={16} className="lounge-spin" /> : <Headphones size={16} />}{connectLabel}</button>}
+      {showConnect && <button type="button" className="lounge-call-connect" onClick={props.onConnect} disabled={props.connecting || (props.connected && props.audioReady && props.starting)}>{props.connecting || props.starting ? <LoaderCircle size={16} className="lounge-spin" /> : <Headphones size={16} />}{connectLabel}</button>}
     </div>
     <div className="lounge-call-dock">
       {props.error && <p className="lounge-call-error" role="alert">{props.error}</p>}

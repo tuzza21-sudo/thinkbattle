@@ -1154,12 +1154,14 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
     const on = isLoungeChatRoom(room);
     setVoiceBusy(true); setError('');
     try {
+      // The ringback starts here, in the tap itself, before any network call: a page may make sound inside a tap, and the
+      // tone was starting only after the server had answered.
+      stopRingback();
+      if (on) { setRinging(true); ringback.current = startCallRingback(() => setRinging(false)); }
       // Ending a call: the time since the last tick is counted before the voice is turned off (after it, the server no longer counts).
       if (!on) await tickLoungeCall(roomId).catch(() => {});
       await setLoungeVoice(roomId, on);
       callPlaced.current = on; newCall.current = on;
-      stopRingback();
-      if (on) { setRinging(true); ringback.current = startCallRingback(() => setRinging(false)); }
       // Turning the voice on connects and prepares the microphone again, as on entering a voice room.
       if (on) { autoConnectAttempted.current = false; autoMicAttempted.current = false; }
       setMicPrepared(false);
