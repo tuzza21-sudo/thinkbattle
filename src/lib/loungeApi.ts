@@ -56,7 +56,7 @@ async function loungeAccessToken(forceRefresh = false) {
   } catch (error) { if (error instanceof LoungeApiError) throw error; throw loungeConnectionError(error, '로그인 서버'); }
 }
 /** Sends an authenticated request; if the server rejects the token, refreshes the session once and sends it again. */
-async function loungeAuthorizedFetch(url: string, init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }, source: string) {
+export async function loungeAuthorizedFetch(url: string, init: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> }, source: string) {
   const send = async (forceRefresh: boolean) => {
     init.signal?.throwIfAborted();
     const token = await loungeAccessToken(forceRefresh);

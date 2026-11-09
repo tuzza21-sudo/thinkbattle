@@ -41,6 +41,15 @@ Android Studio에서 할 일:
   - 키를 잃으면 같은 앱으로 업데이트를 올릴 수 없다.
   - `*.jks`, `*.keystore`, `keystore.properties`는 `android/.gitignore`에 들어 있다.
 
+## 푸시 알림 (Firebase)
+
+- Firebase 프로젝트 `saseok-a1fcf`, 안드로이드 앱 `kr.saseok.app`. 앱은 `android/app/google-services.json`(저장소에 올라가지 않음)으로 Firebase에 연결된다.
+- 서버가 보내는 키: 서비스 계정 JSON을 **한 줄로 만들어** Vercel 환경변수 `FIREBASE_SERVICE_ACCOUNT`(Production, Sensitive)에 넣는다. 파일은 `C:\Users\<사용자>\saseok-keys\firebase\`에 있다.
+- DB: `supabase/migrations/20261213000000_lounge_push_tokens.sql`을 SQL Editor에서 실행한다(기기 토큰 테이블).
+- 앱: 설정 › 계정 관리 › 알림(앱에서만 보임)에서 켜고 끈다. 켜면 알림 허용을 묻고, 기기 토큰을 `register_push_token`으로 등록한다.
+- 서버: `api/push.ts`(테스트 알림), `src/lib/pushServer.ts`(Firebase HTTP v1로 보내기). 캐릭터가 먼저 연락하는 기능은 이 `sendPushToToken`을 쓴다.
+- 알림을 누르면 데이터의 `url`(기본 `/lounge`)이 열린다.
+
 ## 출시용 서명과 AAB
 
 - 업로드 키: `C:\Users\<사용자>\saseok-keys\saseok-upload.jks` (별칭 `saseok-upload`, 유효기간 약 27년). 저장소 밖에 있고, 비밀번호는 `android/keystore.properties`(저장소에 올라가지 않음)와 같은 폴더의 `keystore.properties.backup`에 있다.

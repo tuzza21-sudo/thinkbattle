@@ -32,6 +32,10 @@
 
         </activity>
 
+        <!-- Notifications from Firebase: a white mark for the status bar and the lounge's amber for its tint. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_saseok" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/saseok_notification_color" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -48,5 +52,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Voice calls with a character: the microphone, and the speaker and earpiece routing of a call. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Android 13+: notifications are shown only after the member allows them (src/lib/appPush.ts). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
