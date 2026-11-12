@@ -30,5 +30,21 @@
       "file": "host-shaman-work-v1.webp",
       "prompt": "{{common}} He is at work as a young Korean shaman (a male fortune-teller who reads love fates), wearing a deep indigo-blue traditional hanbok jacket and trousers with a wide sash worn only for rituals, thin silver-rimmed round glasses and a bracelet of thin red thread on his wrist. He sits cross-legged on a cushion in his modern shrine room on a high floor at night, a small brass hand bell held in one hand and the other hand scattering a pinch of rice over a low dark wooden altar table with lit candles, incense smoke and a bowl of rice, many thin red threads hanging behind him catching the candlelight, his sharp eyes fixed on the viewer with a confident, scolding look that is just about to soften. Respectful, atmospheric, warm candlelight, never frightening or horror-like. Nothing readable on any sign, paper or object."
     }
+  },
+  "poker": {
+    "portrait": {
+      "file": "host-poker-v1.webp",
+      "prompt": "{{common}} A strikingly handsome fictional Korean man, 27, lean athletic 184cm build, natural black hair swept aside, sharp playful eyes, defined jawline, one-sided smirk. Black shirt with a lightly draped charcoal jacket. Soft hotel-lounge light. Elegant magazine-portrait quality, tasteful and not provocative."
+    },
+    "full": {
+      "portrait": "host-poker-v1.webp",
+      "file": "host-poker-full-v1.webp",
+      "prompt": "{{common}} The same Korean man stands three-quarter length in an upscale hotel lounge, same black shirt and charcoal jacket, relaxed posture."
+    },
+    "work": {
+      "portrait": "host-poker-v1.webp",
+      "file": "host-poker-work-v1.webp",
+      "prompt": "{{common}} The same Korean man mid-conversation at a quiet hotel lobby cafe table with a coffee cup, cards nowhere in sight, calm confident expression."
+    }
   }
 }

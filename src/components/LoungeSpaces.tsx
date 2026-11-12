@@ -172,7 +172,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
       <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
-          {loungeGroupRoomsEnabled ? <h2 id="lounge-cast-title">대화를 도와줄 캐릭터</h2> : <h1 id="lounge-cast-title">누구와 이야기할까요?</h1>}
+          <h2 id="lounge-cast-title">{loungeGroupRoomsEnabled ? '대화를 도와줄 캐릭터' : '누구와 이야기할까요?'}</h2>
           {loungeGroupRoomsEnabled && <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>}
         </div>
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>

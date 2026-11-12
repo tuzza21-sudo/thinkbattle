@@ -41,9 +41,13 @@ export default defineConfig(({ mode }) => {
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
     // Adult mode for test accounts only (emails or user ids): the closest step of a character that has it is told directly.
     'LOUNGE_ADULT_MODE_USERS',
-    // The model that answers the turns adult mode opens (DeepSeek; without the key OpenAI answers them).
+    // The model that answers the turns adult mode opens (NanoGPT; without the key OpenAI answers them).
     'DEEPSEEK_API_KEY',
+    'NANOGPT_API_KEY',
     'LOUNGE_ADULT_MODEL',
+    // Z.ai GLM for one-to-one chat (GLM 5.3 Flash). LOUNGE_GLM_MODEL overrides the model id.
+    'GLM_API_KEY',
+    'LOUNGE_GLM_MODEL',
     'LOUNGE_LONG_MEMORY',
     'LOUNGE_KNOWLEDGE',
     'LOUNGE_KNOWLEDGE_CACHE_MS',

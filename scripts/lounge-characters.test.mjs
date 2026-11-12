@@ -260,23 +260,33 @@ test('서도현 is settled from the start: his own life, no learned manual and n
   }
 });
 
-test('a reply ends when it has said its piece: no hooks, forced questions or turn engine for anyone (2026-11-06)', () => {
+test('a reply ends on one witty beat: no empty filler questions or turn engine for anyone (2026-11-06; Kindroid rhythm 2026-11-12)', () => {
   const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
   for (const innerVoice of ['on', 'off']) {
-    const rules = messenger.loungeCompanionRules({ ownLength: true, innerVoice });
-    assert.match(rules, /할 말을 하고 그대로 끝낸다\. 대화를 이어 가게 하려고 질문, 미끼, 선택지, 다음 제안을 일부러 붙이지 않는다/);
+    const rules = messenger.loungeCompanionRules({ innerVoice });
+    assert.match(rules, /플러팅·받아치기에서는 한 비트만 치고 끝낸다\. 서사·생각·자기 일 장면에서는 그 이야기의 한 매듭에서 끝낸다/);
+    assert.match(rules, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
+    assert.match(rules, /캐릭터 설명의 '분량'이 있으면 그것을 따른다/);
+    assert.match(rules, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
+    assert.match(rules, /호기심이나 장난으로 구체적인 질문 하나를 붙여도 된다/);
+    assert.match(rules, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
     assert.match(rules, /"그쪽은요\?"/);
     assert.doesNotMatch(rules, /턴 엔진|미끼로 끝낸다|무언가 조금 달라졌는가/);
+    assert.doesNotMatch(rules, /그래도 평소에는 짧은 비트를 우선하고/);
+    assert.match(messenger.loungeInstructionsCacheBreakpoint, /cache-breakpoint/);
   }
+  const guide = loungeCharacters.find(character => character.id === 'guide');
+  assert.match(guide.bible.voice.length, /투어·골목·역사·음식을 안내/);
+  assert.match(loungeCompanionSheetPrompt(guide, 'on'), /분량: .*투어·골목·역사/);
   for (const character of loungeCharacters) {
     for (const field of ['turnEngine', 'hooks', 'weakSpots', 'materialBank', 'hobbyAnswer', 'relationshipDevice']) assert.equal(character.bible?.[field], undefined, `${character.id}.${field}`);
     const sheet = loungeCompanionSheetPrompt(character, 'on');
     assert.doesNotMatch(sheet, /턴 엔진|미끼의 종류|끝맺음 방식:/, character.id);
-    if (character.bible?.hookStyle) assert.match(sheet, /대화를 이어 가려고 쓰지 않고, 대부분의 답은 할 말을 하고 그대로 끝난다/, character.id);
+    if (character.bible?.hookStyle) assert.match(sheet, /빈 질문이나 다음 제안으로 억지로 대화를 붙잡지 않되/, character.id);
   }
   // The director no longer picks how a reply ends.
   assert.equal('ending' in messenger.loungeDirectorSchema.properties, false);
-  assert.match(messenger.loungeDirectorInstructions, /대화를 이어 가려고 질문하기, 되묻기, 선택지 내밀기, 다음 제안을 goal로 정하지 않는다/);
+  assert.match(messenger.loungeDirectorInstructions, /빈 질문·선택지·다음 제안으로 대화를 붙잡는 goal은 쓰지 않는다/);
   assert.equal(messenger.loungeTurnEngineDirectorNote, undefined);
   // Code keeps two replies in a row from ending on a question.
   assert.equal(messenger.loungeEndsOnQuestion('(잔을 내려놓는다)\n그럼 다음엔 어디 갈까요?\n(웃는다)'), true);

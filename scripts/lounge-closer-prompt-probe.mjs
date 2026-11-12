@@ -107,7 +107,7 @@ async function compare() {
       if (url.includes('voice_lounge_companion_state?')) return json([]);
       if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?')) return json([]);
       if (url.includes('voice_lounge_rooms?host_id=')) return json([]);
-      if (url.includes('voice_lounge_rooms?')) return json([{ host_persona: 'closer', host_id: 'probe-user', topic: scenario.title, memory: scene.memory ?? '지금 장면: 둘만 있는 카페, 저녁.\n둘 사이: 6개월 계약의 첫 주. 계약과 비밀 유지 의무 유효.', capacity: 1, ai_turns: 40, voice_on: false, space_id: null, ai_model: 'gpt-sol', scenario }]);
+      if (url.includes('voice_lounge_rooms?')) return json([{ host_persona: 'closer', host_id: 'probe-user', topic: scenario.title, memory: scene.memory ?? '지금 장면: 둘만 있는 카페, 저녁.\n둘 사이: 6개월 계약의 첫 주. 계약과 비밀 유지 의무 유효.', capacity: 1, ai_turns: 40, voice_on: false, space_id: null, ai_model: 'gpt', scenario }]);
       if (url.includes('voice_lounge_messages?')) return json([...history]);
       if (url.includes('voice_lounge_members?')) return json([{ user_id: 'probe-user', nickname: '테스트사용자', last_seen: new Date().toISOString() }]);
       if (url.endsWith('/responses')) {

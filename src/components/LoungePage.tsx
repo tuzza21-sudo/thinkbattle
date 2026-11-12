@@ -864,9 +864,8 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         // Display committed speech immediately. Neither the display refresh nor
         // protection inference holds the ordered audio queue or the ending button.
         inputReadyAt.current = Date.now();
-        void refreshAfterInput.current().catch(err => {
-          if (mounted.current && activeRoomId.current === roomId) setTranscriptError(errorText(err));
-        });
+        // The refresh reports its own errors; do not repeat a passing failure as a transcription notice.
+        void refreshAfterInput.current().catch(() => {});
         void reviewAfterInput();
         // The reply began in the same request: it plays now, without the settle wait and a second request.
         if (result.stream) void answerChained.current(result.stream);
@@ -932,6 +931,12 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const disconnectUnavailableRoom = audio.disconnect;
   const reportRoomError = useCallback((err: unknown) => {
     if (!mounted.current || activeRoomId.current !== roomId) return;
+    // Keep an open one-to-one conversation while polling retries; a passing refresh failure is not a notice.
+    const solo = current.current.room?.capacity === 1 && !current.current.room.space_id;
+    if (solo && (!(err instanceof LoungeApiError) || err.retryable)) {
+      console.warn('[Lounge room] refresh failed', { code: err instanceof LoungeApiError ? err.code : undefined, message: errorText(err).slice(0, 120) });
+      return;
+    }
     setError(errorText(err));
     if (err instanceof LoungeApiError && err.code === 'lounge_network_error') roomNetworkError.current = err.message;
     if (err instanceof LoungeApiError && err.code === 'lounge_access_denied') {
@@ -1391,19 +1396,18 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (chatTurn && err instanceof LoungeApiError && ['lounge_stream_interrupted', 'lounge_network_error'].includes(err.code ?? '')) {
         hostBlocked.current = false; nextHostAttempt.current = Date.now() + 20_000;
         quietFailures.current++;
-        if (mounted.current && quietFailures.current >= 3) setError(errorText(err));
         return;
       }
       // One to one (a chat or a call), a failure that passes on its own is not shown: a crashed or slow server instance
       // ("internal error", a bare 500 on 2026-10-29), a reply or a voice that came late. The page asks again a little
       // later, 3 s, then 6, 12, up to 30, while the member's message is unanswered. Only what the member must act on
-      // (sound off, session over, an allowance used up, credits gone) is still said.
+      // (sound off, session over, an allowance used up, credits gone) is still said. Repeated failures and timeouts
+      // stay quiet too: they are recorded above, never announced as a stopped moderator or a slow server.
       const solo = current.current.room?.capacity === 1 && !current.current.room.space_id;
       if (solo && (!(err instanceof LoungeApiError) || (err.retryable && err.code !== 'lounge_audio_not_ready'))) {
         hostBlocked.current = false;
         nextHostAttempt.current = Date.now() + Math.min(30, 3 * 2 ** quietFailures.current) * 1000;
         quietFailures.current++;
-        if (mounted.current && (quietFailures.current >= 3 || (err instanceof LoungeApiError && ['lounge_reply_timeout', 'lounge_stream_timeout'].includes(err.code ?? '')))) setError(errorText(err));
         return;
       }
       // People kept talking, so the AI stayed quiet; only an explicit request needs to hear about it.

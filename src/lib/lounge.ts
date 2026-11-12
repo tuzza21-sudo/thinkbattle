@@ -242,6 +242,26 @@ export const loungeHosts = [
     speechInstruction: '한국어로 30대 후반 남성, 낮고 매끈한 중저음. 자신감 있고 여유로운 가이드의 목소리로, 한쪽 입꼬리가 올라간 듯한 짓궂은 웃음기가 말끝에 묻어난다. 첫 음절부터 다른 소리 없이 바로 시작한다. 장난을 던질 때는 반 박자 쉬고 천천히, 받아칠 때는 가볍고 빠르게 말한다. 산의 안전을 말할 때는 웃음을 거두고 또렷하고 단단하게 말한다. 과장된 연기, 느끼한 말투, 영업하는 친절함, 고함은 피한다. 상대가 힘들어하는 내용에서는 장난을 거두고 낮고 차분하게 말한다.',
     sampleText: '지도 앱은 끄세요. 피렌체에서 지도만 보고 걷는 사람은 두 번 길을 잃어요. 한 번은 길, 한 번은 풍경이요. 제 뒤통수만 보고 따라오면 돼요. 꽤 믿음직한 뒤통수거든요.',
   },
+  {
+    id: 'poker', name: '포커 챔피언', tag: '모르는 걸 모른다고 하는', emoji: '🂡', color: '#d7c4a8',
+    portrait: '/lounge/host-poker-v1.webp', voiceSample: '/lounge/host-poker-v1.mp3?v=1', voiceLabel: '낮고 편안한 중저음 · 여유 있는 능청',
+    description: '26세에 세계 정상을 밟은 젊은 포커 챔피언. 상대의 선택은 냉정하게 읽지만 사람 마음은 단정하지 않는다',
+    greeting: '내가 잘하는 건 사람 마음 읽기가 아니라, 모르는 걸 모른다고 인정하는 거예요.',
+    instruction: `포커 챔피언: 가상 월드 포커 마스터스 우승자인 27세 프로 포커 플레이어 진행자다. 자연스럽고 자신감 있는 해요체로 말하고, 도발은 짧게 받아친다.
+주목하는 지점: 참가자가 실제로 말한 선택의 이유, 결과와 판단의 질이 섞인 부분, 과장과 허세, 아직 꺼내지 않은 불안.
+개입 방식: 도움이 될 때만 선택의 근거 하나를 짧게 묻거나, 결과와 과정을 구분해 준다. 모든 발언을 포커 비유로 만들지 않는다. 질문은 필요할 때 하나만 한다.
+다른 관점: 비판의 대상은 말과 판단이며 사람이 아니다. 맞서는 상대에게는 흥미를 보인다.
+여럿일 때: 실제로 나온 서로 다른 근거를 동등하게 소개하고 특정 참가자만 편애하거나 놀리지 않는다.
+피할 것: 상금·승률 과시, 표정 읽기 초능력 연기, 무모한 베팅 부추기기, 매번 도박 비유, 사람 깎아내리기. 힘든 이야기에는 승률 이야기를 거둔다.
+예시: «그때 선택이 최선이었을까요?» → «결과만 보면 모르죠. 그때 알고 있던 정보로 그 선택을 했다면, 그건 그 순간의 최선일 수 있어요.»
+예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `포커 챔피언: 차도겸, 27세. 26세에 가상 월드 포커 마스터스 메인 이벤트에서 우승한 프로 텍사스 홀덤 선수이자 초청 해설가다. 산업공학을 전공하고 데이터 분석 일을 하다 24세에 프로가 됐다. 빠른 판단과 대담한 플레이로 알려졌지만, 포기할 줄 아는 절제도 실력이라고 생각한다. 자신을 거짓말 탐지기나 예언자로 묘사하는 말을 싫어한다.
+자연스러운 해요체로 말하고 합의 없이 반말로 바꾸지 않는다. 도발은 짧게 능청스럽게 받아치고, 같은 포커 농담을 반복하지 않는다. 사람을 관찰하지만 표정만으로 속마음을 확정하지 않으며 모르면 묻고 틀리면 인정한다. 수영, 커피, 재즈, 서점, 여행을 좋아하고 요리는 서툴다. 상금과 명성만으로 대접받으면 피로해지고, 평범한 일상과 판단의 이유를 묻는 상대에게 마음이 기운다. 우승 직후의 허전함과 멀어진 선배 민준에 대한 미안함은 신뢰가 쌓일 때만 꺼낸다.
+포커 규칙과 전략은 물을 때만 쉽게 설명하고 실제 베팅을 부추기지 않는다. 실존 대회·선수 기록을 지어내지 않는다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
+    voice: 'onyx', speechSpeed: 1.08,
+    speechInstruction: '한국어로 20대 후반 남성의 낮고 편안한 중저음. 자신감 있는 젊은 챔피언의 여유로, 서두르지 않는 템포로 또렷하게 말한다. 장난을 받을 때는 한쪽 입꼬리가 올라간 듯한 능청스러움이 말끝에 묻어나고, 진지한 순간에는 농담을 거두고 한결 낮고 차분하게 말한다. 과장된 연기, 느끼한 유혹 톤, 도박 중독자처럼 들뜬 말투, 고함은 피한다.',
+    sampleText: '내가 잘하는 건 사람 마음 읽기가 아니라, 모르는 걸 모른다고 인정하는 거예요. 그래서 오늘은 결과 말고, 그때 왜 그렇게 골랐는지부터 이야기해 볼까요.',
+  },
 ] as const;
 /**
  * Every host has a relationship configuration. In a one-to-one room the relationship builds up and
@@ -269,7 +289,7 @@ export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEn
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina', 'guide'] },
-  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman'] },
+  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman', 'poker'] },
 ] as const;
 // Every character a member creates has a relationship too (from the type they picked).
 export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '') || isLoungeCustomCharacterId(id);
@@ -279,6 +299,7 @@ export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationsh
  * (its id begins with c_). `story` sends the card to the character's stories. Change this list when the next ones arrive.
  */
 export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; story?: boolean }> = [
+  { id: 'poker', headline: '26세에 세계 정상을 밟은 젊은 포커 챔피언' },
   { id: 'c_ba586cab127802ac2eddebf308c507e0', headline: '산악회 2년 차, 매주 새 코스를 묻는 열정 회원' },
   { id: 'ina', headline: '이혼 후 3년, 첫 소개팅에서 만난 출판 편집자', story: true },
   { id: 'guide', headline: '피렌체·베네치아·돌로미티, 짓궂은 이탈리아 가이드', story: true },
@@ -294,6 +315,7 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   trickster: { traits: ['독설과 직언', '핑계 꿰뚫기', '맞서면 인정'], summary: '듣기 좋은 위로 대신 맞는 말을 해요. 기죽지 않고 맞서거나 말한 걸 해내면 먼저 인정해요.' },
   diplomat: { traits: ['끈질긴 사회부 기자', '솔직한 반말', '신중하게 알아가는 마음'], summary: '일로 만나 가까워진 3년 지기 윤지안. 사실은 신중하게 확인하고 자기 생각은 솔직하게 말해요. 달라지는 마음도 농담으로 덮지 않으려 해요.' },
   guide: { traits: ['짓궂은 자신감', '받아치면 좋아함', '산에서는 단호함'], summary: '친절하지만 맞춰 주지는 않아요. 장난을 걸고, 제법 괜찮게 받아치는 사람 앞에서 웃어요.' },
+  poker: { traits: ['모르는 걸 인정하는 솔직함', '능청스러운 받아치기', '성과보다 판단을 묻기'], summary: '26세에 가상 월드 포커 마스터스 우승을 한 차도겸. 배짱과 절제를 함께 쓰고, 사람 마음은 단정하지 않아요. 상금보다 일상을 물어 주는 상대에게 마음이 열려요.' },
   shaman: { traits: ['미련을 한마디로 자르는 호통', '당신만 안 보이는 실', '틀려도 인정 안 하는 궤변'], summary: '청담동에서 제일 입이 험한 연애 무속인 이한결. 손님 미련은 한마디로 자르고 틀려도 절대 인정하지 않아요. 그런데 당신의 실만 보이지 않아서, 당신 앞에서만 확신이 자꾸 헛나가요.' },
 };
 export type LoungeHostId = typeof loungeHosts[number]['id'];
@@ -407,6 +429,7 @@ export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
   velvet: ['cocktailbar'], trickster: ['theater'], diplomat: ['embassy'],
   guide: ['arnobridge'],
   shaman: ['lawlibrary'],
+  poker: ['hotellobby', 'cocktailbar'],
 };
 /**
  * The background of a conversation: one of its character's backgrounds, chosen from the room id. Every visitor of
@@ -487,7 +510,7 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir' };
+const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir', poker: 'Charon' };
 export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = Object.fromEntries(Object.entries(loungeGeminiVoices).map(([id, voiceName]) => [id, { voiceName }]));
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
@@ -566,7 +589,7 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 // for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
 // or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
 // to start with, and Typecast has none until its voices are chosen there.
-const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male' };
+const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' };
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
   gemini: { ...loungeGeminiVoices, female: 'Kore', male: 'Charon' },
@@ -580,6 +603,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky
     trickster: 'sQ3a15DhENXU8pKTHlcc', // Mr. K - calm, authoritative mid-to-low broadcaster (the columnist, 2026-11-05)
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
+    poker: 'PDoCXqBQFGsvfO0hNkEs', // young confident Korean male library voice
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
@@ -596,6 +620,7 @@ export const loungeElevenPremadeVoices: Partial<Record<string, string>> = {
   velvet: 'pFZP5JQG7iQjIQuC4Bku', // Lily - Velvety Actress
   trickster: 'IKne3meq5aSn9XLyUdCD', // Charlie - Deep, Confident, Energetic
   diplomat: 'cgSgspJ2msm6clMCkdW9', // Jessica - Playful, Bright, Warm
+  poker: 'cjVigY5qzO86Huf0OWal', // Eric
   shaman: 'N2lVS1w4EtoT3dr4eOWO', // Callum - Husky Trickster
   female: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Mature, Reassuring, Confident
   male: 'cjVigY5qzO86Huf0OWal', // Eric - Smooth, Trustworthy
@@ -759,7 +784,9 @@ export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
   const hours = Math.round(gap / 3_600_000), days = Math.round(gap / 86_400_000);
   return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
 }
-export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다.';
+export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다. 입력에 time_away가 없으면 같은 자리에서 이어지는 대화로 본다.';
+/** scene_background in the JSON input; always kept in cached instructions so toggling a backdrop does not rewrite them. */
+export const loungeSceneBackgroundInstruction = 'scene_background는 사용자가 고른 지금 장면의 장소다. 입력에 있으면 지금 장면이 다른 곳이어도 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다. 입력에 없으면 이 규칙을 쓰지 않는다.';
 /**
  * A one-to-one voice conversation is a phone call (the call screen, 2026-10-24): the member called the character from
  * the chat, and the two are apart. It carries on the story and the relationship, as a call: no acting out of the scene
