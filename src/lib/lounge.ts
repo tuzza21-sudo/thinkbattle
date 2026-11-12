@@ -759,7 +759,9 @@ export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
   const hours = Math.round(gap / 3_600_000), days = Math.round(gap / 86_400_000);
   return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
 }
-export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다.';
+export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다. 입력에 time_away가 없으면 같은 자리에서 이어지는 대화로 본다.';
+/** scene_background in the JSON input; always kept in cached instructions so toggling a backdrop does not rewrite them. */
+export const loungeSceneBackgroundInstruction = 'scene_background는 사용자가 고른 지금 장면의 장소다. 입력에 있으면 지금 장면이 다른 곳이어도 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다. 입력에 없으면 이 규칙을 쓰지 않는다.';
 /**
  * A one-to-one voice conversation is a phone call (the call screen, 2026-10-24): the member called the character from
  * the chat, and the two are apart. It carries on the story and the relationship, as a call: no acting out of the scene

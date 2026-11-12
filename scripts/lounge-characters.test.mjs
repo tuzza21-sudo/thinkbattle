@@ -263,13 +263,16 @@ test('서도현 is settled from the start: his own life, no learned manual and n
 test('a reply ends on one witty beat: no empty filler questions or turn engine for anyone (2026-11-06; Kindroid rhythm 2026-11-12)', () => {
   const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
   for (const innerVoice of ['on', 'off']) {
-    const rules = messenger.loungeCompanionRules({ ownLength: true, innerVoice });
+    const rules = messenger.loungeCompanionRules({ innerVoice });
     assert.match(rules, /플러팅·받아치기에서는 한 비트만 치고 끝낸다\. 서사·생각·자기 일 장면에서는 그 이야기의 한 매듭에서 끝낸다/);
     assert.match(rules, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
+    assert.match(rules, /캐릭터 설명의 '분량'이 있으면 그것을 따른다/);
+    assert.match(rules, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
     assert.match(rules, /호기심이나 장난으로 구체적인 질문 하나를 붙여도 된다/);
     assert.match(rules, /"그쪽은요\?"/);
     assert.doesNotMatch(rules, /턴 엔진|미끼로 끝낸다|무언가 조금 달라졌는가/);
     assert.doesNotMatch(rules, /그래도 평소에는 짧은 비트를 우선하고/);
+    assert.match(messenger.loungeInstructionsCacheBreakpoint, /cache-breakpoint/);
   }
   const guide = loungeCharacters.find(character => character.id === 'guide');
   assert.match(guide.bible.voice.length, /투어·골목·역사·음식을 안내/);

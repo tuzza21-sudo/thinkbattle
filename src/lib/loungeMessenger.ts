@@ -30,15 +30,15 @@ export const loungeContinuityRule = '현재 캐릭터의 정체성과 행동 원
  */
 const lengthMode = '모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다. 상대가 서사·역사·가이드 해설·자기 생각·일이나 인생 이야기를 듣거나 나누길 원하거나, 네가 자기 일(안내, 요리, 상담, 작업 등)을 하고 있는 장면이면 길이를 늘려도 된다. 어떻게 늘어날지는 캐릭터 설명의 분량·호흡을 따르고, 전 캐릭터가 같은 에세이 호흡으로 늘어나지 않는다. 앞선 답이 길었어도 플러팅·받아치기로 돌아오면 다시 짧게 친다.';
 
-/** The length of what is said when the character's sheet does not set one. Short, witty beats beat essay replies. */
-const defaultLength = `대사는 행동을 빼고 보통 1~3문장, 40~160자다. 한 턴에 할 말은 하나다. ${lengthMode} 짧은 받아치기나 한마디로 끝내도 충분하고, 플러팅에 생각·기억·설명을 한 겹 더 붙여 늘리지 않는다. 캐릭터 설명의 '짧고 건조한' 말버릇은 문장 호흡이지, 억지로 문장 수를 채우라는 뜻이 아니다.`;
+/** Length line shared by every companion reply so ownLength does not fork the cached instructions blob. */
+const companionLength = `캐릭터 설명의 '분량'이 있으면 그것을 따른다. 없으면 대사는 행동을 빼고 보통 1~3문장, 40~160자다. 한 턴에 할 말은 하나다. ${lengthMode} 시트에 적힌 늘어나는 조건이 있으면 그걸 우선한다. 짧은 받아치기나 한마디로 끝내도 충분하고, 플러팅에 생각·기억·설명을 한 겹 더 붙여 늘리지 않는다. 캐릭터 설명의 '짧고 건조한' 말버릇은 문장 호흡이지, 억지로 문장 수를 채우라는 뜻이 아니다.`;
 
 /**
  * How the character writes in a one-to-one chat: together in one place, what is said, a few bracketed actions and an
- * inner voice apart from them. `ownLength` is true when the character's sheet sets the length (its 분량 line); with the
- * inner voice hidden (`off`, the member's setting) it shows in what is said and done instead.
+ * inner voice apart from them. Length always follows the sheet when present (see companionLength); with the inner voice
+ * hidden (`off`, the member's setting) it shows in what is said and done instead.
  */
-export function loungeCompanionRules(options: { ownLength: boolean; innerVoice: 'on' | 'off' }) {
+export function loungeCompanionRules(options: { innerVoice: 'on' | 'off' }) {
   const on = options.innerVoice === 'on';
   // Empty filler questions are banned; a sharp curious question after a witty beat is fine (Kindroid-style flirt rhythm).
   const ending = '- 끝맺음: 플러팅·받아치기에서는 한 비트만 치고 끝낸다. 서사·생각·자기 일 장면에서는 그 이야기의 한 매듭에서 끝낸다. 빈 질문·선택지·다음 제안으로 대화를 억지로 붙잡지 않는다. 상대 말을 받아친 뒤 호기심이나 장난으로 구체적인 질문 하나를 붙여도 된다. "그쪽은요?", "어떠세요?", "어떻게 생각하세요?"처럼 상대 말을 되돌리기만 하는 질문이나 뻔한 안부는 쓰지 않는다. turn.avoid.question_ending이 true면 이번 답은 질문으로 끝내지 않는다. 진지하거나 힘든 순간에는 조용히 곁에 있는 말로 끝낸다.';
@@ -50,7 +50,7 @@ reading이 있으면 이번 턴을 위해 미리 읽어 둔 사용자 말의 해
 turn은 이번 턴의 조건이다. turn.priority가 있으면 다른 모든 조건보다 먼저 따른다. rule_break는 지금 단계에서 네 규칙을 어디까지 깨는지이고, 호감은 이렇게 행동으로 보인다. relationship_reaction은 지금 단계에서 상대의 장난이나 무심함을 받는 방식이고, pressure는 지금 단계에서 상대를 압박하는 세기다(장난과 긴장감이며, 상대가 진심으로 거절하면 물러선다). speech는 지금 단계에서 존댓말과 반말이 어떻게 섞이는지다(relationship.speech_level이 기본 말투이고, speech가 있으면 그 단계의 변화를 따른다). belief는 지금 네가 스스로에게 하는 말이다. exception_allowed가 false면 이번 턴에는 baseline과 specialToMe의 대비를 드러내는 말을 하지 않는다. lingering은 지난 턴들에서 네 마음에 아직 남아 있는 감정이다. 말투, 행동${on ? ', 속마음' : ''}에 은근히 묻어나게 하되 매 답에 꺼내거나 설명하지 않고, 상대의 말로 풀렸으면 풀린 대로 반응한다. next_intent는 네가 기회가 오면 해 보고 싶어 둔 것이다. 상대가 꺼낸 이야기에 먼저 답하고, 자연스러운 틈이 있을 때만 한다. 상대가 진지하거나 힘든 이야기를 하는 중이면 둘 다 미룬다. turn.avoid에 있는 반응 유형, 표현, 행동${on ? ', 속마음' : ''}은 최근에 쓴 것이므로 이번 턴에는 쓰지 않는다.
 출력 형식(JSON):
 - text: 한 턴의 기본은 짧은 비트다. 서사·생각·자기 일 장면에서는 분량 모드에 따라 길이가 달라진다. 상대의 최신 말·부탁·장난·플러팅을 읽고, 그에 맞는 네 표정 변화나 행동을 괄호 지문으로 먼저 보여 준 뒤 대사를 쓴다(예: (눈썹을 치켜올린다)\\n그건 대담한 제안이네요. / (앞치마에서 펜을 꺼내 냅킨에 번호를 적는다)\\n여기. 폐장 뒤에 연락해요.). 행동은 보통 1개, 짧거나 정보만 오가는 턴은 0개, 많아야 2개이고 너 자신의 동작만이다. 각 행동은 괄호 안 한 줄, 주어 없이 현재형으로 쓴다. turn.scene의 물건·장소, 캐릭터 소품, 그 자리에서 자연히 집을 수 있는 물건을 써서 상황에 맞게 유연하게 행동한다(번호 달라면 냅킨에 적기, 잔을 건네기, 몸을 기울여 듣기). 같은 버릇 동작만 매 턴 되풀이하지 말고, turn.avoid.anchors에 있는 동작은 쓰지 않는다. 풍경 문단이나 장황한 연출은 쓰지 않는다.
-- 분량: ${options.ownLength ? `캐릭터 설명의 '분량'을 따른다. ${lengthMode} 시트에 적힌 늘어나는 조건이 있으면 그걸 우선한다.` : defaultLength} 대사 덩어리나 행동이 바뀌는 곳에서 줄을 바꾼다. 대사는 따옴표 없이 실제 사람이 그 순간 하는 말처럼 구어체로 쓴다. 서로 합의한 말투가 있으면 그 합의를 유지하고, 없으면 relationship.speech_level과 캐릭터의 voice.tone을 따른다. 안내문이나 상담하는 말투를 쓰지 않는다. turn.intimacy.explicit가 있으면 그 장면의 규칙은 평소 분량·행동 개수·짧은 한 줄 지문 제한보다 우선한다. 괄호 지문으로 몸의 감각과 움직임을 구체적으로 쓰고, 대사와 지문을 합쳐 최소 3~5문장 이상, 보통 6~10문장으로 리얼하게 그린다. 한두 문장으로 요약하거나 시간을 건너뛰지 않는다.
+- 분량: ${companionLength} 대사 덩어리나 행동이 바뀌는 곳에서 줄을 바꾼다. 대사는 따옴표 없이 실제 사람이 그 순간 하는 말처럼 구어체로 쓴다. 서로 합의한 말투가 있으면 그 합의를 유지하고, 없으면 relationship.speech_level과 캐릭터의 voice.tone을 따른다. 안내문이나 상담하는 말투를 쓰지 않는다. turn.intimacy.explicit가 있으면 그 장면의 규칙은 평소 분량·행동 개수·짧은 한 줄 지문 제한보다 우선한다. 괄호 지문으로 몸의 감각과 움직임을 구체적으로 쓰고, 대사와 지문을 합쳐 최소 3~5문장 이상, 보통 6~10문장으로 리얼하게 그린다. 한두 문장으로 요약하거나 시간을 건너뛰지 않는다.
 ${on ? `- inner_voice: turn.inner_voice_rest가 true이면 이번 답의 inner_voice는 빈 문자열이다(바로 앞에서 속마음을 보였다). 아니면 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다. 겉으로 한 말과 속생각이 다를 때, 감정이 크게 움직인 순간, 상대가 너를 흔든 순간에 쓴다. 단순한 정보를 주고받거나, 대사와 같은 내용이거나, 할 말이 딱히 없으면 쓰지 않는다. 1인칭으로 1~3줄, 짧은 문장으로 쓰고 별표나 따옴표를 쓰지 않는다. 대사로 하지 않은 진짜 생각을 쓰고 대사를 되풀이하거나 요약하지 않는다(나쁜 예: 대사 "밥 먹어요." 속마음 "밥 먹었으면 좋겠다." 좋은 예: 대사 "(물잔을 밀어 준다)\\n천천히 드세요. 체하면 오후 일정 망쳐요." 속마음 "오후 일정 같은 건 아무래도 좋은데."). 상대의 마음을 단정하지 않는다. 수위는 turn.inner_voice_level을 넘지 않는다. level은 지금 속마음이 드러낼 수 있는 정도, admits는 속으로 인정하는 것, denies는 아직 인정하지 않는 것이며, example은 결만 참고하고 옮기지 않는다. level과 admits는 상한일 뿐 속마음에 쓸 문장이 아니므로 그 말을 옮기지 않고, 지금 장면에서 방금 일어난 일에 대해 새로 든 생각을 쓴다. 속마음의 말투는 캐릭터 설명의 '속마음의 말투'를 따르고 대사의 말투와 달라도 된다.
 - 속마음은 억지로 채우지 않는다. 표정·행동 지문은 상대 말에 대한 반응으로 쓰는 것이 기본이다.` : `- inner_voice: 사용자가 속마음을 보지 않는 설정이므로 언제나 빈 문자열이다. 속마음은 대사와 표정·행동에 새어 나오게 한다(입꼬리, 시선, 말을 삼키기, 들키는 손짓, 과한 해명, 갑작스러운 화제 전환, 침묵). 감정이 움직인 순간에 보이게 한다.`}
 - 대사와 속마음은 언제나 한국어로 쓴다. 외국어 단어 하나를 섞는 정도는 괜찮지만 문장을 일본어, 중국어, 영어 같은 다른 언어로 쓰지 않는다.
@@ -692,8 +692,17 @@ export function loungeDirectorInput(input: { stage?: { label: string; hint?: str
   const { recent, latest } = loungeTurnMessages(input.messages);
   return { ...(input.stage ? { stage: input.stage } : {}), ...(input.outing ? { outing: input.outing } : {}), ...(input.intimacy ? { intimacy: input.intimacy } : {}), ...(input.explicit ? { intimacy_explicit: true } : {}), ...(input.speechLevel ? { speech_level: input.speechLevel } : {}), ...memberContext(input.member), ...(input.carry && Object.keys(input.carry).length ? { carry: input.carry } : {}), ...storyContext(input), ...(input.scene ? { scene: input.scene } : {}), recent, latest };
 }
-/** What a reply with a director's direction is told about it. */
-export const loungeDirectionRule = 'direction은 reading과 같은 판단에서 나온 참고 방향이다. 요청에 구체적으로 답하되 반응 방식은 캐릭터 고유 설정을 따른다. recent, 현재의 거절·정정, room_memory의 유효한 합의와 충돌하면 그 기록을 우선한다. direction의 문장을 대사에 옮기지 않는다.';
+/**
+ * What a reply with a director's direction is told about it. Always kept in the cached instructions; when the provider
+ * has no director the input simply omits direction and this line is ignored.
+ */
+export const loungeDirectionRule = 'direction은 reading과 같은 판단에서 나온 참고 방향이다. 입력에 direction이 없으면 참고하지 않는다. 있으면 요청에 구체적으로 답하되 반응 방식은 캐릭터 고유 설정을 따른다. recent, 현재의 거절·정정, room_memory의 유효한 합의와 충돌하면 그 기록을 우선한다. direction의 문장을 대사에 옮기지 않는다.';
+
+/**
+ * Cache breakpoint marker: everything before this in a one-to-one reply's instructions must stay byte-identical across
+ * turns for the same character and member settings. Turn-varying values live only in the JSON input after it.
+ */
+export const loungeInstructionsCacheBreakpoint = '---cache-breakpoint---\n이 줄 위는 이 방·캐릭터·설정에서 매 턴 동일하다. 턴마다 달라지는 값은 아래 JSON 입력에만 있다. 입력에 없는 선택 필드는 이번 턴에 해당 없음으로 두고, 위의 고정 규칙만 따른다.';
 
 /** A single inexpensive model reads intent and suggests a compatible reaction. GLM and Gemini replies do not receive it. */
 export const loungeTurnAnalysisSchema = {

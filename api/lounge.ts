@@ -4,14 +4,14 @@ import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeD
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeGlmChatModel } from '../src/lib/loungeModels';
-import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeInnerVoiceDue, loungeInnerVoiceMatters, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeInnerVoiceDue, loungeInnerVoiceMatters, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeCallGreetingRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -969,7 +969,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const replyTo = phoneCall && recent.at(-1)?.kind === 'human' ? turnMessages.latest : undefined;
     const context = { ...(pendingContext.length ? { pending_turns: pendingContext } : {}), mode, ...(solo ? { reply_medium: chat ? 'chat' : 'voice' } : {}), ...(phoneCall ? { phone_call: { just_connected: body.callStart === true && body.reason === 'opening' } } : {}), participant_count: participantCount, topic: room.space_id && !room.topic_source ? null : room.topic, topic_brief: topicBrief, study: room.topic_study ?? null,
       ...(room.space ? { space: { name: room.space.name } } : {}), ...(modelScenario ? { scenario: modelScenario } : {}), ...(storyEpisode ? { story_episode: storyEpisode } : {}),
-      ...(memberPersona ? { member_persona: memberPersona } : {}),
+      ...(memberPersona ? { member_persona: memberPersona } : {}), ...(sceneBackground ? { scene_background: sceneBackground } : {}),
       ...(groupRelationships ? { participants_relationship: groupRelationships } : {}), ...(asker ? { asker } : {}),
       session: session ? { reply_from: session.reply_from ? members.find(member => member.user_id === session.reply_from)?.nickname : undefined, stage_index: session.stage, phase: session.state === 'free' ? 'free' : 'round', stage: stages[session.stage].title, question: loungeSessionPrompt(session, room.topic_study?.questions, topicBrief), target_user_id: session.speaker_id, target_name: members.find(member => member.user_id === session.speaker_id)?.nickname, kind: session.turn_kind } : null,
       // The relationship's stage texts change only with the stage; its scores, mood and memories after them change often.
@@ -1083,11 +1083,30 @@ reason=opening이면 프롤로그 바로 다음 순간에서 첫 장면을 연�
 - 사용자가 맡은 인물의 행동, 대사, 마음은 대신 정하지 않는다. 주변 인물이 사용자에게 말을 걸게 할 수는 있다. 지문의 '나'는 언제나 너 자신(이 캐릭터)이다. 사용자의 행동을 '나는'으로 쓰거나 사용자의 선택(코스를 고르기, 대답하기, 커피를 받기)을 네가 이미 한 것처럼 쓰지 않는다. 프롤로그가 사용자의 대답이나 선택을 기다리며 끝났다면, 첫 장면에서도 그 기다림을 네 쪽에서 이어 간다(재촉하기, 장난, 다른 행동). 사용자 대신 답하지 말고, 사용자가 답할 때까지 기다린다.
 - 캐릭터 설명의 소품과 시그니처 동작(예: 손목시계, 잔)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다.
 ${photoRule}`;
-    // The character's sheet (the length, the actions, the inner voice, the examples) and the chat's rules stay the same
-    // for a character and the member's inner-voice setting, so they are cached; what the turn needs goes in the input.
+    // The companion rules and input-field pointers stay identical every turn; the character sheet is fixed for a host and
+    // inner-voice setting. Turn-varying values (time_away, phone_call, scene_background, direction, …) go only in input.
     const companionSheet = loungeCompanionSheetPrompt(character, innerVoiceMode);
-    const messengerInstruction = [`역할: 사람 한 명과 같은 곳에 함께 있는 대화 상대다. 진행자, 인터뷰어, 작가, 서술자가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`, loungeBiblePrompt(character), companionSheet,
-      loungeCompanionRules({ ownLength: Boolean(character?.bible?.voice?.length), innerVoice: innerVoiceMode }), directorModel ? loungeDirectionRule : '', 'room_memory는 이 방에서 지금 유효한 합의와 풀리지 않은 감정의 원인이다. 합의는 명시적 변경 전까지 유지한다. pending_turns는 상태 갱신을 기다리는 직전 대화이므로 최신 정정과 합의를 읽을 때 함께 본다. recent의 새 명시적 변경을 과거 기억보다 우선한다.', photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)')].filter(Boolean).join('\n');
+    // Shared rules and always-on field pointers first (cache prefix), then the character bible/sheet (still stable per host).
+    // Always-on pointers: values live in input. Includes scenario distance/focus so phone calls (roleInstruction path) keep them without a turn-variable append.
+    const soloInputFieldRules = [
+      loungeTimeAwayInstruction,
+      loungePhoneCallRules,
+      loungeAfterCallRule,
+      loungeMemberPersonaRule,
+      loungeSceneBackgroundInstruction,
+      loungePersonaStoryRule,
+      `scenario가 있으면 둘의 출발 배경이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 사이감으로 말하되, 자유 대화에서는 프롤로그의 사건·초대를 매 턴 이어 가지 않는다. ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}`,
+    ].join('\n');
+    const messengerInstruction = [
+      loungeCompanionRules({ innerVoice: innerVoiceMode }),
+      loungeDirectionRule,
+      soloInputFieldRules,
+      `역할: 사람 한 명과 같은 곳에 함께 있는 대화 상대다. 진행자, 인터뷰어, 작가, 서술자가 아니다.${loungeBiblePrompt(character) ? '' : ` ${host.companion}`}`,
+      loungeBiblePrompt(character),
+      companionSheet,
+      'room_memory는 이 방에서 지금 유효한 합의와 풀리지 않은 감정의 원인이다. 합의는 명시적 변경 전까지 유지한다. pending_turns는 상태 갱신을 기다리는 직전 대화이므로 최신 정정과 합의를 읽을 때 함께 본다. recent의 새 명시적 변경을 과거 기억보다 우선한다.',
+      photoRule.replace('*휴대폰을 들어 한 장 찍는다*', '(휴대폰을 들어 한 장 찍는다)'),
+    ].filter(Boolean).join('\n');
     const interpreted = await analyzerRead;
     const analysis = interpreted?.analysis;
     const direction = directorModel ? interpreted?.direction : undefined;
@@ -1177,26 +1196,20 @@ ${photoRule}`;
       // on 2026-10-21 one turn in the middle of a conversation missed the cache and read about 10,000 tokens anew.
       prompt_cache_key: `lounge-${host.id}`,
       instructions: [
+        // Stable cache prefix: identical every turn for the same character, inner-voice setting, room mode and adult flag.
         `${persona ? `${persona}\n${solo ? loungeOneToOneCharacterRules : loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${solo ? '사람의 가치나 인격은 평가하지 않는다.' : relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,
         ...(solo ? [loungeContinuityRule] : []),
         ...(story || messenger ? [] : [reactionRules, topicRules]), closingRules,
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (text => adultMode ? relationshipAdultModeText(text) : text)((split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config)) : '',
-        messenger ? messengerInstruction : story ? storyInstruction : roleInstruction,
+        messenger ? messengerInstruction : story ? [storyInstruction, soloInputFieldRules, loungeStoryEpisodeInstructions].join('\n')
+          : [roleInstruction, ...(solo && !room.space_id ? [soloInputFieldRules] : [])].filter(Boolean).join('\n'),
         consultRoom ? loungeConsultRules : '',
-        // From here on the instructions depend on the turn; everything above is the same for a character and mode.
-        longMemory ? scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions) : '',
-        timeAway ? loungeTimeAwayInstruction : '',
-        story && storyEpisode ? loungeStoryEpisodeInstructions : '',
-        phoneCall ? loungePhoneCallRules : '',
-        phoneCall && body.callStart === true && body.reason === 'opening' ? loungeCallGreetingRule : '',
-        chat && solo && /^지금 장면: 통화/.test(String(room.memory ?? '')) ? loungeAfterCallRule : '',
-        memberPersona ? loungeMemberPersonaRule : '',
-        scenario?.id === loungePersonaStoryScenarioId ? loungePersonaStoryRule : '',
-        sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
-        // A story room with the voice on keeps to the story, in the voice rules.
-        !story && scenario ? `scenario가 있으면 둘의 출발 배경이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 사이감으로 말하되, 자유 대화에서는 프롤로그의 사건·초대를 매 턴 이어 가지 않는다.${messengerCall || messenger ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
+        // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
+        relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
+        // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.
+        ...(solo ? [loungeInstructionsCacheBreakpoint] : []),
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
