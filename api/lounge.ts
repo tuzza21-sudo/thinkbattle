@@ -3,7 +3,7 @@ import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScen
 import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
-import { getLoungeChatModel, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
+import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeGlmChatModel } from '../src/lib/loungeModels';
 import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeInnerVoiceDue, loungeInnerVoiceMatters, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
@@ -850,8 +850,13 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
     const companionTurn = room.ai_turns ?? 0;
-    // Direction and intent now come from the same Luna call, regardless of the reply model.
-    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR !== 'off';
+    // Direction and intent come from the same Luna call. GLM and Gemini write the reply without that direction: a goal
+    // and a reaction on every turn made their answers follow the director instead of the character. A missing key falls
+    // back to the fast GPT, and that reply still gets the direction. LOUNGE_DIRECTOR=off turns it off for every model.
+    const chosenChat = getLoungeChatModel(solo ? room.ai_model : null);
+    const repliesWithGlm = chosenChat.provider === 'glm' && Boolean(process.env.GLM_API_KEY);
+    const repliesWithGemini = chosenChat.provider === 'gemini' && Boolean(process.env.GEMINI_API_KEY);
+    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR !== 'off' && !repliesWithGlm && !repliesWithGemini;
     // A story is fiction, but the member is a real person playing a role: the character knows what they said about
     // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
     // happens in it. The real world is not brought into the story: no follow-up of a real plan as its opening, and no
@@ -876,12 +881,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room.story_state, storyEpisodes) : undefined;
     const storyStageReached = storyState ? loungeStoryStageReached(storyEpisodes[storyState.episode], relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [], relationship?.record.stage) : true;
     const storyEpisode = storyState ? loungeStoryEpisodeContext(storyEpisodes, storyState, storyStageReached) : undefined;
-    // A plotless one-to-one chat reads its story card's prologue only for the opening (2026-11-07). The prologue's last lines
-    // (an invitation, a place and a time) were read as if they were still being said, and the character came back to them in
-    // reply after reply; after the first turns the summary and the recent talk carry the story. Not for the member's own
-    // narrative (it is their story to follow) or a story told in episodes.
-    const prologueRead = solo && chat && !room.space_id && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off' && scenario?.id !== loungePersonaStoryScenarioId && !storyEpisodes.length && (room.ai_turns ?? 0) > 3;
-    const modelScenario = scenario ? { ...scenario, episodes: undefined, ...(prologueRead ? { prologue: '(사용자는 프롤로그를 이미 읽었고, 지금은 그 뒤를 이어 가는 중이다. 줄거리는 memory와 recent를 따른다.)' } : {}) } : undefined;
+    // A plotless one-to-one chat reads its story card's prologue only for the opening (2026-11-07; tightened 2026-11-12).
+    // After the first reply the place and relationship stay, but the prologue's invitations/hooks are stubbed so the
+    // character follows what the member just said. Not for the member's own narrative or a story told in episodes.
+    const prologueRead = solo && chat && !room.space_id && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off' && scenario?.id !== loungePersonaStoryScenarioId && !storyEpisodes.length && (room.ai_turns ?? 0) > 1;
+    const modelScenario = scenario ? { ...scenario, episodes: undefined, ...(prologueRead ? { prologue: '(사용자는 프롤로그를 이미 읽었다. 장소·사이감만 참고하고, 지금 대화의 중심은 recent의 사용자 말이다. 프롤로그의 사건·초대·미결 훅으로 대화를 되돌리지 않는다.)' } : {}) } : undefined;
     const memoryLimits = loungeMemoryLimits;
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance, memoryLimits) : undefined;
     const analyzerStarted = performance.now();
@@ -998,7 +1002,7 @@ reason=requested이고 request_kind=topic이면 상대가 새 이야깃거리를
 1:1에서는 첫 인사에도 패스나 진행 방식 안내를 넣지 않는다.
 reply_medium=chat이면 글로 주고받는 롤플레이 채팅이다. 소설의 한 장면처럼 생생하고 극적으로 쓴다. 거의 모든 답에 별표로 감싼 지문을 1~2개 넣는다. 지문은 방금 상대가 한 말이나 행동에 대한 네 반응이다. 표정·시선·몸짓·거리·숨·목소리의 변화, 또는 장면이 움직이는 순간을 보여 준다(예: *웃음을 참다가 결국 어깨를 떤다* 그래서, 결론은요?). 상대가 행동을 썼으면 그 행동에 몸으로 반응한다. 반응 없이 소품만 만지거나 바라보는 동작(잔·시계 만지기, 창밖 보기)은 지문으로 쓰지 않는다. 캐릭터 설명의 버릇과 소품은 몇 번에 한 번만 쓰고, recent에서 네 최근 두 답에 쓴 동작·소품·표정은 다시 쓰지 않는다. 짧은 맞장구로 끝나는 답에서만 지문을 생략한다. 지문은 주어 없이 현재형 평서체로 한 개에 15~60자로 쓰고 존댓말로 쓰지 않는다. 대사는 실제 사람이 그 순간 하는 말처럼 구어체로 쓰고, 안내문이나 상담하는 말투('~하셔도 됩니다', '~하는 걸로 하죠')를 쓰지 않는다. 감정이 움직이는 순간에는 짧은 속마음을 별표 안에 작은따옴표로 넣어도 된다(예: *'…이 사람, 생각보다 재밌잖아.'*). 속마음은 한 답변에 많아야 하나다.
 감정 표현의 크기와 방식은 캐릭터의 성격과 현재 상황을 따른다. 절제된 사람은 짧은 말과 신중한 선택으로 반응해도 된다. 웃음·설렘·언짢음을 매번 과장하거나 만들어내지 않는다. relationship.reserve가 있는 첫 단계에서는 먼저 호감이나 설렘을 드러내지 않는다. 직업적 판단은 관계가 깊어져도 유지하고 같은 동작을 되풀이하지 않는다.
-대사는 별표 밖에 쓰고 따옴표로 감싸지 않는다. 채팅의 대사는 지문을 빼고 최소 5문장, 보통 5~7문장(200~450자)이다. 4문장 이하로 짧게 끝내지 않는다. 앞선 네 답이 짧았어도 그 길이를 따르지 않는다. 상대의 말에 먼저 반응하고, 네 생각이나 감정, 떠오른 기억이나 겪은 일을 한 겹 더 붙이고, 이어 갈 거리를 남긴다(질문은 가끔만). 캐릭터 설명의 '짧고 건조한 한 문장' 같은 버릇은 문장 하나하나의 호흡과 결을 말하는 것이고 답의 분량이 아니다. 무뚝뚝하거나 건조한 캐릭터는 말을 줄이는 대신 짧은 문장 여러 개로 같은 분량을 채운다. 지문과 속마음은 글자 수 제한에 넣지 않는다. 이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다.
+대사는 별표 밖에 쓰고 따옴표로 감싸지 않는다. 채팅의 대사는 지문을 빼고 보통 1~3문장(40~160자)이다. 한 턴에 할 말은 하나다. 장난·플러팅·짧은 받아치기는 짧게 끝내고, 서사·자기 생각·일이나 인생 이야기·자기 일(안내·요리·상담 등) 장면에서는 캐릭터 설명의 분량·호흡에 따라 늘려도 된다. 전 캐릭터가 같은 에세이 호흡으로 늘어나지 않는다. 앞선 답이 길었어도 플러팅으로 돌아오면 다시 짧게 친다. 호기심이나 장난으로 구체적인 질문 하나를 붙여도 되지만, "그쪽은요?" 같은 빈 질문으로 대화를 붙잡지 않는다. 캐릭터 설명의 '짧고 건조한 한 문장' 같은 버릇은 문장 호흡이지 분량을 채우라는 뜻이 아니다. 지문과 속마음은 글자 수 제한에 넣지 않는다. 이 채팅 길이 규칙은 위의 1:1 답변 길이 규칙보다 우선한다.
 reply_medium=voice이면 목소리로 들리는 대화이므로 지문과 속마음은 쓰지 않는다. 대신 리액션을 말로 크게 한다. 감탄사(와, 어머, 헐, 어?), 웃음(하하, 풉), 한숨(하아), 망설임(음…)과 말줄임표, 느낌표와 물음표를 캐릭터답게 살려 감정이 목소리에 그대로 실리게 한다. 리액션의 결도 캐릭터의 성격을 따른다. 위의 감탄사는 예일 뿐이다. 건조하거나 차분한 캐릭터는 감탄사 대신 짧은 침묵과 말의 속도로 반응하고, 캐릭터 바이블의 쓰지 않는 말은 쓰지 않는다.
 상황극: 상대가 함께 어디를 가자거나(여행, 산책, 바다, 카페, 드라이브) 무엇을 같이 하자고(영화 보기, 요리, 전시 구경) 할 때, 받아들일지는 relationship.outing을 따른다. 도도하거나 까다로운 캐릭터일수록 같은 단계에서도 더 쉽게 거절하고 받아들일 때도 조건을 걸거나 투덜대며, 다정한 캐릭터는 거절할 때도 부드럽게 미룬다. relationship이 없으면 가볍고 짧은 제안만 받아들인다. 거절할 때도 'AI라서 못 한다', '실제로는 갈 수 없다', '상상으로만 가능하다'는 말은 하지 않고, 아직 그럴 사이가 아니라거나 오늘은 내키지 않는다는 식으로 캐릭터와 관계의 이유로 거절하며 대화는 이어 간다. 상대가 거절 뒤에 같은 제안을 계속 조르면 받아 주지 않는다.
 받아들이면 이야기 속에서 그 장면으로 함께 옮겨 가 지금 실제로 겪는 것처럼 이어 간다. 장소의 풍경·소리·냄새·날씨·주변 사람들, 함께 보는 영화의 분위기 같은 감각적인 디테일을 지문과 대사로 생생하게 그리고, 장면 안에서도 관계 단계에 맞는 거리감을 지킨다.
@@ -1104,11 +1108,13 @@ ${photoRule}`;
       ? '이 방에서 서로 반말하기로 합의했다. 단계의 기본 말투보다 이 합의를 유지한다.'
       : agreedSpeech === 'polite' ? '이 방에서 서로 존댓말을 쓰기로 합의했다. 이 합의를 유지한다.'
         : '이 방에서 서로 존댓말과 반말을 자연스럽게 섞기로 합의했다. 이 합의를 유지한다.' });
-    // The turns adult mode opens are answered by DeepSeek when its key is set (see deepseekReply).
+    // The turns adult mode opens are answered by NanoGPT when its key is set (see deepseekReply). A picked DeepSeek
+    // Flash still uses DeepSeek's own API (DEEPSEEK_API_KEY).
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const nanoKey = process.env.NANOGPT_API_KEY;
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
     const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultVoiceNote}` : undefined;
-    const adultReply = Boolean(deepseekKey && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
+    const adultReply = Boolean(nanoKey && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
@@ -1190,7 +1196,7 @@ ${photoRule}`;
         scenario?.id === loungePersonaStoryScenarioId ? loungePersonaStoryRule : '',
         sceneBackground ? `scene_background는 사용자가 고른 지금 장면의 장소다. 지금 장면이 다른 곳이면 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다.` : '',
         // A story room with the voice on keeps to the story, in the voice rules.
-        !story && scenario ? `scenario가 있으면 이 대화는 그 이야기 속 장면이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 이야기 안의 인물로 말한다.${messengerCall ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
+        !story && scenario ? `scenario가 있으면 둘의 출발 배경이다. scenario.user_role은 사용자가 맡은 인물, scenario.relationship은 둘의 출발점이다. 그 사이감으로 말하되, 자유 대화에서는 프롤로그의 사건·초대를 매 턴 이어 가지 않는다.${messengerCall || messenger ? ` ${loungeScenarioDistanceRule} ${loungeConversationFocusRule}` : ''}` : '',
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
@@ -1214,7 +1220,7 @@ character는 캐릭터 이름이다. recent에서 kind=host는 캐릭터의 말,
 memory: 직전 요약을 방금 주고받은 말까지 반영해 다시 쓴다. ${memoryRules}`,
         loungeContinuityRule,
         'memory에는 서로 합의한 말투와 그 뒤의 명시적인 변경도 유지한다. 일시적인 어미 변화로 합의를 취소하거나, 비밀을 가리기 위한 변명을 실제 직업·계약·과거의 사실로 저장하지 않는다.',
-        scenario ? messenger || messengerCall ? `scenario가 있으면 memory는 둘의 대화 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '있었던 일: 둘 사이에 있었던 중요한 일(사건이나 일은 한 줄로만)', '남은 것: 아직 꺼내지 않은 마음, 둘이 한 약속'을 600자 이내로 적는다. 상대에게 되묻기로 한 장난이나 해명 요구(왜 그렇게 말했는지 등)는 숙제가 되므로 남은 것에 적지 않는다. 계약의 유효 상태·기간·비밀과 바뀐 합의, 직전 사건의 결과와 남은 확인 사항을 잡담보다 우선한다. 확인하지 않은 날짜·조항·과거는 만들지 않는다.` : `scenario가 있으면 이 대화는 이야기이고 memory는 그 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '줄거리: 지금까지 일어난 일(중요한 것부터)', '남은 것: 아직 꺼내지 않은 마음이나 풀리지 않은 일', '다음: 곧 벌어질 일'을 600자 이내로 적는다.` : '',
+        scenario ? messenger || messengerCall ? `scenario가 있으면 memory는 둘의 대화 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '있었던 일: 둘 사이에 있었던 중요한 일(사건이나 일은 한 줄로만)', '남은 것: 아직 꺼내지 않은 마음, 둘이 한 약속'을 600자 이내로 적는다. 프롤로그의 초대·사건·미결 훅은 사용자가 실제로 이어 간 것만 적고, 관심 없이 지나친 것은 남은 것에 넣지 않는다. 상대에게 되묻기로 한 장난이나 해명 요구(왜 그렇게 말했는지 등)는 숙제가 되므로 남은 것에 적지 않는다. 계약의 유효 상태·기간·비밀과 바뀐 합의, 직전 사건의 결과와 남은 확인 사항을 잡담보다 우선한다. 확인하지 않은 날짜·조항·과거는 만들지 않는다.` : `scenario가 있으면 이 대화는 이야기이고 memory는 그 기록이다. 첫 줄 '지금 장면: 장소·시간·하고 있는 일', 이어서 '둘 사이: 지금 마음의 거리와 서로에게 느끼는 것, 둘만의 농담·약속·털어놓은 이야기', '줄거리: 지금까지 일어난 일(중요한 것부터)', '남은 것: 아직 꺼내지 않은 마음이나 풀리지 않은 일', '다음: 곧 벌어질 일'을 600자 이내로 적는다.` : '',
         phoneCall ? `이번 대화는 전화 통화다(phone_call). memory 첫 줄은 '지금 장면: 통화 중 — 각자 있는 곳과 하고 있는 일'로 쓰고, 통화에서 나눈 이야기와 약속을 기록한다. 이 규칙은 위의 '지금 장면' 규칙보다 우선한다.` : '',
         relationship ? relationshipEventInstructionsFor(relationship.config) : '',
         // The member's words are read once (2026-11-06): the events follow the reading the reply was given, so the score
@@ -1467,6 +1473,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     // One speech request up to its first audio. A request that sends nothing for firstAudioMs is given up.
     // Some hosts speak with Gemini (loungeGeminiSpeech); it sends the same 24 kHz PCM, and OpenAI speaks for it when Gemini fails.
     const geminiKey = process.env.GEMINI_API_KEY, geminiHost = Boolean(geminiKey && loungeGeminiSpeech[host.id]);
+    const glmKey = process.env.GLM_API_KEY;
     // Every character speaks with ElevenLabs (2026-10-26): a voice that changes in the middle of a call breaks it, so a
     // choice sent by an older page is not followed and nothing else speaks when ElevenLabs fails (the reply stays text).
     const chosenSpeech: LoungeSpeechEngine = loungeDefaultSpeechEngine(host.id);
@@ -1765,16 +1772,20 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             return parseHostAnswer(output, final, false);
           };
           // Adult mode at the closest step (test accounts, 2026-11-03): OpenAI's models stop short of an explicit scene, so
-          // that turn's reply goes to DeepSeek (DEEPSEEK_API_KEY, LOUNGE_ADULT_MODEL) with the same instructions, input and
-          // JSON shape. Its JSON mode takes no schema, so the instructions carry it; a failed or blank answer falls back to OpenAI.
+          // that turn's reply goes to NanoGPT (NANOGPT_API_KEY, LOUNGE_ADULT_MODEL) with the same instructions, input and
+          // JSON shape. A picked DeepSeek Flash still uses DeepSeek's API. JSON mode takes no schema, so the instructions
+          // carry it; a failed or blank answer falls back to OpenAI.
           // `quiet` is a rewrite that shows nothing while it is written (a reply that came back in another language).
           const deepseekReply = async (note = '', quiet = false) => {
             if (!quiet) partialLength = 0;
-            const model = process.env.LOUNGE_ADULT_MODEL || 'deepseek-flash';
-            const response = await fetchTimed('https://api.deepseek.com/chat/completions', {
-              method: 'POST', headers: { Authorization: `Bearer ${deepseekKey}`, 'Content-Type': 'application/json' }, signal: replyStop,
+            const adult = adultReply;
+            const model = adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
+            const key = adult ? nanoKey : deepseekKey;
+            const response = await fetchTimed(adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
+              method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: replyStop,
               body: JSON.stringify({
-                model, stream: true, stream_options: { include_usage: true }, thinking: { type: 'disabled' },
+                model, stream: true, stream_options: { include_usage: true },
+                ...(adult ? { reasoning: { exclude: true } } : { thinking: { type: 'disabled' } }),
                 response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
@@ -1805,12 +1816,53 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // A reply its JSON mode could not read comes back as spaces.
             return parseHostAnswer(output.trim() || undefined, final, false);
           };
+          // GLM 5.3 Flash (Z.ai, GLM_API_KEY, LOUNGE_GLM_MODEL). Same instructions and input as the others. Its JSON mode
+          // takes no schema, so the schema goes into the instructions. This Flash model cannot turn thinking off, and
+          // `reasoning_effort: low` is the lightest depth it accepts; thinking text is not part of the reply.
+          const glmReply = async (note = '', quiet = false) => {
+            if (!quiet) partialLength = 0;
+            const model = process.env.LOUNGE_GLM_MODEL || loungeGlmChatModel;
+            const response = await fetchTimed('https://api.z.ai/api/paas/v4/chat/completions', {
+              method: 'POST', headers: { Authorization: `Bearer ${glmKey}`, 'Content-Type': 'application/json' }, signal: replyStop,
+              body: JSON.stringify({
+                model, stream: true, stream_options: { include_usage: true }, temperature: 1,
+                thinking: { type: 'enabled' }, reasoning_effort: 'low',
+                response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens + 1500,
+                messages: [
+                  { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
+                  { role: 'user', content: modelRequest.input },
+                ],
+              }),
+            }, 45_000);
+            if (!response.ok || !response.body) {
+              console.warn('[Lounge model] glm failed', JSON.stringify({ model, status: response.status }));
+              throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'glm_rate_limit' : 'glm_request_failed', true, 5);
+            }
+            type GlmChunk = { choices?: Array<{ delta?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number } };
+            let output = '', finish = '', usage: GlmChunk['usage'];
+            for await (const raw of readModelEvents(response.body)) {
+              const chunk = raw as unknown as GlmChunk, choice = chunk.choices?.[0];
+              output += choice?.delta?.content ?? '';
+              if (!quiet) {
+                sendPartial(output);
+                if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
+              }
+              if (choice?.finish_reason) finish = choice.finish_reason;
+              if (chunk.usage) usage = chunk.usage;
+            }
+            if (finish === 'content_filter') throw new LoungeUpstreamError('이 모델이 이번 답을 건너뛰었어요. 다시 말을 걸어 주세요.', 502, 'glm_blocked', true, 5);
+            const final: ModelResult = { status: finish === 'length' ? 'incomplete' : 'completed', ...(finish === 'length' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
+              usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: usage?.prompt_cache_hit_tokens ?? 0 } } };
+            const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
+            return parseHostAnswer(output.trim() || undefined, final, false);
+          };
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'glm' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             if (provider === 'deepseek') return deepseekReply();
+            if (provider === 'glm') return glmReply();
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -1848,7 +1900,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
-          const provider = deepseekKey && (adultReply || chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
+          const provider = adultReply || (deepseekKey && chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'glm' && glmKey ? 'glm' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
             try {
@@ -1858,11 +1910,11 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 if (found || earlySpeech || replyStop.aborted) throw error;
                 // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: GPT answers this turn, so
                 // the conversation goes on.
-                if (provider === 'gemini' || provider === 'deepseek') {
-                  // DeepSeek's JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
-                  if (provider === 'deepseek') {
-                    console.warn('[Lounge API] deepseek reply failed, asking again', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
-                    try { return await attemptReply('deepseek'); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                if (provider === 'gemini' || provider === 'deepseek' || provider === 'glm') {
+                  // JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
+                  if (provider === 'deepseek' || provider === 'glm') {
+                    console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                    try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
                   }
                   console.warn(`[Lounge API] ${provider} reply failed, answering with openai`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                   return await attemptReply('openai');
@@ -1901,6 +1953,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               const openaiModel = chatModel.provider === 'openai';
               const again = await (async () => {
                 if (provider === 'deepseek') return await deepseekReply('이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.', true) as { text?: string; inner_voice?: unknown };
+                if (provider === 'glm') return await glmReply('이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.', true) as { text?: string; inner_voice?: unknown };
                 const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({ ...modelRequest, ...(openaiModel ? {} : { model: 'gpt-6-luna', reasoning: { effort: 'none' } }),
                   instructions: `${modelRequest.instructions}\n이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.` }), undefined, 30_000), 'openai');
                 return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown };
