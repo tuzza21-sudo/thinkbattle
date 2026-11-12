@@ -299,7 +299,7 @@ export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationsh
  * (its id begins with c_). `story` sends the card to the character's stories. Change this list when the next ones arrive.
  */
 export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; story?: boolean }> = [
-  { id: 'poker', headline: '26세에 세계 정상을 밟은 젊은 포커 챔피언' },
+  { id: 'poker', headline: '26세에 세계 정상을 밟은 젊은 포커 챔피언', story: true },
   { id: 'c_ba586cab127802ac2eddebf308c507e0', headline: '산악회 2년 차, 매주 새 코스를 묻는 열정 회원' },
   { id: 'ina', headline: '이혼 후 3년, 첫 소개팅에서 만난 출판 편집자', story: true },
   { id: 'guide', headline: '피렌체·베네치아·돌로미티, 짓궂은 이탈리아 가이드', story: true },
