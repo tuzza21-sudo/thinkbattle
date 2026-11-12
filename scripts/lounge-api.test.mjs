@@ -2554,6 +2554,7 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   assert.match(instructions, /플러팅·받아치기에서는 한 비트만 치고 끝낸다/);
   assert.match(instructions, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
   assert.match(instructions, /유머·플러팅: 상대 말의 결을 짧게 받아치고/);
+  assert.match(instructions, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
   // Director rule stays in the cached instructions; absence of direction is handled in the input.
   assert.match(instructions, /direction은 reading과 같은 판단에서 나온 참고 방향이다/);
   assert.doesNotMatch(instructions, /거의 모든 답에 별표로 감싼 지문/);

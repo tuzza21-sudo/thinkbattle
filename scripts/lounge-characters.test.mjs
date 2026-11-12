@@ -269,6 +269,7 @@ test('a reply ends on one witty beat: no empty filler questions or turn engine f
     assert.match(rules, /캐릭터 설명의 '분량'이 있으면 그것을 따른다/);
     assert.match(rules, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
     assert.match(rules, /호기심이나 장난으로 구체적인 질문 하나를 붙여도 된다/);
+    assert.match(rules, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
     assert.match(rules, /"그쪽은요\?"/);
     assert.doesNotMatch(rules, /턴 엔진|미끼로 끝낸다|무언가 조금 달라졌는가/);
     assert.doesNotMatch(rules, /그래도 평소에는 짧은 비트를 우선하고/);
