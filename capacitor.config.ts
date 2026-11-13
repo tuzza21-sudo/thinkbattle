@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     // Sign-in goes through Supabase and Kakao and comes back to the site; Inicis is the payment window. They stay inside
     // the app; any other address opens in the phone's browser.
-    allowNavigation: ['saseok.kr', '*.saseok.kr', '*.supabase.co', 'kauth.kakao.com', 'accounts.kakao.com', 'logins.daum.net', '*.inicis.com'],
+    allowNavigation: ['saseok.kr', '*.saseok.kr', '*.supabase.co', 'kauth.kakao.com', 'accounts.kakao.com', 'logins.daum.net', '*.inicis.com', '*.portone.io'],
   },
   plugins: {
     // The pages are dark: light status-bar and navigation-bar icons on the dark window behind them.

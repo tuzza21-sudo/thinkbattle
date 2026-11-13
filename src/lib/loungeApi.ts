@@ -462,15 +462,29 @@ export async function deleteMyLoungePersona(id: string) {
 /** The persona of one's own one-to-one room: one of one's personas, none, or (both empty) the default. */
 export const setLoungeRoomPersona = (roomId: string, personaId: string | null, none = false) => loungeRpc<Record<string, unknown> | null>('set_lounge_room_persona', { p_room: roomId, p_persona: personaId, p_none: none });
 
-export type LoungePaymentOrder =
-  | { mode: 'pc'; oid: string; scriptUrl: string; fields: Record<string, string> }
-  | { mode: 'mobile'; oid: string; actionUrl: string; fields: Record<string, string> };
+/** What PortOne.requestPayment is called with (the server sets every value, the price included). */
+export type LoungePaymentOrder = {
+  oid: string;
+  request: {
+    storeId: string; channelKey: string; paymentId: string; orderName: string; totalAmount: number; currency: 'KRW'; payMethod: 'CARD';
+    customer: { fullName: string; email: string; phoneNumber?: string }; redirectUrl: string; noticeUrls: string[];
+  };
+};
 
-/** Opens a pending order for a plan; the server sets the price and returns the fields for the Inicis payment window. */
-export async function createLoungePayment(plan: string, term: 'month' | 'year', device: 'pc' | 'mobile'): Promise<LoungePaymentOrder> {
-  const response = await loungeAuthorizedFetch('/api/payments?action=create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, term, device }) }, '결제 서버');
+/** Opens a pending order for a plan; the server sets the price and returns the request for the PortOne (KG Inicis) payment window. */
+export async function createLoungePayment(plan: string, term: 'month' | 'year', device: 'pc' | 'mobile', phone?: string): Promise<LoungePaymentOrder> {
+  const response = await loungeAuthorizedFetch('/api/payments?action=create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, term, device, phone }) }, '결제 서버');
   const body = await response.json().catch(() => ({})) as LoungePaymentOrder & { error?: string; code?: string };
   if (!response.ok) throw new LoungeApiError(body.error || '결제를 준비하지 못했어요.', body.code || 'lounge_payment_failed', false);
+  return body;
+}
+
+export type LoungePaymentSettled = { result: 'success'; oid: string } | { result: 'fail'; oid?: string; message: string };
+/** After the payment window: the server looks the payment up at PortOne and records it (no sign-in needed; it only reads PortOne). */
+export async function completeLoungePayment(paymentId: string, code?: string, message?: string): Promise<LoungePaymentSettled> {
+  const response = await fetch('/api/payments?action=complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId, code, message }) });
+  const body = await response.json().catch(() => ({})) as LoungePaymentSettled & { error?: string };
+  if (!response.ok) throw new LoungeApiError(body.error || '결제를 확인하지 못했어요.', 'lounge_payment_complete_failed', true);
   return body;
 }
 
