@@ -4,6 +4,7 @@ import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeD
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeGlmChatModel } from '../src/lib/loungeModels';
+import { decideLoungeInitiative, ensureLoungeAutonomyState } from '../src/lib/loungeAutonomy';
 import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeInnerVoiceDue, loungeInnerVoiceMatters, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeCompanionReplySchema, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
@@ -828,7 +829,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const companionChat = body.stream === true && chat && solo && !room.space_id && !session && loungeMessengerChat && process.env.LOUNGE_MESSENGER !== 'off';
     const companionCharacter = getLoungeCharacter(host.id);
     const companionRows = solo && !room.space_id && !session ? await companionRowsRead : null;
-    const companionState = solo && !room.space_id && !session ? normalizeLoungeCompanionState(companionRows?.find(row => row.character_id === host.id)?.state, roomId) : undefined;
+    const companionState = solo && !room.space_id && !session ? (() => {
+      const state = normalizeLoungeCompanionState(companionRows?.find(row => row.character_id === host.id)?.state, roomId, host.id);
+      const autonomy = ensureLoungeAutonomyState(host.id, state.autonomy);
+      return autonomy && autonomy !== state.autonomy ? { ...state, autonomy } : state;
+    })() : undefined;
     // Only where it can be kept (the server key and migration 20261203) does the call after the reply write the scene.
     const companionStored = Boolean(companionState) && Array.isArray(companionRows);
     const durableCompanion = Boolean(room.companion_chat && serviceHeaders);
@@ -1121,7 +1126,16 @@ ${photoRule}`;
     const consulting = Boolean(consult && consult.turn.do !== 'chat');
     const sceneFound = companionChat && companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
-    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, innerDue: companionState ? loungeInnerVoiceDue(companionState, companionTurn, loungeInnerVoiceMatters(analysis, sceneDecision)) : true, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
+    const initiative = companionState ? decideLoungeInitiative({
+      characterId: host.id, autonomy: companionState.autonomy, turn: companionTurn, analysis, latestUserText: lastHuman,
+      hasSceneEvent: Boolean(sceneDecision && 'event' in sceneDecision && sceneDecision.event),
+    }) : undefined;
+    const turnConditions = companionState && sceneDecision ? loungeTurnConditions({
+      bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision,
+      innerVoice: innerVoiceMode, innerDue: companionState ? loungeInnerVoiceDue(companionState, companionTurn, loungeInnerVoiceMatters(analysis, sceneDecision)) : true,
+      sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode,
+      initiative, characterId: host.id,
+    }) : undefined;
     const agreedSpeech = companionState ? loungeRoomSpeechLevel(companionState) : undefined;
     if (turnConditions && agreedSpeech) Object.assign(turnConditions, { speech: agreedSpeech === 'casual'
       ? '이 방에서 서로 반말하기로 합의했다. 단계의 기본 말투보다 이 합의를 유지한다.'
@@ -1268,7 +1282,11 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       const bold = analysis ? analysis.intimacy_proposal === 'elegant' && !analysis.is_sincere_refusal
         : Array.isArray(answer?.events) && answer.events.some(event => (event as { type?: unknown })?.type === 'MAKES_BOLD_MOVE' && Number((event as { confidence?: unknown })?.confidence ?? 1) >= 0.6);
       const boldMove = character?.bible?.intimacyProposal && stageNumber && bold ? { stage: stageNumber } : undefined;
-      const state = nextLoungeCompanionState({ state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, userText: lastHuman, recent: turnMessages.recent, boldMove, emotional: analysis?.is_emotional_moment === true });
+      const state = nextLoungeCompanionState({
+        state: companionState, update: answer, decision: sceneDecision, turn: companionTurn, reply: said, inner,
+        userText: lastHuman, recent: turnMessages.recent, boldMove, emotional: analysis?.is_emotional_moment === true,
+        autonomySelfShare: initiative?.allowSelfShare === true, autonomy: companionState.autonomy,
+      });
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: user.id, character_id: host.id, state, updated_at: new Date().toISOString() }) });
         console.info('[Lounge companion]', JSON.stringify({ host: host.id, saved: response.ok, scene: state.scene?.location ?? null, sceneTurns: state.scene_turns, ...(sceneDecision.event ? { event: sceneDecision.event.id } : {}), reaction: state.reactions.at(-1) ?? null }));

@@ -1,5 +1,7 @@
+import { applyLoungeAutonomyTick, ensureLoungeAutonomyState, getLoungeAutonomyProfile, loungeAutonomyReachOutContext, loungeAutonomyReachOutExtra, readLoungeAutonomyTick } from '../src/lib/loungeAutonomy';
 import { loungeCharacters } from '../src/lib/loungeCharacters';
 import { loungeHosts } from '../src/lib/lounge';
+import { normalizeLoungeCompanionState } from '../src/lib/loungeMessenger';
 import { cleanReachOutLine, reachOutHourAllowed, reachOutInstructions, reachOutPolicyFor, reachOutQualifies, reachedOutToday } from '../src/lib/loungeReachOut';
 import { firebaseAccessToken, readServiceAccount, sendPushToToken } from '../src/lib/pushServer';
 
@@ -52,24 +54,46 @@ async function chatToReach(userId: string, now: number) {
 }
 
 /** One line in the character's voice, from the talk so far; undefined when the model gives nothing usable. */
-async function writeLine(room: Room) {
+async function writeLine(room: Room, userId: string, now: number) {
   const character = loungeCharacters.find(item => item.id === room.host_persona);
   const host = loungeHosts.find(item => item.id === room.host_persona);
   if (!character || !host) return undefined;
   const recent = (await rows<Message>(`/rest/v1/voice_lounge_messages?room_id=eq.${encodeURIComponent(room.id)}&order=id.desc&limit=8&select=kind,text,created_at`)).reverse()
     .map(message => ({ who: message.kind === 'host' ? character.name : '이용자', text: message.text.slice(0, 300), when: message.created_at }));
+  const autonomyOn = Boolean(getLoungeAutonomyProfile(room.host_persona));
+  const companionRow = autonomyOn
+    ? (await rows<{ state: unknown }>(`/rest/v1/voice_lounge_companion_state?user_id=eq.${encodeURIComponent(userId)}&character_id=eq.${encodeURIComponent(room.host_persona)}&select=state&limit=1`))[0]
+    : undefined;
+  const companion = autonomyOn ? normalizeLoungeCompanionState(companionRow?.state, room.id, room.host_persona) : undefined;
+  const autonomy = autonomyOn ? ensureLoungeAutonomyState(room.host_persona, companion?.autonomy, now) : undefined;
+  const autonomyContext = autonomyOn ? loungeAutonomyReachOutContext(room.host_persona, autonomy) : undefined;
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(25_000),
     body: JSON.stringify({
-      model: process.env.LOUNGE_REACH_OUT_MODEL || 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: 200, store: false,
-      instructions: reachOutInstructions,
-      input: JSON.stringify({ character: { name: character.name, job: character.role, tagline: character.tagline, life: character.story.slice(0, 2).join(' ').slice(0, 700), how_to_talk: String((host as { instruction?: string }).instruction ?? '').slice(0, 500) }, memory: (room.memory ?? '').slice(0, 900), recent }),
+      model: process.env.LOUNGE_REACH_OUT_MODEL || 'gpt-6-luna', reasoning: { effort: 'none' }, max_output_tokens: autonomyOn ? 320 : 200, store: false,
+      instructions: autonomyOn ? `${reachOutInstructions}\n${loungeAutonomyReachOutExtra}` : reachOutInstructions,
+      input: JSON.stringify({
+        character: { name: character.name, job: character.role, tagline: character.tagline, life: character.story.slice(0, 2).join(' ').slice(0, 700), how_to_talk: String((host as { instruction?: string }).instruction ?? '').slice(0, 500) },
+        memory: (room.memory ?? '').slice(0, 900), recent,
+        ...(autonomyContext ? { autonomy: autonomyContext } : {}),
+      }),
     }),
   });
   if (!response.ok) return undefined;
   const body = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
   const text = body.output_text ?? (body.output ?? []).flatMap(part => part.content ?? []).map(part => part.text ?? '').join('');
-  return { line: cleanReachOutLine(text), name: character.name };
+  const parsed = autonomyOn ? readLoungeAutonomyTick(text) : undefined;
+  const line = cleanReachOutLine(parsed?.line ?? text);
+  if (!line) return undefined;
+  if (autonomyOn && companion) {
+    const nextAutonomy = applyLoungeAutonomyTick(autonomy, parsed?.update ?? { ambient: line.slice(0, 120) }, now);
+    const state = { ...companion, autonomy: nextAutonomy };
+    await service('/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id', {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: userId, character_id: room.host_persona, state, room_id: room.id, updated_at: new Date(now).toISOString() }),
+    }).catch(() => undefined);
+  }
+  return { line, name: character.name };
 }
 
 export async function runReachOut(options: { now?: number; dry?: boolean } = {}) {
@@ -95,7 +119,7 @@ export async function runReachOut(options: { now?: number; dry?: boolean } = {})
       const room = await chatToReach(userId, now);
       if (!room) { result.skipped += 1; continue; }
       if (options.dry) { result.reached.push({ user: userId, character: room.host_persona, line: '(dry run)' }); continue; }
-      const written = await writeLine(room);
+      const written = await writeLine(room, userId, now);
       if (!written?.line) { result.failed += 1; continue; }
       // The line is left in the chat first, so the push always opens something that is there.
       const saved = await service('/rest/v1/voice_lounge_messages', { method: 'POST', body: JSON.stringify({ room_id: room.id, nickname: written.name, kind: 'host', text: written.line }) });

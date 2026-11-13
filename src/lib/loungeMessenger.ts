@@ -1,4 +1,10 @@
 import { loungeDefaultAdultMode, type LoungeCharacterBible, type LoungeSceneEvent } from './loungeCharacters';
+import {
+  decideLoungeInitiative, ensureLoungeAutonomyState, getLoungeAutonomyProfile, loungeInitiativeTurnField, loungeLifeTurnField,
+  markLoungeAutonomySelfShare, seedLoungeAutonomyState,
+  type LoungeAutonomyState, type LoungeInitiativeDecision,
+} from './loungeAutonomy';
+const seedFreshAutonomy = (characterId: string) => seedLoungeAutonomyState(characterId);
 import type { LoungeMemberPersona } from './loungePersonas';
 import type { LoungeRoomScenario } from './loungeScenarios';
 
@@ -47,7 +53,7 @@ scenario가 있으면 scenario.prologue는 사용자가 이미 읽은 첫 장면
 장면: 사용자가 전환·정정한 장소와 시간을 우선하고, 전환이 없으면 turn.scene을 이어 간다. 이전 장소의 물건이나 끝난 일을 새 장면에 가져오지 않는다. turn.progress를 따른다. stay면 지금 장소와 하던 일을 이어 간다. small_step이면 하던 일이 끝났으니 다음에 할 일을 자연스럽게 제안한다. transition이면 상대가 원한 곳(turn.progress_target)으로 옮겨 가되, 이동 과정을 길게 쓰지 않고 도착한 곳에서 대사를 시작한다. 장소를 옮기는 건 상대가 원하거나 하던 일이 끝났을 때뿐이고 네가 혼자 시간을 건너뛰지 않는다. 함께 어디를 가거나 무엇을 하자는 제안은 relationship.outing에 따라 받아들이거나 캐릭터답게 미룬다. 스킨십과 연애 표현의 한도는 relationship(stage, outing, intimacy)을 따른다. 이 장면은 현실의 만남 약속이 아니다.
 turn.event는 주변 사건의 제안이다. 사용자의 질문과 정정, 진지한 감정에 먼저 답하고 충돌하는 사건은 보류한다. 사건을 쓸 때는 네 행동이나 짧은 말로 무엇이 일어났고 누구에게 답하는지 먼저 알린다. 사용자의 반응이나 선택은 대신 쓰지 않는다. turn.event.purpose는 참고할 방향이며 정해진 감정이나 대사를 연기할 의무가 아니다.
 reading이 있으면 이번 턴을 위해 미리 읽어 둔 사용자 말의 해석이다(사용자에게 보이지 않는다). subtext는 참고할 읽기일 뿐이고, 그 말을 어떻게 받아들일지는 캐릭터 설명의 '너는 상대의 말을 이렇게 듣는다'로 네가 정한다. subtext에 여러 가능성이 적혀 있으면 하나로 단정해서 받지 않는다. request가 있으면 그 부탁에 정확히 응한다. is_repair_request가 true면 사용자가 방금 네 답의 잘못이나 불만을 짚은 것이다. 직전 답의 농담·제안·표현을 되풀이하지 말고 지적한 부분을 바로 고친다. 필요하면 짧게 인정하되 길게 사과하거나 해명하지 않는다. quote_hook은 되받아칠 만한 사용자의 표현이고, 되받을지는 네가 정한다. reading이 recent와 어긋나면 recent를 따른다.
-turn은 이번 턴의 조건이다. turn.priority가 있으면 다른 모든 조건보다 먼저 따른다. rule_break는 지금 단계에서 네 규칙을 어디까지 깨는지이고, 호감은 이렇게 행동으로 보인다. relationship_reaction은 지금 단계에서 상대의 장난이나 무심함을 받는 방식이고, pressure는 지금 단계에서 상대를 압박하는 세기다(장난과 긴장감이며, 상대가 진심으로 거절하면 물러선다). speech는 지금 단계에서 존댓말과 반말이 어떻게 섞이는지다(relationship.speech_level이 기본 말투이고, speech가 있으면 그 단계의 변화를 따른다). belief는 지금 네가 스스로에게 하는 말이다. exception_allowed가 false면 이번 턴에는 baseline과 specialToMe의 대비를 드러내는 말을 하지 않는다. lingering은 지난 턴들에서 네 마음에 아직 남아 있는 감정이다. 말투, 행동${on ? ', 속마음' : ''}에 은근히 묻어나게 하되 매 답에 꺼내거나 설명하지 않고, 상대의 말로 풀렸으면 풀린 대로 반응한다. next_intent는 네가 기회가 오면 해 보고 싶어 둔 것이다. 상대가 꺼낸 이야기에 먼저 답하고, 자연스러운 틈이 있을 때만 한다. 상대가 진지하거나 힘든 이야기를 하는 중이면 둘 다 미룬다. turn.avoid에 있는 반응 유형, 표현, 행동${on ? ', 속마음' : ''}은 최근에 쓴 것이므로 이번 턴에는 쓰지 않는다.
+turn은 이번 턴의 조건이다. turn.priority가 있으면 다른 모든 조건보다 먼저 따른다. rule_break는 지금 단계에서 네 규칙을 어디까지 깨는지이고, 호감은 이렇게 행동으로 보인다. relationship_reaction은 지금 단계에서 상대의 장난이나 무심함을 받는 방식이고, pressure는 지금 단계에서 상대를 압박하는 세기다(장난과 긴장감이며, 상대가 진심으로 거절하면 물러선다). speech는 지금 단계에서 존댓말과 반말이 어떻게 섞이는지다(relationship.speech_level이 기본 말투이고, speech가 있으면 그 단계의 변화를 따른다). belief는 지금 네가 스스로에게 하는 말이다. exception_allowed가 false면 이번 턴에는 baseline과 specialToMe의 대비를 드러내는 말을 하지 않는다. lingering은 지난 턴들에서 네 마음에 아직 남아 있는 감정이다. 말투, 행동${on ? ', 속마음' : ''}에 은근히 묻어나게 하되 매 답에 꺼내거나 설명하지 않고, 상대의 말로 풀렸으면 풀린 대로 반응한다. next_intent는 네가 기회가 오면 해 보고 싶어 둔 것이다. 상대가 꺼낸 이야기에 먼저 답하고, 자연스러운 틈이 있을 때만 한다. 상대가 진지하거나 힘든 이야기를 하는 중이면 둘 다 미룬다. turn.life가 있으면 네가 지금 가진 삶·목표의 배경이다. 말투와 디테일에만 스며들게 하고 상대 화제를 바꾸지 않는다. turn.initiative가 있으면 그 stance와 rule을 따른다. stance가 companion·hold·answer이면 Ambient 사건이나 네 과제로 대화를 끌고 가지 않는다. stance가 self_share일 때만 seed를 자기 삶의 한 조각·사건으로 꺼내고, 그래도 상대 말에 먼저 짧게 반응한 뒤에 한다. turn.avoid에 있는 반응 유형, 표현, 행동${on ? ', 속마음' : ''}은 최근에 쓴 것이므로 이번 턴에는 쓰지 않는다.
 출력 형식(JSON):
 - text: 한 턴의 기본은 짧은 비트다. 서사·생각·자기 일 장면에서는 분량 모드에 따라 길이가 달라진다. 상대의 최신 말·부탁·장난·플러팅을 읽고, 그에 맞는 네 표정 변화나 행동을 괄호 지문으로 먼저 보여 준 뒤 대사를 쓴다(예: (눈썹을 치켜올린다)\\n그건 대담한 제안이네요. / (앞치마에서 펜을 꺼내 냅킨에 번호를 적는다)\\n여기. 폐장 뒤에 연락해요.). 행동은 보통 1개, 짧거나 정보만 오가는 턴은 0개, 많아야 2개이고 너 자신의 동작만이다. 각 행동은 괄호 안 한 줄, 주어 없이 현재형으로 쓴다. turn.scene의 물건·장소, 캐릭터 소품, 그 자리에서 자연히 집을 수 있는 물건을 써서 상황에 맞게 유연하게 행동한다(번호 달라면 냅킨에 적기, 잔을 건네기, 몸을 기울여 듣기). 같은 버릇 동작만 매 턴 되풀이하지 말고, turn.avoid.anchors에 있는 동작은 쓰지 않는다. 풍경 문단이나 장황한 연출은 쓰지 않는다.
 - 분량: ${companionLength} 대사 덩어리나 행동이 바뀌는 곳에서 줄을 바꾼다. 대사는 따옴표 없이 실제 사람이 그 순간 하는 말처럼 구어체로 쓴다. 서로 합의한 말투가 있으면 그 합의를 유지하고, 없으면 relationship.speech_level과 캐릭터의 voice.tone을 따른다. 안내문이나 상담하는 말투를 쓰지 않는다. turn.intimacy.explicit가 있으면 그 장면의 규칙은 평소 분량·행동 개수·짧은 한 줄 지문 제한보다 우선한다. 괄호 지문으로 몸의 감각과 움직임을 구체적으로 쓰고, 대사와 지문을 합쳐 최소 3~5문장 이상, 보통 6~10문장으로 리얼하게 그린다. 한두 문장으로 요약하거나 시간을 건너뛰지 않는다.
@@ -314,6 +320,11 @@ export type LoungeCompanionState = {
    */
   lingering?: { what: string; turn: number };
   next_intent?: { what: string; turn: number };
+  /**
+   * Autonomous goals / ambient beat (2026-11-13). Only characters with a loungeAutonomy profile use it; others omit it.
+   * Companion-first: self_share is gated in loungeAutonomy.decideLoungeInitiative, not every turn.
+   */
+  autonomy?: LoungeAutonomyState;
   /** The last change of scene (2026-11-09): when, and whether the member asked for it; the background follows it (loungeSceneFollow.ts). */
   scene_change?: { turn: number; at: number; explicit: boolean };
   /** The last turn the member asked to go somewhere else: the move itself may come a turn or two later. */
@@ -341,14 +352,18 @@ function readScene(value: unknown): LoungeScene | undefined {
   return { location, scene_type: loungeSceneTypes.find(type => type === scene.scene_type) ?? '기타', activity: clip(scene.activity, 60), time_of_day: clip(scene.time_of_day, 20), season: clip(scene.season, 20), objects: strings(scene.objects, 6, 30) };
 }
 /** The stored state for this room: what belongs to an earlier room is let go, except the events that never repeat. */
-export function normalizeLoungeCompanionState(raw: unknown, roomId: string): LoungeCompanionState {
+export function normalizeLoungeCompanionState(raw: unknown, roomId: string, characterId?: string): LoungeCompanionState {
   const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
   const used_events = strings(value.used_events, 50, 60);
-  if (value.room_id !== roomId) return { room_id: roomId, scene_turns: 0, event_turns: {}, used_events: [], reactions: [], phrases: [], anchors: [], inner: [], shared: [], self_facts: [], room_memory: [] };
+  if (value.room_id !== roomId) {
+    const autonomy = characterId && getLoungeAutonomyProfile(characterId) ? seedFreshAutonomy(characterId) : undefined;
+    return { room_id: roomId, scene_turns: 0, event_turns: {}, used_events, reactions: [], phrases: [], anchors: [], inner: [], shared: [], self_facts: [], room_memory: [], ...(autonomy ? { autonomy } : {}) };
+  }
   const eventTurns = value.event_turns && typeof value.event_turns === 'object' ? Object.fromEntries(Object.entries(value.event_turns as Record<string, unknown>).filter(([, turn]) => turnNumber(turn) !== undefined)) as Record<string, number> : {};
   const listed = <T,>(items: unknown, key: 'what' | 'fact', max: number) => (Array.isArray(items) ? items : [])
     .filter(item => item && typeof item === 'object' && typeof (item as Record<string, unknown>)[key] === 'string')
     .map(item => ({ [key]: String((item as Record<string, unknown>)[key]).slice(0, 80), turn: turnNumber((item as Record<string, unknown>).turn) ?? 0 }) as T).slice(-max);
+  const autonomy = ensureLoungeAutonomyState(characterId, value.autonomy);
   return {
     room_id: roomId, scene: readScene(value.scene), scene_turns: turnNumber(value.scene_turns) ?? 0,
     room_memory: normalizeLoungeRoomMemory(value.room_memory), source_turn: turnNumber(value.source_turn),
@@ -361,6 +376,7 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(readBoost(value.intimacy_boost) ? { intimacy_boost: readBoost(value.intimacy_boost) } : {}),
     ...(readCarry(value.lingering) ? { lingering: readCarry(value.lingering) } : {}),
     ...(readCarry(value.next_intent) ? { next_intent: readCarry(value.next_intent) } : {}),
+    ...(autonomy ? { autonomy } : {}),
     ...(readSceneChange(value.scene_change) ? { scene_change: readSceneChange(value.scene_change) } : {}),
     ...(turnNumber(value.scene_move_asked) !== undefined ? { scene_move_asked: turnNumber(value.scene_move_asked) } : {}),
     ...(turnNumber(value.last_inner_turn) !== undefined ? { last_inner_turn: turnNumber(value.last_inner_turn) } : {}),
@@ -456,7 +472,12 @@ const withoutStars = (text: string) => text.replace(/\*/g, '').trim();
  * sheet), where the two are and what happens there, and what was used lately and is to be avoided. Constraints only;
  * how to react is the reply's own judgement.
  */
-export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; innerDue?: boolean; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean }) {
+export function loungeTurnConditions(input: {
+  bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision;
+  innerVoice: 'on' | 'off'; innerDue?: boolean; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean;
+  /** Autonomous initiative (2026-11-13); omit for characters without a profile. */
+  initiative?: LoungeInitiativeDecision; characterId?: string;
+}) {
   const { bible, state, decision } = input;
   const stage = input.stage ? Math.min(4, Math.max(1, input.stage)) as 1 | 2 | 3 | 4 : undefined;
   // Resting turn: the inner voice was shown a turn or two ago, so this one carries none and is not told what one would reach.
@@ -522,6 +543,19 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(state.self_facts.length ? { self_facts: state.self_facts.map(item => item.fact) } : {}),
     ...(state.shared.length ? { shared: state.shared.map(item => item.what) } : {}),
     ...(Object.keys(avoid).length ? { avoid } : {}),
+    ...(() => {
+      const life = loungeLifeTurnField(input.characterId, state.autonomy);
+      const initiative = input.initiative ?? (input.characterId || state.autonomy
+        ? decideLoungeInitiative({ characterId: input.characterId, autonomy: state.autonomy, turn: input.turn, hasSceneEvent: Boolean(decision.event) })
+        : undefined);
+      const initiativeField = initiative
+        ? loungeInitiativeTurnField(initiative, getLoungeAutonomyProfile(input.characterId), state.autonomy)
+        : undefined;
+      return {
+        ...(life ? { life } : {}),
+        ...(initiativeField ? { initiative: initiativeField } : {}),
+      };
+    })(),
   };
 }
 
@@ -557,7 +591,12 @@ const uniqueTail = (items: readonly string[], max: number) => [...new Set([...it
 export const loungeEndsOnQuestion = (reply: string) => /[?？]\s*$/.test(reply.split('\n').map(line => line.trim()).filter(line => line && !actionLine.test(line)).at(-1) ?? '');
 const carried = (value: unknown, turn: number) => { const what = clip(value, 60); return what ? { what, turn } : undefined; };
 /** The state after a turn: the scene the call after the reply wrote, the event that came, what was used. */
-export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number }): LoungeCompanionState {
+export function nextLoungeCompanionState(input: {
+  state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string;
+  boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number;
+  /** When the reply was allowed to bring in an Ambient / goal beat (initiative self_share). */
+  autonomySelfShare?: boolean; autonomy?: LoungeAutonomyState;
+}): LoungeCompanionState {
   const { state, update, decision, turn } = input;
   if (state.source_turn !== undefined && turn <= state.source_turn) return state;
   const scene = readScene(update?.scene);
@@ -602,6 +641,12 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     // until loungeCarryTurns have passed.
     lingering: update && 'lingering' in update ? carried(update.lingering, turn) : state.lingering,
     next_intent: update && 'next_intent' in update ? carried(update.next_intent, turn) : state.next_intent,
+    ...(() => {
+      const base = input.autonomy ?? state.autonomy;
+      if (!base && !input.autonomySelfShare) return {};
+      const next = input.autonomySelfShare ? markLoungeAutonomySelfShare(base, turn) : base;
+      return next ? { autonomy: next } : {};
+    })(),
   };
 }
 
