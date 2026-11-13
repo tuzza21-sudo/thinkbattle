@@ -28,14 +28,41 @@ export type LoungeAmbientBeat = {
   at: number;
 };
 
+/**
+ * What this member wrote for this character only (Kindroid-style). Stored under autonomy.member; when set it overrides
+ * the static profile / planner tick for that field so the chat stays customized per user.
+ */
+export type LoungeAutonomyMember = {
+  /** Extra personality / tone the member wants this character to show with them. */
+  personality?: string;
+  core_drive?: string;
+  goals?: string[];
+  current_intention?: string;
+  ambient?: string;
+  mood_hint?: string;
+};
+
 export type LoungeAutonomyState = {
   current_intention?: string;
   /** Open ambient beat (at most one). */
   ambient?: LoungeAmbientBeat;
   /** Pocket intent for chat; spoken only when self_share is gated open. */
   conversation_intent?: string;
+  /** Per-member overrides from 대화 설정 › 캐릭터 자율. */
+  member?: LoungeAutonomyMember;
   last_self_share_turn?: number;
   last_tick_at?: number;
+};
+
+/** Resolved values for prompts and the settings sheet (member wins over profile / runtime). */
+export type LoungeAutonomyEffective = {
+  coreDrive: string;
+  persistentGoals: string[];
+  personality?: string;
+  current_intention?: string;
+  ambient?: string;
+  mood_hint?: string;
+  fromMember: boolean;
 };
 
 export type LoungeInitiativeDecision = {
@@ -152,24 +179,76 @@ export const loungeAutonomyProfiles: Record<string, LoungeAutonomyProfile> = {
   },
 };
 
-/** Always-on tint for in-chat liveliness (does not change the member's topic). */
-export function loungeLifeTurnField(characterId: string | undefined, autonomy?: LoungeAutonomyState) {
-  const profile = getLoungeAutonomyProfile(characterId);
-  if (!profile) return undefined;
+export const getLoungeAutonomyProfile = (characterId?: string | null) =>
+  characterId ? loungeAutonomyProfiles[characterId] : undefined;
+
+export const loungeAutonomyPersonalityLimit = 400;
+export const loungeAutonomyGoalLimit = 80;
+export const loungeAutonomyGoalCount = 3;
+
+export function normalizeLoungeAutonomyMember(raw: unknown): LoungeAutonomyMember | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Record<string, unknown>;
+  const personality = clip(value.personality, loungeAutonomyPersonalityLimit);
+  const core_drive = clip(value.core_drive, 120);
+  const goals = Array.isArray(value.goals)
+    ? value.goals.map(item => clip(item, loungeAutonomyGoalLimit)).filter(Boolean).slice(0, loungeAutonomyGoalCount)
+    : [];
+  const current_intention = clip(value.current_intention, 80);
+  const ambient = clip(value.ambient, 120);
+  const mood_hint = clip(value.mood_hint, 40);
+  if (!personality && !core_drive && !goals.length && !current_intention && !ambient && !mood_hint) return undefined;
   return {
-    core_drive: profile.coreDrive,
-    current_intention: autonomy?.current_intention ?? profile.defaultIntention,
-    ...(autonomy?.ambient?.summary ? { ambient: autonomy.ambient.summary } : {}),
-    rule: '너는 지금 네 삶·목표를 가지고 있다. 말투·비유·일 이야기의 디테일에만 은근히 묻혀 나오게 한다. 상대가 꺼낸 화제를 네 일과 목표로 바꾸지 않는다. ambient는 initiative.self_share가 열렸을 때만 사건으로 꺼낸다.',
+    ...(personality ? { personality } : {}),
+    ...(core_drive ? { core_drive } : {}),
+    ...(goals.length ? { goals } : {}),
+    ...(current_intention ? { current_intention } : {}),
+    ...(ambient ? { ambient } : {}),
+    ...(mood_hint ? { mood_hint } : {}),
   };
 }
 
-export const getLoungeAutonomyProfile = (characterId?: string | null) =>
-  characterId ? loungeAutonomyProfiles[characterId] : undefined;
+/** Merge member overrides onto profile + runtime state for prompts and the settings UI. */
+export function effectiveLoungeAutonomy(characterId: string | undefined, autonomy?: LoungeAutonomyState): LoungeAutonomyEffective | undefined {
+  const profile = getLoungeAutonomyProfile(characterId);
+  const member = autonomy?.member;
+  if (!profile && !member) return undefined;
+  const intention = member?.current_intention || autonomy?.current_intention || profile?.defaultIntention;
+  const ambient = member?.ambient || autonomy?.ambient?.summary;
+  const mood = member?.mood_hint || autonomy?.ambient?.mood_hint;
+  const coreDrive = member?.core_drive || profile?.coreDrive || '';
+  const persistentGoals = member?.goals?.length ? [...member.goals] : [...(profile?.persistentGoals ?? [])];
+  if (!coreDrive && !intention && !ambient && !member?.personality && !persistentGoals.length) return undefined;
+  return {
+    coreDrive,
+    persistentGoals,
+    ...(member?.personality ? { personality: member.personality } : {}),
+    ...(intention ? { current_intention: intention } : {}),
+    ...(ambient ? { ambient } : {}),
+    ...(mood ? { mood_hint: mood } : {}),
+    fromMember: Boolean(member && (member.personality || member.core_drive || member.goals?.length || member.current_intention || member.ambient)),
+  };
+}
+
+/** Always-on tint for in-chat liveliness (does not change the member's topic). */
+export function loungeLifeTurnField(characterId: string | undefined, autonomy?: LoungeAutonomyState) {
+  const life = effectiveLoungeAutonomy(characterId, autonomy);
+  if (!life) return undefined;
+  return {
+    ...(life.coreDrive ? { core_drive: life.coreDrive } : {}),
+    ...(life.persistentGoals.length ? { persistent_goals: life.persistentGoals } : {}),
+    ...(life.personality ? { personality: life.personality } : {}),
+    ...(life.current_intention ? { current_intention: life.current_intention } : {}),
+    ...(life.ambient ? { ambient: life.ambient } : {}),
+    ...(life.mood_hint ? { mood_hint: life.mood_hint } : {}),
+    rule: '너는 지금 네 삶·목표를 가지고 있다. turn.life.personality가 있으면 그 성격·말투 결을 이 상대와의 대화에 우선 반영한다(바이블의 금지·선을 깨지 않는다). 말투·비유·일 이야기의 디테일에만 은근히 묻혀 나오게 한다. 상대가 꺼낸 화제를 네 일과 목표로 바꾸지 않는다. ambient는 initiative.self_share가 열렸을 때만 사건으로 꺼낸다.',
+  };
+}
 
 export function normalizeLoungeAutonomyState(raw: unknown): LoungeAutonomyState | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const value = raw as Record<string, unknown>;
+  const member = normalizeLoungeAutonomyMember(value.member);
   const current = clip(value.current_intention, 80);
   const conversation = clip(value.conversation_intent, 80);
   const ambientRaw = value.ambient && typeof value.ambient === 'object' ? value.ambient as Record<string, unknown> : undefined;
@@ -179,14 +258,29 @@ export function normalizeLoungeAutonomyState(raw: unknown): LoungeAutonomyState 
   const lastShare = typeof value.last_self_share_turn === 'number' && Number.isFinite(value.last_self_share_turn) ? value.last_self_share_turn : undefined;
   const lastTick = typeof value.last_tick_at === 'number' && Number.isFinite(value.last_tick_at) ? value.last_tick_at : undefined;
   const ambient = summary && at !== undefined ? { summary, at, ...(mood ? { mood_hint: mood } : {}) } : undefined;
-  if (!current && !conversation && !ambient && lastShare === undefined && lastTick === undefined) return undefined;
+  if (!current && !conversation && !ambient && !member && lastShare === undefined && lastTick === undefined) return undefined;
   return {
     ...(current ? { current_intention: current } : {}),
     ...(conversation ? { conversation_intent: conversation } : {}),
     ...(ambient ? { ambient } : {}),
+    ...(member ? { member } : {}),
     ...(lastShare !== undefined ? { last_self_share_turn: lastShare } : {}),
     ...(lastTick !== undefined ? { last_tick_at: lastTick } : {}),
   };
+}
+
+/** Apply the member's settings sheet: locks those fields against planner overwrite and mirrors intention/ambient into runtime. */
+export function applyLoungeAutonomyMember(state: LoungeAutonomyState | undefined, memberRaw: unknown, now = Date.now()): LoungeAutonomyState {
+  const member = normalizeLoungeAutonomyMember(memberRaw);
+  const next: LoungeAutonomyState = { ...(state ?? {}), last_tick_at: now };
+  if (!member) {
+    delete next.member;
+    return next;
+  }
+  next.member = member;
+  if (member.current_intention) next.current_intention = member.current_intention;
+  if (member.ambient) next.ambient = { summary: member.ambient, at: now, ...(member.mood_hint ? { mood_hint: member.mood_hint } : {}) };
+  return next;
 }
 
 /** Seed runtime autonomy from the static profile when the room has none yet. */
@@ -201,8 +295,10 @@ export function seedLoungeAutonomyState(characterId: string, now = Date.now()): 
 }
 
 export function ensureLoungeAutonomyState(characterId: string | undefined, raw: unknown, now = Date.now()): LoungeAutonomyState | undefined {
-  if (!characterId || !getLoungeAutonomyProfile(characterId)) return normalizeLoungeAutonomyState(raw);
-  return normalizeLoungeAutonomyState(raw) ?? seedLoungeAutonomyState(characterId, now);
+  const normalized = normalizeLoungeAutonomyState(raw);
+  if (normalized?.member) return normalized;
+  if (!characterId || !getLoungeAutonomyProfile(characterId)) return normalized;
+  return normalized ?? seedLoungeAutonomyState(characterId, now);
 }
 
 const clip = (value: unknown, max: number) => typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : '';
@@ -241,8 +337,8 @@ export type LoungeInitiativeInput = {
  * Companion-first initiative. self_share only when a gate opens and there is goal/ambient material.
  */
 export function decideLoungeInitiative(input: LoungeInitiativeInput): LoungeInitiativeDecision {
-  const profile = getLoungeAutonomyProfile(input.characterId);
-  if (!profile) return { stance: 'companion', allowSelfShare: false };
+  const life = effectiveLoungeAutonomy(input.characterId, input.autonomy);
+  if (!life) return { stance: 'companion', allowSelfShare: false };
 
   const analysis = input.analysis;
   if (analysis?.is_emotional_moment || analysis?.is_sincere_refusal || analysis?.is_repair_request) {
@@ -259,10 +355,7 @@ export function decideLoungeInitiative(input: LoungeInitiativeInput): LoungeInit
   const cooled = autonomy?.last_self_share_turn === undefined
     || input.turn - autonomy.last_self_share_turn > loungeAutonomySelfShareCooldown;
   const gate = Boolean(analysis?.topic_stale || analysis?.activity_finished || asked || input.hasSceneEvent);
-  const seed = autonomy?.ambient?.summary
-    || autonomy?.conversation_intent
-    || autonomy?.current_intention
-    || profile.defaultIntention;
+  const seed = life.ambient || autonomy?.conversation_intent || life.current_intention;
 
   if (gate && cooled && seed) {
     return { stance: 'self_share', allowSelfShare: true, seed, reason: asked ? 'asked_life' : analysis?.topic_stale ? 'topic_stale' : analysis?.activity_finished ? 'activity_finished' : 'scene_event' };
@@ -275,15 +368,16 @@ export function decideLoungeInitiative(input: LoungeInitiativeInput): LoungeInit
 }
 
 /** JSON fragment for turn.initiative when self_share is allowed (or hold/companion hints). */
-export function loungeInitiativeTurnField(decision: LoungeInitiativeDecision, profile?: LoungeAutonomyProfile, autonomy?: LoungeAutonomyState) {
-  if (!profile) return undefined;
+export function loungeInitiativeTurnField(decision: LoungeInitiativeDecision, profile?: LoungeAutonomyProfile, autonomy?: LoungeAutonomyState, characterId?: string) {
+  const life = effectiveLoungeAutonomy(characterId ?? profile?.characterId, autonomy);
+  if (!life && !profile) return undefined;
   if (decision.allowSelfShare && decision.seed) {
     return {
       stance: 'self_share' as const,
       rule: '컴패니언이 먼저다. 상대 말에 짧게 반응한 뒤에만, 아래 소재를 자기 삶의 한 조각으로 꺼낸다. 상대 화제를 네 일과 목표로 끌어가지 않는다. 질문으로 끝내지 말고 네 장면·판단 한 줄을 말한다.',
       seed: decision.seed,
-      ...(autonomy?.current_intention ? { current_intention: autonomy.current_intention } : {}),
-      ...(profile.coreDrive ? { core_drive: profile.coreDrive } : {}),
+      ...(life?.current_intention ? { current_intention: life.current_intention } : {}),
+      ...(life?.coreDrive ? { core_drive: life.coreDrive } : {}),
     };
   }
   if (decision.stance === 'hold') {
@@ -304,14 +398,21 @@ export type LoungeAutonomyTickUpdate = {
 };
 
 export function applyLoungeAutonomyTick(state: LoungeAutonomyState | undefined, update: LoungeAutonomyTickUpdate, now = Date.now()): LoungeAutonomyState {
-  const current = clip(update.current_intention, 80) || state?.current_intention;
+  const lockedIntention = Boolean(state?.member?.current_intention);
+  const lockedAmbient = Boolean(state?.member?.ambient);
+  const current = lockedIntention
+    ? state?.member?.current_intention || state?.current_intention
+    : clip(update.current_intention, 80) || state?.current_intention;
   const conversation = clip(update.conversation_intent, 80) || state?.conversation_intent;
-  const ambientSummary = clip(update.ambient, 120);
-  const mood = clip(update.mood_hint, 40);
+  const ambientSummary = lockedAmbient ? (state?.member?.ambient || state?.ambient?.summary || '') : clip(update.ambient, 120);
+  const mood = lockedAmbient
+    ? (state?.member?.mood_hint || state?.ambient?.mood_hint || '')
+    : clip(update.mood_hint, 40);
   return {
+    ...(state?.member ? { member: state.member } : {}),
     ...(current ? { current_intention: current } : {}),
     ...(conversation ? { conversation_intent: conversation } : {}),
-    ...(ambientSummary ? { ambient: { summary: ambientSummary, at: now, ...(mood ? { mood_hint: mood } : {}) } } : state?.ambient ? { ambient: state.ambient } : {}),
+    ...(ambientSummary ? { ambient: { summary: ambientSummary, at: lockedAmbient && state?.ambient?.at ? state.ambient.at : now, ...(mood ? { mood_hint: mood } : {}) } } : state?.ambient ? { ambient: state.ambient } : {}),
     ...(state?.last_self_share_turn !== undefined ? { last_self_share_turn: state.last_self_share_turn } : {}),
     last_tick_at: now,
   };
@@ -324,13 +425,14 @@ export function markLoungeAutonomySelfShare(state: LoungeAutonomyState | undefin
 
 /** Prompt block for reach-out: character life must follow goals, not invent a random day. */
 export function loungeAutonomyReachOutContext(characterId: string, autonomy?: LoungeAutonomyState) {
-  const profile = getLoungeAutonomyProfile(characterId);
-  if (!profile) return undefined;
+  const life = effectiveLoungeAutonomy(characterId, autonomy);
+  if (!life) return undefined;
   return {
-    core_drive: profile.coreDrive,
-    persistent_goals: [...profile.persistentGoals],
-    current_intention: autonomy?.current_intention ?? profile.defaultIntention,
-    ...(autonomy?.ambient ? { open_ambient: autonomy.ambient.summary } : {}),
+    ...(life.coreDrive ? { core_drive: life.coreDrive } : {}),
+    ...(life.persistentGoals.length ? { persistent_goals: life.persistentGoals } : {}),
+    ...(life.personality ? { personality: life.personality } : {}),
+    ...(life.current_intention ? { current_intention: life.current_intention } : {}),
+    ...(life.ambient ? { open_ambient: life.ambient } : {}),
   };
 }
 

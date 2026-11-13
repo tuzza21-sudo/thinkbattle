@@ -1125,6 +1125,10 @@
 
 /* The memories, the important moments and the timeline of a relationship. */
 .lounge-memory-sheet { gap:10px; }
+.lounge-autonomy-sheet header b { display:inline-flex; align-items:center; gap:8px; }
+.lounge-autonomy-editor { gap:10px; }
+.lounge-autonomy-goals { display:grid; gap:6px; margin:0; padding:0; border:0; }
+.lounge-autonomy-goals legend { margin:0 0 4px; font-size:12px; }
 .lounge-memory-tabs { display:flex; gap:6px; }
 .lounge-memory-tabs button { flex:1; padding:8px 6px; border:1px solid #ffffff24; border-radius:999px; background:transparent; color:#fff5e8; font-size:13px; cursor:pointer; }
 .lounge-memory-tabs button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; font-weight:700; }

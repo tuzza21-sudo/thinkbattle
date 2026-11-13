@@ -425,6 +425,23 @@ export const forgetMyLoungeMemory = (id: string) => loungeRpc<boolean>('forget_m
 export const addMyLoungeMemory = (characterId: string, kind: string, summary: string, followUp: string) => loungeRpc<string>('add_my_lounge_memory', { p_character: characterId, p_kind: kind, p_summary: summary, p_follow_up: followUp });
 export const forgetMyLoungeEvent = (characterId: string, at: string, summary: string) => loungeRpc<boolean>('forget_my_lounge_event', { p_character: characterId, p_at: at, p_summary: summary });
 
+/** Per-member character autonomy (personality / goals / ambient) for one character — migration 20261218. */
+export type LoungeAutonomyBook = {
+  room_id: string;
+  autonomy: Record<string, unknown>;
+  member: {
+    personality?: string;
+    core_drive?: string;
+    goals?: string[];
+    current_intention?: string;
+    ambient?: string;
+    mood_hint?: string;
+  };
+};
+export const getMyLoungeAutonomy = (characterId: string) => loungeRpc<LoungeAutonomyBook | null>('get_my_lounge_autonomy', { p_character: characterId });
+export const setMyLoungeAutonomy = (characterId: string, member: LoungeAutonomyBook['member']) =>
+  loungeRpc<LoungeAutonomyBook>('set_my_lounge_autonomy', { p_character: characterId, p_member: member });
+
 /** The member's personas (see loungePersonas.ts). Before migration 20261128 the table is missing and this says so. */
 const personaFailure = (error: { message?: string; code?: string }) => /schema cache|does not exist|Could not find|42P01/i.test(`${error.message} ${error.code}`)
   ? new Error('페르소나 기능을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.')

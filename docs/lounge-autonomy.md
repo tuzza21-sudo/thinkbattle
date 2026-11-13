@@ -16,10 +16,23 @@
 | Current Intention / Ambient / Conversation Intent | `voice_lounge_companion_state.state.autonomy` | reach-out tick, 시드 |
 | Initiative stance | 매 턴 코드 (`decideLoungeInitiative`) | 분석 결과 + 게이트 |
 
+## 유저 맞춤 (대화 설정 › 캐릭터 자율)
+
+Kindroid처럼 **이 유저×이 캐릭터만** 성격·Core Drive·장기 목표·Current Intention·Ambient를 직접 고친다.
+
+- UI: `LoungeAutonomySheet` (대화 설정 메뉴)
+- RPC: `get_my_lounge_autonomy` / `set_my_lounge_autonomy` (`20261218000000_lounge_autonomy_member.sql`)
+- 저장: `voice_lounge_companion_state.state.autonomy.member`
+- 멤버가 적은 Intention/Ambient는 reach-out tick이 덮어쓰지 않음
+- 프롬프트: `turn.life.personality` 등으로 다음 대사에 반영
+
+로컬 DB에 마이그레이션을 적용해야 설정 저장이 됩니다.
+
 ## 파일
 
-- `src/lib/loungeAutonomy.ts` — 프로필, 게이트, tick, reach-out 프롬프트 조각
-- `src/lib/loungeMessenger.ts` — `state.autonomy`, `turn.initiative`
+- `src/lib/loungeAutonomy.ts` — 프로필, 게이트, tick, member override
+- `src/components/LoungeAutonomySheet.tsx` — 설정 UI
+- `src/lib/loungeMessenger.ts` — `state.autonomy`, `turn.life` / `turn.initiative`
 - `api/lounge.ts` — 턴에 initiative 주입
 - `api/lounge-reach-out.ts` — autonomy 입력 + companion_state 갱신
 - `scripts/lounge-autonomy.test.mjs`

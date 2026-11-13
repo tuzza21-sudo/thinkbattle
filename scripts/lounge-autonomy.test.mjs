@@ -109,3 +109,34 @@ test('unknown character ids get no life or initiative field', () => {
   assert.equal(turn.life, undefined);
   assert.equal(turn.initiative, undefined);
 });
+
+test('member overrides win over profile and lock planner ticks', () => {
+  const member = autonomy.normalizeLoungeAutonomyMember({
+    personality: '더 다정하고 반말',
+    core_drive: '나만의 욕구',
+    goals: ['목표A', '목표B'],
+    current_intention: '유저가 정한 지금',
+    ambient: '유저가 정한 ambient',
+  });
+  const state = autonomy.applyLoungeAutonomyMember(undefined, member, 10);
+  const life = autonomy.effectiveLoungeAutonomy('trickster', state);
+  assert.equal(life.personality, '더 다정하고 반말');
+  assert.equal(life.coreDrive, '나만의 욕구');
+  assert.equal(life.current_intention, '유저가 정한 지금');
+  assert.equal(life.ambient, '유저가 정한 ambient');
+
+  const ticked = autonomy.applyLoungeAutonomyTick(state, {
+    current_intention: '플래너가 바꾸려는 의도',
+    ambient: '플래너 ambient',
+  }, 20);
+  assert.equal(ticked.current_intention, '유저가 정한 지금');
+  assert.equal(ticked.ambient.summary, '유저가 정한 ambient');
+  assert.equal(ticked.member.personality, '더 다정하고 반말');
+
+  const turn = messenger.loungeTurnConditions({
+    state: { ...messenger.normalizeLoungeCompanionState(null, 'room-1', 'trickster'), autonomy: state },
+    turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', characterId: 'trickster',
+  });
+  assert.equal(turn.life.personality, '더 다정하고 반말');
+  assert.equal(turn.life.current_intention, '유저가 정한 지금');
+});
