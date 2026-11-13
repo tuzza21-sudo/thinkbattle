@@ -1,36 +1,25 @@
-import { getLoungePlan, loungeCallLimitMinutes, loungeOrderPrefix, loungeOrderTerm, loungePhotoMonthly, loungePlanGoodName, type LoungePlan } from '../src/lib/loungePlans';
+import { getLoungePlan, loungeCallLimitMinutes, loungeOrderPrefix, loungeOrderTerm, loungePhotoMonthly, loungePlanGoodName } from '../src/lib/loungePlans';
 
 export const config = { runtime: 'edge' };
 
-// KG Inicis card payments for the paid plan (Pro, by the month or by the year). One order is one month or one year, with no automatic renewal.
-//   POST ?action=create          (member, JSON {plan, term, device}) -> a pending order and the fields for the payment window
-//   POST ?action=return          (Inicis, PC INIStdPay)       -> approve, record, redirect to /lounge/payment
-//   POST ?action=mobile-return   (Inicis, mobile smart pay)   -> the same for phones
-//   GET  ?action=close           (Inicis, PC window closed)   -> the page that closes the overlay
-//   POST ?action=status          (member)                     -> the plan running now and whether it can be cancelled with a refund
-//   POST ?action=cancel          (member, JSON {oid})         -> cancels the plan and refunds the card when the refund terms are met
-// The amount always comes from loungePlans on the server, and an order counts as paid only when Inicis approves that
-// exact amount for that exact order. Without INICIS_* variables the Inicis test merchant is used: test card payments
-// are approved and cancelled again by Inicis the same night.
+// Card payments for the paid plan (Pro, by the month or by the year) through PortOne V2, with KG Inicis as the payment
+// company (2026-11-13; before that Inicis was called directly). One order is one month or one year, with no automatic renewal.
+//   POST ?action=create    (member, JSON {plan, term, device, phone?}) -> a pending order and the request for PortOne.requestPayment
+//   POST ?action=complete  (the result page, JSON {paymentId, code?, message?}) -> looks the payment up at PortOne and records it
+//   POST ?action=webhook   (PortOne, the noticeUrls of each payment)  -> the same, for a member who never came back to the site
+//   POST ?action=status    (member)                                   -> the plan running now and whether it can be cancelled with a refund
+//   POST ?action=cancel    (member, JSON {oid})                       -> cancels the plan and refunds the card when the refund terms are met
+// The PortOne paymentId is our order id. The amount always comes from loungePlans on the server, and an order counts as paid
+// only when PortOne's own record of that payment says PAID for that exact amount: what the browser or a webhook says is only
+// a reason to look. Needs PORTONE_STORE_ID, PORTONE_CHANNEL_KEY (a test channel with INIpayTest first, the live MID later)
+// and PORTONE_API_SECRET; PORTONE_WEBHOOK_SECRET is checked when it is set.
 
-const TEST_MID = 'INIpayTest';
-const MID = process.env.INICIS_MID || TEST_MID;
-const SIGN_KEY = process.env.INICIS_SIGN_KEY || (MID === TEST_MID ? 'SU5JTElURV9UUklQTEVERVNfS0VZU1RS' : '');
-const MOBILE_HASH_KEY = process.env.INICIS_MOBILE_HASH_KEY || (MID === TEST_MID ? '3CB8183A4BE283555ACC8363C0360223' : '');
-const TEST = MID === TEST_MID || process.env.INICIS_TEST === '1';
-const STD_HOST = TEST ? 'https://stgstdpay.inicis.com' : 'https://stdpay.inicis.com';
-const MOBILE_PAY_URL = 'https://mobile.inicis.com/smart/payment/';
-const IDC = ['fc', 'ks', 'stg'];
+const PORTONE_API = 'https://api.portone.io';
+const storeId = () => process.env.PORTONE_STORE_ID || '';
+const channelKey = () => process.env.PORTONE_CHANNEL_KEY || '';
+const apiSecret = () => process.env.PORTONE_API_SECRET || '';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
-const html = (body: string) => new Response(body, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
-
-async function digest(algorithm: 'SHA-256' | 'SHA-512', value: string) {
-  return new Uint8Array(await crypto.subtle.digest(algorithm, new TextEncoder().encode(value)));
-}
-const hex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-const sha256 = async (value: string) => hex(await digest('SHA-256', value));
-const sha512Base64 = async (value: string) => btoa(String.fromCharCode(...await digest('SHA-512', value)));
 
 const supabaseBase = () => (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
 const serviceKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -53,9 +42,10 @@ const findOrder = async (oid: string) => /^[A-Za-z0-9]{8,40}$/.test(oid)
   ? (await db<PaymentRow[]>(`lounge_payments?oid=eq.${oid}&select=*`))[0]
   : undefined;
 
+/** A failed order can still turn out paid (PortOne is asked again), so failing one never closes it for good. */
 async function markFailed(oid: string, code: string, message: string) {
   try {
-    await db(`lounge_payments?oid=eq.${oid}&status=eq.pending`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', result_code: code.slice(0, 20), result_message: message.slice(0, 300), updated_at: new Date().toISOString() }) });
+    await db(`lounge_payments?oid=eq.${oid}&status=in.(pending,failed)`, { method: 'PATCH', body: JSON.stringify({ status: 'failed', result_code: code.slice(0, 20), result_message: message.slice(0, 300), updated_at: new Date().toISOString() }) });
   } catch (error) { console.warn('[payments] could not mark failed', oid, error instanceof Error ? error.message : error); }
 }
 
@@ -69,53 +59,141 @@ async function periodFor(order: PaymentRow) {
   return { start, end };
 }
 
-/** Marks a pending order paid. False when it was no longer pending or the write failed, so the caller cancels. */
-async function markPaid(order: PaymentRow, tid: string, payMethod: string) {
+// ---- PortOne ----
+type PortOnePayment = {
+  id?: string; status?: string; storeId?: string; transactionId?: string; currency?: string;
+  amount?: { total?: number }; method?: { type?: string }; channel?: { type?: string }; failure?: { reason?: string; pgMessage?: string };
+  type?: string; message?: string;
+};
+
+async function portone<T>(path: string, init: RequestInit = {}): Promise<{ status: number; body: T }> {
+  const response = await fetch(`${PORTONE_API}${path}`, {
+    ...init,
+    headers: { Authorization: `PortOne ${apiSecret()}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(20_000),
+  });
+  return { status: response.status, body: await response.json().catch(() => ({})) as T };
+}
+
+const getPayment = (paymentId: string) => portone<PortOnePayment>(`/payments/${encodeURIComponent(paymentId)}`);
+
+/** Cancels the whole payment. A payment PortOne already shows as cancelled counts as done. */
+async function cancelPayment(paymentId: string, reason: string): Promise<{ ok: boolean; code: string; message: string }> {
+  const { status, body } = await portone<{ cancellation?: { status?: string }; type?: string; message?: string }>(`/payments/${encodeURIComponent(paymentId)}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+  const ok = status < 300 ? ['SUCCEEDED', 'REQUESTED'].includes(String(body.cancellation?.status)) : body.type === 'PAYMENT_ALREADY_CANCELLED';
+  return { ok, code: String(body.cancellation?.status ?? body.type ?? status), message: String(body.message ?? '') };
+}
+
+/** Marks an order paid. 'taken' when it was no longer pending or failed (another check got there first). */
+async function markPaid(order: PaymentRow, payment: PortOnePayment): Promise<'paid' | 'taken' | 'error'> {
   try {
     const { start, end } = await periodFor(order);
     const now = new Date().toISOString();
-    const rows = await db<PaymentRow[]>(`lounge_payments?oid=eq.${order.oid}&status=eq.pending`, {
+    const method = String(payment.method?.type || 'Card').replace(/^PaymentMethod/, '');
+    const rows = await db<PaymentRow[]>(`lounge_payments?oid=eq.${order.oid}&status=in.(pending,failed)`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: 'paid', tid, pay_method: payMethod.slice(0, 40), result_code: '0000', result_message: null, paid_at: now, period_start: start.toISOString(), period_end: end.toISOString(), updated_at: now }),
+      body: JSON.stringify({ status: 'paid', tid: String(payment.transactionId || order.oid).slice(0, 80), pay_method: method.slice(0, 40), result_code: 'PAID', result_message: payment.channel?.type === 'TEST' ? 'test channel' : null, paid_at: now, period_start: start.toISOString(), period_end: end.toISOString(), updated_at: now }),
     });
-    return rows.length === 1;
+    return rows.length === 1 ? 'paid' : 'taken';
   } catch (error) {
     console.error('[payments] could not record payment', order.oid, error instanceof Error ? error.message : error);
-    return false;
+    return 'error';
   }
 }
 
-const resultUrl = (req: Request, params: Record<string, string>) => `${new URL(req.url).origin}/lounge/payment?${new URLSearchParams(params)}`;
-// The PC window may post the result inside its overlay frame, so the result page is opened in the top window.
-const redirect = (url: string) => html(`<!doctype html><html><head><meta charset="utf-8"><title>결제 결과</title></head><body><script>var u=${JSON.stringify(url).replace(/</g, '\\u003c')};try{(window.top||window).location.replace(u)}catch(e){location.replace(u)}</script><noscript><a href="${url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">결제 결과 보기</a></noscript></body></html>`);
-const failTo = (req: Request, message: string) => redirect(resultUrl(req, { result: 'fail', message: message.slice(0, 120) }));
+type Settled = { result: 'success'; oid: string } | { result: 'fail'; oid?: string; message: string };
 
-/** An Inicis address is used only when it is https on the host the IDC code names. */
-function inicisUrl(raw: string, idc: string, host: (idc: string) => string) {
+/** Looks the payment up at PortOne and brings the order in line with it: paid, failed, or (cancelled at PortOne) ended. */
+async function settle(paymentId: string, hint: { code?: string; message?: string } = {}): Promise<Settled> {
+  const order = await findOrder(paymentId);
+  if (!order) return { result: 'fail', message: '주문을 찾지 못했어요.' };
+  const success = { result: 'success', oid: order.oid } as const;
+  const fail = (message: string) => ({ result: 'fail', oid: order.oid, message }) as const;
+  const failed = async (code: string, message: string) => { await markFailed(order.oid, code, message); return fail(message); };
+
+  const { status, body: payment } = await getPayment(order.oid);
+  // No payment at PortOne: the window was closed before anything was paid.
+  if (status === 404) return order.status === 'paid' ? success : failed(hint.code || 'not_found', hint.message || '결제가 완료되지 않았어요.');
+  if (status >= 300) throw new Error(`portone ${status} ${payment.type ?? ''}`);
+
+  if (order.status === 'paid') {
+    if (payment.status !== 'CANCELLED') return success;
+    // Cancelled from the PortOne console: the plan ends with it.
+    try { await db(`lounge_payments?oid=eq.${order.oid}&status=eq.paid`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled', result_code: 'cancel', result_message: 'cancelled at PortOne', updated_at: new Date().toISOString() }) }); }
+    catch (error) { console.error('[payments] could not end a plan cancelled at PortOne', order.oid, error instanceof Error ? error.message : error); }
+    return fail('취소된 결제예요.');
+  }
+  if (order.status === 'cancelled') return fail('취소된 결제예요.');
+
+  if (payment.status !== 'PAID') {
+    const message = hint.message || payment.failure?.pgMessage || payment.failure?.reason || '결제가 완료되지 않았어요.';
+    if (payment.status === 'FAILED' || payment.status === 'CANCELLED' || hint.code) return failed(hint.code || String(payment.status), message);
+    // READY or PENDING: still going on at the card company; the webhook settles it.
+    return fail('결제가 아직 끝나지 않았어요. 잠시 뒤 계정 관리의 이용권에서 확인해 주세요.');
+  }
+
+  const exact = payment.amount?.total === order.amount && payment.currency === 'KRW' && (!payment.storeId || payment.storeId === storeId());
+  if (exact) {
+    const wrote = await markPaid(order, payment);
+    if (wrote === 'paid') return success;
+    // The member's return and the webhook arrive together: the other one may have recorded it already.
+    const now = await findOrder(order.oid).catch(() => undefined);
+    if (now?.status === 'paid') return success;
+    if (wrote === 'taken' && now?.status === 'cancelled') return fail('취소된 결제예요.');
+  }
+  // A wrong amount, or a payment that could not be recorded, is not kept.
+  const reason = exact ? '결제 기록 실패로 자동 취소' : '주문 금액 불일치로 자동 취소';
+  const refund = await cancelPayment(order.oid, reason).catch(error => ({ ok: false, code: 'network', message: error instanceof Error ? error.message : 'error' }));
+  console.error('[payments] payment not kept', order.oid, reason, `paid ${String(payment.amount?.total)} ${String(payment.currency)}`, 'refund', refund.ok, refund.code);
+  return failed(exact ? 'record' : 'mismatch', refund.ok ? '결제 기록을 남기지 못해 결제를 취소했어요.' : '결제를 확인하지 못했어요. ask.saseok@gmail.com으로 문의해 주세요.');
+}
+
+/** Standard Webhooks, as PortOne signs them (the same as @portone/server-sdk's Webhook.verify). */
+async function webhookSigned(headers: Headers, body: string) {
+  const secret = process.env.PORTONE_WEBHOOK_SECRET;
+  // Without a secret the event is still only a reason to ask PortOne, so nothing can be faked through it.
+  if (!secret) return true;
+  const id = headers.get('webhook-id'), timestamp = headers.get('webhook-timestamp'), signatures = headers.get('webhook-signature');
+  if (!id || !timestamp || !signatures || !(Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300)) return false;
   try {
-    const url = new URL(raw);
-    return url.protocol === 'https:' && IDC.includes(idc) && url.hostname === host(idc) ? url : null;
-  } catch { return null; }
+    const raw = Uint8Array.from(atob(secret.startsWith('whsec_') ? secret.slice(6) : secret), char => char.charCodeAt(0));
+    const key = await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${body}`)))));
+    return signatures.split(' ').some(part => { const [version, signature] = part.split(','); return version === 'v1' && signature === expected; });
+  } catch { return false; }
 }
 
-const form = async (req: Request) => new URLSearchParams(await req.text());
-const post = (url: string, fields: Record<string, string>) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields), signal: AbortSignal.timeout(20_000) });
-
-/** Inicis's mobile answers are key=value pairs joined by &, with values that are not always escaped. */
-function parsePairs(text: string) {
-  const out: Record<string, string> = {};
-  for (const part of text.split('&')) {
-    const at = part.indexOf('=');
-    if (at > 0) out[part.slice(0, at).trim()] = part.slice(at + 1).trim();
+async function webhook(req: Request) {
+  const text = await req.text();
+  if (!(await webhookSigned(req.headers, text))) return json({ error: 'invalid signature' }, 400);
+  let event: { type?: unknown; data?: { paymentId?: unknown } };
+  try { event = JSON.parse(text); } catch { return json({ error: 'invalid body' }, 400); }
+  const paymentId = event.data?.paymentId;
+  // Unknown types are answered 200 and left alone, as PortOne asks.
+  if (typeof event.type === 'string' && event.type.startsWith('Transaction.') && typeof paymentId === 'string') {
+    const settled = await settle(paymentId);
+    console.info('[payments] webhook', event.type, paymentId, settled.result);
   }
-  return out;
+  return json({ ok: true });
+}
+
+function sameSite(req: Request) {
+  const origin = req.headers.get('origin');
+  return !origin || origin === new URL(req.url).origin || (process.env.APP_ORIGIN || '').split(',').map(value => value.trim()).includes(origin);
+}
+
+async function complete(req: Request) {
+  if (!sameSite(req)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
+  let body: { paymentId?: unknown; code?: unknown; message?: unknown };
+  try { body = JSON.parse(await req.text()); } catch { return json({ error: '요청 형식이 올바르지 않아요.' }, 400); }
+  if (typeof body.paymentId !== 'string') return json({ error: '주문을 찾지 못했어요.' }, 400);
+  const text = (value: unknown) => typeof value === 'string' && value ? value.slice(0, 120) : undefined;
+  return json(await settle(body.paymentId, { code: text(body.code), message: text(body.message) }));
 }
 
 async function createOrder(req: Request) {
-  const origin = req.headers.get('origin');
-  const self = new URL(req.url).origin;
-  if (origin && origin !== self && !(process.env.APP_ORIGIN || '').split(',').map(value => value.trim()).includes(origin)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
-  if (!SIGN_KEY || !MOBILE_HASH_KEY) return json({ error: '결제 설정이 아직 끝나지 않았어요.' }, 503);
+  if (!sameSite(req)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
+  if (!storeId() || !channelKey() || !apiSecret()) return json({ error: '결제 설정이 아직 끝나지 않았어요.' }, 503);
   const authorization = req.headers.get('authorization') || '';
   if (!/^Bearer \S+$/i.test(authorization)) return json({ error: '로그인이 필요해요.' }, 401);
   const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
@@ -125,145 +203,41 @@ async function createOrder(req: Request) {
   if (!user.id) return json({ error: '다시 로그인해 주세요.' }, 401);
   if (user.is_anonymous || !user.email) return json({ error: '회원가입 후 결제할 수 있어요.', code: 'signup_required' }, 403);
 
-  let body: { plan?: unknown; term?: unknown; device?: unknown };
+  let body: { plan?: unknown; term?: unknown; device?: unknown; phone?: unknown };
   try { body = JSON.parse(await req.text()); } catch { return json({ error: '요청 형식이 올바르지 않아요.' }, 400); }
   const plan = getLoungePlan(body.plan, body.term);
   if (!plan) return json({ error: '요금제를 다시 골라 주세요.' }, 400);
   const device = body.device === 'mobile' ? 'mobile' : 'pc';
+  // KG Inicis's PC window needs the buyer's phone number (optional on phones). It goes to the window only and is not stored.
+  const phone = typeof body.phone === 'string' ? body.phone.replace(/\D/g, '') : '';
+  const phoneOk = /^01\d{8,9}$/.test(phone);
+  if (device === 'pc' && !phoneOk) return json({ error: '결제창에 필요한 휴대폰 번호를 입력해 주세요.', code: 'phone_required' }, 400);
 
   const oid = `${loungeOrderPrefix[plan.term]}${Date.now()}${crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase()}`.slice(0, 40);
   await db('lounge_payments', { method: 'POST', body: JSON.stringify({ user_id: user.id, plan: plan.id, amount: plan.price, oid, device }) });
 
-  const buyerName = (user.user_metadata?.nickname || user.user_metadata?.name || user.email.split('@')[0]).slice(0, 15);
-  return json(device === 'mobile' ? await mobileFields(plan, oid, buyerName, user.email, self) : await pcFields(plan, oid, buyerName, user.email, self));
-}
-
-async function pcFields(plan: LoungePlan, oid: string, buyerName: string, email: string, origin: string) {
-  const price = String(plan.price), timestamp = String(Date.now());
-  return {
-    mode: 'pc', scriptUrl: `${STD_HOST}/stdjs/INIStdPay.js`, oid,
-    fields: {
-      version: '1.0', gopaymethod: 'Card', mid: MID, oid, price, timestamp, use_chkfake: 'Y',
-      signature: await sha256(`oid=${oid}&price=${price}&timestamp=${timestamp}`),
-      verification: await sha256(`oid=${oid}&price=${price}&signKey=${SIGN_KEY}&timestamp=${timestamp}`),
-      mKey: await sha256(SIGN_KEY),
-      currency: 'WON', goodname: loungePlanGoodName(plan), buyername: buyerName, buyertel: '', buyeremail: email,
-      returnUrl: `${origin}/api/payments?action=return`, closeUrl: `${origin}/api/payments?action=close`,
-      acceptmethod: 'centerCd(Y)', charset: 'UTF-8',
+  const self = new URL(req.url).origin;
+  const fullName = (user.user_metadata?.nickname || user.user_metadata?.name || user.email.split('@')[0]).slice(0, 15);
+  return json({
+    oid,
+    request: {
+      storeId: storeId(), channelKey: channelKey(), paymentId: oid, orderName: loungePlanGoodName(plan), totalAmount: plan.price,
+      currency: 'KRW', payMethod: 'CARD',
+      customer: { fullName, email: user.email, ...(phoneOk ? { phoneNumber: phone } : {}) },
+      // Phones leave the site for the card company and come back here with ?paymentId=…; a computer gets the answer in place.
+      redirectUrl: `${self}/lounge/payment`,
+      noticeUrls: [`${self}/api/payments?action=webhook`],
     },
-  };
-}
-
-async function mobileFields(plan: LoungePlan, oid: string, buyerName: string, email: string, origin: string) {
-  const amount = String(plan.price), timestamp = String(Date.now());
-  return {
-    mode: 'mobile', actionUrl: MOBILE_PAY_URL, oid,
-    fields: {
-      P_INI_PAYMENT: 'CARD', P_MID: MID, P_OID: oid, P_AMT: amount, P_GOODS: loungePlanGoodName(plan), P_UNAME: buyerName, P_EMAIL: email,
-      P_NEXT_URL: `${origin}/api/payments?action=mobile-return`, P_NOTI: oid, P_CHARSET: 'utf8',
-      P_TIMESTAMP: timestamp, P_CHKFAKE: await sha512Base64(`${amount}${oid}${timestamp}${MOBILE_HASH_KEY}`),
-      P_RESERVED: 'centerCd=Y&amt_hash=Y',
-    },
-  };
-}
-
-async function pcReturn(req: Request) {
-  const data = await form(req);
-  const oid = data.get('orderNumber') || '';
-  const order = await findOrder(oid).catch(() => undefined);
-  if (!order) return failTo(req, '주문을 찾지 못했어요.');
-  if (order.status === 'paid') return redirect(resultUrl(req, { result: 'success', oid }));
-  const code = data.get('resultCode') || '', message = data.get('resultMsg') || '결제가 완료되지 않았어요.';
-  if (code !== '0000') { await markFailed(oid, code, message); return failTo(req, message); }
-
-  const idc = data.get('idc_name') || '', authToken = data.get('authToken') || '';
-  const host = (name: string) => `${name}stdpay.inicis.com`;
-  const authUrl = inicisUrl(data.get('authUrl') || '', idc, host);
-  const netCancelUrl = inicisUrl(data.get('netCancelUrl') || '', idc, host);
-  if (data.get('mid') !== MID || !authUrl || !authToken) { await markFailed(oid, 'invalid', 'invalid return'); return failTo(req, '결제 정보를 확인하지 못했어요.'); }
-
-  const sign = async () => {
-    const timestamp = String(Date.now());
-    return {
-      mid: MID, authToken, timestamp, charset: 'UTF-8', format: 'JSON', price: String(order.amount),
-      signature: await sha256(`authToken=${authToken}&timestamp=${timestamp}`),
-      verification: await sha256(`authToken=${authToken}&signKey=${SIGN_KEY}&timestamp=${timestamp}`),
-    };
-  };
-  const netCancel = async () => {
-    if (!netCancelUrl) return;
-    try { await post(netCancelUrl.href, await sign()); } catch (error) { console.error('[payments] net cancel failed', oid, error instanceof Error ? error.message : error); }
-  };
-
-  let approval: Record<string, unknown>;
-  try {
-    const response = await post(authUrl.href, await sign());
-    approval = await response.json() as Record<string, unknown>;
-  } catch (error) {
-    console.error('[payments] approval failed', oid, error instanceof Error ? error.message : error);
-    await netCancel(); await markFailed(oid, 'network', 'approval request failed');
-    return failTo(req, '결제 승인 중 연결이 끊겼어요. 결제는 취소됐어요.');
-  }
-  if (approval.resultCode !== '0000') {
-    const reason = String(approval.resultMsg || '결제가 승인되지 않았어요.');
-    await markFailed(oid, String(approval.resultCode || ''), reason);
-    return failTo(req, reason);
-  }
-  if (Number(approval.TotPrice) !== order.amount || String(approval.MOID) !== oid || !(await markPaid(order, String(approval.tid || ''), String(approval.payMethod || '')))) {
-    await netCancel(); await markFailed(oid, 'mismatch', `approved ${String(approval.TotPrice)} for ${String(approval.MOID)}`);
-    return failTo(req, '결제 기록을 남기지 못해 결제를 취소했어요.');
-  }
-  return redirect(resultUrl(req, { result: 'success', oid }));
-}
-
-async function mobileReturn(req: Request) {
-  const data = await form(req);
-  const oid = data.get('P_NOTI') || '';
-  const order = await findOrder(oid).catch(() => undefined);
-  if (!order) return failTo(req, '주문을 찾지 못했어요.');
-  if (order.status === 'paid') return redirect(resultUrl(req, { result: 'success', oid }));
-  const status = data.get('P_STATUS') || '', message = data.get('P_RMESG1') || '결제가 완료되지 않았어요.';
-  if (status !== '00') { await markFailed(oid, status, message); return failTo(req, message); }
-
-  const tid = data.get('P_TID') || '';
-  const reqUrl = inicisUrl(data.get('P_REQ_URL') || '', data.get('idc_name') || '', name => `${name}mobile.inicis.com`);
-  if (!reqUrl || !tid) { await markFailed(oid, 'invalid', 'invalid return'); return failTo(req, '결제 정보를 확인하지 못했어요.'); }
-  const netCancel = async () => {
-    try {
-      const timestamp = String(Date.now()), amount = String(order.amount);
-      await post(`${reqUrl.origin}/smart/payNetCancel.ini`, { P_TID: tid, P_MID: MID, P_AMT: amount, P_OID: oid, P_TIMESTAMP: timestamp, P_CHKFAKE: await sha512Base64(`${amount}${oid}${timestamp}${MOBILE_HASH_KEY}`) });
-    } catch (error) { console.error('[payments] mobile net cancel failed', oid, error instanceof Error ? error.message : error); }
-  };
-
-  let approval: Record<string, string>;
-  try {
-    approval = parsePairs(await (await post(reqUrl.href, { P_MID: MID, P_TID: tid })).text());
-  } catch (error) {
-    console.error('[payments] mobile approval failed', oid, error instanceof Error ? error.message : error);
-    await netCancel(); await markFailed(oid, 'network', 'approval request failed');
-    return failTo(req, '결제 승인 중 연결이 끊겼어요. 결제는 취소됐어요.');
-  }
-  if (approval.P_STATUS !== '00') {
-    const reason = approval.P_RMESG1 || '결제가 승인되지 않았어요.';
-    await markFailed(oid, approval.P_STATUS || '', reason);
-    return failTo(req, reason);
-  }
-  if (Number(approval.P_AMT) !== order.amount || (approval.P_OID && approval.P_OID !== oid) || !(await markPaid(order, approval.P_TID || tid, approval.P_TYPE || 'CARD'))) {
-    await netCancel(); await markFailed(oid, 'mismatch', `approved ${approval.P_AMT} for ${approval.P_OID}`);
-    return failTo(req, '결제 기록을 남기지 못해 결제를 취소했어요.');
-  }
-  return redirect(resultUrl(req, { result: 'success', oid }));
+  });
 }
 
 // ---- Cancelling a plan from the account (2026-11-07) ----
 // The terms (청약철회): within 7 days of paying, with none of the paid features used, the plan is cancelled and the whole
 // amount refunded. The member does it from the account; any other case (7 days passed, or a paid feature used) is the
-// prorated refund the terms promise by e-mail, which a person decides. The refund is Inicis's INIAPI card cancellation
-// (needs INICIS_API_KEY, and the server's address registered with Inicis; INICIS_API_CLIENT_IP names it). Without the
-// key nothing is cancelled and the member is told to write.
+// prorated refund the terms promise by e-mail, which a person decides (and refunds from the PortOne console, which ends
+// the plan through the webhook). The refund is PortOne's payment cancellation; without PORTONE_API_SECRET nothing is
+// cancelled and the member is told to write.
 const REFUND_DAYS = 7;
-const INIAPI_REFUND_URL = 'https://iniapi.inicis.com/v2/pg/refund';
-const inicisApiKey = () => process.env.INICIS_API_KEY || (MID === TEST_MID ? 'ItEQKi3rY7uvDS8l' : '');
 
 type Refundable = { ok: true } | { ok: false; reason: 'late' | 'used'; message: string };
 
@@ -286,9 +260,7 @@ async function refundable(order: PaymentRow, now = Date.now()): Promise<Refundab
 }
 
 async function authMember(req: Request): Promise<{ id: string } | Response> {
-  const origin = req.headers.get('origin');
-  const self = new URL(req.url).origin;
-  if (origin && origin !== self && !(process.env.APP_ORIGIN || '').split(',').map(value => value.trim()).includes(origin)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
+  if (!sameSite(req)) return json({ error: '허용되지 않은 요청입니다.' }, 403);
   const authorization = req.headers.get('authorization') || '';
   if (!/^Bearer \S+$/i.test(authorization)) return json({ error: '로그인이 필요해요.' }, 401);
   const anon = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
@@ -309,21 +281,7 @@ async function planStatus(req: Request) {
   const order = await runningOrder(member.id);
   if (!order) return json({ order: null });
   const check = await refundable(order);
-  return json({ order: { oid: order.oid, plan: order.plan, amount: order.amount, paidAt: order.paid_at ?? null, periodEnd: order.period_end, refundable: check.ok, ...(check.ok ? {} : { reason: check.reason, message: check.message }), canCancel: Boolean(inicisApiKey() && order.tid) } });
-}
-
-const kstStamp = (time = Date.now()) => new Date(time + 9 * 3_600_000).toISOString().replace(/\D/g, '').slice(0, 14);
-
-/** Asks Inicis to cancel the whole card approval. */
-async function inicisRefund(order: PaymentRow): Promise<{ ok: boolean; code: string; message: string }> {
-  const type = 'Refund', paymethod = 'Card', timestamp = kstStamp(), clientIp = process.env.INICIS_API_CLIENT_IP || '127.0.0.1', tid = String(order.tid);
-  const hashData = hex(await digest('SHA-512', `${inicisApiKey()}${type}${paymethod}${timestamp}${clientIp}${MID}${tid}`));
-  const response = await fetch(INIAPI_REFUND_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/json;charset=utf-8' }, signal: AbortSignal.timeout(20_000),
-    body: JSON.stringify({ type, paymethod, timestamp, clientIp, mid: MID, tid, msg: '회원 요청 이용권 취소(7일 이내)', hashData }),
-  });
-  const body = await response.json().catch(() => ({})) as { resultCode?: string; resultMsg?: string };
-  return { ok: body.resultCode === '00', code: String(body.resultCode ?? response.status), message: String(body.resultMsg ?? '') };
+  return json({ order: { oid: order.oid, plan: order.plan, amount: order.amount, paidAt: order.paid_at ?? null, periodEnd: order.period_end, refundable: check.ok, ...(check.ok ? {} : { reason: check.reason, message: check.message }), canCancel: Boolean(apiSecret() && order.tid) } });
 }
 
 async function cancelPlan(req: Request) {
@@ -337,7 +295,7 @@ async function cancelPlan(req: Request) {
   const latest = order.status === 'paid' ? await runningOrder(member.id) : undefined;
   if (order.status !== 'paid' || !latest) return json({ error: '지금 이용 중인 이용권이 아니에요.' }, 409);
   if (latest.oid !== order.oid) return json({ error: '나중에 결제한 이용권부터 취소해 주세요.', code: 'cancel_later_first' }, 409);
-  if (!order.tid || !inicisApiKey()) return json({ error: '자동 취소 설정이 아직 끝나지 않았어요. ask.saseok@gmail.com으로 문의해 주세요.', code: 'cancel_unavailable' }, 503);
+  if (!order.tid || !apiSecret()) return json({ error: '자동 취소 설정이 아직 끝나지 않았어요. ask.saseok@gmail.com으로 문의해 주세요.', code: 'cancel_unavailable' }, 503);
   const check = await refundable(order);
   if (!check.ok) return json({ error: `${check.message} 남은 기간만큼의 환불은 ask.saseok@gmail.com으로 문의해 주세요.`, code: 'not_refundable', reason: check.reason }, 409);
 
@@ -345,11 +303,11 @@ async function cancelPlan(req: Request) {
   const claimed = await db<PaymentRow[]>(`lounge_payments?oid=eq.${order.oid}&status=eq.paid`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled', result_code: 'cancel', result_message: '회원 요청 취소(7일 이내)', updated_at: new Date().toISOString() }) });
   if (claimed.length !== 1) return json({ error: '이미 처리된 요청이에요.', code: 'already_cancelled' }, 409);
   const restore = async (message: string) => {
-    try { await db(`lounge_payments?oid=eq.${order.oid}&status=eq.cancelled`, { method: 'PATCH', body: JSON.stringify({ status: 'paid', result_code: '0000', result_message: message.slice(0, 300), updated_at: new Date().toISOString() }) }); }
+    try { await db(`lounge_payments?oid=eq.${order.oid}&status=eq.cancelled`, { method: 'PATCH', body: JSON.stringify({ status: 'paid', result_code: 'PAID', result_message: message.slice(0, 300), updated_at: new Date().toISOString() }) }); }
     catch (error) { console.error('[payments] could not restore the plan after a failed refund', order.oid, error instanceof Error ? error.message : error); }
   };
   try {
-    const refund = await inicisRefund(order);
+    const refund = await cancelPayment(order.oid, '회원 요청 이용권 취소(7일 이내)');
     if (!refund.ok) {
       console.error('[payments] refund refused', order.oid, refund.code, refund.message);
       await restore(`cancel refused ${refund.code}`);
@@ -366,17 +324,17 @@ async function cancelPlan(req: Request) {
 export default async function handler(req: Request): Promise<Response> {
   const action = new URL(req.url).searchParams.get('action');
   if (!supabaseBase() || !serviceKey()) return json({ error: '결제 설정이 아직 끝나지 않았어요.' }, 503);
+  if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
   try {
-    if (action === 'close') return html(`<!doctype html><html><head><meta charset="utf-8"><script src="${STD_HOST}/stdjs/INIStdPay_close.js" charset="UTF-8"></script></head><body></body></html>`);
-    if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
     if (action === 'create') return await createOrder(req);
+    if (action === 'complete') return await complete(req);
+    if (action === 'webhook') return await webhook(req);
     if (action === 'status') return await planStatus(req);
     if (action === 'cancel') return await cancelPlan(req);
-    if (action === 'return') return await pcReturn(req);
-    if (action === 'mobile-return') return await mobileReturn(req);
     return json({ error: '알 수 없는 요청이에요.' }, 404);
   } catch (error) {
     console.error('[payments] failed', action, error instanceof Error ? error.message : error);
-    return action === 'create' ? json({ error: '결제를 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, 502) : failTo(req, '결제를 처리하지 못했어요. 문의해 주세요.');
+    // A webhook answered with an error is sent again by PortOne.
+    return json({ error: action === 'create' ? '결제를 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.' : '결제를 확인하지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, 502);
   }
 }

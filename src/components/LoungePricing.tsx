@@ -1,59 +1,53 @@
 import { useEffect, useState } from 'react';
 import { Check, CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import * as PortOne from '@portone/browser-sdk/v2';
 import type { AppUser } from '../types';
-import { createLoungePayment, type LoungePaymentOrder } from '../lib/loungeApi';
+import { completeLoungePayment, createLoungePayment, type LoungePaymentOrder } from '../lib/loungeApi';
 import { loungeFreePlan, loungePlanReceiptName, loungePlans, loungeTermLabel, type LoungePlan } from '../lib/loungePlans';
 import { supabase } from '../lib/supabase';
 import { isSaseokApp } from '../lib/nativeApp';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
 import './LoungePricing.css';
 
-declare global { interface Window { INIStdPay?: { pay: (formId: string) => void } } }
-
-const FORM_ID = 'lounge-inicis-form';
 const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const phoneDigits = (value: string) => value.replace(/\D/g, '');
+const phoneOk = (value: string) => /^01\d{8,9}$/.test(phoneDigits(value));
 
-const loadScript = (src: string) => new Promise<void>((resolve, reject) => {
-  if (window.INIStdPay && document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-  const script = document.createElement('script');
-  script.src = src; script.charset = 'UTF-8';
-  script.onload = () => resolve();
-  script.onerror = () => reject(new Error('결제창을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
-  document.head.appendChild(script);
-});
-
-/** Builds the hidden form Inicis reads, then opens the overlay (PC) or moves to the Inicis mobile page. */
-async function openPaymentWindow(order: LoungePaymentOrder) {
-  document.getElementById(FORM_ID)?.remove();
-  const form = document.createElement('form');
-  form.id = FORM_ID; form.method = 'POST'; form.acceptCharset = 'UTF-8'; form.hidden = true;
-  for (const [name, value] of Object.entries(order.fields)) {
-    const input = document.createElement('input');
-    input.type = 'hidden'; input.name = name; input.value = value;
-    form.appendChild(input);
-  }
-  document.body.appendChild(form);
-  // Inicis's mobile page reads the request as EUC-KR (P_CHARSET only sets the charset of what comes back).
-  if (order.mode === 'mobile') { form.acceptCharset = 'EUC-KR'; form.action = order.actionUrl; form.submit(); return; }
-  await loadScript(order.scriptUrl);
-  if (!window.INIStdPay) throw new Error('결제창을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.');
-  window.INIStdPay.pay(FORM_ID);
+/**
+ * Opens the PortOne (KG Inicis) window. On a phone the page moves to the card company and comes back to /lounge/payment;
+ * on a computer the window closes in place and the answer is here: the payment id to check, or why it stopped.
+ */
+async function openPaymentWindow(order: LoungePaymentOrder): Promise<{ paymentId: string } | { message: string } | null> {
+  const response = await PortOne.requestPayment(order.request);
+  if (!response) return null;
+  if (response.code !== undefined) return { message: response.message || '결제가 완료되지 않았어요.' };
+  return { paymentId: response.paymentId };
 }
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '결제를 시작하지 못했어요.';
 
 /** The free plan and the paid plan by the month and by the year, shown at the bottom of the lounge home. */
 export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest?: () => void }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // KG Inicis's PC window needs the buyer's phone number; it is asked for on the card, sent to the window and not kept.
+  const [asking, setAsking] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
   // In the store app a pass is not sold yet (the stores require their own in-app billing for it): the plans show, without a buy button.
   const inApp = isSaseokApp();
   const start = async (plan: LoungePlan) => {
     setNotice(null);
     if (!user || user.isAnonymous) { setNotice('회원가입 또는 로그인 후 결제할 수 있어요.'); onLoginRequest?.(); return; }
+    const mobile = isMobile();
+    if (!mobile && !phoneOk(phone)) { setAsking(plan.key); return; }
     setBusy(plan.key);
-    try { await openPaymentWindow(await createLoungePayment(plan.id, plan.term, isMobile() ? 'mobile' : 'pc')); }
+    try {
+      const done = await openPaymentWindow(await createLoungePayment(plan.id, plan.term, mobile ? 'mobile' : 'pc', mobile ? undefined : phoneDigits(phone)));
+      if (done && 'paymentId' in done) navigate(`/lounge/payment?paymentId=${encodeURIComponent(done.paymentId)}`);
+      else if (done) setNotice(done.message);
+    }
     catch (error) { setNotice(errorText(error)); }
     finally { setBusy(null); }
   };
@@ -84,13 +78,20 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
         <ul className="lounge-pricing-features">
           {plan.features.map(feature => <li key={feature}><Check size={15} aria-hidden="true" />{feature}</li>)}
         </ul>
-        {inApp ? <p className="lounge-pricing-included">앱에서는 아직 이용권을 구매할 수 없어요</p> : <button type="button" className="lounge-pricing-cta" disabled={busy !== null} onClick={() => void start(plan)}>
-          {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : `${plan.name} 시작하기`}
-        </button>}
+        {inApp ? <p className="lounge-pricing-included">앱에서는 아직 이용권을 구매할 수 없어요</p> : <>
+          {asking === plan.key && <form className="lounge-pricing-phone" onSubmit={event => { event.preventDefault(); void start(plan); }}>
+            <label htmlFor={`lounge-pay-phone-${plan.key}`}>휴대폰 번호</label>
+            <input id={`lounge-pay-phone-${plan.key}`} type="tel" inputMode="numeric" autoComplete="tel" placeholder="010-1234-5678" maxLength={13} value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
+            <p>카드 결제창(KG이니시스)에 필요해요. 결제창에만 전달하고 사석에는 저장하지 않아요.</p>
+          </form>}
+          <button type="button" className="lounge-pricing-cta" disabled={busy !== null || (asking === plan.key && !phoneOk(phone))} onClick={() => void start(plan)}>
+            {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : asking === plan.key ? '결제창 열기' : `${plan.name} 시작하기`}
+          </button>
+        </>}
       </li>)}
     </ul>
     {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}
-    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
+    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 포트원을 거쳐 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
   </section>;
 }
 
@@ -102,15 +103,31 @@ export function LoungePricingPage({ user, onLoginRequest }: { user: AppUser | nu
 type PaymentRecord = { plan: string; amount: number; status: string; period_end: string | null };
 const dateText = (value: string) => new Date(value).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
 
-/** Where Inicis sends the member back after paying (/lounge/payment). */
+/**
+ * /lounge/payment: where the member lands after paying. It comes with ?paymentId=… (from the window on a computer, or back
+ * from the card company on a phone, then with code and message when it stopped), which the server checks with PortOne;
+ * the address is then replaced by the result so a reload does not check again.
+ */
 export function LoungePaymentResult() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const paymentId = params.get('paymentId');
+  const checking = Boolean(paymentId) && !params.get('result');
   const success = params.get('result') === 'success';
   const oid = params.get('oid') ?? '';
-  const [record, setRecord] = useState<PaymentRecord | null | undefined>(success && oid ? undefined : null);
+  const code = params.get('code') ?? undefined, stopped = params.get('message') ?? undefined;
+  const [record, setRecord] = useState<PaymentRecord | null | undefined>(undefined);
   useEffect(() => {
-    if (!success || !oid) return;
+    if (!checking || !paymentId) return;
     let cancelled = false;
+    void completeLoungePayment(paymentId, code, stopped)
+      .then(done => { if (!cancelled) setParams(done.result === 'success' ? { result: 'success', oid: done.oid } : { result: 'fail', message: done.message }, { replace: true }); })
+      .catch(() => { if (!cancelled) setParams({ result: 'fail', message: '결제 결과를 확인하지 못했어요. 결제가 됐다면 잠시 뒤 계정 관리의 이용권에 보여요.' }, { replace: true }); });
+    return () => { cancelled = true; };
+  }, [checking, paymentId, code, stopped, setParams]);
+  useEffect(() => {
+    if (!success || !oid) { setRecord(null); return; }
+    let cancelled = false;
+    setRecord(undefined);
     void supabase.from('lounge_payments').select('plan,amount,status,period_end').eq('oid', oid).maybeSingle()
       .then(({ data }) => { if (!cancelled) setRecord((data as PaymentRecord | null) ?? null); });
     return () => { cancelled = true; };
@@ -118,7 +135,11 @@ export function LoungePaymentResult() {
   const plan = record ? loungePlanReceiptName(record.plan, oid) : undefined;
   return <div className="lounge-page lounge-payment-page">
     <main className="lounge-payment-result">
-      {success ? <>
+      {checking ? <>
+        <LoaderCircle size={40} className="lounge-pricing-spin lounge-payment-icon ok" aria-hidden="true" />
+        <h1>결제를 확인하고 있어요</h1>
+        <p>잠시만 기다려 주세요. 이 화면을 닫아도 결제는 그대로 처리돼요.</p>
+      </> : success ? <>
         <CircleCheck size={40} className="lounge-payment-icon ok" aria-hidden="true" />
         <h1>결제가 완료됐어요</h1>
         {record === undefined ? <p><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제 내역을 불러오는 중이에요.</p>
@@ -134,10 +155,10 @@ export function LoungePaymentResult() {
         <h1>결제가 완료되지 않았어요</h1>
         <p>{params.get('message') || '결제가 취소됐거나 처리되지 않았어요.'}</p>
       </>}
-      <div className="lounge-payment-actions">
+      {!checking && <div className="lounge-payment-actions">
         <Link to="/lounge" className="lounge-pricing-cta solid">홈으로</Link>
-        {!success && <Link to="/lounge" className="lounge-pricing-cta">요금제 다시 보기</Link>}
-      </div>
+        {!success && <Link to="/lounge/pricing" className="lounge-pricing-cta">요금제 다시 보기</Link>}
+      </div>}
       <p className="lounge-pricing-fine">결제 관련 문의: <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a></p>
     </main>
     <LoungeBusinessFooter />
