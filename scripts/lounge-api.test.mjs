@@ -2410,7 +2410,7 @@ test('a chat started from a story is told as a story; with the voice on it stays
       assert.deepEqual(JSON.parse(after.input).scenario, scenario);
     } else {
       assert.doesNotMatch(reply.instructions, /롤플레이 소설이다/);
-      assert.match(reply.instructions, /scenario가 있으면 이 대화는 그 이야기 속 장면이다/);
+      assert.match(reply.instructions, /scenario는 이야기의 출발 배경이고 room_memory, memory와 recent는 이 방에서 그 뒤에 나눈 기록이다/);
     }
   }
 });
@@ -2551,7 +2551,7 @@ test('a chat reply is what is said with a few bracketed actions and an inner voi
   assert.match(instructions, /거절하거나 불편함을 표현하면 즉시 멈추고 존중한다/);
   assert.match(instructions, /metrics의 점수와 이름\(예: 사로잡힘, 눈을 떼지 못함\)은 참고일 뿐이고/);
   assert.match(instructions, /그 기억 때문에 말투가 상담하듯 순해지지 않는다/);
-  assert.match(instructions, /플러팅·받아치기에서는 한 비트만 치고 끝낸다/);
+  assert.match(instructions, /플러팅·받아치기는 짧게 친다\. 한 비트로 충분하면 한 비트로 끝내고/);
   assert.match(instructions, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
   assert.match(instructions, /유머·플러팅: 상대 말의 결을 짧게 받아치고/);
   assert.match(instructions, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
@@ -2627,7 +2627,7 @@ test('a chat reply is short and kept within 1200 characters; a voice reply keeps
   const long = '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long, host: plainLengthHost });
   assert.ok(chat.events[0].text.length <= 1200 && chat.events[0].text.length > 1190);
-  assert.match(chat.instructions, /앞선 네 답이 짧았어도 그 길이를 따르지 않는다/);
+  assert.match(chat.instructions, /앞선 답이 길었어도 플러팅·받아치기로 돌아오면 다시 짧게 친다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long, host: plainLengthHost });
   assert.equal(voice.events[0].text.length, 600);
   assert.match(voice.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
