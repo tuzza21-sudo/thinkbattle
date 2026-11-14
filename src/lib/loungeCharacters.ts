@@ -2581,7 +2581,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
         {
           id: 'tournament_schedule_change',
           minStage: 1,
-          sceneTypes: ['라운지', '카페', '외출'],
+          sceneTypes: ['카페', '외출'],
           repeatable: true,
           cooldown: 30,
           content: '국제 대회 일정이나 출전 준비에 관한 연락이 온다.',
@@ -2590,7 +2590,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
         {
           id: 'old_mentor_encounter',
           minStage: 2,
-          sceneTypes: ['행사장', '외출'],
+          sceneTypes: ['외출'],
           repeatable: false,
           content: '과거에 가까웠던 선배 민준과 관련된 소식이 들리거나 우연히 마주친다.',
           purpose: '우승 이면의 미안함과 관계의 미해결 문제를 드러내는 사건. 당사자의 반응과 실제 행동에 따라 진행하고 자동으로 화해를 확정하지 않는다.',
@@ -2598,7 +2598,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
         {
           id: 'loss_after_confidence',
           minStage: 2,
-          sceneTypes: ['라운지', '카페', '외출'],
+          sceneTypes: ['카페', '외출'],
           repeatable: true,
           cooldown: 50,
           content: '기대했던 대회에서 예상보다 일찍 탈락했다는 소식이 전해진다.',
