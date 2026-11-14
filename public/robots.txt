@@ -1,3 +1,7 @@
+# 사석 (https://saseok.kr) — public pages are open to search engines (Google, Naver Yeti, Daum, Bing) and to AI search and
+# answer engines (OpenAI, Anthropic, Perplexity, Google, Apple). Only logged-in screens, rooms and the API are closed.
+# A short description of the service for language models: /llms.txt (full text: /llms-full.txt).
+
 User-agent: *
 Allow: /
 Disallow: /api/

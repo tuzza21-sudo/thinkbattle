@@ -14,6 +14,7 @@ import { captureFirstTouch, saveFirstTouch } from './lib/attribution';
 import { AuthenticatedRoute } from './components/AuthenticatedRoute';
 import { isSuperAdminUser } from './lib/superAdmin';
 import { applySeo, seoFor } from './lib/seo';
+import { seoGuideByPath, seoGuides } from './lib/seoContent';
 import {
   clearOAuthCallbackError,
   getCurrentUser,
@@ -53,6 +54,7 @@ const PersonalTrainingPage = lazy(async () => ({ default: (await import('./compo
 const LegalPage = lazy(async () => ({ default: (await import('./components/LegalPage')).LegalPage }));
 const LoungePaymentResult = lazy(async () => ({ default: (await import('./components/LoungePricing')).LoungePaymentResult }));
 const LoungePage = lazy(async () => ({ default: (await import('./components/LoungePage')).LoungePage }));
+const SeoGuidePage = lazy(async () => ({ default: (await import('./components/SeoGuidePage')).SeoGuidePage }));
 const LoungePersonaPage = lazy(async () => ({ default: (await import('./components/LoungePersonaPage')).LoungePersonaPage }));
 
 function App() {
@@ -184,7 +186,7 @@ function App() {
   );
 
   // The lounge (and the app, which opens it) waits on its own dark brown, so the start is one colour from the splash on (2026-11-08).
-  const loungeRoute = normalizedPath === '/' || normalizedPath.startsWith('/lounge');
+  const loungeRoute = normalizedPath === '/' || normalizedPath.startsWith('/lounge') || Boolean(seoGuideByPath(normalizedPath));
   const loungeWaiting = <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100dvh', background: '#1a110d', color: '#b39d88', fontSize: 14 }}>화면을 준비하고 있습니다...</div>;
 
   if (authLoading) {
@@ -225,6 +227,7 @@ function App() {
         <Route path="/lounge/:roomId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/report/:shareId" element={<SharedReportPage />} />
         <Route path="/argument-library" element={requireAuth(<ArgumentLibraryPage />)} />
+        {seoGuides.map(guide => <Route key={guide.path} path={guide.path} element={<SeoGuidePage />} />)}
         <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy" element={<LegalPage kind="privacy" />} />
         <Route path="/terms" element={<LegalPage kind="terms" />} />

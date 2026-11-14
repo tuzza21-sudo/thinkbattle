@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { seoGuides } from '../lib/seoContent';
 import './LoungeBusinessFooter.css';
 
 /** Business details shown at the bottom of the lounge's public pages, the same as on the debate service's page. */
@@ -12,6 +13,7 @@ export function LoungeBusinessFooter() {
       <p><span>문의</span> <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a></p>
     </div>
     <div className="lounge-business-links">
+      {seoGuides.map(guide => <Link key={guide.path} to={guide.path}>{guide.label}</Link>)}
       <Link to="/terms">이용약관</Link>
       <Link to="/privacy">개인정보 처리 안내</Link>
       <small>© 2026 사석</small>
