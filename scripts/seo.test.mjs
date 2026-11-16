@@ -116,3 +116,20 @@ test('no search or answer engine is shut out, and the build writes the static pa
   assert.ok(/prerender-seo\.mjs/.test(read('package.json')));
   assert.ok(/llms/.test(read('vercel.json')));
 });
+
+test('the old domain (thinkfit.kr, with and without www) redirects every path to the same path on saseok.kr, permanently', () => {
+  const redirects = JSON.parse(read('vercel.json')).redirects;
+  for (const host of ['thinkfit.kr', 'www.thinkfit.kr']) {
+    const rule = redirects.find(item => item.has?.some(entry => entry.type === 'host' && entry.value === host));
+    assert.ok(rule, `${host} has a redirect`);
+    assert.equal(rule.permanent, true);
+    assert.equal(rule.source, '/(.*)', 'every path, API included');
+    assert.equal(rule.destination, 'https://saseok.kr/$1', 'the path is kept');
+  }
+  assert.ok(redirects.every(item => item.has?.some(entry => entry.type === 'host')), 'no redirect applies to saseok.kr itself');
+});
+
+test('the page code, sitemap and share image name saseok.kr and never the old domain', () => {
+  for (const file of ['index.html', 'src/lib/reportShare.ts', 'src/lib/seo.ts', 'src/lib/seoContent.ts', 'public/robots.txt']) assert.ok(!/thinkfit\.kr/.test(read(file)), `${file} has no thinkfit.kr`);
+  assert.ok(buildSitemap('2026-11-17').split('<loc>').slice(1).every(entry => entry.startsWith('https://saseok.kr/')));
+});
