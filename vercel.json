@@ -10,6 +10,20 @@
     { "path": "/api/lounge-images", "schedule": "0 3 * * *" },
     { "path": "/api/lounge-reach-out", "schedule": "0 10 * * *" }
   ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "thinkfit.kr" }],
+      "destination": "https://saseok.kr/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.thinkfit.kr" }],
+      "destination": "https://saseok.kr/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/gemini/:path*",

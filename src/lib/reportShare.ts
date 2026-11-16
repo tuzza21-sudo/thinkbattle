@@ -86,8 +86,8 @@ export const downloadReportImage = async ({ topic, score, maxScore, grade }: { t
     <text x="540" y="600" text-anchor="middle" fill="#e8edf7" font-size="48">${score} / ${maxScore}</text>
     <line x1="120" y1="820" x2="960" y2="820" stroke="#2d476f" stroke-width="2"/>
     <text x="120" y="900" fill="#e8edf7" font-size="38" font-weight="700">생각을 구조화하고, 설득력을 훈련합니다.</text>
-    <text x="120" y="970" fill="#9fb0cc" font-size="30">내 토론 리포트는 thinkfit.kr에서 확인하세요.</text>
-    <text x="120" y="1190" fill="#4fd1ff" font-size="28">thinkfit.kr</text>
+    <text x="120" y="970" fill="#9fb0cc" font-size="30">내 토론 리포트는 saseok.kr에서 확인하세요.</text>
+    <text x="120" y="1190" fill="#4fd1ff" font-size="28">saseok.kr</text>
   </svg>`;
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
   const image = new Image();
