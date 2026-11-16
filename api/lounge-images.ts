@@ -7,7 +7,7 @@ import { loungePhotoMonthly, loungePhotoMonthlyFor } from '../src/lib/loungePlan
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
 import { cleanSceneName, loungeBackgroundRequestKey, loungeSceneDailyTotal, loungeSceneImagePath, loungeSceneLibraryTarget, sceneLibraryLine, shortlistSceneBackgrounds, type SceneLibraryRow } from '../src/lib/loungePhotos.js';
-import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
+import { type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
 
 /**
@@ -57,50 +57,11 @@ async function writeScene(context: Context, characterId: string, kind: 'chat' | 
   return scene;
 }
 
-/** A made image: its bytes and type (GPT gives webp, FLUX jpeg). */
+/** A made image: its bytes and type (GPT gives webp). */
 type MadeImage = { bytes: Uint8Array<ArrayBuffer>; type: string; ext: string };
 const webp = (bytes: Uint8Array<ArrayBuffer>): MadeImage => ({ bytes, type: 'image/webp', ext: 'webp' });
-const gptQuality = (model: LoungeImageModel) => model === 'gpt-low' ? 'low' : process.env.LOUNGE_IMAGE_QUALITY || 'low';
-const bytesToBase64 = (bytes: Uint8Array) => { let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); };
-
-/**
- * An image from FLUX.2 on Black Forest Labs' API: the request is queued, its polling address is asked until the image is
- * ready, and the image (a signed address valid for ten minutes) is downloaded at once. References go as base64, so BFL
- * never has to reach our site (nor a member's character's storage).
- */
-async function fluxImage(model: 'flux-klein' | 'flux-pro', prompt: string, size: string, references: Uint8Array[] = []): Promise<MadeImage> {
-  const key = process.env.BFL_API_KEY;
-  if (!key) throw new LoungePhotoError('FLUX 모델을 쓰려면 서버에 BFL_API_KEY를 설정해야 해요. 다른 모델을 골라 주세요.', 503, 'lounge_photo_flux_not_configured');
-  const [width, height] = size.split('x').map(Number);
-  const inputs = Object.fromEntries(references.slice(0, 4).map((bytes, index) => [index ? 'input_image_' + (index + 1) : 'input_image', bytesToBase64(bytes)]));
-  const endpoint = model === 'flux-klein' ? 'flux-2-klein-4b' : 'flux-2-pro';
-  const queued = await timed('https://api.bfl.ai/v1/' + endpoint, { method: 'POST', headers: { 'x-key': key, accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, width, height, output_format: 'jpeg', ...inputs }) }, 30_000);
-  const task = await queued.json().catch(() => null) as { id?: string; polling_url?: string; detail?: unknown } | null;
-  if (!queued.ok || !task?.polling_url) {
-    console.warn('[Lounge photo] flux refused', JSON.stringify({ model: endpoint, status: queued.status, detail: JSON.stringify(task?.detail ?? null).slice(0, 160) }));
-    if (queued.status === 429) throw new LoungePhotoError('사진 요청이 잠시 몰렸어요. 조금 뒤 다시 부탁해 주세요.', 429, 'lounge_photo_rate_limit');
-    if (queued.status === 402) throw new LoungePhotoError('FLUX 크레딧이 모자라요. BFL 계정을 확인하거나 다른 모델을 골라 주세요.', 503, 'lounge_photo_flux_credits');
-    throw new LoungePhotoError('사진을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_failed');
-  }
-  const deadline = Date.now() + 150_000;
-  while (Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const polled = await timed(task.polling_url, { headers: { 'x-key': key, accept: 'application/json' } }).catch(() => null);
-    const state = await polled?.json().catch(() => null) as { status?: string; result?: { sample?: string } } | null;
-    if (!state?.status || state.status === 'Pending') continue;
-    if (state.status === 'Ready' && state.result?.sample) {
-      const image = await timed(state.result.sample, {}, 30_000);
-      if (!image.ok) break;
-      const type = image.headers.get('content-type')?.split(';')[0] || 'image/jpeg';
-      return { bytes: new Uint8Array(await image.arrayBuffer()), type, ext: type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg' };
-    }
-    if (/moderat/i.test(state.status)) throw new LoungePhotoError('이 장면은 사진으로 만들 수 없어요. 다른 장면으로 부탁해 주세요.', 422, 'lounge_photo_blocked');
-    console.warn('[Lounge photo] flux failed', JSON.stringify({ model: endpoint, status: state.status }));
-    break;
-  }
-  throw new LoungePhotoError('사진을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_failed');
-}
+/** Every image is made at low quality (2026-11-16: no model or quality choice any more). */
+const gptQuality = (_model?: LoungeImageModel) => 'low';
 
 /** The image, made from the character's reference photos by the chosen model. */
 async function makeImage(context: Context, characterId: string, scene: string, model: LoungeImageModel = 'gpt'): Promise<MadeImage> {
@@ -114,7 +75,6 @@ async function makeImage(context: Context, characterId: string, scene: string, m
   }
   // Without a reference the face would be a stranger's, so no photo is better than a wrong one.
   if (!references.length) throw new LoungePhotoError('인물 사진을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_reference');
-  if (model === 'flux-klein' || model === 'flux-pro') return fluxImage(model, prompt, loungePhotoSize, references.map(item => item.bytes));
   const form = new FormData();
   form.append('model', process.env.LOUNGE_IMAGE_MODEL || loungePhotoModel);
   form.append('prompt', prompt);
@@ -267,7 +227,7 @@ async function memberBackground(context: Context, userId: string, roomId: string
   if (!sharedToday.ok) throw new LoungePhotoError('공용 배경 저장소를 확인해 주세요.', 503, 'lounge_scene_library_unavailable');
   const used = (listed.ok ? (await listed.json() as Array<{ created_at?: string }>).filter(item => (item.created_at ?? '') >= todayStart).length : 0) + (await sharedToday.json() as unknown[]).length;
   if (used >= loungeBackgroundDaily) return json({ error: `오늘 만들 수 있는 배경 ${loungeBackgroundDaily}장을 모두 만들었어요. 기존 배경에서 골라 주세요.`, code: 'lounge_background_limit', retryable: false }, 429);
-  const made = model === 'flux-klein' || model === 'flux-pro' ? await fluxImage(model, loungeBackgroundImagePrompt(match.place), loungeBackgroundSize) : await gptBackground(context, match.place, model);
+  const made = await gptBackground(context, match.place, model);
   const path = loungeSceneImagePath(match.slug, crypto.randomUUID(), made.ext);
   await upload(context, loungePhotoBuckets.public, path, made.bytes, made.type);
   // Saved on the room so it stays on every device; the member's browser keeps it too if this does not go through.
@@ -436,7 +396,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   // The page asks twice per reply: the decision is kept before the picture is made, so the second ask does not make another one.
   if (automatic && followNote) await recordFollow();
   try {
-    const image = await gptBackground(context, place, 'gpt-low');
+    const image = await gptBackground(context, place, 'gpt');
     const path = loungeSceneImagePath(fresh.slug, crypto.randomUUID(), image.ext);
     await upload(context, loungePhotoBuckets.public, path, image.bytes, image.type);
     const sceneKey = key ?? (automatic && followNote ? `auto:${followNote.key}`.slice(0, 120) : undefined);
@@ -511,7 +471,7 @@ async function handle(req: Request) {
     // Photos are kept per member, so a guest without an account cannot receive them.
     if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
     const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
-    const model: LoungeImageModel = isLoungeImageModel(body.imageModel) ? body.imageModel : 'gpt';
+    const model: LoungeImageModel = 'gpt';
     if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
     if (body.action === 'scene_auto') return await setSceneAuto(context, user.id, roomId, body.enabled !== false);
     if (background) return await memberBackground(context, user.id, roomId, request, model);

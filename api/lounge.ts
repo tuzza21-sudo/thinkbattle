@@ -3,7 +3,7 @@ import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScen
 import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
-import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeGlmChatModel } from '../src/lib/loungeModels';
+import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
 import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
@@ -877,11 +877,10 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
     const companionTurn = room.ai_turns ?? 0;
     // The analyzer reads facts and user intent. The character owns its reaction; a director is an explicit opt-in
-    // (LOUNGE_DIRECTOR=on), never the default author of its psychology. GLM and Gemini omit direction as before.
+    // (LOUNGE_DIRECTOR=on), never the default author of its psychology. Gemini omits direction as before.
     const chosenChat = getLoungeChatModel(solo ? room.ai_model : null);
-    const repliesWithGlm = chosenChat.provider === 'glm' && Boolean(process.env.GLM_API_KEY);
     const repliesWithGemini = chosenChat.provider === 'gemini' && Boolean(process.env.GEMINI_API_KEY);
-    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR === 'on' && !repliesWithGlm && !repliesWithGemini;
+    const directorModel = companionChat && !isLoungeConsultRoom(scenario?.id, host.id) && process.env.LOUNGE_DIRECTOR === 'on' && !repliesWithGemini;
     // A story is fiction, but the member is a real person playing a role: the character knows what they said about
     // themselves (tastes, what to call them, how they like things to go) and a story records only that, never what
     // happens in it. The real world is not brought into the story: no follow-up of a real plan as its opening, and no
@@ -1498,7 +1497,6 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     // One speech request up to its first audio. A request that sends nothing for firstAudioMs is given up.
     // Some hosts speak with Gemini (loungeGeminiSpeech); it sends the same 24 kHz PCM, and OpenAI speaks for it when Gemini fails.
     const geminiKey = process.env.GEMINI_API_KEY, geminiHost = Boolean(geminiKey && loungeGeminiSpeech[host.id]);
-    const glmKey = process.env.GLM_API_KEY;
     // Every character speaks with ElevenLabs (2026-10-26): a voice that changes in the middle of a call breaks it, so a
     // choice sent by an older page is not followed and nothing else speaks when ElevenLabs fails (the reply stays text).
     const chosenSpeech: LoungeSpeechEngine = loungeDefaultSpeechEngine(host.id);
@@ -1841,53 +1839,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // A reply its JSON mode could not read comes back as spaces.
             return parseHostAnswer(output.trim() || undefined, final, false);
           };
-          // GLM 5.3 Flash (Z.ai, GLM_API_KEY, LOUNGE_GLM_MODEL). Same instructions and input as the others. Its JSON mode
-          // takes no schema, so the schema goes into the instructions. This Flash model cannot turn thinking off, and
-          // `reasoning_effort: low` is the lightest depth it accepts; thinking text is not part of the reply.
-          const glmReply = async (note = '', quiet = false) => {
-            if (!quiet) partialLength = 0;
-            const model = process.env.LOUNGE_GLM_MODEL || loungeGlmChatModel;
-            const response = await fetchTimed('https://api.z.ai/api/paas/v4/chat/completions', {
-              method: 'POST', headers: { Authorization: `Bearer ${glmKey}`, 'Content-Type': 'application/json' }, signal: replyStop,
-              body: JSON.stringify({
-                model, stream: true, stream_options: { include_usage: true }, temperature: 1,
-                thinking: { type: 'enabled' }, reasoning_effort: 'low',
-                response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens + 1500,
-                messages: [
-                  { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
-                  { role: 'user', content: modelRequest.input },
-                ],
-              }),
-            }, 45_000);
-            if (!response.ok || !response.body) {
-              console.warn('[Lounge model] glm failed', JSON.stringify({ model, status: response.status }));
-              throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'glm_rate_limit' : 'glm_request_failed', true, 5);
-            }
-            type GlmChunk = { choices?: Array<{ delta?: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number } };
-            let output = '', finish = '', usage: GlmChunk['usage'];
-            for await (const raw of readModelEvents(response.body)) {
-              const chunk = raw as unknown as GlmChunk, choice = chunk.choices?.[0];
-              output += choice?.delta?.content ?? '';
-              if (!quiet) {
-                sendPartial(output);
-                if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
-              }
-              if (choice?.finish_reason) finish = choice.finish_reason;
-              if (chunk.usage) usage = chunk.usage;
-            }
-            if (finish === 'content_filter') throw new LoungeUpstreamError('이 모델이 이번 답을 건너뛰었어요. 다시 말을 걸어 주세요.', 502, 'glm_blocked', true, 5);
-            const final: ModelResult = { status: finish === 'length' ? 'incomplete' : 'completed', ...(finish === 'length' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
-              usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: usage?.prompt_cache_hit_tokens ?? 0 } } };
-            const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
-            return parseHostAnswer(output.trim() || undefined, final, false);
-          };
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'glm' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             if (provider === 'deepseek') return deepseekReply();
-            if (provider === 'glm') return glmReply();
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -1925,7 +1882,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
-          const provider = adultReply || (deepseekKey && chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'glm' && glmKey ? 'glm' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
+          const provider = adultReply || (deepseekKey && chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
             try {
@@ -1935,9 +1892,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 if (found || earlySpeech || replyStop.aborted) throw error;
                 // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: GPT answers this turn, so
                 // the conversation goes on.
-                if (provider === 'gemini' || provider === 'deepseek' || provider === 'glm') {
+                if (provider === 'gemini' || provider === 'deepseek') {
                   // JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
-                  if (provider === 'deepseek' || provider === 'glm') {
+                  if (provider === 'deepseek') {
                     console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                     try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
                   }
@@ -1976,7 +1933,6 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               // Live comparisons kept returning the same novice role on DeepSeek. Its failed non-explicit Dohyun
               // replies use the existing GPT fallback for this one repair; a healthy chosen-model reply stays as is.
               if (provider === 'deepseek' && (!characterRepair || adultReply)) return await deepseekReply(note, true) as { text?: string; inner_voice?: unknown; character_life?: unknown };
-              if (provider === 'glm') return await glmReply(note, true) as { text?: string; inner_voice?: unknown; character_life?: unknown };
               const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({ ...modelRequest, ...(chatModel.provider === 'openai' ? {} : { model: 'gpt-6-luna', reasoning: { effort: 'none' } }), instructions: `${modelRequest.instructions}\n${note}` }), replyStop, 30_000), 'openai');
               return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown; character_life?: unknown };
             };
