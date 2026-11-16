@@ -6,7 +6,7 @@ import {
 } from './seoContent';
 
 export { SEO_ORIGIN };
-export const SEO_DEFAULT_IMAGE = { url: `${SEO_ORIGIN}/og-saseok.jpg`, alt: '한강 야경이 보이는 라운지, 사석', width: 1200, height: 630 };
+export const SEO_DEFAULT_IMAGE = { url: `${SEO_ORIGIN}/brand/saseok-banner.jpg`, alt: '은은한 조명이 켜진 라운지의 사석에서 배너', width: 1672, height: 941 };
 
 export type PageSeo = {
   title: string; description: string; path: string; noindex: boolean;
@@ -45,9 +45,9 @@ export function seoFor(pathname: string): PageSeo | null {
       breadcrumb: [homeCrumb, { name: character.name, path }],
     };
   }
-  if (path === '/terms') return { title: '이용약관 · 사석', description: '사석 이용약관. 대화방 이용 규칙, 안전 관리, 베타 기간 이용 시간 안내.', path, noindex: false, kind: 'legal' };
-  if (path === '/account-deletion') return { title: '계정·데이터 삭제 안내 · 사석', description: '사석 계정을 삭제하는 방법과 삭제되는 데이터, 보관되는 정보 안내.', path, noindex: false, kind: 'legal' };
-  if (path === '/privacy') return { title: '개인정보 처리 안내 · 사석', description: '사석이 처리하는 개인정보와 대화 데이터, 보관 기간, 이용자의 권리 안내.', path, noindex: false, kind: 'legal' };
+  if (path === '/terms') return { title: '이용약관 · 사석에서', description: '사석 이용약관. 대화방 이용 규칙, 안전 관리, 베타 기간 이용 시간 안내.', path, noindex: false, kind: 'legal' };
+  if (path === '/account-deletion') return { title: '계정·데이터 삭제 안내 · 사석에서', description: '사석 계정을 삭제하는 방법과 삭제되는 데이터, 보관되는 정보 안내.', path, noindex: false, kind: 'legal' };
+  if (path === '/privacy') return { title: '개인정보 처리 안내 · 사석에서', description: '사석이 처리하는 개인정보와 대화 데이터, 보관 기간, 이용자의 권리 안내.', path, noindex: false, kind: 'legal' };
   // Rooms and places keep the lounge title; the staff and login-only screens of the other service keep their own, so only the no-index tag is set.
   if (path === '/lounge/spaces' || path.startsWith('/lounge/')) return { title: seoHome.title, description: seoHome.description, path, noindex: true };
   if (privatePrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return { title: '', description: '', path, noindex: true };

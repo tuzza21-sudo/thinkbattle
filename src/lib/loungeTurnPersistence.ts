@@ -8,6 +8,8 @@ export type LoungeTurnPayload = {
   request?: Record<string, unknown>; recent?: LoungeTurnMessage[]; memories?: MemoryRow[];
   memoryRefs?: Array<[string, string]>; companion?: boolean; consult?: boolean;
   proposalRule?: boolean; closest?: boolean; boldMove?: { stage: number };
+  /** State authored by the reply model, kept in the durable job even if recording must be recovered. */
+  character_life?: unknown;
 };
 export type LoungePendingTurn = {
   room_id: string; turn: number; user_text: string; reply: string;
@@ -34,9 +36,9 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   const payload = job.payload, answer = payload.answer;
   const { reply, inner } = splitLoungeInnerVoice(job.reply);
   const state = normalizeLoungeCompanionState(snapshot.state, roomId);
-  const nextState = nextLoungeCompanionState({ state, update: answer, decision: payload.decision ?? { progress: 'stay' },
+  const nextState = nextLoungeCompanionState({ state, update: payload.character_life ? { ...answer, character_life: payload.character_life } : answer, decision: payload.decision ?? { progress: 'stay' },
     turn: job.turn, reply, inner, userText: job.user_text, recent: payload.recent,
-    boldMove: payload.boldMove, emotional: payload.analysis?.is_emotional_moment === true });
+    boldMove: payload.boldMove, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
   let relationship: LoungeTurnCommit['relationship'] = null;
   let mood = snapshot.mood;
   let change: { relationship: RelationshipView; change: RelationshipChange } | undefined;

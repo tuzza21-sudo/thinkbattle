@@ -8,7 +8,7 @@ Capacitor 8로 만든 안드로이드 앱이다. 설정은 `capacitor.config.ts`
 - 앱은 user agent에 `SaseokApp/1`을 붙인다.
   - 페이지: `src/lib/nativeApp.ts`의 `isSaseokApp()`으로 앱인지 안다.
   - 서버: `api/lounge.ts`의 `isSaseokAppRequest()`로 앱인지 안다.
-- 앱에서는 성인 모드가 항상 꺼진다(스토어 정책).
+- 앱에서는 성인 모드가 기본으로 꺼진다(스토어 정책). 프로필 › 성인 인증에서 만 18세 이상을 확인하면 `lounge_adult_verification`에 한 번 기록되고, 이후 자동으로 열린다(웹은 등록 없이 기본 켜짐).
 - 앱의 요금제 화면에는 구매 버튼이 없다. 인앱결제는 2단계에서 붙인다.
 - 로그인(Supabase, 카카오)과 이니시스 결제창 주소는 앱 안에서 열리고, 나머지 외부 주소는 휴대폰 브라우저로 열린다(`allowNavigation`).
 - **구글 로그인**: 구글은 웹뷰 로그인을 막는다. 그래서 앱에서는 브라우저 탭(Custom Tab)으로 열고, `kr.saseok.app://auth?code=...`로 앱에 돌아와 페이지에서 PKCE 코드를 세션으로 바꾼다(`src/lib/nativeApp.ts`, 매니페스트 intent filter).

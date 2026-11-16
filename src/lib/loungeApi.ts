@@ -331,7 +331,7 @@ export async function makeLoungeRoomBackground(roomId: string, prompt: string) {
   const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'background', roomId, imageModel: loadLoungeImageModel(), request: prompt.slice(0, 300) }) }, '배경 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '배경을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_background_http_${response.status}`, payload?.retryable !== false, 10);
-  return payload as { image: string; prompt: string; left: number };
+  return payload as { image: string; scene?: string; prompt: string; left?: number; reused?: boolean };
 }
 /** A refusal from the character maker, with the fields to fix. */
 export class LoungeCharacterError extends LoungeApiError {
@@ -352,7 +352,7 @@ export const saveLoungeCharacter = (character: { id?: string; sheet: LoungeCusto
 export const makeLoungeCharacterPortrait = (id: string, prompt?: string) => loungeCharacterRequest<{ path: string; url: string }>({ action: 'portrait', id, ...(prompt !== undefined ? { prompt } : {}) });
 /** The AI writes the opening of the first conversation from the sheet. Nothing is stored. */
 export const writeLoungeCharacterPrologue = (sheet: LoungeCustomSheet) =>
-  loungeCharacterRequest<Pick<LoungeCustomSheet, 'prologue' | 'userRole' | 'storyRelationship'>>({ action: 'prologue', sheet });
+  loungeCharacterRequest<Pick<LoungeCustomSheet, 'prologue' | 'userRole' | 'storyRelationship' | 'storyPlace'>>({ action: 'prologue', sheet });
 export const chooseLoungeCharacterPortrait = (id: string, path: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'choose', id, path });
 export const uploadLoungeCharacterPortrait = (id: string, image: string) => loungeCharacterRequest<{ character: LoungeCustomCharacterRow }>({ action: 'upload', id, image, consent: true });
 /** The active stories (scenarios) a member can start with a character, in their order. Empty if none can be read. */
@@ -522,6 +522,21 @@ export async function getLoungeReachOut(): Promise<boolean> {
 export async function setLoungeReachOut(enabled: boolean): Promise<void> {
   const { error } = await supabase.rpc('set_reach_out', { p_enabled: enabled });
   if (error) throw new LoungeApiError(/set_reach_out|schema cache|could not find/i.test(error.message) ? '설정을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message, 'lounge_reach_out_failed', false);
+}
+
+/** When the member confirmed adult mode on the app (null = not yet). Web does not need this. */
+export async function getLoungeAdultStatus(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('lounge_adult_status');
+  if (error) throw new LoungeApiError(/lounge_adult_status|schema cache|could not find/i.test(error.message) ? '성인 인증을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message, 'lounge_adult_status_failed', false);
+  return typeof data === 'string' && data ? data : null;
+}
+
+/** Confirms the member is 18+ once; unlocks adult mode in the store app. */
+export async function confirmLoungeAdult(): Promise<string> {
+  const { data, error } = await supabase.rpc('confirm_lounge_adult', { p_method: 'self' });
+  if (error) throw new LoungeApiError(/confirm_lounge_adult|schema cache|could not find/i.test(error.message) ? '성인 인증을 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.' : error.message, 'lounge_adult_confirm_failed', false);
+  if (typeof data !== 'string' || !data) throw new LoungeApiError('성인 인증을 완료하지 못했어요.', 'lounge_adult_confirm_failed', false);
+  return data;
 }
 
 /** Deletes the member's own account and everything with it; a running paid plan must be accepted (acceptPaid). */

@@ -71,9 +71,9 @@ function App() {
 
   useEffect(() => {
     const pageTitles: Record<string, string> = {
-      '/lounge': '사석',
-      '/lounge/personas': '내 페르소나 · 사석',
-      '/lounge/guide': '플레이 가이드 · 사석',
+      '/lounge': '사석에서',
+      '/lounge/personas': '내 페르소나 · 사석에서',
+      '/lounge/guide': '플레이 가이드 · 사석에서',
       '/debate': '토론 훈련',
       '/battle/new': 'AI 토론',
       '/history': '훈련 기록',
@@ -91,7 +91,7 @@ function App() {
       '/super-admin': '서비스 관리',
     };
     const pageTitle = pageTitles[normalizedPath]
-      ?? (normalizedPath.startsWith('/lounge/') ? '사석'
+      ?? (normalizedPath.startsWith('/lounge/') ? '사석에서'
         : normalizedPath.startsWith('/battle/lobby/') ? '토론 대기실'
         : normalizedPath.startsWith('/battle/live/') ? '실시간 토론'
           : normalizedPath.startsWith('/simulation/') ? '페르소나 대화'

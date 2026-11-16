@@ -62,7 +62,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 function LoungeHeader({ user, inRoom, introduction, pricing, guide, onLoginRequest, onSignupRequest, onLogout, loggingOut }: Props & { inRoom: boolean; introduction: boolean; pricing: boolean; guide: boolean; loggingOut: boolean; unread: number }) {
   return <header className="lounge-header">
     {inRoom && <Link to="/lounge" className="lounge-back"><ArrowLeft size={17} /> 사석</Link>}
-    <Link to="/lounge" className="lounge-brand"><Coffee size={23} /><strong><i className="lounge-brand-name"><img src="/brand/saseok-wordmark.png" alt="사석에서" width="156" height="43" /></i><b className="lounge-beta">Beta 테스트</b><span>음성과 분위기로, 진짜 대화는 사석에서</span></strong></Link>
+    <Link to="/lounge" className="lounge-brand"><img className="lounge-brand-mark" src="/favicon.svg" alt="" width="32" height="32" /><strong><i className="lounge-brand-name"><img src="/brand/saseok-wordmark.png" alt="사석에서" width="156" height="43" /></i><b className="lounge-beta">Beta 테스트</b><span>음성과 분위기로, 진짜 대화는 사석에서</span></strong></Link>
     <div className="lounge-header-end">{!inRoom && <Link to="/lounge/about" className="lounge-about-link" aria-current={introduction ? 'page' : undefined}><Sparkles size={14} />서비스 소개</Link>}{!inRoom && <Link to="/lounge/guide" className="lounge-about-link lounge-guide-link" aria-current={guide ? 'page' : undefined}><BookOpen size={14} />플레이 가이드</Link>}{!inRoom && <Link to="/lounge/pricing" className="lounge-about-link lounge-pricing-link" aria-current={pricing ? 'page' : undefined}><Ticket size={14} />요금제(안)</Link>}{!inRoom && <nav className="lounge-account" aria-label="내 계정">
       {user && !user.isAnonymous ? <>
         <Link to="/lounge/personas" className="lounge-persona-link" title="대화 속 나(페르소나)를 만들고 고쳐요"><UserCog size={15} aria-hidden="true" />페르소나</Link>
@@ -1333,7 +1333,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           // The sentence as it is being written: it starts typing out right away.
           if (event.type === 'text') {
             if (!shownAt) { shownAt = performance.now(); console.info(`[Lounge latency] ${JSON.stringify({ firstTextMs: Math.round(shownAt - started) })}`); }
-            if (mounted.current) { setChatHostText(event.text.slice(0, 1200)); setPending(false); }
+            if (mounted.current) { setChatHostText(event.text); setPending(false); }
             continue;
           }
           // Saved: the room is reloaded with the reply and the next message can be answered, while the summary and
@@ -1346,7 +1346,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
           }
           if (event.type !== 'host' || !mounted.current) continue;
           quietFailures.current = 0; setError('');
-          spoke = true; setChatHostText(event.text.slice(0, 1200)); setPending(false);
+          spoke = true; setChatHostText(event.text); setPending(false);
           console.info(`[Lounge latency] ${JSON.stringify({ ...event.timings, textDoneMs: Math.round(performance.now() - started) })}`);
         }
         if (mounted.current && !released) await refreshAfterMessage();
@@ -1554,7 +1554,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if ('scene' in picked) keepBackground(readLoungeRoomBackground(saved));
     }}
     onMatch={async () => { keepBackground(readLoungeRoomBackground((await matchLoungeSceneBackground(roomId)).background) ?? background); }}
-    onMake={async prompt => { const made = await makeLoungeRoomBackground(roomId, prompt); keepBackground({ image: made.image, prompt: made.prompt, ...(storyState ? { episode: storyState.episode + 1 } : {}) }); }} /> : undefined;
+    onMake={async prompt => { const made = await makeLoungeRoomBackground(roomId, prompt); keepBackground({ image: made.image, ...(made.scene ? { scene: made.scene } : {}), prompt: made.prompt, ...(storyState ? { episode: storyState.episode + 1 } : {}) }); }} /> : undefined;
   const episode = storyState ? loungeStoryEpisodeAt(storyEpisodes, storyState) : undefined;
   const settingsItems: LoungeSettingsItem[] | undefined = chatSettings ? [
     { key: 'background', icon: <ImageIcon size={16} />, label: '배경', onSelect: () => setBackgroundOpen(true) },

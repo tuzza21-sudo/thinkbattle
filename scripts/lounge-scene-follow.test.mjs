@@ -44,6 +44,13 @@ test('the same place changes nothing, however many replies ask', () => {
   assert.equal(decide({ scene: s, follow: { key, at: now - 60 * minute, place: '집 거실' } }).reason, 'same');
 });
 
+test('learning a scene type after the prologue does not turn the same physical place into a move', () => {
+  const place = '성북동 본가 식탁';
+  const first = follow.sceneFollowKey(undefined, place);
+  assert.equal(decide({ scene: scene(place, '집'), follow: { key: first, at: now - 1000, place } }).reason, 'same');
+  assert.equal(decide({ scene: scene(place, '집'), follow: { key: `식당|${first}`, at: now - 1000, place } }).reason, 'same', 'old stored keys remain compatible');
+});
+
 test('an explicit move after the last decision changes the background at once, however recent', () => {
   const was = { key: follow.sceneFollowKey(scene('식당', '식당'), '식당'), at: now - 2 * minute, place: '식당' };
   const moved = decide({ scene: scene('집 거실', '집'), sceneTurns: 0, change: { turn: 12, at: now - 1 * minute, explicit: true }, follow: was });

@@ -82,7 +82,7 @@ async function prologue(context: Context, body: Record<string, unknown>) {
   const written = await modelJson<Record<string, unknown>>(context, 'lounge_character_prologue', loungeCustomPrologueInstructions,
     { name: sheet.name, age: sheet.age, gender: sheet.gender, job: sheet.job, intro: sheet.intro, personality: sheet.personality, tastes: sheet.tastes, look: sheet.look, greeting: sheet.greeting, draft: sheet.prologue }, loungeCustomPrologueSchema, 3500);
   const story = normalizeLoungeCustomSheet(written);
-  return json({ prologue: story.prologue, userRole: story.userRole, storyRelationship: story.storyRelationship });
+  return json({ prologue: story.prologue, userRole: story.userRole, storyRelationship: story.storyRelationship, storyPlace: story.storyPlace ?? '' });
 }
 async function save(context: Context, body: Record<string, unknown>) {
   const sheet: LoungeCustomSheet = normalizeLoungeCustomSheet(body.sheet);

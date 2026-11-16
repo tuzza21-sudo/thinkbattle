@@ -37,10 +37,11 @@ export async function signLoungeBackground(path: string) {
 /** A background made for a scene and shared by every member (lounge_scene_backgrounds). */
 export type LoungeSharedScene = { id: string; description: string; image_path: string; url: string; name?: string | null };
 /** The shared scenes, most picked and newest first; empty before migration 20261129. */
-export async function loadLoungeSharedScenes(limit = 30): Promise<LoungeSharedScene[]> {
+export async function loadLoungeSharedScenes(limit = 30, query = ''): Promise<LoungeSharedScene[]> {
   // With the name (migration 20261216); before it, without.
   const read = (columns: string) => supabase.from('lounge_scene_backgrounds').select(columns).order('uses', { ascending: false }).order('created_at', { ascending: false }).limit(limit);
-  let { data, error } = await read('id,description,image_path,name');
+  let { data, error } = await supabase.rpc('search_lounge_scene_backgrounds', { p_query: query.trim().slice(0, 200), p_limit: limit });
+  if (error) ({ data, error } = await read('id,description,image_path,name'));
   if (error) ({ data, error } = await read('id,description,image_path'));
   if (error) return [];
   return ((data ?? []) as unknown as Array<Omit<LoungeSharedScene, 'url'>>).filter(row => isLoungeSceneImage(row.image_path))

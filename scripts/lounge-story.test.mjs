@@ -18,6 +18,8 @@ test('contract dates use the agreed story while other characters, stories and ph
   const before = structuredClone(original);
   const contract = { id: 'closer-contract-love' };
   const adjusted = loungeScenarioRelationshipContext(original, contract, 'closer');
+  assert.match(adjusted.outing, /초안·제안 상태면 회의실에서/);
+  assert.match(adjusted.outing, /서명과 합의가 끝났다고 미리 처리하거나 가족 식사 장면으로 건너뛰지 않는다/);
   assert.match(adjusted.outing, /둘만의 평범한 데이트에도 성실하게 참여/);
   assert.match(adjusted.outing, /명시적인 계약 종료나 합의 변경/);
   assert.deepEqual(original, before, 'do not mutate the shared base context');
@@ -29,6 +31,19 @@ test('contract dates use the agreed story while other characters, stories and ph
   const friends = loungeScenarioRelationshipContext(original, { id: 'diplomat-old-friend-fling' }, 'diplomat');
   assert.match(friends.outing, /영화, 밥, 술 한잔, 산책이나 조깅 같은 평범한 약속은 단계와 상관없이/);
   assert.deepEqual({ ...friends, outing: original.outing }, original, 'only the outing changes');
+});
+
+test('Dohyun can propose ordinary dates from the start while physical limits and the existing room remain intact', () => {
+  const { loungeScenarioRelationshipContext } = loadTs(fileURLToPath(new URL('../src/lib/loungeScenarios.ts', import.meta.url)));
+  const config = relationship.relationshipConfigs.auditor;
+  const original = relationship.relationshipPromptContext(relationship.createRelationship(config), config, relationship.initialMood(config));
+  const scenario = { id: 'auditor-vip-match', relationship: '이미 나눈 이야기와 약속', place: '기존 카페' };
+  const before = structuredClone(scenario);
+  const adjusted = loungeScenarioRelationshipContext(original, scenario, 'auditor');
+  assert.match(adjusted.outing, /첫 단계부터 먼저 제안하고 수락/);
+  assert.deepEqual({ ...adjusted, outing: original.outing }, original);
+  assert.deepEqual(scenario, before);
+  assert.equal(loungeScenarioRelationshipContext(original, scenario, 'trickster'), original);
 });
 
 test('《검은 장미》 is six episodes, each with checkpoints the page keeps, and gates that are real stages of 선우령', () => {

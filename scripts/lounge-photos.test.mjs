@@ -22,6 +22,56 @@ const run = async (mock, task) => {
   try { await task(); } finally { globalThis.fetch = fetch; for (const name of ['OPENAI_API_KEY', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'CRON_SECRET']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
 };
 
+test('a manually generated background is publicly indexed and another member reuses it without another model or image call', async () => {
+  let actor = userId, indexed, background, modelCalls = 0, images = 0, uploaded;
+  await run(async (url, init) => {
+    if (url.includes('/auth/v1/user')) return result({ id: actor });
+    if (url.includes('voice_lounge_rooms?') && init?.method === 'PATCH') { background = JSON.parse(init.body).background; return result([]); }
+    if (url.includes('voice_lounge_rooms?')) { assert.ok(url.includes(`host_id=eq.${actor}`)); return result([{ id: roomId }]); }
+    if (url.includes('lounge_scene_backgrounds?scene_key=')) return result(indexed ? [indexed] : []);
+    if (url.includes('/rpc/search_lounge_scene_backgrounds')) return result([]);
+    if (url.includes('/rpc/bump_lounge_scene_use')) return result(null);
+    if (url.includes('lounge_scene_backgrounds?created_by=')) return result([]);
+    if (url.includes('/storage/v1/object/list/')) return result([]);
+    if (url.endsWith('/responses')) { modelCalls++; return result(sceneOutput({ choice: 'new', place: '밤, 조용한 호텔 레스토랑의 창가 테이블', name: '밤 호텔 레스토랑', slug: 'hotel-restaurant-night', tags: ['호텔', '식당', '실내', '밤'] })); }
+    if (url.endsWith('/images/generations')) { images++; const body = JSON.parse(init.body); assert.doesNotMatch(body.prompt, /민지/); return result({ data: [{ b64_json: 'AA==' }] }); }
+    if (url.includes(`/storage/v1/object/${photos.loungePhotoBuckets.public}/scenes/`)) { uploaded = url; return result({}); }
+    if (url.includes('lounge_scene_backgrounds?on_conflict=')) { const body = JSON.parse(init.body); assert.equal(body.source, 'member'); assert.equal(body.created_by, actor); assert.doesNotMatch(JSON.stringify(body), /민지/); indexed = { ...body, id: '22222222-2222-4222-8222-222222222222' }; return result([indexed], 201); }
+    throw new Error(`Unexpected shared background request: ${url}`);
+  }, async () => {
+    const first = await handler(request({ action: 'background', roomId, request: '민지가 원하는 조용한 호텔 레스토랑 밤 창가' }));
+    assert.equal(first.status, 200, await first.clone().text());
+    const made = await first.json();
+    assert.equal(made.reused, false); assert.equal(made.scene, indexed.id);
+    assert.equal(background.scene, indexed.id); assert.match(uploaded, /\/scenes\/hotel-restaurant-night-/);
+    actor = '00000000-0000-4000-8000-0000000000bb';
+    const next = await handler(request({ action: 'background', roomId, request: '민지가 원하는 조용한 호텔 레스토랑 밤 창가' }));
+    assert.equal(next.status, 200);
+    const reused = await next.json();
+    assert.equal(reused.reused, true); assert.equal(reused.image, made.image);
+    assert.equal(modelCalls, 1); assert.equal(images, 1);
+  });
+});
+
+test('automatic first background uses the prologue destination before a summary or recorder scene exists', async () => {
+  let selected;
+  await run(async (url, init) => {
+    if (url.includes('/auth/v1/user')) return result({ id: userId });
+    if (url.includes('voice_lounge_rooms?') && init?.method === 'PATCH') return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_persona: 'closer', scenario: { id: 'closer-contract-love', title: '계약 협상', prologue: '회의실에서 아직 서명하지 않은 합의서 초안을 놓고 마주 앉아 있다.', user_role: '계약연애 의뢰인', relationship: '조건 협상 중', place: '도심 고층 빌딩 회의실' }, memory: '', story_state: null, background: null }]);
+    if (url.includes('voice_lounge_companion_state?')) return result([]);
+    if (url.includes('/rpc/search_lounge_scene_backgrounds')) return result([{ id: '22222222-2222-4222-8222-222222222222', name: '고층 회의실', description: '계약서 초안이 놓인 고층 회의실', image_path: 'scenes/contract-boardroom.webp', tags: ['회의실','실내','테이블'] }]);
+    if (url.includes('/rpc/bump_lounge_scene_use')) return result(null);
+    if (url.endsWith('/responses')) { selected = JSON.parse(init.body); return result(sceneOutput({ choice: '22222222-2222-4222-8222-222222222222', place: '' })); }
+    throw new Error('Unexpected first-background request');
+  }, async () => {
+    const response = await handler(request({ action: 'scene', roomId, auto: true }));
+    assert.equal(response.status, 200);
+    assert.match(JSON.parse(selected.input).scene, /고층 빌딩 회의실/);
+    assert.equal((await response.json()).background.image, 'scenes/contract-boardroom.webp');
+  });
+});
+
 test('the deployed ESM function loads with real Node resolution (Vercel compiles it file by file)', async () => {
   const workspace = fileURLToPath(new URL('../', import.meta.url));
   const tempRoot = resolve(workspace, 'node_modules/.tmp');

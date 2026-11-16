@@ -6,7 +6,7 @@ import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin.js';
 import { loungePhotoMonthly, loungePhotoMonthlyFor } from '../src/lib/loungePlans.js';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters.js';
 import { getLoungeCharacter, loungeCharacters, loungePersonaPrompt } from '../src/lib/loungeCharacters.js';
-import { cleanSceneName, loungeSceneDailyTotal, loungeSceneImagePath, loungeSceneLibraryTarget, sceneLibraryLine, shortlistSceneBackgrounds, type SceneLibraryRow } from '../src/lib/loungePhotos.js';
+import { cleanSceneName, loungeBackgroundRequestKey, loungeSceneDailyTotal, loungeSceneImagePath, loungeSceneLibraryTarget, sceneLibraryLine, shortlistSceneBackgrounds, type SceneLibraryRow } from '../src/lib/loungePhotos.js';
 import { isLoungeImageModel, type LoungeImageModel, loungeBackgroundDaily, loungeBackgroundImagePrompt, loungeBackgroundSize, loungePhotoBuckets, loungeSceneDaily, loungeSceneFromMemory, loungeSceneKey, loungeSceneMatchInstructions, loungeSceneMatchSchema, readLoungeSceneMatch, loungePhotoImagePrompt, loungePhotoModel, loungePhotoNow, loungePhotoReferences, loungePhotoSceneInstructions, loungePhotoSceneSchema, loungePhotoSize, readLoungePhotoScene } from '../src/lib/loungePhotos.js';
 import { applyDecay, getRelationshipConfig, relationshipFromRow, speechLevel, type RelationshipRow } from '../src/lib/relationship/index.js';
 
@@ -220,24 +220,62 @@ async function memberPhoto(context: Context, authorization: string, anon: string
  * A background for the member's own one-to-one conversation, made from their description. A few a day; each is kept
  * under the member's folder and saved on the room (rooms.background), which the conversation then shows.
  */
+async function searchSceneLibrary(context: Context, scene: string): Promise<SceneLibraryRow[]> {
+  const searched = await timed(`${context.base}/rest/v1/rpc/search_lounge_scene_backgrounds`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_query: scene.slice(0, 200), p_limit: 40 }) }).catch(() => null);
+  if (searched?.ok) return await searched.json() as SceneLibraryRow[];
+  // Compatibility until the search migration is applied.
+  const legacy = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?select=id,scene_key,name,tags,description,image_path,uses&order=uses.desc,created_at.desc&limit=400`, { headers: serviceHeaders(context) }).catch(() => null);
+  return legacy?.ok ? await legacy.json() as SceneLibraryRow[] : [];
+}
+
 async function memberBackground(context: Context, userId: string, roomId: string, request: string, model: LoungeImageModel) {
   if (request.length < 4) return json({ error: '어떤 곳인지 조금만 더 적어 주세요.', code: 'lounge_background_short', retryable: false }, 400);
   const rooms = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&capacity=eq.1&space_id=is.null&select=id`, { headers: serviceHeaders(context) });
   if (!rooms.ok || !(await rooms.json() as unknown[]).length) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
+  const sceneKey = await loungeBackgroundRequestKey(request);
+  const exact = async () => {
+    const response = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?scene_key=eq.${encodeURIComponent(sceneKey)}&select=id,description,image_path,name,tags&limit=1`, { headers: serviceHeaders(context) });
+    if (!response.ok) throw new LoungePhotoError('공용 배경 저장소를 확인해 주세요.', 503, 'lounge_scene_library_unavailable');
+    return (await response.json() as SceneLibraryRow[])[0];
+  };
+  const apply = async (row: SceneLibraryRow, left: number | undefined, reused: boolean) => {
+    const background = { scene: row.id, image: row.image_path, prompt: row.description };
+    const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ background }) });
+    if (!saved.ok) throw new LoungePhotoError('배경을 대화에 저장하지 못했어요. 다시 선택해 주세요.', 502, 'lounge_background_save_failed');
+    await timed(`${context.base}/rest/v1/rpc/bump_lounge_scene_use`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_id: row.id }) }).catch(() => undefined);
+    return json({ ...background, ...(left === undefined ? {} : { left }), reused });
+  };
+  const existing = await exact();
+  if (existing) return apply(existing, undefined, true);
+  const candidates = shortlistSceneBackgrounds(await searchSceneLibrary(context, request), request, 30);
+  const matched = await timed('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${context.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
+    model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 1200, store: false,
+    instructions: `${loungeSceneMatchInstructions}\n직접 요청한 장소다. name은 짧은 한국어 장소명, slug는 영문 장소명, tags는 장소 종류·실내외·시간대·분위기 검색어 3~8개다. 이름·계정·주소·사용자 이야기·개인 정보는 모든 출력에서 빼고 누구나 재사용할 수 있는 장소만 남긴다.`,
+    input: JSON.stringify({ scene: request, places: candidates.map(row => ({ id: row.id, description: sceneLibraryLine(row) })) }),
+    text: { format: { type: 'json_schema', name: 'lounge_scene_match', strict: true, schema: loungeSceneMatchSchema } },
+  }) }, 30_000);
+  const matchBody = matched.ok ? await matched.json() as { output?: Array<{ content?: Array<{ type: string; text?: string }> }> } : null;
+  let match: ReturnType<typeof readLoungeSceneMatch>;
+  try { match = readLoungeSceneMatch(JSON.parse((matchBody?.output ?? []).flatMap(item => item.content ?? []).filter(part => part.type === 'output_text').map(part => part.text ?? '').join('')), candidates.map(row => row.id)); } catch { match = undefined; }
+  if (!match) throw new LoungePhotoError('배경의 장소 정보를 정하지 못했어요. 다시 시도해 주세요.', 502, 'lounge_background_index_failed');
+  if ('id' in match) return apply(candidates.find(row => row.id === match.id)!, undefined, true);
   const folder = `${userId}/backgrounds`;
   const listed = await timed(`${context.base}/storage/v1/object/list/${loungePhotoBuckets.private}`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ prefix: folder, limit: 100, sortBy: { column: 'created_at', order: 'desc' } }) });
   const kst = new Date(Date.now() + 9 * 3_600_000);
   const todayStart = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()) - 9 * 3_600_000).toISOString();
-  const used = listed.ok ? (await listed.json() as Array<{ created_at?: string }>).filter(item => (item.created_at ?? '') >= todayStart).length : 0;
+  const sharedToday = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?created_by=eq.${userId}&source=eq.member&created_at=gte.${encodeURIComponent(todayStart)}&select=id`, { headers: serviceHeaders(context) });
+  if (!sharedToday.ok) throw new LoungePhotoError('공용 배경 저장소를 확인해 주세요.', 503, 'lounge_scene_library_unavailable');
+  const used = (listed.ok ? (await listed.json() as Array<{ created_at?: string }>).filter(item => (item.created_at ?? '') >= todayStart).length : 0) + (await sharedToday.json() as unknown[]).length;
   if (used >= loungeBackgroundDaily) return json({ error: `오늘 만들 수 있는 배경 ${loungeBackgroundDaily}장을 모두 만들었어요. 기존 배경에서 골라 주세요.`, code: 'lounge_background_limit', retryable: false }, 429);
-  const made = model === 'flux-klein' || model === 'flux-pro' ? await fluxImage(model, loungeBackgroundImagePrompt(request), loungeBackgroundSize) : await gptBackground(context, request, model);
-  const path = folder + '/' + roomId.replace(/^lounge-/, '') + '-' + crypto.randomUUID().slice(0, 8) + '.' + made.ext;
-  await upload(context, loungePhotoBuckets.private, path, made.bytes, made.type);
+  const made = model === 'flux-klein' || model === 'flux-pro' ? await fluxImage(model, loungeBackgroundImagePrompt(match.place), loungeBackgroundSize) : await gptBackground(context, match.place, model);
+  const path = loungeSceneImagePath(match.slug, crypto.randomUUID(), made.ext);
+  await upload(context, loungePhotoBuckets.public, path, made.bytes, made.type);
   // Saved on the room so it stays on every device; the member's browser keeps it too if this does not go through.
-  const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ background: { image: path, prompt: request } }) }).catch(() => null);
-  if (!saved?.ok) console.warn('[Lounge background] not saved on the room', saved?.status);
-  console.info('[Lounge background]', JSON.stringify({ model, left: loungeBackgroundDaily - used - 1 }));
-  return json({ image: path, prompt: request, left: loungeBackgroundDaily - used - 1 });
+  const inserted = await timed(`${context.base}/rest/v1/lounge_scene_backgrounds?on_conflict=scene_key`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify({ scene_key: sceneKey, description: match.place.slice(0,400), name: match.name, tags: match.tags, image_path: path, created_by: userId, source: 'member' }) });
+  if (!inserted.ok) throw new LoungePhotoError('배경을 공용 저장소에 등록하지 못했어요.', 502, 'lounge_background_index_failed');
+  const row = (await inserted.json() as SceneLibraryRow[])[0] ?? await exact();
+  if (!row) throw new LoungePhotoError('배경을 공용 저장소에 등록하지 못했어요.', 502, 'lounge_background_index_failed');
+  return apply(row, loungeBackgroundDaily - used - 1, false);
 }
 
 /** A background from GPT, at the chosen quality. */
@@ -279,7 +317,8 @@ async function setSceneAuto(context: Context, userId: string, roomId: string, en
   const current = room.background && typeof room.background === 'object' ? room.background : null;
   let next: Record<string, unknown> | null;
   if (enabled) {
-    const { auto_off: _off, follow: _follow, auto: _auto, ...kept } = current ?? {};
+    const kept = { ...(current ?? {}) };
+    delete kept.auto_off; delete kept.follow; delete kept.auto;
     next = Object.keys(kept).length ? { ...kept, auto: true } : null;
   } else {
     next = current && current.auto !== true ? { ...current, auto_off: true } : { ...(current ?? {}), auto: true, auto_off: true };
@@ -309,7 +348,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     const [stateRow] = stateRows?.ok ? await stateRows.json() as Array<{ state: unknown }> : [];
     const engine = readEngineScene(stateRow?.state);
     const now = Date.now();
-    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory), sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), now });
+    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory) || scenario?.place, sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), now });
     if (decision.action === 'keep') return json({ background: null });
     followNote = { key: decision.key, at: now, place: decision.place };
     scene = sceneForMatch(engine.scene, decision.place);
@@ -334,7 +373,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   type SceneRow = SceneLibraryRow & { scene_key: string | null };
   // A background taken from the library counts as one more use (so the most used come first); the member sees its name and
   // description, and the name and tags (migration 20261216) are for finding it.
-  const sharedScene = async (row: SceneRow) => {
+  const sharedScene = async (row: SceneLibraryRow) => {
     await timed(`${context.base}/rest/v1/rpc/bump_lounge_scene_use`, { method: 'POST', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ p_id: row.id }) }).catch(() => undefined);
     return saveOnRoom({ scene: row.id, image: row.image_path, prompt: row.name ? `${row.name} — ${row.description}`.slice(0, 300) : row.description });
   };
@@ -352,7 +391,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   }
   // The places, and the scenes of the library that share the most with this one (the library is narrowed here, in code, since it
   // grows past what a prompt holds), for the model to choose from.
-  const everything = await library('', 'uses.desc,created_at.desc', 400);
+  const everything = await searchSceneLibrary(context, scene);
   const shared = shortlistSceneBackgrounds(everything, scene, 30);
   const places = [...loungeThemes.map(theme => ({ id: theme.id, description: `${theme.name}: ${theme.subtitle}` })), ...shared.map(row => ({ id: row.id, description: sceneLibraryLine(row) }))];
   let match: ReturnType<typeof readLoungeSceneMatch>;

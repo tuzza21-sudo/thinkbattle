@@ -32,7 +32,7 @@ export const seoVirtualNotice = '모든 캐릭터와 사진, 목소리는 AI로 
 export const seoGuides: readonly SeoGuide[] = [
   {
     slug: 'ai-companion', path: '/ai-companion', label: 'AI 컴패니언',
-    title: 'AI 컴패니언 사석 — 나를 기억하고 가까워지는 AI 캐릭터 대화',
+    title: '사석에서 — 나를 기억하고 가까워지는 AI 캐릭터 대화',
     description: '나를 기억하고 함께한 시간만큼 가까워지는 AI 컴패니언 사석. 캐릭터와 채팅하고 전화로 목소리를 나눠 보세요.',
     h1: 'AI 컴패니언 사석: 어제의 나를 기억하는 대화 상대',
     lead: `사석은 개성과 자기만의 삶을 가진 AI 캐릭터와 이야기하는 AI 컴패니언 서비스입니다. 질문에 답만 하는 챗봇이 아니라, 지난 대화를 기억하고 함께한 시간만큼 가까워지는 ${castCount}명의 캐릭터가 기다리고 있어요.`,
@@ -75,7 +75,7 @@ export const seoGuides: readonly SeoGuide[] = [
   },
   {
     slug: 'ai-call', path: '/ai-call', label: 'AI 전화·AI 통화',
-    title: 'AI 전화 · AI 통화 — 캐릭터에게 전화 걸어 목소리로 대화 | 사석',
+    title: 'AI 전화 · AI 통화 — 캐릭터에게 전화 걸어 목소리로 대화 | 사석에서',
     description: '캐릭터에게 전화를 걸어 목소리로 대화하는 AI 통화. 타이핑 없이 말하면 바로 대답하고, 끊으면 채팅으로 이어져요.',
     h1: 'AI 전화·AI 통화: 캐릭터에게 전화를 걸어 보세요',
     lead: '사석의 AI 통화는 대화방 안의 ‘전화 연결’ 버튼 하나로 시작합니다. 마이크에 대고 말하면 캐릭터가 실시간으로 대답하고, 목소리는 캐릭터마다 달라요.',
@@ -123,7 +123,7 @@ export const seoGuides: readonly SeoGuide[] = [
   },
   {
     slug: 'voice-chat', path: '/voice-chat', label: '음성 채팅·음성 컴패니언',
-    title: '음성 채팅 AI · 음성 컴패니언 — 말로 나누는 대화 | 사석',
+    title: '음성 채팅 AI · 음성 컴패니언 — 말로 나누는 대화 | 사석에서',
     description: '타이핑 대신 말로 이야기하는 음성 컴패니언. 채팅과 음성을 오가며 나를 기억하는 AI와 대화해 보세요.',
     h1: '음성 채팅 AI, 말로 나누는 음성 컴패니언',
     lead: '키보드를 두드리지 않고 말로 하는 대화. 사석의 음성 컴패니언은 채팅과 음성을 끊김 없이 오가며, 하루 이야기를 나만의 속도로 들어 줍니다.',
@@ -164,7 +164,7 @@ export const seoGuides: readonly SeoGuide[] = [
   },
   {
     slug: 'character-chat', path: '/character-chat', label: 'AI 캐릭터 채팅',
-    title: 'AI 캐릭터 채팅 — 롤플레이와 나만의 캐릭터 만들기 | 사석',
+    title: 'AI 캐릭터 채팅 — 롤플레이와 나만의 캐릭터 만들기 | 사석에서',
     description: '개성 있는 AI 캐릭터와 채팅하고 롤플레이를 즐겨 보세요. 캐릭터와 시나리오를 직접 만들 수도 있어요.',
     h1: 'AI 캐릭터 채팅: 이야기의 주인공이 되어 보세요',
     lead: `직업과 과거, 말투와 비밀을 가진 ${castCount}명의 AI 캐릭터와 채팅하고, 준비된 시나리오로 롤플레이를 시작하거나 캐릭터와 장면을 직접 만들어 보세요.`,
@@ -216,7 +216,7 @@ export const seoHomeFaq: readonly SeoFaq[] = [
 
 export const seoHome = {
   path: '/lounge',
-  title: '사석 — 목소리로 대화하는 AI 컴패니언 · AI 전화 · 캐릭터 채팅',
+  title: '사석에서 — 목소리로 대화하는 AI 컴패니언 · AI 전화 · 캐릭터 채팅',
   description: '나를 기억하고 가까워지는 AI 컴패니언 사석. 캐릭터와 채팅하고, 전화를 걸어 목소리로 대화해 보세요.',
   h1: '사석 — 나를 기억하는 AI 컴패니언',
   lead: '어제의 나를 기억하는 사람. 사석은 AI 캐릭터와 채팅하고, 전화로 목소리를 나누며, 함께한 시간만큼 가까워지는 AI 컴패니언 서비스입니다.',
@@ -236,7 +236,7 @@ export const seoHome = {
 };
 
 const portraitOf = (character: LoungeCharacter) => (loungeHosts as readonly { id: string; portrait: string; voiceLabel: string }[]).find(host => host.id === character.id);
-export const seoCharacterPortrait = (character: LoungeCharacter) => portraitOf(character)?.portrait ?? character.fullBody ?? '/og-saseok.jpg';
+export const seoCharacterPortrait = (character: LoungeCharacter) => portraitOf(character)?.portrait ?? character.fullBody ?? '/brand/saseok-banner.jpg';
 export const seoCharacterVoice = (character: LoungeCharacter) => portraitOf(character)?.voiceLabel ?? '';
 
 const firstSentences = (text: string, max: number) => {
@@ -251,7 +251,7 @@ export function seoCharacterPage(character: LoungeCharacter) {
   const voice = seoCharacterVoice(character);
   return {
     path: `/lounge/characters/${character.id}`,
-    title: `${character.name} — ${character.job} AI 캐릭터와 목소리로 대화 · 사석`,
+    title: `${character.name} — ${character.job} AI 캐릭터와 목소리로 대화 · 사석에서`,
     description: `${character.name}(${character.job}). ${character.role}. AI로 만든 가상의 인물과 목소리로 직접 이야기해 보세요.`,
     h1: `${character.name} — ${character.job}`,
     lead: character.tagline,

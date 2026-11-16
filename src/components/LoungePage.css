@@ -111,3 +111,6 @@
 .lounge-brand-name { display:inline-flex; align-items:center; vertical-align:middle; }
 .lounge-brand-name img { display:block; height:1.55em; width:auto; }
 .lounge-page:not(.lounge-navy):not(.has-room) .lounge-brand-name img { filter:brightness(.28) sepia(.5); }
+.lounge-brand-mark { display:block; width:34px; height:34px; flex:none; border-radius:50%; }
+@media(max-width:760px) { .lounge-brand-mark { width:28px; height:28px; } }
+@media(max-width:360px) { .lounge-brand-mark { width:24px; height:24px; } }

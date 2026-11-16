@@ -839,6 +839,7 @@
 .lounge-chat-composer button:disabled { opacity:.45; cursor:default; }
 .lounge-chat-composer-error { margin:0 0 8px; color:#ffc9bf; font-size:12.5px; text-shadow:0 1px 4px #000d; }
 .lounge-action-text { font-style:italic; opacity:.8; }
+.lounge-background-search { display:block; box-sizing:border-box; width:100%; margin:8px 0 12px; padding:10px 12px; border:1px solid #ffffff30; border-radius:10px; background:#ffffff0c; color:inherit; font:inherit; }
 /* A character's inner voice below its reply (engine v4): apart from what is said, quieter, its lines kept. */
 .lounge-inner-voice { display:block; margin-top:12px; padding:9px 12px; border-left:2px solid currentColor; border-radius:0 10px 10px 0; background:#ffffff0f; font-size:.92em; line-height:1.65; font-style:italic; opacity:.82; white-space:pre-line; }
 .lounge-inner-voice b { display:block; margin-bottom:3px; font-size:11px; font-style:normal; font-weight:600; letter-spacing:.04em; opacity:.7; }

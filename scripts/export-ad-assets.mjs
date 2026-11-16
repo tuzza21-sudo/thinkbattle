@@ -16,7 +16,7 @@ const assets = {
   site,
   brand: {
     name: '사석', tagline: '진짜 대화는 사석에서', slogan: '혼자여도 괜찮아요. 오늘 밤, 이야기할 사람이 있으니까.',
-    description: '목소리로 만나는 AI 캐릭터 대화 라운지', shareImage: `${site}/og-saseok.jpg`,
+    description: '목소리로 만나는 AI 캐릭터 대화 라운지', shareImage: `${site}/brand/saseok-banner.jpg`,
   },
   // Wording and image rules every creative must follow (see README.md).
   rules: [

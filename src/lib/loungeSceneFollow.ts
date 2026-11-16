@@ -59,7 +59,8 @@ export type SceneFollowDecision =
   | { action: 'apply'; reason: 'first' | 'explicit' | 'moved'; key: string; place: string };
 
 export function sceneFollowKey(scene: SceneForFollow | undefined, place: string) {
-  return `${scene?.scene_type ?? ''}|${normalized(place).slice(0, 30)}`;
+  void scene;
+  return normalized(place).slice(0, 30);
 }
 
 /** A place that is only passed through on the way to another (a corridor, an elevator, stairs): it never gets a background of its own. */
@@ -77,7 +78,7 @@ export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision 
   const { follow, change, now } = input;
   // The start: the place is stated and nothing was decided for this chat yet.
   if (!follow) return { action: 'apply', reason: 'first', key, place };
-  if (follow.key === key) return { action: 'keep', reason: 'same' };
+  if (follow.key.split('|').at(-1) === key) return { action: 'keep', reason: 'same' };
   // An explicit move, made after the last decision, changes it at once, however recently the last change was.
   if (fromEngine && change?.explicit && change.at > follow.at) return { action: 'apply', reason: 'explicit', key, place };
   // Otherwise not often: the new place has held for a few turns, and the last change was a while ago.

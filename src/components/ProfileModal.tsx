@@ -7,8 +7,10 @@ import { LoungeAccountDialog } from './LoungeAccountDialog';
 import { LoungeSubscription } from './LoungeSubscription';
 import { LoungeAccountDeletion } from './LoungeAccountDeletion';
 import { LoungeAppNotifications } from './LoungeAppNotifications';
+import { LoungeAdultVerification } from './LoungeAdultVerification';
 import { LoungeProfileFields, type LoungeProfileFieldsValue } from './LoungeProfileFields';
 import { saveLoungeProfile } from '../lib/auth';
+import { isSaseokApp } from '../lib/nativeApp';
 
 interface ProfileModalProps {
   user: AppUser;
@@ -118,7 +120,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose, onPro
         <span className="lounge-account-section-label">04 · 이용권</span>
         <LoungeSubscription onNavigate={onClose} />
         <LoungeAppNotifications />
-        <span className="lounge-account-section-label">05 · 계정</span>
+        {isSaseokApp() && <>
+          <span className="lounge-account-section-label">05 · 성인 인증</span>
+          <LoungeAdultVerification />
+        </>}
+        <span className="lounge-account-section-label">{isSaseokApp() ? '06' : '05'} · 계정</span>
         <p className="lounge-persona-note">계정을 삭제하면 이 계정의 모든 기록이 지워져요.</p>
         <LoungeAccountDeletion />
       </>}

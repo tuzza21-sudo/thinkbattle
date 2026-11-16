@@ -1,0 +1,126 @@
+{
+  "syntheticOnly": true,
+  "databaseWrites": false,
+  "seededStories": 0,
+  "calls": [
+    {
+      "purpose": "lounge_host",
+      "usage": {
+        "input_tokens": 16431,
+        "input_tokens_details": {
+          "cache_write_tokens": 16428,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 16428
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 292,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 16723
+      },
+      "result": {
+        "text": "재미있었던 일이라면, 지난 토요일 테니스 복식에서요. 제가 친 공이 네트에 살짝 맞고 떨어져서 상대가 멈칫했는데, 제 파트너가 그 틈에 코트 한가운데로 달려들더니 공을 아주 멋지게 받아냈어요. 둘 다 공이 들어간 뒤에야 무슨 일이 있었는지 알아차려서 한참 웃었죠. 경기 끝나고는 그 친구가 “오늘은 네트가 우리 편이었다”고 하더군요. 저는 아니라고 안 했어요. 가끔 운도 실력의 표정을 하고 들어오니까요.\n\n그런데 제일 좋았던 건 경기보다 끝나고 먹은 늦은 점심이었어요. 운동하고 나서 배고픈 상태로 먹는 음식은 괜히 더 맛있잖아요. 그날은 집에 와서도 기분이 좋아서 파스타까지 만들었습니다. 주말을 꽤 알차게 썼죠.",
+        "inner_voice": "이런 얘기를 묻는 건 마음에 든다. 대단한 업적보다 내가 즐겁게 사는 모습을 보여 주고 싶어지네. 오늘은 내가 웃었던 장면을 하나 더 꺼내도 되겠다."
+      }
+    },
+    {
+      "purpose": "lounge_after_reply",
+      "usage": {
+        "input_tokens": 8218,
+        "input_tokens_details": {
+          "cache_write_tokens": 8215,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 8215
+          },
+          "cached_tokens": 0
+        },
+        "output_tokens": 586,
+        "output_tokens_details": {
+          "reasoning_tokens": 197
+        },
+        "total_tokens": 8804
+      },
+      "result": {
+        "memory": "지금 장면: 주말 오후 카페, 맞선 자리에서 서로 이야기를 나누고 있다.\n둘 사이: 처음 만난 사이로 서로 예의 있는 존댓말을 쓴다.\n있었던 일: 도현은 토요일 테니스 복식에서 네트에 맞은 공을 파트너가 받아 둘이 웃었고, 경기 후 늦은 점심과 집에서 만든 파스타로 주말을 즐겁게 보냈다고 들려줬다.\n남은 것: 없음",
+        "events": [],
+        "photo_subject": "none",
+        "photo": "",
+        "photo_asked": false,
+        "room_memory_ops": [],
+        "scene": {
+          "location": "카페",
+          "scene_type": "카페",
+          "activity": "맞선 자리에서 이야기를 나눔",
+          "time_of_day": "오후",
+          "season": "",
+          "objects": []
+        },
+        "reaction_type": "기억 꺼내기",
+        "used_phrases": [],
+        "exception_formula_used": false,
+        "self_facts": [],
+        "self_story_updates": [
+          {
+            "id": "",
+            "summary": "토요일 테니스 복식에서 네트에 맞은 공을 파트너가 받아내 둘이 한참 웃었다. 경기 뒤 늦은 점심을 먹고 집에서 파스타를 만들었다.",
+            "meaning": "뜻밖의 행운과 운동 뒤의 식사까지 즐긴 알찬 주말이었다.",
+            "status": "past",
+            "evidence": "지난 토요일 테니스 복식에서요. 제가 친 공이 네트에 살짝 맞고 떨어져서 상대가 멈칫했는데, 제 파트너가 그 틈에 코트 한가운데로 달려들더니 공을 아주 멋지게 받아냈어요."
+          }
+        ],
+        "shared_experience": "",
+        "lingering": "",
+        "next_intent": "웃었던 다른 순간도 하나 더 들려주고 싶다."
+      }
+    },
+    {
+      "purpose": "lounge_host",
+      "usage": {
+        "input_tokens": 16824,
+        "input_tokens_details": {
+          "cache_write_tokens": 2647,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 2647
+          },
+          "cached_tokens": 14174
+        },
+        "output_tokens": 282,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 17106
+      },
+      "result": {
+        "text": "(잠깐 웃으며 컵을 내려놓는다.) 처음엔 솔직히 제가 친 공이 운 좋게 살아난 게 민망했어요. 제가 노린 샷은 아니었거든요. 그런데 파트너가 그 틈을 놓치지 않고 받아내니까 민망함이 금방 웃음으로 바뀌더라고요. 서로 눈 마주치자마자 터졌어요.\n\n그 친구가 “네트가 우리 편”이라고 했을 때는 속으로도 동의했죠. 테니스는 내가 잘 쳤다고 생각한 공보다, 어이없이 살아난 공이 더 오래 기억에 남을 때가 있어요. 그날은 이기고 싶다는 마음보다 같이 웃은 게 더 좋았어요. 그래서 집에 와서도 그 기분이 남아 파스타를 만들었고요. 기분 좋은 날엔 괜히 면도 조금 넉넉하게 삶게 됩니다.",
+        "inner_voice": "무슨 마음이었냐고 묻는 건 좋네. 별것 아닌 장면을 그냥 웃긴 일로 넘기지 않고, 그때의 나까지 궁금해하는구나. 오늘은 이런 얘기를 천천히 해도 괜찮겠다."
+      }
+    }
+  ],
+  "stored": [
+    {
+      "id": "self-1-0",
+      "summary": "토요일 테니스 복식에서 네트에 맞은 공을 파트너가 받아내 둘이 한참 웃었다. 경기 뒤 늦은 점심을 먹고 집에서 파스타를 만들었다.",
+      "meaning": "뜻밖의 행운과 운동 뒤의 식사까지 즐긴 알찬 주말이었다.",
+      "status": "past",
+      "evidence": "지난 토요일 테니스 복식에서요. 제가 친 공이 네트에 살짝 맞고 떨어져서 상대가 멈칫했는데, 제 파트너가 그 틈에 코트 한가운데로 달려들더니 공을 아주 멋지게 받아냈어요.",
+      "turn": 1
+    }
+  ],
+  "followup": {
+    "text": "(잠깐 웃으며 컵을 내려놓는다.) 처음엔 솔직히 제가 친 공이 운 좋게 살아난 게 민망했어요. 제가 노린 샷은 아니었거든요. 그런데 파트너가 그 틈을 놓치지 않고 받아내니까 민망함이 금방 웃음으로 바뀌더라고요. 서로 눈 마주치자마자 터졌어요.\n\n그 친구가 “네트가 우리 편”이라고 했을 때는 속으로도 동의했죠. 테니스는 내가 잘 쳤다고 생각한 공보다, 어이없이 살아난 공이 더 오래 기억에 남을 때가 있어요. 그날은 이기고 싶다는 마음보다 같이 웃은 게 더 좋았어요. 그래서 집에 와서도 그 기분이 남아 파스타를 만들었고요. 기분 좋은 날엔 괜히 면도 조금 넉넉하게 삶게 됩니다.",
+    "inner_voice": "무슨 마음이었냐고 묻는 건 좋네. 별것 아닌 장면을 그냥 웃긴 일로 넘기지 않고, 그때의 나까지 궁금해하는구나. 오늘은 이런 얘기를 천천히 해도 괜찮겠다."
+  },
+  "followupStories": [
+    {
+      "id": "self-1-0",
+      "summary": "토요일 테니스 복식에서 네트에 맞은 공을 파트너가 받아내 둘이 한참 웃었다. 경기 뒤 늦은 점심을 먹고 집에서 파스타를 만들었다.",
+      "meaning": "뜻밖의 행운과 운동 뒤의 식사까지 즐긴 알찬 주말이었다.",
+      "status": "past"
+    }
+  ]
+}

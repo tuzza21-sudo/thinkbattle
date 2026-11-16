@@ -5,6 +5,7 @@ import ts from 'typescript';
 import { filmCard, filmMaterial, filmSource, filmStudyFixture } from './lounge-film-fixtures.mjs';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
+import { createRequire } from 'node:module';
 const compile = (path, require = () => {}) => {
   const exports = {};
   new Function('exports', 'require', ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS } }).outputText)(exports, require);
@@ -24,12 +25,13 @@ const modelsLib = compile('../src/lib/loungeModels.ts');
 const storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts');
-const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : undefined);
+const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('lounge.js') ? lounge : undefined);
 // The analyzer is a call of its own before each one-to-one chat reply (engine v4, 2026-11-02); the tests that fake the
 // model answer one call per turn, so it is off here except in its own tests.
 process.env.LOUNGE_ANALYZER ??= 'off';
 // The same for the director, which a fast-model chat asks beside the analyzer (back on 2026-11-02).
 process.env.LOUNGE_DIRECTOR ??= 'off';
+process.env.LOUNGE_EXTENDED_COMPANION_REPLIES ??= 'on';
 const consultLib = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', import.meta.url)));
 const sajuLib = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
 const turnsLib = loadTs(fileURLToPath(new URL('../src/lib/loungeTurnPersistence.ts', import.meta.url)));
@@ -50,7 +52,8 @@ const run = async (mock, task) => {
 
 test('canonical companion replies persist agreements atomically and reuse them on the next turn', async () => {
   let turn = 1, stateRow, relationRow, mood = {}, summary = '';
-  let human = '우리 반말하자', replyText = '좋아. 반말하자.';
+  const ownStoryQuote = '이번 주말엔 친구들을 불러서 저녁을 해 주기로 했어.';
+  let human = '우리 반말하자', replyText = `좋아. 반말하자. ${ownStoryQuote}`, modelCalls = 0;
   const jobs = [], commits = [], writerInputs = [];
   const toRelationship = (state, version) => ({ user_id: 'user-1', character_id: 'auditor', scores: state.scores, stage: state.stage,
     pending: state.pending, recent_events: state.recentEvents, memories: state.memories, meaningful_turns: state.meaningfulTurns,
@@ -71,12 +74,14 @@ test('canonical companion replies persist agreements atomically and reuse them o
     if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
     if (url.endsWith('/embeddings')) return result({ data: [] });
     if (url.endsWith('/responses')) {
+      modelCalls++;
       const body = JSON.parse(init.body);
       if (isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 카페\n둘 사이: 서로 반말하기로 합의했다.', events: [], memory_ops: [],
+        self_story_updates: turn === 1 ? [{ id: '', summary: '주말에 친구들에게 저녁을 해 주기로 했다.', meaning: '직접 만든 요리를 함께 먹을 생각에 기대된다.', status: 'ongoing', evidence: ownStoryQuote }] : [],
         room_memory_ops: turn === 1 ? [{ op: 'add', ref: '', kind: 'agreement', summary: '서로 반말하기로 합의했다',
           human_quote: '우리 반말하자', character_quote: '좋아. 반말하자.', speech_level: 'casual' }] : [] });
       writerInputs.push(JSON.parse(body.input));
-      return modelAnswer({ text: replyText, inner_voice: '' });
+      return modelAnswer({ text: replyText, inner_voice: '', character_life: { feeling: '편안하고 기분이 좋음', body: '운동 뒤 어깨에 남은 열감', attention: '주말 저녁 준비', want: '편히 자기 이야기를 나누기', cause: '운동을 마치고 이 자리에 나옴' } });
     }
     if (url.includes('finish_voice_lounge_reply')) {
       jobs.push({ room_id: roomId, turn, user_text: human, reply: replyText, status: 'pending', payload: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
@@ -104,13 +109,21 @@ test('canonical companion replies persist agreements atomically and reuse them o
       if (turn === 2) { human = '오늘 커피 마시자'; replyText = '좋아. 커피 마시자.'; }
       const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
       assert.equal(response.status, 200);
-      assert.doesNotMatch(await response.text(), /"type":"error"/);
+      const streamed = await response.text();
+      assert.doesNotMatch(streamed, /"type":"error"/);
+      assert.doesNotMatch(streamed, /운동 뒤 어깨에 남은 열감/, 'private living context is not shown as dialogue');
     }
   }));
   assert.deepEqual(commits.map(item => item.p_turn), [1, 2]);
   assert.equal(stateRow.state.room_memory[0].speech_level, 'casual');
   assert.equal(writerInputs[1].relationship.speech_level, 'casual');
   assert.equal(writerInputs[1].room_memory[0].summary, '서로 반말하기로 합의했다');
+  assert.equal(stateRow.state.self_stories.length, 1);
+  assert.equal(writerInputs[1].turn.self_stories[0].summary, '주말에 친구들에게 저녁을 해 주기로 했다.');
+  assert.match(writerInputs[1].turn.self_stories[0].meaning, /기대/);
+  assert.equal(modelCalls, 4, 'own-story recording reuses the existing writer and recorder calls');
+  assert.equal(writerInputs[1].turn.character_life.body, '운동 뒤 어깨에 남은 열감');
+  assert.equal(stateRow.state.character_life.turn, 2);
   assert.equal(jobs.filter(item => item.status !== 'applied').length, 0);
 });
 
@@ -233,7 +246,7 @@ test('solo starts and continues a brief conversation without group introductions
         assert.ok(charactersLib.getLoungeCharacter(host.id)?.bible ? payload.instructions.includes('캐릭터 바이블(') && !payload.instructions.includes(host.companion) : payload.instructions.includes(host.companion), 'solo uses the conversation-partner style');
         assert.ok(!payload.instructions.includes(host.instruction), 'moderator techniques do not turn a conversation into an interview');
         assert.equal(JSON.parse(payload.input).request_kind, reason === 'requested' ? 'topic' : undefined, 'the solo button asks for a new topic');
-        assert.match(payload.instructions, /request_kind=topic이면 상대가 새 이야깃거리를 원한 것이다/);
+        assert.match(payload.instructions, /request_kind=topic이면 새 이야깃거리를 원한 것이다/);
         assert.doesNotMatch(payload.instructions, /AI 도우미/);
         // The character is a person with a name, a job and a past, never "an AI host".
         const character = charactersLib.getLoungeCharacter(host.id);
@@ -242,13 +255,10 @@ test('solo starts and continues a brief conversation without group introductions
         // One to one, a character reacts by the moment and how close the two are; it does not argue its ground or ask for proof.
         assert.ok(payload.instructions.includes(charactersLib.loungeOneToOneCharacterRules));
         assert.ok(!payload.instructions.includes(charactersLib.loungeDebateStanceRule) && !payload.instructions.includes('평가하고 반박할 수 있다'));
-        assert.doesNotMatch(payload.instructions, /음성 대화방의 AI다|AI 도우미다|인 척하지 않는다/);
-        assert.match(payload.instructions, /첫 인사를 포함해 보통 1~2개의 짧은 문장, 140자 이내/);
-        assert.match(payload.instructions, /자세한 설명을 명시적으로 요청했을 때만/);
-        assert.match(payload.instructions, /가벼운 인사와 방 소개의 관심사에 맞는 질문 하나/);
-        assert.match(payload.instructions, /매번 질문으로 끝내지 않는다/);
-        assert.match(payload.instructions, /첫 인사에도 패스나 진행 방식 안내를 넣지 않는다/);
-        assert.doesNotMatch(payload.instructions, /4~6문장|1:1에서도 준비된 주제 배경|이번 첫 인사에서만 발언하기 싫으면/);
+        assert.doesNotMatch(payload.instructions, /음성 대화방의 AI다|AI 도우미다/);
+        assert.match(payload.instructions, /자기 경험·근황·관심사로 이야기를 확장/);
+        assert.match(payload.instructions, /reply_medium=voice이면 목소리로 들리는 대화/);
+        assert.doesNotMatch(payload.instructions, /140자 이내|한 답변에 모두 넣지 않는다/);
         return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그 선택이 마음에 걸렸어요?', memory: '' }) }] }] });
       }
       if (url.includes('finish_voice_lounge_host')) return result(true);
@@ -289,10 +299,10 @@ test('a question about the field of the character brings the closest knowledge a
           // Found knowledge travels in the input; the instructions never change with it, so they stay cached.
           assert.ok(!instructions.includes('[전문 지식]') && !instructions.includes('[겪은 일]'));
           assert.equal(found.includes('[전문 지식]'), expectKnowledge, text);
-          assert.match(instructions, /character_knowledge는 서버가 이번 질문에 맞춰 넣은 네 전문 지식/);
+          assert.match(instructions, /character_knowledge는 서버가 넣은 전문 지식/);
           if (expectKnowledge) {
             assert.ok(found.includes('- 증거능력과 증명력: 증거능력은 법정에서 쓸 수 있는 자격이다.') && found.includes('[겪은 일]') && found.includes('세 번째 질문에서 진짜 답이 나왔다.'));
-            assert.ok(found.includes('(교훈: 질문을 바꿔 다시 묻는다.)') && found.includes('이미 들려준 일화는 다시 꺼내지 않는다'), 'the lesson and the use-sparingly rules reach the prompt');
+            assert.ok(!found.includes('(교훈:') && found.includes('교훈을 설명하거나 사용자에게 질문·판단을 돌려줄 의무는 없다'), 'companion anecdotes remain stories rather than mandatory advice');
           }
           return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.', memory: '', events: [] }) }] }] });
         }
@@ -812,7 +822,7 @@ function roomRecoveryFixture(failure, { chat = true, group = false } = {}) {
   };
   visit(source);
   const ref = current => ({ current });
-  const notices = [], diagnostics = [];
+  const notices = [], diagnostics = [], shownText = [];
   let now = 1_000_000, nextResponse, calls = 0;
   const scope = {
     LoungeApiError: client.LoungeApiError, isLoungeChatRoom: lounge.isLoungeChatRoom,
@@ -827,7 +837,7 @@ function roomRecoveryFixture(failure, { chat = true, group = false } = {}) {
     nextHostAttempt: ref(0), failedAtMessage: ref(0), hostRequest: ref(null), quietFailures: ref(0),
     mounted: ref(true), activeRoomId: ref(roomId), roomNetworkError: ref(null),
     setError: message => notices.push(message), errorText: error => error.message,
-    setPending: () => {}, setChatHostText: () => {}, setRoom: () => {}, setSession: () => {},
+    setPending: () => {}, setChatHostText: text => shownText.push(text), setRoom: () => {}, setSession: () => {},
     stopRingback: () => {}, disconnectUnavailableRoom: () => {}, refreshAfterMessage: async () => {},
     requestLoungeHost: async () => { calls++; if (nextResponse) return nextResponse; throw failure(client.LoungeApiError); },
   };
@@ -837,7 +847,7 @@ function roomRecoveryFixture(failure, { chat = true, group = false } = {}) {
     return new Function(...Object.keys(scope), `${code}\nreturn callback;`)(...Object.values(scope));
   };
   const hostTurn = load('hostTurn');
-  return { scope, notices, diagnostics, client, calls: () => calls, reportRoomError: load('reportRoomError'),
+  return { scope, notices, diagnostics, shownText, client, calls: () => calls, reportRoomError: load('reportRoomError'),
     attempt: async () => { now = Math.max(now + 10_000, scope.nextHostAttempt.current); await hostTurn('followup'); },
     reply: response => { nextResponse = response; },
   };
@@ -874,6 +884,18 @@ test('one-to-one polling keeps the conversation open without transient error not
   assert.ok(fixture.scope.current.current.room, 'the current conversation stays available');
   fixture.reportRoomError(new fixture.client.LoungeApiError('로그인 세션이 끝났어요.', 'lounge_session_expired', false));
   assert.deepEqual(fixture.notices, ['로그인 세션이 끝났어요.']);
+});
+
+test('the page shows long live and completed replies without a second 1200-character cut', async () => {
+  const fixture = roomRecoveryFixture(() => new Error('unused'));
+  const text = '이야기가 끝나기 전에 문장을 자르지 않는다. '.repeat(110);
+  assert.ok(text.length > 1200 && text.length < 3000);
+  const partial = text.slice(0, 1700);
+  const events = [{ type: 'text', text: partial }, { type: 'host', text, timings: {} }, { type: 'saved' }, { type: 'done' }];
+  fixture.reply({ stream: new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(events.map(event => JSON.stringify(event)).join('\n') + '\n')); controller.close(); } }) });
+  await fixture.attempt();
+  assert.deepEqual(fixture.shownText, [partial, text, '']);
+  assert.deepEqual(fixture.diagnostics, []);
 });
 
 test('login, permission and allowance failures still explain the action needed', async () => {
@@ -1067,8 +1089,8 @@ test('a relationship character reads stored state, classifies events in the same
       assert.deepEqual(context.relationship.memories, ['지난번 가정이 틀렸다고 인정함']);
       assert.equal(context.relationship.mood.curiosity, 60);
       assert.ok(context.relationship.character_core.includes('낮고 차분한 존댓말로 말한다. 명령은 정말 필요한 순간에만 쓴다'));
-      assert.match(body.instructions, /점수, 단계 이름, 이벤트 코드는 말하지 않는다/);
-      assert.match(body.instructions, /사람의 가치·외모·지능·정체성을 깎아내리거나/);
+      assert.match(body.instructions, /점수·단계·이벤트 코드는 대사로 읽지 않는다/);
+      assert.match(body.instructions, /사용자를 모욕하거나 현실의 의존·죄책감·두려움·결제로/);
       assert.match(body.instructions, /SHARES_FEELING: /); assert.doesNotMatch(body.instructions, /CHALLENGES_CHARACTER_RESPECTFULLY: /);
       assert.match(body.instructions, /사람의 가치나 인격은 평가하지 않는다/);
       assert.ok(body.instructions.includes('캐릭터 바이블(') && !body.instructions.includes(lounge.getLoungeHost('velvet').companion));
@@ -1121,7 +1143,7 @@ test('one-to-one turns send no example dialogues, and the crisis rule stays in t
   assert.equal(context.relationship.style_examples, undefined);
   assert.equal(context.relationship.stage.id, 'INTRIGUED');
   assert.doesNotMatch(sent.instructions, /style_examples/);
-  assert.match(sent.instructions, /자살예방상담전화 109/);
+  assert.match(sent.instructions, /실제 위기와 자해 위험.*안전을 먼저 확인/);
 });
 
 // One relationship turn with long-term memory available; returns what the model was sent and what was saved.
@@ -1377,7 +1399,8 @@ test('every host has a relationship configuration and instructions for both one-
   assert.deepEqual(Object.keys(relationshipLib.relationshipConfigs).sort(), [...lounge.loungeRelationshipHostIds].sort());
   assert.equal(lounge.isLoungeRelationshipHost('sunny'), false);
   for (const host of lounge.loungeHosts) {
-    assert.match(host.companion, /사람의 가치|사람 자체|사람이 아니다|인간으로서의 가치/, `${host.id} companion never judges the person`);
+    assert.ok(host.companion.length > 0 && charactersLib.getLoungeCharacter(host.id), `${host.id} has its own voice`);
+    assert.match(charactersLib.loungeOneToOneCharacterRules, /거절과 불편함은 존중하고 위협·강요/, 'shared boundaries reach every host without duplicating them in every profile');
     assert.ok(host.instruction.length > 200 && host.instruction.includes('여럿일 때'), `${host.id} has a real group instruction`);
   }
 });
@@ -1392,7 +1415,7 @@ test('a solo host turn uses one-to-one instructions and returns playable speech'
     if (url.endsWith('/responses')) {
       const input = JSON.parse(init.body);
       assert.equal(JSON.parse(input.input).mode, 'solo');
-      assert.match(input.instructions, /존재하지 않는 다른 참가자를 만들거나/);
+      assert.match(input.instructions, /자기 삶과 시점으로 사람 한 명과 대화하는 인물/);
       assert.doesNotMatch(input.instructions, /다른 사람도 참여할 수 있도록/);
       return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '최근에 어떤 영화 봤어요?', memory: '' }) }] }] });
     }
@@ -2066,15 +2089,17 @@ const storyLayer = (t, { episodes = false } = {}) => {
 
 // Any house character: companion length rules are unified (sheet 분량 when present, else the short default).
 const plainLengthHost = 'guide';
-const chatTurn = async ({ voiceOn, replyText, innerVoice, photo, anonymous = false, host = 'ina', messages = [], extra = {} }) => {
+const chatTurn = async ({ voiceOn, replyText, innerVoice, photo, anonymous = false, host = 'ina', messages = [], extra = {}, withRelationship = false, roomExtra = {} }) => {
   const spoken = [];
   let input, instructions, schema, events, after, summary;
   await run(async (url, init) => {
     if (url.includes('/auth/')) return result({ id: 'host', is_anonymous: anonymous });
     if (url.includes('claim_voice_lounge_host')) return result('ticket');
-    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: host, memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 2 }]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: host, memory: '', capacity: 1, space_id: null, voice_on: voiceOn, ai_turns: 2, ...roomExtra }]);
     if (url.includes('voice_lounge_messages?')) return result(messages);
     if (url.includes('voice_lounge_members?')) return result([]);
+    if (withRelationship && ['voice_lounge_relationships?', 'voice_lounge_memories?', 'voice_lounge_companion_state?', 'lounge_member_personas?'].some(table => url.includes(table))) return result([]);
+    if (withRelationship && url.includes('save_voice_lounge_relationship')) return result(1);
     if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '영화 이야기를 했다.', ...(photo ?? {}) }); }
     if (url.endsWith('/responses')) { const body = JSON.parse(init.body); ({ instructions } = body); schema = body.text.format.schema; input = JSON.parse(body.input); return modelAnswer({ text: replyText, ...(innerVoice === undefined ? {} : { inner_voice: innerVoice }) }); }
     if (url.includes('finish_voice_lounge_reply')) return result(true);
@@ -2136,7 +2161,7 @@ test('the fast model does not reason in a chat or a voice reply', async () => {
     }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
     assert.equal(body.reasoning.effort, effort, `${aiModel} ${voiceOn ? 'voice' : 'chat'}`);
     assert.equal(body.model, openaiModel, `${aiModel} ${voiceOn ? 'voice' : 'chat'} asks ${openaiModel}`);
-    assert.equal(body.max_output_tokens >= 3000, effort !== 'none', 'reasoning gets room in the output limit');
+    assert.equal(body.max_output_tokens, voiceOn ? 800 : messengerLib.loungeCompanionOutputTokens, 'chat has space for living state and expressive replies');
     // Nobody waits for the call after the reply, so it reasons a little whichever model answers.
     assert.equal(after.reasoning.effort, 'low');
     // Each kind of request keeps to one cache.
@@ -2219,16 +2244,16 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
         events.push(...(await response.text()).trim().split('\n').map(line => JSON.parse(line)));
       });
       assert.equal(geminiBody.generationConfig.responseMimeType, 'application/json');
-      assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'text', 'the same JSON shape, text first');
-      assert.match(geminiBody.systemInstruction.parts[0].text, /정해진 줄거리 없이 주고받는 1:1 대화/, 'the same instructions');
+      assert.equal(geminiBody.generationConfig.responseJsonSchema.required[0], 'character_life', 'the same JSON shape, private state before dialogue');
+      assert.match(geminiBody.systemInstruction.parts[0].text, /자기 삶과 감정, 취향과 목적을 가진 이 인물/, 'the same instructions');
       assert.equal(JSON.parse(geminiBody.contents[0].parts[0].text).reply_medium, 'chat', 'the same input');
       if (geminiWorks) {
         assert.equal(openaiCalled, false);
         // The sentence goes out while it is written, then whole.
         assert.deepEqual(events.filter(event => event.type === 'text').map(event => event.text), ['*컵을 내려놓으며* 그 장면, ']);
         assert.deepEqual(events.filter(event => event.type !== 'text').map(event => event.type), ['host', 'saved', 'done'], '"없음" is not a photo');
-        // Star narration is not the chat's form any more (engine v4): what is saved has it taken out.
-        assert.equal(events.find(event => event.type === 'host').text, '그 장면, 저도 오래 남았어요.');
+        // Live and saved narration use the same italic markers.
+        assert.equal(events.find(event => event.type === 'host').text, '*컵을 내려놓으며* 그 장면, 저도 오래 남았어요.');
       } else {
         assert.equal(openaiCalled, true, 'GPT answers when Gemini fails');
         assert.equal(events[0].text, 'GPT가 대신 답해요.');
@@ -2276,7 +2301,7 @@ test('a room set to GLM 5.3 Flash sends the same instructions and JSON shape the
       assert.deepEqual(glmBody.thinking, { type: 'enabled' });
       assert.equal(glmBody.reasoning_effort, 'low');
       assert.equal(glmBody.response_format.type, 'json_object');
-      assert.match(glmBody.messages[0].content, /정해진 줄거리 없이 주고받는 1:1 대화/, 'the same instructions');
+      assert.match(glmBody.messages[0].content, /자기 삶과 감정, 취향과 목적을 가진 이 인물/, 'the same instructions');
       assert.match(glmBody.messages[0].content, /"text"/, 'the JSON schema rides in the instructions');
       assert.equal(JSON.parse(glmBody.messages[1].content).reply_medium, 'chat', 'the same input');
       if (glmWorks) {
@@ -2299,7 +2324,7 @@ test('a room set to GLM 5.3 Flash sends the same instructions and JSON shape the
 test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
   const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo_subject: 'character', photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
   // The reply shows the photo being sent; the call after it writes the scene from that.
-  assert.deepEqual(asked.schema.required, ['text', 'inner_voice']);
+  assert.deepEqual(asked.schema.required, ['character_life', 'text', 'inner_voice']);
   assert.equal(asked.input.photos, true);
   assert.match(asked.instructions, /사진은 채팅에서 photos=true일 때만 보낼 수 있다/);
   assert.deepEqual(asked.after.text.format.schema.required.slice(-3), ['photo_subject', 'photo', 'photo_asked']);
@@ -2410,7 +2435,7 @@ test('a chat started from a story is told as a story; with the voice on it stays
       assert.deepEqual(JSON.parse(after.input).scenario, scenario);
     } else {
       assert.doesNotMatch(reply.instructions, /롤플레이 소설이다/);
-      assert.match(reply.instructions, /scenario는 이야기의 출발 배경이고 room_memory, memory와 recent는 이 방에서 그 뒤에 나눈 기록이다/);
+      assert.match(reply.instructions, /scenario가 있으면 둘의 출발 배경이다/);
     }
   }
 });
@@ -2478,8 +2503,8 @@ test('the prologue of a story card is read for the opening of a plotless chat on
   assert.match(scenario.prologue, /프롤로그를 이미 읽었다/);
   assert.match(scenario.prologue, /recent의 사용자 말/);
   assert.deepEqual([scenario.id, scenario.user_role, scenario.relationship, scenario.place], ['velvet-review', '평론가', '앙숙', '갤러리 홀'], 'who the two are stays');
-  assert.match(later.instructions, /프롤로그의 사건·갈등·초대·미결 훅을 매 턴 이어 가지 않는다/);
-  assert.match(later.instructions, /프롤로그·시나리오의 사건·초대·미결 훅으로 되돌리지 말고/);
+  assert.match(later.instructions, /관심 없이 지나친 프롤로그의 사건이나 초대로 반복해서 끌고 가지 않는다/);
+  assert.match(later.instructions, /상대가 화제를 바꾸면 그 뜻을 존중/);
 });
 
 test('a narrative the member wrote with this character in their persona takes the story card\'s place; with another character it does not', async t => {
@@ -2524,60 +2549,36 @@ test('a narrative the member wrote with this character in their persona takes th
 test('a chat reply is what is said with a few bracketed actions and an inner voice apart, the two together in one place', async () => {
   const { spoken, input, instructions, schema, events, after, summary } = await chatTurn({ voiceOn: false, replyText: '(잔을 내려놓는다)\n그래서, 결론은 내일이에요.', innerVoice: '결론 같은 건 아무래도 좋은데.' });
   assert.equal(input.reply_medium, 'chat');
-  // Engine v4 (2026-11-02): together in one place, no narrator.
-  assert.match(instructions, /정해진 줄거리 없이 주고받는 1:1 대화이고, 너와 상대는 지금 같은 곳에 함께 있다/);
-  assert.match(instructions, /turn\.progress를 따른다/);
-  assert.match(instructions, /무엇이 일어났고 누구에게 답하는지 먼저 알린다/);
-  assert.match(instructions, /사용자의 반응이나 선택은 대신 쓰지 않는다/);
-  assert.match(instructions, /이 장면은 현실의 만남 약속이 아니다/);
-  // Unified length rule (cache-stable): sheet 분량 when present, otherwise the short default — same text every host.
-  assert.match(instructions, /캐릭터 설명의 '분량'이 있으면 그것을 따른다/);
-  assert.match(instructions, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
+  // The actual request keeps identity, consent and JSON while leaving expression to the character.
+  assert.ok(instructions.includes(messengerLib.loungeCompanionRules({ innerVoice: 'on' })));
+  assert.ok(instructions.includes(charactersLib.loungeOneToOneCharacterRules));
+  assert.doesNotMatch(instructions, /40~280자|한 턴에 할 말은 하나|turn\.avoid|inner_voice_rest|많아야 3개/);
+  assert.match(instructions, /사용자의 행동·대사·감정·선택·동의를 대신 쓰지 않는다/);
+  assert.match(instructions, /명시적인 거절은 존중/);
+  assert.match(instructions, /자기 이야기는 질문받았을 때만 하는 것이 아니다/);
   assert.match(instructions, /---cache-breakpoint---/);
-  assert.match((await chatTurn({ voiceOn: false, replyText: '좋아요.', host: plainLengthHost })).instructions, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
-  // Actions in brackets, only when they say something; the inner voice only when it differs from what is said.
-  assert.match(instructions, /그에 맞는 네 표정 변화나 행동을 괄호 지문으로 먼저 보여 준 뒤 대사를 쓴다/);
-  assert.match(instructions, /행동은 보통 1개, 짧거나 정보만 오가는 턴은 0개, 많아야 2개이고 너 자신의 동작만이다/);
-  assert.match(instructions, /번호 달라면 냅킨에 적기/);
-  assert.match(instructions, /turn\.intimacy\.explicit가 있으면 그 장면의 규칙은 평소 분량/);
-  assert.match(instructions, /inner_voice: turn.inner_voice_rest가 true이면 이번 답의 inner_voice는 빈 문자열이다.*아니면 필요할 때만 네 속마음을 쓰고, 아니면 빈 문자열로 둔다/);
-  assert.match(instructions, /대사를 되풀이하거나 요약하지 않는다/);
-  assert.match(instructions, /속마음은 억지로 채우지 않는다\. 표정·행동 지문은 상대 말에 대한 반응으로 쓰는 것이 기본이다/);
-  assert.match(instructions, /별표\(\*\)로 지문을 쓰지 않는다/);
-  assert.match(instructions, /3인칭 서술\(그는, 그녀는, 네 이름으로 시작하는 서술\)과 풍경이나 분위기를 묘사하는 문단을 쓰지 않는다/);
-  assert.match(instructions, /별표나 괄호 없이 .*지문으로 쓴 부분은 상대의 행동이나 상황/);
-  assert.match(instructions, /속마음은 네가 들은 말이 아니므로/);
-  assert.match(instructions, /불편한 차이를 즉각적인 양보나 장난으로 덮지 않는다/);
-  assert.match(instructions, /거절하거나 불편함을 표현하면 즉시 멈추고 존중한다/);
-  assert.match(instructions, /metrics의 점수와 이름\(예: 사로잡힘, 눈을 떼지 못함\)은 참고일 뿐이고/);
-  assert.match(instructions, /그 기억 때문에 말투가 상담하듯 순해지지 않는다/);
-  assert.match(instructions, /플러팅·받아치기는 짧게 친다\. 한 비트로 충분하면 한 비트로 끝내고/);
-  assert.match(instructions, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
-  assert.match(instructions, /유머·플러팅: 상대 말의 결을 짧게 받아치고/);
-  assert.match(instructions, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
-  // Director rule stays in the cached instructions; absence of direction is handled in the input.
-  assert.match(instructions, /direction은 reading과 같은 판단에서 나온 참고 방향이다/);
-  assert.doesNotMatch(instructions, /거의 모든 답에 별표로 감싼 지문/);
-  assert.doesNotMatch(instructions, /롤플레이 소설/);
-  assert.doesNotMatch(instructions, /reply_medium=chat이면 글로 주고받는 롤플레이 채팅이다/);
-  assert.deepEqual(schema.required, ['text', 'inner_voice']);
+  assert.match((await chatTurn({ voiceOn: false, replyText: '좋아요.', host: plainLengthHost })).instructions, /말의 길이.*캐릭터의 호흡에 맡긴다/);
+  assert.deepEqual(schema.required, ['character_life', 'text', 'inner_voice']);
   // The inner voice is saved after the reply, on a line of its own, and the call after it reads it as its own field.
-  assert.equal(events[0].text, '(잔을 내려놓는다)\n그래서, 결론은 내일이에요.\n\n[속마음]\n결론 같은 건 아무래도 좋은데.');
-  assert.deepEqual(JSON.parse(after.input).recent.at(-1), { kind: 'host', nickname: '윤서연', text: '(잔을 내려놓는다)\n그래서, 결론은 내일이에요.', inner_voice: '결론 같은 건 아무래도 좋은데.' });
+  assert.equal(events[0].text, '*잔을 내려놓는다*\n그래서, 결론은 내일이에요.\n\n[속마음]\n결론 같은 건 아무래도 좋은데.');
+  assert.deepEqual(JSON.parse(after.input).recent.at(-1), { kind: 'host', nickname: '윤서연', text: '*잔을 내려놓는다*\n그래서, 결론은 내일이에요.', inner_voice: '결론 같은 건 아무래도 좋은데.' });
   assert.match(after.instructions, /memory 첫 줄에 '지금 장면: '/);
   assert.equal(summary.p_memory, '영화 이야기를 했다.');
   assert.deepEqual(spoken, [], 'no speech is made for a chat');
   assert.deepEqual(typesOf(events), ['host', 'saved', 'done']);
 });
 
-test('what a chat reply broke is fixed before it is saved: star narration, a third action, an inner voice that says the reply again', async () => {
-  const stars = await chatTurn({ voiceOn: false, replyText: '*웃음을 참는다* 그건 반칙이죠.\n(잔을 든다)\n좋아요.\n(잔을 내려놓는다)\n하나 더요.\n(창밖을 본다)', innerVoice: '그건 반칙이죠.' });
-  assert.equal(stars.events[0].text, '그건 반칙이죠.\n(잔을 든다)\n좋아요.\n(잔을 내려놓는다)\n하나 더요.');
+test('saving a chat preserves every action and the full inner voice while honoring hidden thoughts and exact duplicates', async () => {
+  const stars = await chatTurn({ voiceOn: false, replyText: '*웃음을 참는다* 그건 반칙이죠.\n(잔을 든다)\n좋아요.\n(잔을 내려놓는다)\n하나 더요.\n(창밖을 본다)\n마지막요.\n(안경을 고쳐 쓴다)', innerVoice: '그건 반칙이죠.' });
+  assert.equal(stars.events[0].text, '*웃음을 참는다* 그건 반칙이죠.\n*잔을 든다*\n좋아요.\n*잔을 내려놓는다*\n하나 더요.\n*창밖을 본다*\n마지막요.\n*안경을 고쳐 쓴다*');
   const long = await chatTurn({ voiceOn: false, replyText: '좋아요.', innerVoice: '*하나.*\n둘.\n셋.\n넷.' });
-  assert.equal(long.events[0].text, '좋아요.\n\n[속마음]\n하나.\n둘.\n셋.');
+  assert.equal(long.events[0].text, '좋아요.\n\n[속마음]\n하나.\n둘.\n셋.\n넷.');
+  const thought = '왜 그 얘기가 자꾸 생각나는지 모르겠다. '.repeat(16);
+  const full = await chatTurn({ voiceOn: false, replyText: '아까 얘기 좀 더 해봐요.', innerVoice: thought });
+  assert.equal(lounge.splitLoungeInnerVoice(full.events[0].text).inner, thought.trim(), 'thoughts longer than 200 characters survive saving');
   // Hidden by the member: no inner voice is asked for or kept, and the thought shows in what is said instead.
   const hidden = await chatTurn({ voiceOn: false, replyText: '…아니에요. 드세요.', innerVoice: '들켰나.', extra: { innerVoice: 'off' } });
-  assert.match(hidden.instructions, /사용자가 속마음을 보지 않는 설정이므로 언제나 빈 문자열이다/);
+  assert.match(hidden.instructions, /사용자가 숨긴 설정이므로 빈 문자열/);
   assert.equal(hidden.events[0].text, '…아니에요. 드세요.');
 });
 
@@ -2604,9 +2605,9 @@ test('a chat reply in another language is written once more in Korean before it 
   assert.equal(asked.length, 2);
   assert.match(asked[1].instructions, /이번 답은 반드시 한국어로만 쓴다/);
   assert.equal(events.find(event => event.type === 'host').text, '같이 장 보고 저녁 만들어 보고 싶어요.\n\n[속마음]\n아직은 취향 얘기다.');
-  assert.match(asked[0].instructions, /대사와 속마음은 언제나 한국어로 쓴다/);
-  assert.match(asked[0].instructions, /turn\.event는 주변 사건의 제안이다/);
-  assert.match(asked[0].instructions, /충돌하는 사건은 보류한다/);
+  assert.match(asked[0].instructions, /대사와 너 자신의 행동·심리를 한국어로 쓴다/);
+  assert.match(asked[0].instructions, /turn\.event는 쓸 수 있는 주변 사건의 재료/);
+  assert.match(asked[0].instructions, /현재 질문·정정·진지한 감정과 충돌하면 미룬다/);
   assert.equal(messengerLib.loungeNotKorean('좋아요. 오늘 와인은 Pinot Noir예요.'), false);
   assert.equal(messengerLib.loungeNotKorean('さっきと同じ 질문이네요'), true);
   assert.equal(messengerLib.loungeNotKorean('我们一起去吃饭吧，好不好'), true);
@@ -2619,31 +2620,104 @@ test('a character\'s reply shows its bracketed actions as actions and its inner 
   assert.deepEqual(lounge.splitLoungeInnerVoice('좋아요.\n\n[속마음]\n들켰나.'), { reply: '좋아요.', inner: '들켰나.' });
   assert.deepEqual(lounge.splitLoungeInnerVoice('좋아요.'), { reply: '좋아요.', inner: '' });
   assert.equal(lounge.joinLoungeInnerVoice('좋아요.', ''), '좋아요.');
+  const fullDialogue = '자기 이야기를 이어간다. '.repeat(100);
+  assert.equal(lounge.joinLoungeInnerVoice(fullDialogue, '긴 생각'.repeat(500), 1200), lounge.clipLoungeReply(fullDialogue, 1200), 'an oversized thought never erases dialogue with a negative slice');
+  const bounded = lounge.joinLoungeInnerVoice('여기서부터 시작할게요.', '생각'.repeat(900), 1200);
+  assert.equal(bounded.length, 1200);
+  assert.equal(lounge.splitLoungeInnerVoice(bounded).reply, '여기서부터 시작할게요.');
   // The voice reads neither.
   assert.equal(lounge.loungeSpokenText('(잔을 돌린다)\n좋아요.\n\n[속마음]\n들켰나.'), '좋아요.');
 });
 
-test('a chat reply is short and kept within 1200 characters; a voice reply keeps its own rules and 600 characters', async () => {
+test('private chat keeps full expressive replies up to 3000 characters while voice retains 600 characters', async () => {
   const long = '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long, host: plainLengthHost });
-  assert.ok(chat.events[0].text.length <= 1200 && chat.events[0].text.length > 1190);
-  assert.match(chat.instructions, /앞선 답이 길었어도 플러팅·받아치기로 돌아오면 다시 짧게 친다/);
+  assert.equal(chat.events[0].text, long.trimEnd());
+  const expanded = await chatTurn({ voiceOn: false, replyText: long.repeat(3), host: plainLengthHost });
+  assert.ok(expanded.events[0].text.length <= 3000 && expanded.events[0].text.length > 2900);
+  assert.match(expanded.events[0].text, /[.!?]$/);
+  assert.match(chat.instructions, /말의 길이.*캐릭터의 호흡에 맡긴다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long, host: plainLengthHost });
   assert.equal(voice.events[0].text.length, 600);
-  assert.match(voice.instructions, /목소리로 말할 때\(reply_medium=voice\)는 첫 인사를 포함해 보통 1~2개의 짧은 문장/);
-  assert.match(voice.instructions, /reply_medium=voice이면 .*리액션을 말로 크게 한다/);
+  assert.match(voice.instructions, /reply_medium=voice이면 목소리로 들리는 대화/);
+  assert.match(voice.instructions, /말투·침묵·말의 내용으로 마음을 드러낸다/);
+});
+
+test('narration handles inline and multiline legacy brackets, partial typing and spoken technical explanations', () => {
+  assert.deepEqual(lounge.splitLoungeActions('반가워요. (웃는다) HBM(고대역폭 메모리) 이야기예요.', { parens: true }), [
+    { action: false, text: '반가워요. ' }, { action: true, text: '웃는다' }, { action: false, text: ' HBM(고대역폭 메모리) 이야기예요.' },
+  ]);
+  assert.equal(lounge.formatLoungeNarration('(잔을 들고\n조용히 웃는다)\n좋아요.'), '*잔을 들고\n조용히 웃는다*\n좋아요.');
+  assert.deepEqual(lounge.splitLoungeActions('(조용히 웃', { parens: true, streaming: true }), [{ action: true, text: '조용히 웃' }]);
+  assert.equal(lounge.loungeSpokenText('반가워요. (웃는다) *잔을 내려놓는다* HBM(고대역폭 메모리)예요.'), '반가워요. HBM(고대역폭 메모리)예요.');
+});
+
+test('the real message renderer uses italics without brackets during typing and after save, with a separate inner voice', () => {
+  const require = createRequire(import.meta.url);
+  const view = {};
+  const code = ts.transpileModule(readFileSync(new URL('../src/components/LoungeChatComposer.tsx', import.meta.url), 'utf8'), { fileName: 'LoungeChatComposer.tsx', compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  new Function('exports', 'require', code)(view, name => name === '../lib/lounge' ? lounge : require(name));
+  const React = require('react'), { renderToStaticMarkup } = require('react-dom/server');
+  for (const [text, streaming] of [['안녕. (웃는다)', false], ['안녕. *웃는다*', false], ['안녕. (웃', true], ['안녕. *웃', true]]) {
+    const html = renderToStaticMarkup(React.createElement(view.LoungeMessageText, { text, host: true, streaming, fresh: 3 }));
+    assert.match(html, /<em class="lounge-action-text">/);
+    assert.doesNotMatch(html, /[()*]/);
+  }
+  const thought = renderToStaticMarkup(React.createElement(view.LoungeMessageText, { text: '좋아요.\n\n[속마음]\n조금 기대된다.', host: true }));
+  assert.match(thought, /lounge-inner-voice/);
+  assert.match(thought, /<b>속마음<\/b>/);
+});
+
+test('a new prologue seeds the actual first conversation place while an ongoing room is not rewound', async () => {
+  const scenario = { id: 'closer-contract-love', title: '6개월의 연인', prologue: '회의실에서 합의서 초안을 놓고 계약 조건을 협상하려 한다. 서명은 아직 하지 않았다.', user_role: '계약연애를 의뢰한 여성', relationship: '아직 계약 체결 전', place: '도심 고층 빌딩 회의실' };
+  const first = await chatTurn({ voiceOn: false, host: 'closer', replyText: '여기 앉아요.', roomExtra: { ai_turns: 0, scenario } });
+  assert.equal(first.input.turn.scene.location, scenario.place);
+  const continued = await chatTurn({ voiceOn: false, host: 'closer', replyText: '이야기 계속해요.', roomExtra: { ai_turns: 8, scenario } });
+  assert.equal(continued.input.turn.scene, undefined, 'do not manufacture the initial place for existing conversations without saved scene data');
+});
+
+test('extended private replies require the migration rollout flag and tell the writer the active limit', async t => {
+  const saved = process.env.LOUNGE_EXTENDED_COMPANION_REPLIES;
+  t.after(() => { if (saved === undefined) delete process.env.LOUNGE_EXTENDED_COMPANION_REPLIES; else process.env.LOUNGE_EXTENDED_COMPANION_REPLIES = saved; });
+  const long = '이어지는 자기 이야기를 문장으로 마무리한다. '.repeat(90);
+  for (const enabled of [undefined, 'off', 'on']) {
+    if (enabled === undefined) delete process.env.LOUNGE_EXTENDED_COMPANION_REPLIES;
+    else process.env.LOUNGE_EXTENDED_COMPANION_REPLIES = enabled;
+    const chat = await chatTurn({ voiceOn: false, replyText: long, host: plainLengthHost });
+    const limit = enabled === 'on' ? 3000 : 1200;
+    assert.equal(chat.input.reply_char_limit, limit);
+    assert.equal(chat.events[0].text, lounge.clipLoungeReply(long, limit));
+    assert.match(chat.instructions, /reply_char_limit는 저장되는 text와 inner_voice를 합친 글자 수의 상한/);
+  }
+});
+
+test('Dohyun uses the new Casanova canon and early attraction through the real handler in both modes', async () => {
+  for (const innerVoice of ['on', 'off']) {
+    let captured;
+    await withServiceKey(async () => { captured = await chatTurn({ voiceOn: false, host: 'auditor', replyText: '경험은 좀 있죠.', extra: { innerVoice }, withRelationship: true }); });
+    const { input, instructions } = captured;
+    assert.match(instructions, /카사노바형 남자/);
+    assert.match(instructions, /HBM(?: 메모리)? 아키텍처(?:와 |·)패키징/);
+    assert.match(instructions, /클래식 시계/);
+    assert.match(input.relationship.character_core.join(' '), /연애 경험/);
+    assert.equal(input.relationship.stage.id, 'FIRST_MEETING');
+    assert.match(input.relationship.stage.hint, /플러팅과 제안을 보류하지 않는다/);
+    assert.match(input.relationship.stage.romance, /처음부터.*플러팅/);
+    assert.match(input.relationship.outing, /첫 단계부터 먼저 제안하고 수락/);
+    assert.ok(input.voice_examples.length > 0 && input.voice_examples.every(shot => shot.stage === 1));
+    if (innerVoice === 'off') assert.ok(input.voice_examples.every(shot => shot.inner_voice === ''));
+    assert.doesNotMatch(instructions, /빛·소품·몸 감각이 먼저|한 줄로 한 수 위|여러 사람을 만나기보다 잘 맞는 한 사람을 고르는/);
+  }
 });
 
 test('a character with a bible shows it in a chat: rules of behaviour, how people usually treat them, why this member differs', async () => {
   const { instructions } = await chatTurn({ voiceOn: false, replyText: '좋아요.', host: 'guide' });
-  assert.match(instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다. 대사를 정해 주는 것이 아니므로/);
-  // Ways of reacting, never lines: quoted lines in the bibles were copied word for word (2026-11-01).
-  assert.match(instructions, /웃음이 나는 상황과 방식\(정해진 대사가 아니다/);
-  assert.match(instructions, /이럴 때 이렇게 한다:\n- 함께 하자는 제안을 아직 받을 수 없을 때 → /);
-  assert.match(instructions, /\n- 무시하거나 선을 그을 때/);
-  assert.match(instructions, /호감이 생겨도 갑자기 바뀌지 않는 것/);
-  assert.match(instructions, /보통 사람들이 너를 대하는 방식: 12년 동안/);
-  assert.match(instructions, /지금 이 사람이 너에게 다른 이유: /);
+  const guide = charactersLib.getLoungeCharacter('guide');
+  assert.ok(instructions.includes(charactersLib.loungeCompanionPersonaPrompt(guide, 'on')));
+  assert.ok(instructions.includes(guide.baseline));
+  assert.ok(instructions.includes(guide.specialToMe));
+  for (const rule of guide.bible.invariants) assert.ok(instructions.includes(rule));
+  assert.doesNotMatch(instructions, /\[\d단계 · /, 'examples belong to current context, not the stable identity');
   // A bible needs actual principles, not a quota of examples or exception performances.
   for (const character of charactersLib.loungeCharacters) {
     assert.ok(character.bible, `${character.name} has a bible`);
@@ -2654,7 +2728,7 @@ test('a character with a bible shows it in a chat: rules of behaviour, how peopl
     if (character.specialToMe) assert.ok(compiled.includes(character.specialToMe));
   }
   const ina = await chatTurn({ voiceOn: false, replyText: '좋아요.' });
-  assert.match(ina.instructions, /캐릭터 바이블\(어떤 상황에서 어떻게 행동하는지의 규칙이다/);
+  assert.ok(ina.instructions.includes(charactersLib.loungeCompanionPersonaPrompt(charactersLib.getLoungeCharacter('ina'), 'on')));
 });
 
 test('a chat prompt puts what stays the same first, so the provider can cache it, and keeps the last 20 messages', async () => {
@@ -2669,8 +2743,8 @@ test('a chat prompt puts what stays the same first, so the provider can cache it
   assert.match(after.instructions, /900자 이내/, 'the summary may be 900 characters');
   assert.equal(input.recent.at(-1).text, '말 24');
   // Shared companion rules and always-on field pointers stay in the cached prefix; turn values stay in input only.
-  assert.ok(instructions.indexOf('정해진 줄거리 없이 주고받는 1:1 대화') >= 0);
-  const timeAwayAt = instructions.indexOf('time_away'), messengerAt = instructions.indexOf('정해진 줄거리 없이 주고받는 1:1 대화');
+  assert.ok(instructions.indexOf('너는 자기 삶과 감정, 취향과 목적을 가진 이 인물이다') >= 0);
+  const timeAwayAt = instructions.indexOf('time_away'), messengerAt = instructions.indexOf('너는 자기 삶과 감정, 취향과 목적을 가진 이 인물이다');
   const breakAt = instructions.indexOf('---cache-breakpoint---');
   assert.ok(timeAwayAt > messengerAt, 'field pointers stay with the companion rules');
   assert.ok(breakAt > timeAwayAt, 'cache breakpoint closes the stable instructions');
@@ -2679,6 +2753,9 @@ test('a chat prompt puts what stays the same first, so the provider can cache it
 
 test('the analyzer reads the member\'s words and the scene before every chat reply, for every model; code decides the scene and the reply keeps to the turn', async t => {
   const saved = process.env.LOUNGE_ANALYZER;
+  const savedDirector = process.env.LOUNGE_DIRECTOR;
+  delete process.env.LOUNGE_DIRECTOR;
+  t.after(() => { if (savedDirector === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = savedDirector; });
   delete process.env.LOUNGE_ANALYZER;
   t.after(() => { if (saved === undefined) delete process.env.LOUNGE_ANALYZER; else process.env.LOUNGE_ANALYZER = saved; });
   const messages = [{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '여기 다 먹었으니까 분식집 가요!', created_at: '2026-11-01T00:00:00Z' }];
@@ -2711,6 +2788,7 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
     assert.equal(asked.prompt_cache_key, 'lounge-turn-analysis');
     assert.match(asked.instructions, /너는 1:1 대화를 읽는 분석가다/);
     const analyzerInput = JSON.parse(asked.input);
+    assert.equal(analyzerInput.direction_enabled, false, 'without an explicit opt-in the character chooses its reaction');
     assert.equal(analyzerInput.latest, '여기 다 먹었으니까 분식집 가요!');
     assert.equal(analyzerInput.scene.location, '오마카세 카운터');
     const input = JSON.parse(reply.input);
@@ -2729,10 +2807,10 @@ test('the analyzer reads the member\'s words and the scene before every chat rep
     assert.equal(input.turn.stage, 1);
     // Turn 7 is off the beat: the stage's leaning without what changes at it (see the beat test below).
     assert.equal(input.turn.rule_break, undefined);
-    assert.match(input.turn.inner_voice_level.level, /^신중한 관찰과 경계$/);
+    assert.equal(input.turn.inner_voice_level.level, charactersLib.getLoungeCharacter('auditor').bible.innerVoice.ladder[1].level);
     assert.equal(input.turn.inner_voice_level.example, undefined);
     assert.equal(input.turn.belief, undefined);
-    assert.deepEqual(input.turn.avoid, { reaction: '당황하기', phrases: ['반응 데이터'], anchors: ['와인잔을 돌린다'] });
+    assert.equal(input.turn.avoid, undefined, 'past reactions are not turn prohibitions');
     assert.deepEqual(input.turn.self_facts, ['오마카세는 두 달 기다려 예약함']);
     assert.equal(input.direction, undefined);
     // The scene and the record are written back after the reply.
@@ -2929,6 +3007,9 @@ test('선우령 through the handler: a graceful proposal opens the step in the r
 });
 
 test('adult mode (test accounts only): explicit only at 선우령\'s closest step, for a listed account, never after a no; the hard limits stay', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
   const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   const turn = (stage, extra = {}) => messengerLib.loungeTurnConditions({ bible, stage, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true, ...extra }).intimacy;
@@ -3027,6 +3108,9 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
 });
 
 test('adult mode: the turns it opens are answered by DeepSeek when its key is set, any other by OpenAI, and OpenAI steps in when DeepSeek fails', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
   const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.DEEPSEEK_API_KEY, nano: process.env.NANOGPT_API_KEY, model: process.env.LOUNGE_ADULT_MODEL };
   t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.key], ['NANOGPT_API_KEY', saved.nano], ['LOUNGE_ADULT_MODEL', saved.model]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
   Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key', NANOGPT_API_KEY: 'nano-key' });
@@ -3078,6 +3162,9 @@ test('adult mode: the turns it opens are answered by DeepSeek when its key is se
 });
 
 test('adult mode is for every built-in character with adult flirtation, answered by DeepSeek at its closest stage; a character a member made never has it', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
   const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.NANOGPT_API_KEY };
   t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
   Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
@@ -3123,6 +3210,9 @@ test('adult mode is for every built-in character with adult flirtation, answered
 });
 
 test('adult mode on a phone call: the closest stage is answered by DeepSeek with the call\'s own note, any other stage or account by OpenAI', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
   const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.NANOGPT_API_KEY };
   t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
   Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
@@ -3163,6 +3253,9 @@ test('adult mode on a phone call: the closest stage is answered by DeepSeek with
 });
 
 test('adult mode: a DeepSeek answer that comes back blank is asked once more before OpenAI answers, and the scene\'s rules keep the roles of the bodies, the length and the call\'s silence about the call (2026-11-03)', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
   const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, key: process.env.NANOGPT_API_KEY };
   t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.key]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
   Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
@@ -3204,7 +3297,7 @@ test('adult mode: a DeepSeek answer that comes back blank is asked once more bef
   assert.match(velvetMode, /주도성, 긴장감, 감정의 밀도를 우선/, 'hers keeps the lead, the tension and the feeling');
   assert.match(velvetMode, /최소 3~5문장 이상/);
   assert.match(charactersLib.loungeDefaultAdultMode.explicit, /최소 3~5문장 이상, 보통 6~10문장/);
-  assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /turn\.intimacy\.explicit가 있으면 그 장면의 규칙은 평소 분량/);
+  assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /turn\.intimacy가 있으면 이번 장면의 한도/);
   const note = charactersLib.loungeAdultVoiceNote;
   assert.match(note, /통화 중이라는 말\(통화, 전화, 전화 너머/);
   assert.match(note, /목소리를 듣고 있다거나 소리가 들린다는 말도 되풀이하지 않는다/);
@@ -4364,9 +4457,9 @@ test('a call in a story room preserves work and consequences with the chat summa
     throw new Error('Unexpected call ' + url);
   }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
   assert.match(reply.instructions, /phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다/);
-  assert.match(reply.instructions, /진행 중인 사건·업무·약속의 결과는 사라지지 않/);
+  assert.match(reply.instructions, /진행 중인 일과 약속의 결과는 기억/);
   assert.match(reply.instructions, /둘의 말투와 처음 거리는 scenario.relationship과 scenario.prologue에서 시작한다/);
-  assert.match(reply.instructions, /사건이나 일은 먼저 꺼내지 않고, 사용자가 꺼낼 때만/);
+  assert.match(reply.instructions, /이야기 속 사건이나 일도 통화로 전할 수 있는 만큼 네 쪽에서 자연스럽게 이야기할 수 있다/);
   // Every call starts from the two, not the case: the recent talk, the summary, what the member has told.
   assert.match(reply.instructions, /받자마자 사건이나 일 이야기를 꺼내지 않는다/);
   assert.match(reply.instructions, /먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories/);
@@ -4598,7 +4691,7 @@ test('임시우 is the member\'s former lover of seven years ago: the past they 
   const state = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   for (const stage of [1, 2, 3, 4]) assert.equal(messengerLib.loungeTurnConditions({ bible: siwoo.bible, stage, state, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' }).speech, siwoo.bible.speechLadder[stage]);
   assert.equal(messengerLib.loungeTurnConditions({ bible: charactersLib.loungeCharacters.find(character => character.id === 'auditor').bible, stage: 2, state, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on' }).speech, undefined);
-  assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /speech는 지금 단계에서 존댓말과 반말이 어떻게 섞이는지다/);
+  assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /turn.speech가 있으면 이 인물의 현재 말투 변화로 반영/);
   // The base speech level of the relationship agrees with the ladder: casual from the third stage.
   assert.equal(relationshipLib.getRelationshipConfig('jaeseok').casualFromStage, 'SAME_SCREEN');
   assert.equal(relationshipLib.getRelationshipConfig('jaeseok').stages[2].id, 'SAME_SCREEN');
@@ -4645,11 +4738,11 @@ test('a leftover feeling and an intention carry over a few turns, are rewritten 
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   const decision = { progress: 'stay' };
   const after = (state, turn, update) => messengerLib.nextLoungeCompanionState({ state, update, decision, turn, reply: '네.', inner: '' });
-  const written = after(base, 5, { lingering: '선수 소리를 세 번 들어 살짝 오기가 생김', next_intent: '왜 자꾸 의심하는지 묻기' });
-  assert.deepEqual(written.lingering, { what: '선수 소리를 세 번 들어 살짝 오기가 생김', turn: 5 });
+  const written = after(base, 5, { lingering: '서로 받아치는 대화가 재미있어 함께 더 있고 싶음', next_intent: '좋아하는 저녁을 같이 먹자고 제안하기' });
+  assert.deepEqual(written.lingering, { what: '서로 받아치는 대화가 재미있어 함께 더 있고 싶음', turn: 5 });
   const conditions = (state, turn, sincereRefusal) => messengerLib.loungeTurnConditions({ state, turn, decision, innerVoice: 'on', sincereRefusal });
-  assert.equal(conditions(written, 6).lingering, '선수 소리를 세 번 들어 살짝 오기가 생김');
-  assert.equal(conditions(written, 6).next_intent, '왜 자꾸 의심하는지 묻기');
+  assert.equal(conditions(written, 6).lingering, '서로 받아치는 대화가 재미있어 함께 더 있고 싶음');
+  assert.equal(conditions(written, 6).next_intent, '좋아하는 저녁을 같이 먹자고 제안하기');
   assert.equal(conditions(written, 6, true).lingering, undefined, 'a sincere no is not met with a leftover feeling');
   assert.equal(conditions(written, 6, true).next_intent, undefined);
   const failed = after(written, 6, undefined);
@@ -4663,6 +4756,124 @@ test('a leftover feeling and an intention carry over a few turns, are rewritten 
   for (const field of ['lingering', 'next_intent']) assert.ok(messengerLib.loungeCompanionUpdateFields.includes(field));
   assert.deepEqual(messengerLib.loungeDirectorInput({ memory: '', carry: messengerLib.loungeCarry(written, 6), messages: [] }).carry, { lingering: written.lingering.what, next_intent: written.next_intent.what });
   assert.equal('carry' in messengerLib.loungeDirectorInput({ memory: '', carry: messengerLib.loungeCarry(written, 20), messages: [] }), false);
+});
+
+test('Dohyun can recover in an existing room without turning an unanswered preference into an obligation', async () => {
+  const oldQuestion = '휴가 때 어디에서 며칠 머물고 싶은지 듣고 싶다';
+  const oldMemory = `지금 장면: 카페에서 첫 맞선 중.\n있었던 일: 도현이 여행 취향을 연달아 물었다.\n남은 것: ${oldQuestion}`;
+  const stored = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), next_intent: { what: oldQuestion, turn: 12 } };
+  const scenario = { id: 'auditor-meeting', title: '첫 맞선', place: '카페', relationship: '소개로 처음 만난 성인 두 사람', user_role: '맞선 상대', prologue: '서로 존댓말로 인사했다.' };
+  let reply, after;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_rooms?host_id=')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', topic: '맞선', host_persona: 'auditor', memory: oldMemory, capacity: 1, voice_on: false, space_id: null, ai_turns: 12, scenario }]);
+    if (url.includes('voice_lounge_companion_state?')) return result([{ character_id: 'auditor', state: stored }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '나', kind: 'human', text: '질문 그만하고 도현 씨 얘기도 해 봐요.' }]);
+    if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '지금 장면: 카페에서 첫 맞선 중.', events: [], next_intent: '', lingering: '' }); }
+    if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '제 얘기는 빼고 설명만 하게 했네요. 저는 쉬는 날부터 좀 이야기하고 싶어요.', inner_voice: '' }); }
+    return result([]);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    assert.equal(response.status, 200);
+    await response.text();
+  }));
+  const input = JSON.parse(reply.input);
+  assert.equal(input.memory, oldMemory, 'preserve what happened rather than silently rewriting a real room');
+  assert.equal(input.turn.next_intent, undefined, 'an old question is no longer promoted to the next instruction');
+  assert.equal(stored.next_intent.what, oldQuestion, 'the stored history itself is not overwritten');
+  assert.deepEqual(input.latest, input.recent.at(-1));
+  assert.equal(Object.keys(input).at(-1), 'latest', 'finish with what was actually said rather than stale intentions');
+  assert.match(reply.instructions, /사소한 미답 질문이라면 답을 받아 낼 의무가 아니다/);
+  assert.match(input.relationship.stage.romance, /처음부터 마음에 드는 점과 이성적인 끌림을 분명히 표현/);
+  assert.match(after.instructions, /이전 요약에 그런 질문이 남아 있으면 이번에 제거한다/);
+  assert.match(after.instructions, /일상 질문은 다음 턴의 과제로 저장하지 않는다/);
+});
+
+test('answer-seeking carry is omitted while own stories and actual joint plans remain available', () => {
+  const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
+  const carry = what => messengerLib.loungeCarry({ ...base, next_intent: { what, turn: 12 } }, 13);
+  for (const question of ['휴가 때 어디에서 며칠 머물지 묻고 싶다', '왜 그렇게 말했는지 물어보기', '어느 코스로 가는지 궁금하다', '이탈리아에서 오래 머물 곳을 듣고 싶다', '주말에 무엇을 하는지 알고 싶다']) {
+    assert.equal(carry(question).next_intent, undefined, question);
+  }
+  for (const own of ['좋아하는 저녁을 같이 먹자고 제안하기', '처음 요리를 시작한 이야기를 들려주기', '약속한 주말 산행 준비물을 함께 정하기', '마음에 묻어 둔 오래된 취미 이야기를 들려주기']) {
+    assert.equal(carry(own).next_intent, own, own);
+  }
+});
+
+test('Dohyun review catches the live failures including indirect questions, without applying a shared personality', () => {
+  const review = (userText, text, inner = '', characterId = 'auditor') => messengerLib.loungeCompanionReplyReview({ characterId, userText, text, inner });
+  assert.deepEqual(review('질문 그만하고 도현 씨 이야기도 해 봐요.', '저는 이제 제 얘기 했으니까요. 오늘 이 자리에 나온 이유가 궁금해요.').notes, ['question_after_stop']);
+  assert.deepEqual(review('바다도 숲도 좋아해요.', '보고만 있는 바다, 아니면 발 담글 수 있는 바다가 좋으세요?').notes, ['preference_interview']);
+  assert.deepEqual(review('산에서는 제가 다 가르쳐야겠어요 ㅎㅎ', '코스는 선생님께 맡길게요. 저는 얌전히 따라만 가겠습니다.').notes, ['submissive_novice']);
+  assert.deepEqual(review('제가 가르쳐야겠어요 ㅎㅎ', '가르침은 감사히 받을게요. 제 쪽은 있으니까 그냥 따라가면 됩니다.').notes, ['submissive_novice']);
+  assert.deepEqual(review('호감 있다고 단정하지 마요.', '네. 오늘 이야기만 해요.', '첫 만남에서 그 선을 미리 그어 두는 사람은 오히려 마음이 있는 쪽인데.').notes, ['refusal_as_attraction']);
+  assert.equal(review('오늘 다음 약속은 잡고 싶지 않아요.', '네. 다음 약속은 잡지 않을게요.', '선을 분명히 그어 주니 나도 편하다.'), undefined);
+  assert.equal(review('등산은 초보네요.', '정상에는 아직 안 가 봤어요. 제 페이스는 제가 챙길게요.'), undefined);
+  assert.equal(review('제가 가르쳐야겠어요.', '가르침을 받아야 한다고 하니 웃음이 나네요. 제 페이스는 제가 챙길게요.'), undefined, 'mentioning a lesson is not by itself submission');
+  assert.equal(review('질문 그만하고 자기 얘기 해 봐요.', '저는 코트에서 긴 랠리를 할 때 일이 머릿속에서 사라지는 게 좋아요.'), undefined);
+  assert.equal(review('주말에 뭐 하세요?', '토요일에 운동해요. 주말에 뭐 하세요?', '', 'closer'), undefined);
+});
+
+test('a failed Dohyun reply is rewritten once before saving; a second failure does not loop or replace a better draft', async () => {
+  for (const succeeds of [true, false]) {
+    let generations = 0;
+    const requests = [];
+    const bad = '제가 얘기는 했으니까요. 오늘 나온 이유가 궁금해요.';
+    const fixed = '저는 토요일 아침 코트에 나가는 게 좋아요. 공이 길게 오가면 일 생각이 완전히 사라지거든요.';
+    const messages = [{ id: 1, user_id: 'host', nickname: '나', kind: 'human', text: '질문 그만하고 도현 씨 이야기 좀 해 봐요.' }];
+    let saved;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'host' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '맞선', host_persona: 'auditor', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 2 }]);
+      if (url.includes('voice_lounge_messages?')) return result(messages);
+      if (url.includes('voice_lounge_members?')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+      if (url.endsWith('/responses')) { requests.push(JSON.parse(init.body)); generations++; return modelAnswer({ text: generations === 1 || !succeeds ? bad : fixed, inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply')) { saved = JSON.parse(init.body); return result(true); }
+      if (url.includes('save_voice_lounge_room_memory')) return result(true);
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+    assert.equal(generations, 2, 'at most one expression rewrite');
+    assert.match(requests[1].instructions, /끝에 질문, 궁금하다는 말/);
+    assert.equal(saved.p_text, succeeds ? fixed : bad);
+  }
+});
+
+test('a failed DeepSeek Dohyun reply uses one GPT repair while a healthy reply keeps the selected model', async () => {
+  const previousKey = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = 'mock-deepseek';
+  try {
+    for (const needsRepair of [false, true]) {
+      let deepseekCalls = 0, gptCalls = 0, saved;
+      const fixed = '처음 가는 산인 건 맞아요. 제 페이스는 제가 챙길게요. 내려온 뒤 식사는 제가 고르고 싶고요.';
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '맞선', host_persona: 'auditor', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 2, ai_model: 'deepseek-flash' }]);
+        if (url.includes('voice_lounge_messages?')) return result([{ id: 1, user_id: 'host', nickname: '나', kind: 'human', text: '산에서는 제가 가르쳐야겠어요 ㅎㅎ' }]);
+        if (url.includes('voice_lounge_members?')) return result([]);
+        if (url === 'https://api.deepseek.com/chat/completions') {
+          deepseekCalls++;
+          const content = JSON.stringify({ text: needsRepair ? '코스는 선생님께 맡길게요. 저는 얌전히 따라만 가겠습니다.' : fixed, inner_voice: '' });
+          return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+        if (url.endsWith('/responses')) { gptCalls++; const body = JSON.parse(init.body); assert.equal(body.model, 'gpt-6-luna'); assert.match(body.instructions, /자기 판단과 페이스는 자기가 책임진다/); return modelAnswer({ text: fixed, inner_voice: '' }); }
+        if (url.includes('finish_voice_lounge_reply')) { saved = JSON.parse(init.body); return result(true); }
+        if (url.includes('save_voice_lounge_room_memory')) return result(true);
+        throw new Error(`Unexpected ${url}`);
+      }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+      assert.equal(deepseekCalls, 1);
+      assert.equal(gptCalls, needsRepair ? 1 : 0);
+      assert.equal(saved.p_text, fixed);
+    }
+  } finally {
+    if (previousKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = previousKey;
+  }
 });
 
 test('the recent changes of a relationship are listed newest first, with their direction', () => {
@@ -4741,8 +4952,9 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
       assert.equal(input.turn.previous_scene.location, '차 안');
       assert.equal(input.turn.progress_target, '다음 날 점심 국밥집');
     } else {
-      assert.match(reply.instructions, /계약 기간과 비밀 유지 의무를 지키되 감정의 변화까지 금지하지 않는다/);
-      assert.equal((reply.instructions.match(/\[\d단계 · /g) ?? []).length, 6, 'all six supplied examples reach the actual reply');
+      assert.match(input.relationship.character_core.join(' '), /계약과 비밀/);
+      assert.ok(input.voice_examples.length <= 2, 'only relevant eligible examples reach the reply');
+      assert.ok(input.voice_examples.every(example => example.stage <= input.turn.stage));
       assert.match(input.relationship.reserve, /가벼운 플러팅을 숨기거나 차갑게 튕길 필요는 없다/);
       for (const call of calls) {
         const body = JSON.parse(call.input);
@@ -4750,7 +4962,7 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
         assert.match(outing, /둘만의 평범한 데이트에도 성실하게 참여/);
         assert.doesNotMatch(outing, /상황극 제안은 아직 받아들이지 않는다/);
       }
-      assert.match(reply.instructions, /합의가 기본값보다 먼저/);
+      assert.match(reply.instructions, /합의한 말투와 이미 맺은 관계·계약은 유지/);
       assert.match(calls.find(call => call.text.format.name === 'lounge_after_reply').instructions, /서로 합의한 말투/);
     }
   }

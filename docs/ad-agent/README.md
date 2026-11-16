@@ -16,7 +16,7 @@
 | 광고 클릭 ID(`fbclid`)를 `_fbc` 쿠키로 직접 저장 | `captureMetaClickId` | 픽셀이 막힌 방문자도 서버 이벤트에서 광고와 연결 |
 | 첫 방문 경로(utm, 메타 광고 여부, 첫 화면, 유입 사이트)를 가입 시 DB에 1회 저장 | `src/lib/attribution.ts`, 테이블 `user_first_touch` | 마이그레이션 `20261028000000` 적용 필요 |
 | 캠페인별 일일 퍼널 집계 | SQL 함수 `ad_funnel_report(from, to)` | 서버 역할 키로만 호출. 숫자만 반환 |
-| 공유·광고 링크 미리보기 이미지와 사이트 소개 | `public/og-saseok.jpg`, `index.html` | 1200×630 |
+| 공유·광고 링크 미리보기 이미지와 사이트 소개 | `public/brand/saseok-banner.jpg`, `index.html` | 1672×941 |
 | 소재 원본 데이터(캐릭터, 장소, 문구, 이미지·음성 주소) | `docs/ad-agent/assets.json` | `node scripts/export-ad-assets.mjs`로 갱신 |
 
 ## 3. 에이전트가 만들 것

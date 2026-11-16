@@ -13,10 +13,17 @@ const LoungeInnerVoice = ({ text }: { text: string }) => <span className="lounge
  * Message text with `*actions*` set apart from what is said. A character's reply (`host`) also has its actions on
  * bracketed lines, and its inner voice below unless the member hides it (`innerVoice` false).
  */
-export function LoungeMessageText({ text, host = false, innerVoice = true }: { text: string; host?: boolean; innerVoice?: boolean }) {
+export function LoungeMessageText({ text, host = false, innerVoice = true, streaming = false, fresh = 0 }: { text: string; host?: boolean; innerVoice?: boolean; streaming?: boolean; fresh?: number }) {
   const { reply, inner } = host ? splitLoungeInnerVoice(text) : { reply: text, inner: '' };
+  const parts = splitLoungeActions(reply, { parens: host, streaming: streaming || host });
+  const freshAt = Math.max(0, parts.reduce((sum, part) => sum + part.text.length, 0) - fresh);
   return <>
-    {splitLoungeActions(reply, { parens: host }).map((part, index) => part.action ? <em key={index} className="lounge-action-text">{part.text}</em> : <span key={index}>{part.text}</span>)}
+    {parts.map((part, index) => {
+      const offset = parts.slice(0, index).reduce((sum, previous) => sum + previous.text.length, 0);
+      const cut = Math.max(0, Math.min(part.text.length, freshAt - offset));
+      const content = <>{part.text.slice(0, cut)}{cut < part.text.length && <span className="lounge-type-fresh">{part.text.slice(cut)}</span>}</>;
+      return part.action ? <em key={index} className="lounge-action-text">{content}</em> : <span key={index}>{content}</span>;
+    })}
     {inner && innerVoice && <LoungeInnerVoice text={inner} />}
   </>;
 }
@@ -51,15 +58,8 @@ export function LoungeTypewriterText({ text: message, fromStart = false, innerVo
     return () => clearInterval(timer);
   }, [text, shown]);
   const visible = text.slice(0, shown);
-  const fresh = Math.min(3, visible.length);
-  const settled = visible.slice(0, visible.length - fresh), tail = visible.slice(visible.length - fresh);
-  // An action whose closing star has not been typed yet is already shown as an action.
-  const open = (settled.match(/\*/g)?.length ?? 0) % 2 === 1;
-  const openAt = open ? settled.lastIndexOf('*') : -1;
   return <>
-    <LoungeMessageText text={open ? settled.slice(0, openAt) : settled} host />
-    {open && <em className="lounge-action-text">{settled.slice(openAt + 1)}</em>}
-    {tail && <span key={shown} className={`lounge-type-fresh ${open ? 'lounge-action-text' : ''}`}>{tail.replace(/\*/g, '')}</span>}
+    <LoungeMessageText text={visible} host innerVoice={false} streaming={shown < text.length} fresh={shown < text.length ? 3 : 0} />
     {shown < text.length && <span className="lounge-type-caret" aria-hidden="true" />}
     {shown >= text.length && inner && innerVoice && <LoungeInnerVoice text={inner} />}
   </>;

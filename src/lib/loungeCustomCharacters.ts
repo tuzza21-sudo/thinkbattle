@@ -29,7 +29,7 @@ export type LoungeCustomSheet = {
   name: string; age: number; gender: LoungeCustomGender; job: string; concept: string;
   intro: string; personality: string; tastes: string;
   tagline: string; look: string; greeting: string;
-  prologue: string; userRole: string; storyRelationship: string; portraitPrompt: string;
+  prologue: string; userRole: string; storyRelationship: string; storyPlace?: string; portraitPrompt: string;
 };
 export type LoungeCustomCharacterRow = {
   id: string; owner_id: string; name: string; status: LoungeCustomStatus; sheet: LoungeCustomSheet;
@@ -117,6 +117,7 @@ export function normalizeLoungeCustomSheet(raw: unknown): LoungeCustomSheet {
     tastes: multiline(value.tastes, 600),
     tagline: text(value.tagline, 100), look: text(value.look, 240), greeting: text(value.greeting, 140),
     prologue: multiline(value.prologue, 12000), userRole: text(value.userRole, 120), storyRelationship: text(value.storyRelationship, 200),
+    ...(text(value.storyPlace, 200) ? { storyPlace: text(value.storyPlace, 200) } : {}),
     portraitPrompt: multiline(value.portraitPrompt, 600),
   };
 }
@@ -152,13 +153,14 @@ ${loungeCustomSafety}`;
 
 /** The opening of the first conversation, written from the sheet: the prologue, the member's role and where the two start. */
 export const loungeCustomPrologueSchema = {
-  type: 'object', additionalProperties: false, required: ['prologue', 'userRole', 'storyRelationship'],
-  properties: { prologue: { type: 'string' }, userRole: { type: 'string' }, storyRelationship: { type: 'string' } },
+  type: 'object', additionalProperties: false, required: ['prologue', 'userRole', 'storyRelationship', 'storyPlace'],
+  properties: { prologue: { type: 'string' }, userRole: { type: 'string' }, storyRelationship: { type: 'string' }, storyPlace: { type: 'string' } },
 } as const;
 export const loungeCustomPrologueInstructions = `너는 한국어 대화 서비스의 이야기 작가다. 사용자가 만든 인물의 설정(이름·나이·직업·소개·성격·취향, 있으면 사용자가 적어 둔 프롤로그 초안이나 아이디어)을 읽고, 이 인물과 사용자의 첫 대화가 시작되기 직전까지의 이야기를 쓴다.
 - prologue: 800~1800자. 사용자를 '당신'이라 부르는 2인칭 현재형 서술. 시간과 장소, 빛과 소리, 둘이 왜 지금 여기서 만나는지를 장면으로 보여 주고, 인물의 첫 등장(외모와 말투 한두 줄)으로 이어 간다. 문단은 빈 줄로 나누고, 짧은 대사를 두세 줄 섞는다. 사용자의 대사나 마음을 길게 정하지 않는다. 인물이 사용자에게 말을 거는 순간, 사용자가 답하고 싶어지는 지점에서 끝낸다.
 - userRole: 이 이야기에서 사용자가 맡은 사람 한 문장(120자 이내).
 - storyRelationship: 둘의 출발점과 지금 마음의 거리 한두 문장(200자 이내).
+- storyPlace: 프롤로그 마지막 순간, 실제 첫 대화를 나눌 장소와 때(200자 이내). 이동을 기다리는 현관·주차장·버스 앞 대신 두 사람이 머물며 이야기할 자리에 도착한 상태에서 시작한다. 이동 경위는 이미 있었던 일로 짧게 쓰고, 프롤로그 끝의 장소와 이 값은 일치시킨다.
 설렘과 긴장이 있는 이야기로 쓰되, 인물의 설정과 어긋나지 않게 한다. 실존 회사·학교·유명인 이름은 쓰지 않는다.
 ${loungeCustomSafety}`;
 

@@ -9,6 +9,14 @@ const relationship = load('../src/lib/relationship/index.ts');
 const config = relationship.getRelationshipConfig('auditor');
 const op = (extra = {}) => ({ op: 'add', ref: '', kind: 'agreement', summary: '서로 반말하기로 합의했다', human_quote: '우리 반말하자', character_quote: '좋아. 반말하자.', speech_level: 'casual', ...extra });
 
+test('durable jobs keep writer-authored living context through recorder recovery and ordered state updates', () => {
+  const character_life = { feeling: '마음이 가볍다', body: '운동 후 허기가 있다', attention: '친구들과 먹을 저녁 준비', want: '자기 이야기를 편하게 나누기', cause: '주말을 시작했다' };
+  const job = { room_id: 'room', turn: 1, user_text: '안녕하세요.', reply: '반가워요.', status: 'ready', payload: { companion: true, character_life, answer: { memory: '지금 장면: 카페' } }, created_at: '2026-11-16T00:00:00Z', updated_at: '2026-11-16T00:00:00Z' };
+  const { commit } = turns.reduceLoungeTurn('room', undefined, { relationship: null, state: null, stateVersion: 0, mood: {} }, job);
+  assert.equal(commit.state.character_life.body, character_life.body);
+  assert.equal(commit.state.character_life.recorded_at, '2026-11-16T00:00:00.000Z');
+});
+
 test('the latest full user utterance reaches every reader, including its middle and conclusion', () => {
   const latest = `${'앞'.repeat(480)} 이건 농담이 아니라 진짜 서운해서 묻는 거예요. ${'뒤'.repeat(480)}`;
   const messages = [{ kind: 'host', text: 'x'.repeat(900) }, { kind: 'human', text: latest }];
@@ -16,7 +24,9 @@ test('the latest full user utterance reaches every reader, including its middle 
   const direction = m.loungeDirectorInput({ memory: '', messages });
   assert.equal(analysis.latest, latest); assert.equal(direction.latest, latest);
   assert.deepEqual(analysis.recent, direction.recent);
-  assert.equal(analysis.recent[0].text.length, 600);
+  assert.equal(analysis.recent[0].text, messages[0].text, 'a recent anecdote keeps its middle as well as the latest user utterance');
+  const older = m.loungeTurnMessages([{ kind: 'host', text: 'x'.repeat(1500) }, ...Array.from({ length: 6 }, (_, index) => ({ kind: index % 2 ? 'host' : 'human', text: '다음 이야기' }))]);
+  assert.equal(older.recent[0].text.length, 1000, 'older messages are still bounded');
 });
 test('one intent controls the request and a genuine refusal overrides a contradictory playful direction', () => {
   const result = m.readLoungeTurnAnalysis({ subtext: '실제로 불편해한다', request: '그만하기', is_sincere_refusal: true,

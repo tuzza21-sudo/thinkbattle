@@ -189,6 +189,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
         <Field label="나의 역할" hint="이 이야기에서 나는 누구인가요" problem={problemFor('userRole')}><input value={sheet.userRole} maxLength={rules.userRole[1]} onChange={event => set('userRole', event.target.value)} placeholder="예: 새벽 라디오에 사연을 보내던 청취자" /></Field>
         <Field label="둘의 관계" hint="어디서 시작하나요" problem={problemFor('storyRelationship')}><input value={sheet.storyRelationship} maxLength={rules.storyRelationship[1]} onChange={event => set('storyRelationship', event.target.value)} placeholder="예: 오늘 처음 얼굴을 보는 사이. 목소리만은 오래 알았다." /></Field>
       </div>
+      <Field label="첫 대화 장소" hint="프롤로그 끝에서 두 사람이 머무는 자리"><input value={sheet.storyPlace ?? ''} maxLength={200} onChange={event => set('storyPlace', event.target.value)} placeholder="예: 산악회 버스 안, 나란히 앉은 뒷자리" /></Field>
       <button type="button" className="lounge-character-secondary" onClick={() => void writePrologue()} disabled={Boolean(busy)}>{busy === 'prologue' ? <LoaderCircle size={16} className="lounge-spin" /> : <BookOpen size={16} />}{sheet.prologue ? 'AI로 프롤로그 다듬기' : 'AI로 프롤로그 쓰기'}</button>
     </section>
 

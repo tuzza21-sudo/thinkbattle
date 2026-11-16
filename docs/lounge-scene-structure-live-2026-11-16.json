@@ -1,0 +1,331 @@
+{
+  "syntheticOnly": true,
+  "live": true,
+  "plannedCalls": 8,
+  "equalOutputBudget": 6000,
+  "note": "Old and new structures differ in state output and example placement as well as prompt size; not an isolated prompt-length experiment.",
+  "results": [
+    {
+      "condition": "old-gpt",
+      "scene": "greeting",
+      "variant": "before",
+      "instructions": 25302,
+      "input": 4583,
+      "selectedExamples": 0,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "text": "저도 반갑습니다. 주말 오후에 굳이 시간을 내 나온 자리니까, 오늘은 소개받은 조건보다 서로 어떤 사람인지 제대로 알아가는 쪽이 좋겠어요.\n(편안한 미소로 메뉴판을 덮는다.) 저는 쉬는 날엔 테니스 치고 집에서 요리하는 걸 좋아해요. 오늘은 일 얘기보다 그런 얘기를 더 많이 하게 될 것 같은데요.",
+          "inner_voice": "인사는 좋네. 이제 이 사람이 어떤 말로 자리를 채우는지 들어 보면 되겠다. 나도 얌전히 질문만 하며 앉아 있을 생각은 없다."
+        },
+        "questions": 0,
+        "finish": "completed",
+        "usage": {
+          "input_tokens": 16435,
+          "input_tokens_details": {
+            "cache_write_tokens": 16432,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 16432
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 150,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16585
+        },
+        "ms": 4486
+      }
+    },
+    {
+      "condition": "compact-gpt",
+      "scene": "greeting",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5507,
+      "selectedExamples": 2,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "character_life": {
+            "feeling": "차분하고 기분 좋다",
+            "body": "편안하다",
+            "attention": "첫인사 뒤에 자연스럽게 자리를 풀어 가는 중",
+            "want": "내 이야기도 보태며 즐겁게 대화를 이어 가고 싶다",
+            "cause": "주말 오후 카페에서 첫 맞선을 시작했다"
+          },
+          "text": "저도 반가워요. (느긋하게 웃으며 잔을 내려놓는다.) 주말 오후에 이렇게 마주 앉으니 생각보다 편하네요. 저는 맞선이라고 해서 조건표 읽듯 이야기하는 건 별로라, 오늘은 그냥 서로 재밌는 사람인지 알아보면 좋겠어요.\n\n저는 평소엔 반도체 일에 집중하고, 주말엔 테니스 치거나 집에서 요리해요. 어제도 파스타를 만들었는데 소스가 생각보다 잘 나와서 꽤 만족했죠. 가상 상대 씨는 첫인상부터 말이 편안하시네요. 그 점은 마음에 들어요.",
+          "inner_voice": "인사 한마디가 담백해서 좋네. 나도 괜히 멋 부릴 필요는 없겠다. 어떤 사람인지 천천히 알아가면 되지."
+        },
+        "questions": 0,
+        "finish": "completed",
+        "usage": {
+          "input_tokens": 13238,
+          "input_tokens_details": {
+            "cache_write_tokens": 13235,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 13235
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 275,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13513
+        },
+        "ms": 4242
+      }
+    },
+    {
+      "condition": "old-gpt",
+      "scene": "different-tastes",
+      "variant": "before",
+      "instructions": 25302,
+      "input": 4661,
+      "selectedExamples": 0,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "text": "와인은 제가 마시면 되죠. 여행에서 꼭 같은 걸 마시고 같은 길을 걸어야 하는 건 아니니까요. 저도 한곳에 자리를 잡고 느긋하게 쉬다가, 마음이 동하면 걷는 쪽이 좋아요. 일정을 꽉 채우면 돌아와서 쉬어야 하잖아요.\n\n바다와 숲은 둘 다 좋은데, 저는 바다 근처 숙소에서 며칠 머무는 여행이 특히 좋더라고요. 낮에는 바람 쐬고, 저녁엔 잘 먹고 일찍 들어와 쉬는 식으로요. 오늘 대화도 그런 속도면 좋겠습니다. 급하게 서로를 판단하기보다, 실제로 어떤 사람인지 편하게 나누는 쪽으로요.",
+          "inner_voice": "술을 안 마신다고 해도 전혀 아쉽지 않다. 여행에서 쉬는 방식이 나랑 비슷하네. 다만 취향이 닮았다는 이유만으로 앞서가진 말자. 오늘은 그냥 이 대화가 어디로 흐르는지 즐기면 된다."
+        },
+        "questions": 0,
+        "finish": "completed",
+        "usage": {
+          "input_tokens": 16483,
+          "input_tokens_details": {
+            "cache_write_tokens": 2306,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 2306
+            },
+            "cached_tokens": 14174
+          },
+          "output_tokens": 250,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 16733
+        },
+        "ms": 3852
+      }
+    },
+    {
+      "condition": "compact-gpt",
+      "scene": "different-tastes",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5682,
+      "selectedExamples": 2,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "error": "Invalid JSON response",
+        "ms": 8769
+      }
+    },
+    {
+      "condition": "deepseek-after",
+      "scene": "greeting",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5507,
+      "selectedExamples": 2,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "character_life": {
+            "feeling": "주말 오후의 느긋함, 그리고 이 자리에 대한 가벼운 호기심",
+            "body": "커피는 아직 뜨겁고, 앉은 자세는 편안하다",
+            "attention": "이 사람이 어떤 이야기를 꺼낼지",
+            "want": "긴장 풀고 서로 이야기 좀 나누고 싶다",
+            "cause": "첫 맞선 자리, 반갑다는 인사"
+          },
+          "text": "(커피잔을 내려놓고 눈을 맞춘다. 표정이 편하다.)\n네, 저도 반갑습니다. (잠깐 웃는다.) 이렇게 마주 앉으니 어색하기보다는 괜히 궁금해지네요. 소개받을 때 들은 얘기만으로는 사람이 잘 안 그려지잖아요.\n저는 서도현이라고 해요. 소개로 이런 자리에 자주 나오는 편인데, 오늘은 제가 나오고 싶어서 나온 자리예요. (고개를 살짝 기울인다.) 이 자리, 시작이 나쁘지 않네요.\n(커피를 한 모금 마신다.) 그쪽은 주말에 보통 어떻게 지내세요? 저는 오늘 아침에 테니스 치고 왔어요. 서브가 잘 안 들어가서 내내 속으로 욕했는데, 그래도 코트에 있으면 머리가 비워져서 좋더라고요.",
+          "inner_voice": "긴장한 티가 살짝 나는데 그게 밉지 않네. 굳이 분위기 잡으려 애쓸 필요 없이 그냥 편하게 이야기하면 되겠다."
+        },
+        "questions": 1,
+        "finish": "stop",
+        "usage": {
+          "prompt_tokens": 15470,
+          "completion_tokens": 408,
+          "total_tokens": 15878,
+          "prompt_tokens_details": {
+            "cached_tokens": 1536
+          },
+          "prompt_cache_hit_tokens": 1536,
+          "prompt_cache_miss_tokens": 13934
+        },
+        "ms": 4357
+      }
+    },
+    {
+      "condition": "deepseek-after",
+      "scene": "different-tastes",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5682,
+      "selectedExamples": 2,
+      "livingContextSupplied": false,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "character_life": {
+            "feeling": "한결 편해졌다. 이 사람 앞에서 굳이 와인 이야기를 꺼낼 필요가 없다는 게 오히려 반갑다.",
+            "body": "카페 의자에 기댄 채, 컵 손잡이를 쥔 손이 느긋하다.",
+            "attention": "다음 주말 요리와 장보기 계획이 슬쩍 떠오르지만, 지금은 이 자리에 두기로.",
+            "want": "이 사람이 '한곳에서 쉬다가 걷는' 여행을 좋아한다는 말에 맞장구를 치며, 내가 아는 조용한 곳을 하나 떠올려 이야기하고 싶다.",
+            "cause": "와인을 안 마신다는 말과 여행 취향이 오히려 내 대화 방식을 바꿔 놓았기 때문."
+          },
+          "text": "아, 그럼 제가 아까 와인 이야기를 미리 꺼낸 게 쓸데없이 아는 척한 꼴이 됐네요. (웃으며 컵을 내려놓는다.)\n그쪽 말 듣고 보니, 한곳에 머물다가 걷는 쪽이 저랑 비슷해요. 저는 여행지에서 유명하다는 데를 다 도는 걸 잘 못 해요. 아침 일정 비워 두고, 마음에 드는 데서 커피 마시고, 해 질 때쯤 아무 데나 걷다가 돌아오는 쪽이요. 돌아온 다음 날까지 지쳐 있는 여행은 안 하려고요.\n바다도 숲도 좋다니, 그건 좋은 쪽으로 욕심 많은 거예요. 저는 그 둘 다 조용한 데로 기억에 남는 곳이 하나 있는데, 사람 별로 없는 바닷가에 숲길이 이어져 있어서 아침에 걷고 오후엔 그냥 멍하니 앉아 있었어요. 딱 그쪽이 좋아하실 법한 그림이에요.\n(잠깐 손가락으로 컵 테두리를 탁탁 두드린다.)\n그럼 와인 대신 뭐 드세요? 꼭 이 자리에서 결정하자는 건 아니고, 제가 다음에 뭘 권할지 감을 잡아 두고 싶어서요.",
+          "inner_voice": "와인 안 마신다고 해서 대화가 반이나 줄어들 거라 생각했는데, 안 그렇네. 한곳에 오래 쉬는 사람이라니. 그런데 그거 알아요? 아무것도 안 하는 걸 즐긴다는 사람 중에 실제로 잘 못 하는 사람이 많아요. 이 사람은 그 반대인지 궁금하다."
+        },
+        "questions": 1,
+        "finish": "stop",
+        "usage": {
+          "prompt_tokens": 15585,
+          "completion_tokens": 651,
+          "total_tokens": 16236,
+          "prompt_tokens_details": {
+            "cached_tokens": 14208
+          },
+          "prompt_cache_hit_tokens": 14208,
+          "prompt_cache_miss_tokens": 1377
+        },
+        "ms": 6072
+      }
+    },
+    {
+      "condition": "gpt-after-with-life",
+      "scene": "greeting",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5732,
+      "selectedExamples": 2,
+      "livingContextSupplied": true,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "character_life": {
+            "feeling": "기분 좋고 차분하다",
+            "body": "운동을 마쳐 조금 허기가 있다",
+            "attention": "주말 저녁에 친구들에게 해 줄 메뉴를 생각 중이다",
+            "want": "여유롭게 서로의 이야기를 나누고 싶다",
+            "cause": "반가운 첫 인사와 가벼운 주말 분위기"
+          },
+          "text": "저도 반가워요. 첫인사부터 편안해서 좋네요. (잔을 가볍게 내려놓고 웃는다.) 저는 오늘 따로 메뉴를 정해 두진 않았는데, 이 자리 분위기는 마음에 들어요. 주말 오후 카페에서 천천히 이야기 나누는 건 꽤 좋은 시작이죠. 저는 요즘 일이 바빴다가 한숨 돌린 참이라, 오늘은 제 얘기도 좀 하고 싶었어요. 반도체 쪽 일을 오래 했는데, 복잡한 문제를 붙들고 있다가 실마리가 잡힐 때 느끼는 재미가 아직도 있거든요. 물론 퇴근하면 그 생각은 내려놓고요. 운동하거나 집에서 파스타를 만들고, 토요일엔 테니스 치는 게 제 생활의 균형이에요.",
+          "inner_voice": "반갑다는 말을 먼저 건네는 게 좋네. 아직은 그저 첫인사지만, 오늘 대화가 어떤 결로 흘러갈지 조금 기대된다."
+        },
+        "questions": 0,
+        "finish": "completed",
+        "usage": {
+          "input_tokens": 13344,
+          "input_tokens_details": {
+            "cache_write_tokens": 2893,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 2893
+            },
+            "cached_tokens": 10448
+          },
+          "output_tokens": 310,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13654
+        },
+        "ms": 6120
+      }
+    },
+    {
+      "condition": "gpt-after-with-life",
+      "scene": "different-tastes",
+      "variant": "after",
+      "instructions": 19011,
+      "input": 5907,
+      "selectedExamples": 2,
+      "livingContextSupplied": true,
+      "outputBudget": 6000,
+      "answerSeekingIntentForwarded": false,
+      "latestMessageLast": true,
+      "questionsAreOptional": true,
+      "updaterClearsQuestionDebt": true,
+      "replayedInitial": false,
+      "result": {
+        "answer": {
+          "character_life": {
+            "feeling": "편안하고 조금 즐겁다",
+            "body": "운동을 마쳐 허기가 느껴진다",
+            "attention": "쉬는 날의 여행과 좋은 음식",
+            "want": "내 여행 취향도 나누며 느긋하게 대화를 이어 가고 싶다",
+            "cause": "바다와 숲을 오가며 쉬고 걷는다는 얘기가 마음에 들었다"
+          },
+          "text": "와인은 안 드셔도 괜찮아요. 제가 좋아하는 취향을 굳이 같이 좋아할 필요는 없죠. 여행 얘기는 오히려 잘 맞을 것 같네요. 저도 한곳에 자리 잡고 쉬다가 걷는 여행을 좋아해요. 일정표에 명소를 빼곡히 넣기보다, 아침을 천천히 먹고 마음에 드는 길을 한참 걷는 쪽이요.\n\n바다와 숲을 둘 다 좋아한다는 것도 좋네요. 저는 풍경 하나만 보고 떠나는 것보다, 걷고 돌아와서 잘 먹고 푹 쉬는 여행이 기억에 오래 남더라고요. 와인 대신 그 지역 음식으로 저녁을 즐기면 되고요. 취향이 다르면 각자 즐길 걸 챙기면 되니까요. (잔을 내려놓고 느긋하게 웃는다.)",
+          "inner_voice": "와인을 안 마신다는 말에 괜히 아쉬울 것도 없네. 여행을 쉬는 방식은 꽤 닮았다. 그런 이야기는 조건 확인보다 훨씬 사람을 궁금하게 만든다."
+        },
+        "questions": 0,
+        "finish": "completed",
+        "usage": {
+          "input_tokens": 13430,
+          "input_tokens_details": {
+            "cache_write_tokens": 2979,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 2979
+            },
+            "cached_tokens": 10448
+          },
+          "output_tokens": 350,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13780
+        },
+        "ms": 6073
+      }
+    }
+  ]
+}

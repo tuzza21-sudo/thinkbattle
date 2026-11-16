@@ -4,7 +4,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
-const { loungeCharacters, loungePersonaPrompt, loungeBiblePrompt, loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+const { loungeCharacters, loungeFewShotTurn, loungePersonaPrompt, loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const { loungeTurnConditions, normalizeLoungeCompanionState } = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
 const { relationshipConfigs, defaultEventEffects, protectiveEvents, relationshipEventTypes } = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const { loungeHosts, loungeThemes, loungeHostGroups, loungeCharacterProfiles, loungeHostThemes, loungeEngineVoice } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
@@ -71,7 +71,7 @@ test('every character has a full profile for the model: name, age, work, past, t
 });
 
 test('character-specific prompt choices preserve autonomy without compulsory comedy', () => {
-  const { loungeBiblePrompt, loungeCompanionSheetPrompt } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const { loungeBiblePrompt, loungeCompanionSheetPrompt, loungeOneToOneCharacterRules } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
   for (const id of ['closer', 'diplomat']) {
     const character = loungeCharacters.find(item => item.id === id);
     const config = relationshipConfigs[id];
@@ -87,7 +87,8 @@ test('character-specific prompt choices preserve autonomy without compulsory com
     assert.equal(character.bible.exceptionFormula, undefined, id + ': no scripted exception performance');
   }
   const closer = loungeCharacters.find(item => item.id === 'closer');
-  assert.match(closer.bible.invariants.join(' '), /6개월.*계약 기간과 비밀 유지/);
+  assert.match(closer.bible.invariants.join(' '), /협상 중인 초안은 아직 성립한 계약이 아니다/);
+  assert.match(closer.bible.invariants.join(' '), /이미 합의한 계약의 기간과 비밀 유지/);
   assert.equal(closer.bible.fewShot.length, 6, 'use the six examples from the supplied patch');
   assert.match(closer.bible.voice.tone, /서로 합의해 반말로 전환하면 이후 일관되게 유지/);
   assert.match(closer.bible.invariants.join(' '), /외부 인물에게 계약의 실체나 문서를 공개하지 않는다/);
@@ -132,7 +133,7 @@ test('no character is shipped with the placeholders scripts/new-lounge-character
 });
 
 test('a companion sheet has a lens, distinct actions, stage limits and usable events without padding quotas', () => {
-  const { loungeCompanionSheetPrompt, loungeFewShotTurn } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  const { loungeCompanionSheetPrompt, loungeOneToOneCharacterRules, loungeFewShotTurn } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
   const sheetFields = ['interpretationLens', 'actionAnchors', 'innerVoice', 'ruleBreak', 'relationshipLadder', 'fewShot', 'sceneEvents'];
   const withSheet = loungeCharacters.filter(character => sheetFields.some(field => character.bible?.[field]));
   // 서도현 is the first (2026-11-02); the others follow one by one.
@@ -150,7 +151,7 @@ test('a companion sheet has a lens, distinct actions, stage limits and usable ev
     // An example has both forms (서도현) or one reply for both (강무진); hidden, it never carries an inner voice.
     for (const shot of bible.fewShot ?? []) {
       const shownTurn = loungeFewShotTurn(shot, 'on'), hiddenTurn = loungeFewShotTurn(shot, 'off');
-      assert.ok(shownTurn.text && hiddenTurn.text && hiddenTurn.inner_voice === '' && !/\*/.test(shownTurn.text + hiddenTurn.text), `${id}: an example with a reply and no stars`);
+      assert.ok(shownTurn.text && hiddenTurn.text && hiddenTurn.inner_voice === '', `${id}: examples share the narration format and hide thoughts when requested`);
     }
     const ids = new Set();
     for (const event of bible.sceneEvents ?? []) {
@@ -230,7 +231,7 @@ test('every part of a companion sheet meant for the model reaches it', () => {
     const parts = [character.tagline, ...character.story, ...character.personality.map(item => item.text), ...character.habits, bible.desire, bible.fear, bible.outward, bible.hidden, bible.humor,
       bible.interpretationLens, bible.voice?.tone, bible.voice?.length, bible.voice?.rhythm, ...(bible.humorExamples?.good ?? []), ...(bible.humorExamples?.bad ?? []), ...(bible.forbidden ?? []), ...(bible.actionAnchors ?? []), bible.innerVoice.style,
       ...bible.reactions.flatMap(item => [item.when, item.then]), ...bible.invariants, bible.growth,
-      ...(bible.fewShot ?? []).flatMap(shot => [shot.user, 'on' in shot ? shot.on.reply : shot.reply])].filter(Boolean);
+      ...(bible.fewShot ?? []).flatMap(shot => [shot.user, loungeFewShotTurn(shot, 'on').text])].filter(Boolean);
     for (const text of parts) assert.ok(sent(prompt, text), `${character.id}: not sent: ${text.slice(0, 40)}`);
     for (const stage of [1, 2, 3, 4]) {
       const level = bible.innerVoice.ladder[stage].level;
@@ -245,76 +246,97 @@ test('every part of a companion sheet meant for the model reaches it', () => {
   }
 });
 
-test('서도현 is settled from the start: his own life, no learned manual and no turn engine (2026-11-06)', () => {
+test('Dohyun is an experienced Casanova from the first meeting, with equal confidence in both inner-voice modes', () => {
   const doHyun = loungeCharacters.find(character => character.id === 'auditor');
   const bible = doHyun.bible;
   const prompt = [loungeBiblePrompt(doHyun), loungeCompanionSheetPrompt(doHyun, 'on')].join('\n');
   assert.doesNotMatch(prompt, /진공관|메모장|코스를 세 개|플랜 [ABC]|턴 엔진/, 'nothing of the learned manual is left');
   for (const text of [bible.interpretationLens, bible.voice.tone, ...bible.forbidden]) assert.ok(prompt.includes(text), `not sent: ${text.slice(0, 40)}`);
-  // Eight examples across the four stages, each with both forms; an action is a line of its own.
-  assert.equal(bible.fewShot.length, 8);
+  // Keep ordinary conversation and real boundaries alongside the new seduction examples.
+  assert.ok(bible.fewShot.length >= 13);
+  for (const user of ['만나니 반갑네요.', '저 잘 꼬실 자신 있어요?', '저는 이런 플러팅 별로 안 좋아해요.', '질문 그만하고 도현 씨 이야기도 좀 해 봐요.']) assert.ok(bible.fewShot.some(shot => shot.user === user), user);
+  assert.match(doHyun.role, /카사노바/);
+  assert.match(doHyun.story.join(' '), /연애를 경험/);
+  assert.match(doHyun.bible.innerVoice.initialBelief, /마음에 들면 티를 내는/);
+  assert.doesNotMatch(bible.voice.length, /1~3개|한두 번/);
+  assert.doesNotMatch(bible.voice.rhythm, /→/);
+  const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
+  for (const event of bible.sceneEvents) for (const type of event.sceneTypes ?? []) assert.ok(messenger.loungeSceneTypes.includes(type), `${event.id}: event can reach a real scene`);
   assert.deepEqual([...new Set(bible.fewShot.map(shot => shot.stage))], [1, 2, 3, 4]);
   for (const shot of bible.fewShot) {
     assert.ok('on' in shot && shot.on.reply && shot.off.reply, shot.user);
+    assert.equal(shot.off.reply, shot.on.reply, 'hidden thoughts keep the same confident spoken example');
     for (const line of shot.on.reply.split('\n')) assert.ok(!line.includes('(') || /^\([^()]+\)$/.test(line), `an action on its own line: ${line}`);
   }
 });
 
-test('a reply ends on one witty beat: no empty filler questions or turn engine for anyone (2026-11-06; Kindroid rhythm 2026-11-12)', () => {
+test('characters keep their own expression without shared question, action or inner-voice quotas', () => {
   const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
   for (const innerVoice of ['on', 'off']) {
     const rules = messenger.loungeCompanionRules({ innerVoice });
-    assert.match(rules, /플러팅·받아치기는 짧게 친다\. 한 비트로 충분하면 한 비트로 끝내고/);
-    assert.match(rules, /서사·생각·자기 일 장면에서는 그 이야기의 한 매듭에서 끝낸다/);
-    assert.match(rules, /모드: 장난·플러팅·짧은 받아치기·정보만 오가는 턴은 1~3문장으로 짧게 친다/);
-    assert.match(rules, /캐릭터 설명의 '분량'이 있으면 그것을 따른다/);
-    assert.match(rules, /대사는 행동을 빼고 보통 1~3문장, 40~160자다/);
-    assert.match(rules, /호기심이나 장난으로 구체적인 질문 하나를 붙여도 된다/);
-    assert.match(rules, /상대 말이 대담하거나, 뜻밖이거나, 칭찬·인상적인 한 줄이면 그 부분을 네 관점으로 짧게 해석해 보여 준다/);
-    assert.match(rules, /"그쪽은요\?"/);
-    assert.doesNotMatch(rules, /턴 엔진|미끼로 끝낸다|무언가 조금 달라졌는가/);
-    assert.doesNotMatch(rules, /그래도 평소에는 짧은 비트를 우선하고/);
-    assert.match(messenger.loungeInstructionsCacheBreakpoint, /cache-breakpoint/);
+    assert.doesNotMatch(rules, /1~4문장|40~280자|한 턴에 할 말은 하나|question_ending|inner_voice_rest|감각이 한 조각이라도/);
+    assert.match(rules, /자기 이야기는 질문받았을 때만 하는 것이 아니다/);
+    assert.match(rules, /사용자의 행동·대사·감정·선택·동의를 대신 쓰지 않는다/);
+    assert.match(rules, /명시적인 거절은 존중/);
+    if (innerVoice === 'off') assert.match(rules, /사용자가 숨긴 설정이므로 빈 문자열/);
   }
-  const guide = loungeCharacters.find(character => character.id === 'guide');
-  assert.match(guide.bible.voice.length, /투어·골목·역사·음식을 안내/);
-  assert.match(loungeCompanionSheetPrompt(guide, 'on'), /분량: .*투어·골목·역사/);
-  for (const character of loungeCharacters) {
-    for (const field of ['turnEngine', 'hooks', 'weakSpots', 'materialBank', 'hobbyAnswer', 'relationshipDevice']) assert.equal(character.bible?.[field], undefined, `${character.id}.${field}`);
-    const sheet = loungeCompanionSheetPrompt(character, 'on');
-    assert.doesNotMatch(sheet, /턴 엔진|미끼의 종류|끝맺음 방식:/, character.id);
-    if (character.bible?.hookStyle) assert.match(sheet, /빈 질문이나 다음 제안으로 억지로 대화를 붙잡지 않되/, character.id);
-  }
-  // The director no longer picks how a reply ends.
-  assert.equal('ending' in messenger.loungeDirectorSchema.properties, false);
-  assert.match(messenger.loungeDirectorInstructions, /빈 질문·선택지·다음 제안으로 대화를 붙잡는 goal은 쓰지 않는다/);
-  assert.equal(messenger.loungeTurnEngineDirectorNote, undefined);
-  // Code keeps two replies in a row from ending on a question.
-  assert.equal(messenger.loungeEndsOnQuestion('(잔을 내려놓는다)\n그럼 다음엔 어디 갈까요?\n(웃는다)'), true);
-  assert.equal(messenger.loungeEndsOnQuestion('그렇군요. 저도 좋아해요.'), false);
   const base = messenger.normalizeLoungeCompanionState(null, 'r');
-  const asked = messenger.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 4, reply: '주말엔 뭐 하세요?', inner: '' });
-  assert.equal(asked.last_question_turn, 4);
-  assert.equal(messenger.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(asked)), 'r').last_question_turn, 4);
-  const conditions = turn => messenger.loungeTurnConditions({ state: asked, turn, decision: { progress: 'stay' }, innerVoice: 'on' });
-  assert.equal(conditions(5).avoid?.question_ending, true, 'the next reply does not end on a question');
-  assert.equal(conditions(6).avoid?.question_ending, undefined, 'after that it may, when it really asks something');
-  assert.equal(messenger.nextLoungeCompanionState({ state: asked, decision: { progress: 'stay' }, turn: 5, reply: '저는 테니스 쳐요.', inner: '' }).last_question_turn, 4);
-  // The inner voice is paced by code (2026-11-09): after one is shown the next turns rest, a serious moment sooner.
-  const shown = messenger.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 10, reply: '네.', inner: '괜히 신경 쓰이네.' });
+  const shown = messenger.nextLoungeCompanionState({ state: base, decision: { progress: 'stay' }, turn: 10, reply: '주말에 뭐 하세요?', inner: '나도 같이 가고 싶은데.' });
+  for (const turn of [11, 12, 13]) {
+    const conditions = messenger.loungeTurnConditions({ state: shown, turn, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: false });
+    assert.equal(conditions.avoid, undefined, 'history does not forbid another question or a recurring gesture');
+    assert.equal(conditions.inner_voice_rest, undefined, 'the previous thought does not silence this one');
+    assert.equal(conditions.exception_allowed, undefined);
+  }
+  assert.equal(shown.last_question_turn, 10, 'observations remain available as history');
   assert.equal(shown.last_inner_turn, 10);
-  assert.equal(messenger.normalizeLoungeCompanionState(JSON.parse(JSON.stringify(shown)), 'r').last_inner_turn, 10);
-  assert.equal(messenger.nextLoungeCompanionState({ state: shown, decision: { progress: 'stay' }, turn: 11, reply: '네.', inner: '' }).last_inner_turn, 10, 'a turn without one keeps the last');
-  assert.deepEqual([11, 12, 13].map(turn => messenger.loungeInnerVoiceDue(shown, turn)), [false, false, true]);
-  assert.deepEqual([11, 12].map(turn => messenger.loungeInnerVoiceDue(shown, turn, true)), [true, true], 'a turn that matters is never held back');
-  const calm = { is_emotional_moment: false, moves_character: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
-  assert.equal(messenger.loungeInnerVoiceMatters(calm), false);
-  for (const key of [{ is_emotional_moment: true }, { moves_character: true }, { is_sincere_refusal: true }, { intimacy_proposal: 'elegant' }]) assert.equal(messenger.loungeInnerVoiceMatters({ ...calm, ...key }), true, JSON.stringify(key));
-  assert.equal(messenger.loungeInnerVoiceMatters(calm, { event: { id: 'x' } }), true);
-  assert.equal(messenger.loungeInnerVoiceMatters(undefined), true, 'without a reading nothing is held back');
-  assert.equal(messenger.loungeInnerVoiceDue(base, 1), true);
-  const resting = messenger.loungeTurnConditions({ state: shown, turn: 11, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: false });
-  assert.equal(resting.inner_voice_rest, true);
-  assert.equal(resting.avoid?.inner_voice, undefined, 'a resting turn is not shown the earlier ones to follow');
-  assert.equal(messenger.loungeTurnConditions({ state: shown, turn: 13, decision: { progress: 'stay' }, innerVoice: 'on', innerDue: true }).inner_voice_rest, undefined);
+  for (const character of loungeCharacters) {
+    const sheet = loungeCompanionSheetPrompt(character, 'on');
+    assert.doesNotMatch(sheet, /turn\.avoid|exception_allowed|한 답에 많아야 하나/, character.id);
+    if (character.bible.voice?.length) assert.ok(sheet.includes(character.bible.voice.length), `${character.id}: its own speaking rhythm remains`);
+  }
+});
+
+test('Dohyun can discuss ordinary life at the first meeting while deeper private history stays closed', () => {
+  const relationship = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
+  const config = relationship.getRelationshipConfig('auditor');
+  const disclosure = relationship.relationshipDisclosure(config, 0);
+  for (const word of ['테니스', '수영', '피노 누아', '단골 식당', '시계', '연애 경험']) {
+    assert.ok(disclosure.open.join(' ').includes(word), word);
+    assert.ok(!disclosure.kept.join(' ').includes(word), word);
+  }
+  assert.match(disclosure.kept.join(' '), /연애의 사연/);
+  assert.doesNotMatch(loungeOneToOneCharacterRules, /질문이 아니면 먼저 신상 이야기를 늘어놓지 않는다/);
+});
+
+test('recent lived details reach readers intact and repair does not force every character into the same emotion', () => {
+  const messenger = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
+  const detail = '가'.repeat(390) + '오늘 복식 파트너가 발목을 다쳤다' + '나'.repeat(390);
+  const context = messenger.loungeTurnMessages([{ kind: 'host', text: detail }, { kind: 'human', text: '그래서 어떻게 됐어요?' }]);
+  assert.equal(context.recent[0].text, detail, 'the middle of the latest anecdote is not abbreviated away');
+  const raw = { subtext: '말투를 고쳐 달라는 실제 요청', is_repair_request: true, direction: { reaction: '받아치기', goal: '상황에 맞게 받는다' } };
+  const repaired = messenger.readLoungeTurnAnalysis(raw);
+  assert.equal(repaired.direction.reaction, '받아치기', 'a factual repair need not prescribe a generic psychology');
+  assert.match(repaired.direction.goal, /바로잡고/);
+  const refused = messenger.readLoungeTurnAnalysis({ ...raw, is_sincere_refusal: true });
+  assert.equal(refused.direction.reaction, '진지하게 듣기');
+  assert.match(refused.direction.goal, /거절을 존중/);
+});
+
+test('the compact companion profile keeps canon and constraints while only eligible voice examples enter the turn', () => {
+  const chars = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
+  for (const character of loungeCharacters) {
+    const prompt = chars.loungeCompanionPersonaPrompt(character, 'on');
+    for (const fact of character.story) assert.ok(prompt.includes(fact), `${character.id}: canon retained`);
+    for (const rule of character.bible?.invariants ?? []) assert.ok(prompt.includes(rule), `${character.id}: principle retained`);
+    for (const rule of character.bible?.forbidden ?? []) assert.ok(prompt.includes(rule), `${character.id}: constraint retained`);
+    for (const stage of [1, 2, 3, 4]) {
+      const examples = chars.loungeCompanionVoiceExamples(character, { stage, innerVoice: 'off', userText: '주말에 뭐 해요?', turn: 4 });
+      assert.ok(examples.length <= 2);
+      assert.ok(examples.every(item => item.stage <= stage && item.inner_voice === ''));
+    }
+  }
+  const dohyun = loungeCharacters.find(character => character.id === 'auditor');
+  const examples = chars.loungeCompanionVoiceExamples(dohyun, { stage: 1, innerVoice: 'on', userText: '주말에 보통 뭐 하세요?' });
+  assert.ok(examples.some(shot => /주말/.test(shot.user)));
 });

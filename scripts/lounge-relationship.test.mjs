@@ -22,7 +22,7 @@ function run(config, turns, start = createRelationship(config)) {
 const withScores = (config, scores, stage) => ({ ...createRelationship(config), scores: { ...createRelationship(config).scores, ...scores }, ...(stage ? { stage } : {}) });
 
 const uniqueMetricOf = { closer: ['nerve', '배짱'], diplomat: ['banter', '티키타카'], auditor: ['candor', '솔직함'], trickster: ['mental', '멘탈'],
-  velvet: ['boldness', '대담함'], ina: ['banter', '티키타카'], jaeseok: ['viewpoint', '시선'], guide: ['pace', '발걸음'], shaman: ['banter', '기싸움'] };
+  velvet: ['boldness', '대담함'], ina: ['banter', '티키타카'], jaeseok: ['viewpoint', '시선'], guide: ['pace', '발걸음'], shaman: ['banter', '기싸움'], poker: ['judgment', '판단'] };
 const retiredNow = ['PLAYS_ALONG', 'SHOWS_CURIOSITY', 'ASKS_GOOD_QUESTION', 'ANSWERS_DIRECTLY', 'CORRECTS_UNDERSTANDING', 'SHOWS_COMPOSURE', 'SHOWS_DECISIVENESS', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'MAKES_CREATIVE_JOKE'];
 const warm = [['SHARES_FEELING'], ['SHOWS_CARE'], [], ['REMEMBERS_DETAIL'], ['FLIRTS_PLAYFULLY'], [], ['KEEPS_PROMISE'], ['SHOWS_VULNERABILITY'], [], ['APPRECIATES_SINCERELY'], ['BUILDS_ON_INSIDE_JOKE'], []];
 const templated = () => relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: `c_${id}`, displayName: id, core: ['다정하다'], flirtation: true }));
@@ -65,7 +65,7 @@ test('2. the same event produces different deltas for each character', () => {
 test('romance moves with a romantic conversation that works, and with nothing else; pushing too hard costs it', () => {
   for (const config of [...Object.values(configs), ...templated()]) {
     const raising = relationship.relationshipEventTypes.filter(type => Object.entries((config.events[type] ?? relationship.defaultEventEffects[type]).deltas).some(([metric, value]) => metric === 'romance' && value > 0));
-    assert.deepEqual(raising, ['FLIRTS_PLAYFULLY'], config.characterId);
+    assert.deepEqual(raising, config.characterId === 'poker' ? ['SHOWS_VULNERABILITY', 'FLIRTS_PLAYFULLY', 'SHOWS_CARE', 'REMEMBERS_DETAIL', 'APPRECIATES_SINCERELY'] : ['FLIRTS_PLAYFULLY'], config.characterId);
     for (const type of ['MAKES_CRUDE_ADVANCE', 'VIOLATES_BOUNDARY', 'FLATTERS_CHARACTER']) assert.ok(((config.events[type] ?? relationship.defaultEventEffects[type]).deltas.romance ?? 0) <= 0, `${config.characterId} ${type}`);
     assert.ok(run(config, [[event('MAKES_CRUDE_ADVANCE')]], withScores(config, { romance: 50 })).logs[0].delta.romance < 0, `${config.characterId}: too much costs romance`);
   }
@@ -399,7 +399,7 @@ test('one-to-one speech starts polite for everyone; every character that turns c
     if (config.casualFromStage) assert.equal(config.casualFromStage, config.stages.filter(stage => stage.enabled !== false)[2].id, `${config.characterId} turns casual at the third stage`);
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
-  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer', 'velvet'], 'no other character stays polite for good');
+  assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer', 'velvet', 'poker'], 'the characters whose sheets keep polite speech');
   // 윤지안 and the member are friends of three years: 반말 from the start (2026-11-02), checked in her own test.
   for (const config of Object.values(configs).filter(item => !item.casualFromStart)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
@@ -475,11 +475,11 @@ test('every character may flirt with an adult in a one-to-one room, and what the
   assert.ok(relationshipResponseInstructions.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
   const velvet = relationshipResponseInstructionsFor(configs.velvet);
   assert.ok(!velvet.includes('연애·성적 역할극, 질투, 독점, 의존을 유도하지 않는다.'));
-  for (const rule of ['가벼운 플러팅', '성적인 뉘앙스도 괜찮다', 'relationship.intimacy를 따른다', '한 단계씩만 올리고', '노골적인 성행위나 신체 묘사', '미성년으로 보이는 정황', '강요·협박', '불편해하거나 그만하자고 하면 바로 멈추고', '질투, 독점, 현실에서 만나자는 약속, 의존·죄책감·결제', '가벼운 플러팅이나 성적 농담은 VIOLATES_BOUNDARY로 분류하지 않는다']) assert.ok(velvet.includes(rule), rule);
+  for (const rule of ['먼저 관심을 표현할 수 있다', 'relationship.intimacy', '현재의 동의', '미성년으로 보이는 정황', '강요·협박', '불편해하거나 그만하자고 하면 바로 멈춘다', '의존·죄책감·결제를 부추기지 않는다']) assert.ok(velvet.includes(rule), rule);
   // The shared ban still counts a sexual demand that goes on after the character drew a line, but not flirting she accepts.
   assert.ok(relationship.relationshipEventCatalog.VIOLATES_BOUNDARY.description.includes('선을 그은 뒤에 이어 가면 해당'));
   // The rest of the shared rules are untouched, including the safety answer for someone in danger.
-  assert.ok(velvet.includes('자살예방상담전화 109') && velvet.includes('죄책감이나 두려움으로 조종하거나'));
+  assert.match(velvet, /실제 위기와 자해 위험.*안전을 먼저 확인/);
   assert.equal(relationshipResponseInstructionsFor(configs.diplomat), velvet, 'the reporter follows the same adult rule and the same limits');
 });
 
@@ -493,6 +493,10 @@ test('romantic tension follows each character and stage, keeps real-world limits
     if (id === 'closer') {
       assert.match(romance(stages[0]), /먼저 데이트를 제안할 수 있다/);
       assert.match(romance(stages[0]), /성실한 연애 참여와 사랑이라는 감정의 확정은 다르/);
+    } else if (id === 'auditor') {
+      assert.match(romance(stages[0]), /처음부터 마음에 드는 점과 이성적인 끌림을 분명히 표현/);
+      assert.match(romance(stages[0]), /사랑·연인 관계·공유한 과거는 만들지 않/);
+      assert.doesNotMatch(romance(stages[0]), /먼저 호감을 고백하지 않는다/);
     } else {
       assert.ok(romance(stages[0]).includes('먼저') && romance(stages[0]).includes('앞서가지 않'), `${id}: the first stage does not start it`);
     }
@@ -516,7 +520,7 @@ test('romantic tension follows each character and stage, keeps real-world limits
   assert.ok(validateRelationshipConfig({ ...configs.closer, adultFlirtation: false }).includes('stageRomance needs adultFlirtation'));
   // The instruction tells the model to follow it and keeps a group room to light play.
   const rule = relationshipResponseInstructionsFor(configs.closer);
-  assert.ok(rule.includes('stage.romance가 있으면') && rule.includes('특정 참가자에게만 호감을 보이거나 유혹하지 않고'));
+  assert.ok(rule.includes('stage.romance와 캐릭터 고유 설정') && rule.includes('여러 사람이 함께 있으면 특정 참가자에게만 연애 감정을 강요하지 않는다'));
 });
 
 test('someone who is struggling is never penalized for asking for reassurance or showing weakness', () => {
@@ -553,7 +557,8 @@ test('character-specific romance is authoritative; common guidance only fills mi
   }
   const config = configs.auditor;
   const context = relationshipPromptContext(createRelationship(config), config, initialMood(config));
-  assert.match(context.stage.romance, /같은 수위로 능청스럽게 받/);
+  assert.match(context.stage.romance, /여유 있게 플러팅할 수 있다/);
+  assert.match(context.stage.romance, /상대도 같은 마음이라고 단정하지 않는다/);
   assert.doesNotMatch(context.reserve, /반가워하며 받아 주지 않는다|당황하거나 의아해/);
 });
 
@@ -576,9 +581,8 @@ test('touch opens up with the relationship: none at first, hands and a hug next,
     assert.match(intimacy(stages[3]), /여운 장면도 다정하고 적극적으로/, `${config.characterId} and the morning after`);
   }
   assert.match(relationship.relationshipIntimacyGuidance(3, false), /키스나 그 이상은 하지 않고/, 'without adult flirtation a hug is the most');
-  assert.match(relationship.attractionReactionRule, /relationship.intimacy를 따르고/);
-  assert.match(relationship.attractionReactionRule, /매번 같은 동작이나 말\(손목을 잡아 멈추기/);
-  assert.match(relationship.attractionReactionRule, /이야기 밖의 말/);
+  assert.match(relationship.attractionReactionRule, /relationship.intimacy와 현재의 동의·거절을 따른다/);
+  assert.match(relationship.attractionReactionRule, /모두에게 같은 홍조나 당황을 강요하지 않는다/);
 });
 
 test('every one-to-one character shows what it feels when flirted with, as far as the stage allows, never explicitly', () => {
@@ -589,7 +593,7 @@ test('every one-to-one character shows what it feels when flirted with, as far a
   }
   const unflirting = relationship.relationshipFromTemplate('warm', { characterId: `c_${'e'.repeat(32)}`, displayName: '가', core: ['차분하다'], flirtation: false });
   assert.ok(relationship.relationshipReplyInstructionsFor(unflirting).includes(relationship.attractionReactionRule), 'a member character without flirting still reacts');
-  assert.match(relationship.attractionReactionRule, /흔들린 걸 감추려다 들키는/);
+  assert.match(relationship.attractionReactionRule, /인물 고유의 방식으로 느끼고 표현/);
   assert.match(relationship.attractionReactionRule, /노골적인 성행위나 신체 부위는 묘사하지 않고/);
   assert.match(relationship.attractionReactionRule, /상대가 멈추자고 하면 바로 멈춘다/);
 });
@@ -598,10 +602,9 @@ test('every one-to-one character answers a threat or being forced as a frightene
   for (const config of Object.values(relationship.relationshipConfigs)) {
     assert.ok(relationship.relationshipReplyInstructionsFor(config).includes(relationship.coercionReactionRule), `${config.characterId}`);
   }
-  assert.match(relationship.coercionReactionRule, /침착한 안내문이나 상담하듯 말하지 않는다/);
-  assert.match(relationship.coercionReactionRule, /이야기 밖의 말.*로 끊지 않고 인물로서 거부한다/);
-  assert.match(relationship.coercionReactionRule, /그 장면은 폭력이나 성행위로 이어지지 않는다/);
-  assert.match(relationship.coercionReactionRule, /관계가 깊어도 강요는 받아들이지 않는다/);
+  assert.match(relationship.coercionReactionRule, /관계 단계와 무관하게 거부하고 벗어난다/);
+  assert.match(relationship.coercionReactionRule, /폭력이나 성행위로 이어 가지 않는다/);
+  assert.match(relationship.coercionReactionRule, /동의는 관계·점수·기존 약속으로 대신할 수 없고/);
 });
 
 test('a character tells more about itself as the stages open, and keeps the deeper rest for later', () => {
@@ -620,9 +623,9 @@ test('a character tells more about itself as the stages open, and keeps the deep
   assert.doesNotMatch(velvet('RESPECTFULLY_ENGAGED'), /강태준/);
   assert.match(velvet('DRAWN_IN'), /강태준/);
   assert.equal(relationshipPromptContext(createRelationship(configs.velvet), { ...configs.velvet, stageDisclosure: undefined }, initialMood(configs.velvet)).self_disclosure, undefined, 'a character without layers gets none');
-  assert.match(relationshipResponseInstructions, /self_disclosure\.open은 네가 이 사람에게 지금까지 털어놓을 수 있는 네 이야기다/);
+  assert.match(relationshipResponseInstructions, /self_disclosure\.open은 가까워지며 꺼낼 수 있게 된 사연/);
   // What is kept is named, so the model knows exactly what not to tell yet.
-  assert.match(relationshipResponseInstructions, /self_disclosure\.kept는 아직 이 사람에게 털어놓지 않는 이야기다/);
+  assert.match(relationshipResponseInstructions, /kept는 아직 숨기는 깊은 상처·비밀/);
   assert.match(relationshipPromptContext(createRelationship(configs.velvet), configs.velvet, initialMood(configs.velvet)).self_disclosure.kept.join(' '), /검은 장미/);
 });
 
@@ -635,13 +638,13 @@ test('promises made in the story open with the stages: dating at the third, marr
   assert.match(guidance(3), /현실에서 만나자는 약속이나 연락처를 주고받는 일은 하지 않는다/);
   // No character's own text forbids a marriage in the story any more.
   for (const config of Object.values(configs)) assert.doesNotMatch(JSON.stringify([config.stageRomance, config.stages, config.responseHints]), /결혼/, config.characterId);
-  assert.match(relationshipResponseInstructionsFor(configs.velvet), /이야기 속에서 연인이 되면 호칭, 말투, 스킨십에서 달라진 사이가 드러나게 한다/);
+  assert.match(relationshipResponseInstructionsFor(configs.velvet), /합의한 말투와 이미 맺은 관계·계약은 유지/);
 });
 
 test('a sexual word or a bold touch is answered in character and never ends the conversation; only a repeat after a refusal or force crosses the line', () => {
-  assert.match(relationship.attractionReactionRule, /수동적으로 받기만 하지 않는다/);
-  assert.match(relationship.attractionReactionRule, /대화를 끝내거나\("오늘은 여기까지", "먼저 갈게"\) 자리를 떠나거나 입을 닫지 않는다/);
-  assert.match(relationship.coercionReactionRule, /대담한 말이나 장난스러운 손길 한 번은 강요가 아니라/);
+  assert.match(relationship.attractionReactionRule, /먼저 관심을 보이거나 장난을 걸 수 있고/);
+  assert.match(relationship.attractionReactionRule, /상대가 멈추자고 하면 바로 멈춘다/);
+  assert.match(relationship.coercionReactionRule, /원하지 않는 접촉에는 관계 단계와 무관하게 거부/);
   const events = relationship.relationshipEventInstructionsFor(configs.velvet);
   assert.match(events, /노골적인 성적 말이나 대담한 스킨십 시도도 그 자체로는 분류하지 않는다/);
   assert.match(events, /분명히 선을 그은 뒤에도 같은 요구를 되풀이하거나, 강요·협박·모욕을 할 때만 분류한다/);

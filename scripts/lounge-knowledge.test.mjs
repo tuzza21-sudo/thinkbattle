@@ -254,3 +254,16 @@ test('an upload on a character\'s page is limited to that character, and a file 
   assert.match(checkKnowledgeFile('a.jsonl', many, all, 'ina').problems[0], /200개까지/);
   assert.match(checkKnowledgeFile('a.jsonl', 'x'.repeat(loungeKnowledgeFileLimits.bytes + 1), all, 'ina').problems[0], /너무 커요/);
 });
+
+test('a companion can tell a lived anecdote without a mandatory lesson or a return question, while factual dates stay explicit', () => {
+  const entries = [
+    { id: '1', kind: 'knowledge', title: '공개 사실', content: '확인한 정보', time_sensitive: true, as_of: '2026-10-01' },
+    { id: '2', kind: 'experience', title: '복식 경기', content: '쉬운 공을 놓쳐서 함께 웃었다.', lesson: '실수에서 배운다' },
+  ];
+  const prompt = loungeKnowledgePrompt(entries, Date.parse('2026-11-14T00:00:00Z'), { companion: true });
+  assert.ok(prompt.includes(entries[1].content));
+  assert.ok(!prompt.includes('(교훈:') && !prompt.includes('400자 이내') && !prompt.includes('반드시 지금 상대의 상황으로 돌아와'));
+  assert.match(prompt, /교훈을 설명하거나 사용자에게 질문·판단을 돌려줄 의무는 없다/);
+  assert.match(prompt, /기준 2026-10/);
+  assert.match(prompt, /실제 사람의 개인정보·비공개 사실을 덧붙이지 않는다/);
+});

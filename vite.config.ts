@@ -39,7 +39,8 @@ export default defineConfig(({ mode }) => {
     'SUPABASE_SERVICE_ROLE_KEY',
     // Lounge switches: the developer panel for relationships and the kill switch for long-term memory.
     'LOUNGE_RELATIONSHIP_DEBUG_USERS',
-    // Adult mode for test accounts only (emails or user ids): the closest step of a character that has it is told directly.
+    // Adult mode: default web on (omit or LOUNGE_ADULT_MODE=web). off kills it; allowlist + LOUNGE_ADULT_MODE_USERS for tests.
+    'LOUNGE_ADULT_MODE',
     'LOUNGE_ADULT_MODE_USERS',
     // The model that answers the turns adult mode opens (NanoGPT; without the key OpenAI answers them).
     'DEEPSEEK_API_KEY',

@@ -32,6 +32,10 @@ export const loungeOneToOneStoriesOnly = true;
 export const loungeScenarioCasualStart: ReadonlySet<string> = new Set(['diplomat-old-friend-fling']);
 /** Keep the agreed contract's ordinary dates separate from the engine's limits on disclosing new feelings. */
 export function loungeScenarioRelationshipContext<T extends { outing: string }>(context: T, scenario: Pick<LoungeRoomScenario, 'id'> | undefined, characterId: string): T {
+  if (characterId === 'auditor') return {
+    ...context,
+    outing: '연애와 만남에 능숙한 서도현은 이야기 속 식사·술 한잔·산책 같은 평범한 데이트와 다음 만남을 첫 단계부터 먼저 제안하고 수락할 수 있다. 낮은 관계 단계만으로 관심 표현과 약속을 보류하지 않는다. 자신의 일정과 취향에 따라 원하지 않으면 거절하거나 다른 안을 내놓고, 실제 함께 이동하거나 만나는 선택은 상대에게 남긴다. 이미 합의한 약속은 유지하며 새로운 신체적 친밀감과 둘만의 여행은 현재 동의와 관계에 맞춘다.',
+  };
   // 윤지안 and the member are friends of three years (2026-11-05: she put off a movie and a jog for "the documents").
   if (characterId === 'diplomat') return {
     ...context,
@@ -40,7 +44,7 @@ export function loungeScenarioRelationshipContext<T extends { outing: string }>(
   if (characterId !== 'closer' || scenario?.id !== 'closer-contract-love') return context;
   return {
     ...context,
-    outing: '이야기 속 계약연애가 유효한 동안에는 가족 앞에서만 연기하지 않고 둘만의 평범한 데이트에도 성실하게 참여한다. 식사나 산책은 관계 단계가 낮다는 이유로 일괄 거절하지 않고, 일정과 취향에 따라 먼저 제안하거나 대안을 말한다. 기억에 명시적인 계약 종료나 합의 변경이 있으면 그 현재 상태를 따른다. 사랑의 감정이나 스킨십을 의무로 요구하지 않으며 상대의 거절을 존중한다.',
+    outing: '현재 계약이 초안·제안 상태면 회의실에서 기간·보수·연인 역할의 범위를 실제 대화로 협상한다. 서명과 합의가 끝났다고 미리 처리하거나 가족 식사 장면으로 건너뛰지 않는다. 실제로 합의한 계약연애가 유효한 동안에는 가족 앞에서만 연기하지 않고 둘만의 평범한 데이트에도 성실하게 참여한다. 식사나 산책은 관계 단계가 낮다는 이유로 일괄 거절하지 않고, 일정과 취향에 따라 먼저 제안하거나 대안을 말한다. 기억에 명시적인 계약 종료나 합의 변경이 있으면 그 현재 상태를 따른다. 사랑의 감정이나 스킨십을 의무로 요구하지 않으며 상대의 거절을 존중한다.',
   };
 }
 /** The character page section that lists a character's stories. */
