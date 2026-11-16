@@ -133,3 +133,16 @@ test('the page code, sitemap and share image name saseok.kr and never the old do
   for (const file of ['index.html', 'src/lib/reportShare.ts', 'src/lib/seo.ts', 'src/lib/seoContent.ts', 'public/robots.txt']) assert.ok(!/thinkfit\.kr/.test(read(file)), `${file} has no thinkfit.kr`);
   assert.ok(buildSitemap('2026-11-17').split('<loc>').slice(1).every(entry => entry.startsWith('https://saseok.kr/')));
 });
+
+test('the site is named 사석에서 and has real icon files at the addresses search engines ask for', () => {
+  const html = read('index.html');
+  assert.ok(html.includes('<meta property="og:site_name" content="사석에서" />'));
+  const graph = JSON.parse(html.match(/<script type="application\/ld\+json" id="seo-jsonld">(.*?)<\/script>/s)[1])['@graph'];
+  assert.ok(seoJsonLd(seoFor('/lounge'))['@graph'].some(item => item['@type'] === 'WebSite' && item.name === '사석에서' && item.alternateName.includes('사석')));
+  assert.ok(graph.length >= 2);
+  for (const link of ['/favicon.ico', '/favicon.svg', '/favicon-192.png', '/apple-touch-icon.png']) assert.ok(html.includes(`href="${link}"`), `${link} is linked`);
+  const ico = readFileSync(new URL('../public/favicon.ico', import.meta.url));
+  assert.deepEqual([...ico.subarray(0, 4)], [0, 0, 1, 0], '/favicon.ico is a real icon file, not the app page');
+  for (const file of ['favicon-192.png', 'apple-touch-icon.png']) assert.ok(existsSync(new URL(`../public/${file}`, import.meta.url)), file);
+  for (const page of pagesToWrite()) assert.ok(renderPage(html, page).includes('og:site_name" content="사석에서"'), page.path);
+});

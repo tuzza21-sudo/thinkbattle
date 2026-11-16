@@ -68,9 +68,9 @@ const organization = {
   brand: { '@type': 'Brand', name: SEO_BRAND },
   contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: SEO_EMAIL, availableLanguage: 'ko' },
 };
-const website = { '@type': 'WebSite', '@id': `${SEO_ORIGIN}/#site`, url: `${SEO_ORIGIN}/`, name: SEO_BRAND, alternateName: ['Saseok', '사석에서'], inLanguage: 'ko-KR', publisher: { '@id': `${SEO_ORIGIN}/#org` } };
+const website = { '@type': 'WebSite', '@id': `${SEO_ORIGIN}/#site`, url: `${SEO_ORIGIN}/`, name: SEO_BRAND, alternateName: ['사석', 'Saseok'], inLanguage: 'ko-KR', publisher: { '@id': `${SEO_ORIGIN}/#org` } };
 const application = {
-  '@type': 'WebApplication', '@id': `${SEO_ORIGIN}/#app`, name: SEO_BRAND, alternateName: '사석 AI 컴패니언', url: `${SEO_ORIGIN}/lounge`,
+  '@type': 'WebApplication', '@id': `${SEO_ORIGIN}/#app`, name: SEO_BRAND, alternateName: '사석', url: `${SEO_ORIGIN}/lounge`,
   applicationCategory: 'EntertainmentApplication', operatingSystem: 'Web', inLanguage: 'ko-KR',
   description: '나를 기억하고 함께한 시간만큼 가까워지는 AI 컴패니언. AI 캐릭터 채팅, 전화로 하는 음성 대화, 직접 만드는 캐릭터와 시나리오. 캐릭터는 AI로 만든 가상의 인물입니다.',
   featureList: ['AI 컴패니언 채팅', 'AI 전화·AI 통화(음성 대화)', '대화를 기억하는 장기 기억', '롤플레이와 시나리오', '나만의 캐릭터 만들기'],
