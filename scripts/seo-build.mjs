@@ -25,7 +25,7 @@ export function headFor(page) {
     `<meta name="description" content="${attr(page.description)}" />`,
     `<meta name="robots" content="${page.noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1'}" />`,
     `<link rel="canonical" href="${url}" />`,
-    '<meta property="og:site_name" content="사석" />',
+    `<meta property="og:site_name" content="${attr(content.SEO_BRAND)}" />`,
     `<meta property="og:title" content="${attr(page.title)}" />`,
     `<meta property="og:description" content="${attr(page.description)}" />`,
     '<meta property="og:type" content="website" />',
@@ -95,7 +95,7 @@ const priceLine = plan => `${plan.name} ${plan.price.toLocaleString('ko-KR')}원
 
 export function buildLlmsTxt() {
   const lines = [
-    '# 사석 (Saseok)',
+    '# 사석에서 (줄여서 사석, Saseok)',
     '',
     `> ${seoHome.lead} 한국어 서비스이며, 모든 캐릭터·사진·목소리는 AI로 만든 가상의 인물입니다. 만 18세 이상을 위한 서비스입니다.`,
     '',

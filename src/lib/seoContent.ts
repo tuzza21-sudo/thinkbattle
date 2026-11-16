@@ -9,7 +9,7 @@ import { loungeCallMinutes, loungeFreePlan, loungePhotoMonthly, loungePlans } fr
  * the three never say different things. Every figure comes from the code that enforces it (plans, call minutes, photos).
  */
 export const SEO_ORIGIN = 'https://saseok.kr';
-export const SEO_BRAND = '사석';
+export const SEO_BRAND = '사석에서';
 export const SEO_COMPANY = '대치레드';
 export const SEO_EMAIL = 'ask.saseok@gmail.com';
 
