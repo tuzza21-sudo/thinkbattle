@@ -18,18 +18,8 @@ export type LoungeCharacterPost = {
 export const loungePhotoBuckets = { private: 'lounge-character-private', public: 'lounge-character-public' } as const;
 /** gpt-image-2.5-sunburst keeps a reference face best (OpenAI calls it the editing-precision model). */
 export const loungePhotoModel = 'gpt-image-2.5-sunburst';
-/**
- * The image models a member can choose in a chat's settings, to compare (2026-10-29). GPT is the one used until now
- * (LOUNGE_IMAGE_QUALITY, low by default since 2026-11-07); "low" is the same model at low quality. FLUX.2 runs on Black Forest Labs'
- * API (BFL_API_KEY) with the character's reference photos: Klein 4B is the cheapest (about $0.014 a 1 MP image at
- * launch), Pro the best of FLUX.
- */
-export const loungeImageModels = [
-  { id: 'gpt', label: 'GPT 이미지', hint: '기본 모델 · 낮은 품질(low)로 만들어요' },
-  { id: 'gpt-low', label: 'GPT 이미지 · low', hint: '같은 모델을 낮은 품질로 · 더 저렴하고 빨라요' },
-  { id: 'flux-klein', label: 'FLUX.2 Klein 4B', hint: '가장 저렴 · 한 장 약 $0.014~0.015' },
-  { id: 'flux-pro', label: 'FLUX.2 Pro', hint: 'FLUX의 고품질 모델' },
-] as const;
+/** Every image is made by the one model above at low quality (2026-11-16: the member's choice of image model is gone). */
+export const loungeImageModels = [{ id: 'gpt', label: 'GPT 이미지', hint: '낮은 품질(low)' }] as const;
 export type LoungeImageModel = typeof loungeImageModels[number]['id'];
 export const isLoungeImageModel = (value: unknown): value is LoungeImageModel => loungeImageModels.some(model => model.id === value);
 export const loungeImageModelLabel = (id: string | null | undefined) => loungeImageModels.find(model => model.id === id)?.label;

@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, ChevronDown, Cpu, Flame, Sparkles, Zap } from 'lucide-react';
+import { Check, ChevronDown, Flame, Sparkles, Zap } from 'lucide-react';
 import { getLoungeChatModel, loungeOfferedChatModels } from '../lib/loungeModels';
 
-const modelIcons: Record<string, typeof Zap> = { gpt: Zap, 'gemini-flash': Sparkles, 'glm-flash': Cpu, 'deepseek-flash': Flame };
+const modelIcons: Record<string, typeof Zap> = { gpt: Zap, 'gemini-flash': Sparkles, 'deepseek-flash': Flame };
 
 /**
  * The conversation model of a one-to-one room: a pill with the model in use that opens a short menu above it, each

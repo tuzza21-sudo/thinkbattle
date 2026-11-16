@@ -2262,65 +2262,6 @@ test('a room set to Gemini sends the same instructions and JSON shape there; if 
   } finally { if (savedKey === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = savedKey; }
 });
 
-test('a room set to GLM 5.3 Flash sends the same instructions and JSON shape there; if GLM fails, GPT answers', async () => {
-  const savedKey = process.env.GLM_API_KEY;
-  const savedModel = process.env.LOUNGE_GLM_MODEL;
-  process.env.GLM_API_KEY = 'glm-key';
-  delete process.env.LOUNGE_GLM_MODEL;
-  const sse = events => new Response(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } });
-  try {
-    for (const glmWorks of [true, false]) {
-      let glmBody, glmCalls = 0, openaiCalled = false;
-      const events = [];
-      await run(async (url, init) => {
-        if (url.includes('/auth/')) return result({ id: 'host' });
-        if (url.includes('claim_voice_lounge_host')) return result('ticket');
-        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '영화', host_persona: 'ina', memory: '', capacity: 1, space_id: null, voice_on: false, ai_model: 'glm-flash' }]);
-        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?')) return result([]);
-        if (url.includes('api.z.ai')) {
-          assert.equal(url, 'https://api.z.ai/api/paas/v4/chat/completions');
-          assert.equal(init.headers.Authorization, 'Bearer glm-key');
-          glmBody = JSON.parse(init.body);
-          glmCalls += 1;
-          if (!glmWorks) return result({ error: { message: 'unavailable' } }, 503);
-          const answer = JSON.stringify({ text: '그 장면, 저도 오래 남았어요.', inner_voice: '' });
-          return sse([
-            { choices: [{ delta: { reasoning_content: '생각은 대사에 넣지 않는다', content: null } }] },
-            { choices: [{ delta: { content: answer }, finish_reason: 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 20, prompt_cache_hit_tokens: 0 } },
-          ]);
-        }
-        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', photo: '', photo_asked: false });
-        if (url.endsWith('/responses')) { openaiCalled = true; return modelAnswer({ text: 'GPT가 대신 답해요.' }); }
-        if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
-        throw new Error(`Unexpected ${url}`);
-      }, async () => {
-        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
-        events.push(...(await response.text()).trim().split('\n').map(line => JSON.parse(line)));
-      });
-      assert.equal(glmBody.model, 'glm-5.3-flash');
-      assert.deepEqual(glmBody.thinking, { type: 'enabled' });
-      assert.equal(glmBody.reasoning_effort, 'low');
-      assert.equal(glmBody.response_format.type, 'json_object');
-      assert.match(glmBody.messages[0].content, /자기 삶과 감정, 취향과 목적을 가진 이 인물/, 'the same instructions');
-      assert.match(glmBody.messages[0].content, /"text"/, 'the JSON schema rides in the instructions');
-      assert.equal(JSON.parse(glmBody.messages[1].content).reply_medium, 'chat', 'the same input');
-      if (glmWorks) {
-        assert.equal(glmCalls, 1);
-        assert.equal(openaiCalled, false);
-        assert.equal(events.find(event => event.type === 'host').text, '그 장면, 저도 오래 남았어요.');
-        assert.equal(events.some(event => String(event.text ?? '').includes('생각은')), false, 'thinking is not spoken');
-      } else {
-        assert.equal(glmCalls, 2, 'a failed GLM answer is asked once more');
-        assert.equal(openaiCalled, true, 'GPT answers when GLM fails');
-        assert.equal(events[0].text, 'GPT가 대신 답해요.');
-      }
-    }
-  } finally {
-    if (savedKey === undefined) delete process.env.GLM_API_KEY; else process.env.GLM_API_KEY = savedKey;
-    if (savedModel === undefined) delete process.env.LOUNGE_GLM_MODEL; else process.env.LOUNGE_GLM_MODEL = savedModel;
-  }
-});
-
 test('a chat reply can come with a photo: the scene goes to the browser after the reply is saved', async () => {
   const asked = await chatTurn({ voiceOn: false, replyText: '*휴대폰을 들어 한 장 찍는다* 자, 지금 여기.', photo: { photo_subject: 'character', photo: '작업실 창가에서 야경을 등지고 찍은 셀카', photo_asked: true } });
   // The reply shows the photo being sent; the call after it writes the scene from that.
@@ -2860,15 +2801,13 @@ test('one Luna call interprets intent and direction consistently for every reply
     assert.deepEqual(JSON.parse(reply.input).direction, works ? direction : undefined);
     assert.equal(JSON.parse(reply.input).recent.at(-1).text, latest);
   }
-  // GLM and Gemini answer without the director. The analyzer still reads the turn, and a missing key falls back to GPT, which keeps the direction.
-  const savedKeys = { gemini: process.env.GEMINI_API_KEY, glm: process.env.GLM_API_KEY };
+  // Gemini answers without the director. The analyzer still reads the turn, and a missing key falls back to GPT, which keeps the direction.
+  const savedKeys = { gemini: process.env.GEMINI_API_KEY };
   process.env.GEMINI_API_KEY = 'gemini-key';
-  process.env.GLM_API_KEY = 'glm-key';
   t.after(() => {
     if (savedKeys.gemini === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = savedKeys.gemini;
-    if (savedKeys.glm === undefined) delete process.env.GLM_API_KEY; else process.env.GLM_API_KEY = savedKeys.glm;
   });
-  for (const [aiModel, directed, endpoint] of [['gemini-flash', false, 'generativelanguage.googleapis.com'], ['glm-flash', false, 'api.z.ai'], ['gemini-flash', true, '/responses']]) {
+  for (const [aiModel, directed, endpoint] of [['gemini-flash', false, 'generativelanguage.googleapis.com'], ['gemini-flash', true, '/responses']]) {
     const withKey = directed === false;
     if (!withKey) delete process.env.GEMINI_API_KEY;
     const calls = []; let reply;
@@ -4663,15 +4602,14 @@ test('a story in episodes: the character leads the current episode, the checkpoi
   }
 });
 
-test('the picker offers the fast GPT, Gemini 3.8 Flash, GLM 5.3 Flash and DeepSeek Flash', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gemini-flash', 'glm-flash', 'deepseek-flash']);
+test('the picker offers the fast GPT, Gemini 3.8 Flash and DeepSeek Flash under code names, and no GLM', () => {
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gemini-flash', 'deepseek-flash']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['루미', '아리아', '오닉스']);
+  for (const model of modelsLib.loungeChatModels) assert.doesNotMatch(`${model.label} ${model.description}`, /GPT|Gemini|DeepSeek|GLM|딥시크|제미나이/i, 'members never see a provider name');
   const gemini = modelsLib.getLoungeChatModel('gemini-flash');
   assert.equal(gemini.provider, 'gemini'); assert.equal(gemini.listed, true);
   assert.equal(modelsLib.loungeGeminiChatModels['gemini-flash'], 'gemini-3.8-flash');
-  const glm = modelsLib.getLoungeChatModel('glm-flash');
-  assert.equal(glm.provider, 'glm'); assert.equal(glm.label, 'GLM 5.3 Flash');
-  assert.equal(modelsLib.loungeGlmChatModel, 'glm-5.3-flash');
-  assert.equal(modelsLib.getLoungeChatModel(glm.voiceFallback).provider, 'openai', 'a voice reply is OpenAI\'s');
+  assert.equal(modelsLib.getLoungeChatModel('glm-flash').id, 'gpt', 'a room still set to GLM answers with the fast GPT');
   const deepseek = modelsLib.getLoungeChatModel('deepseek-flash');
   assert.equal(deepseek.provider, 'deepseek'); assert.equal(modelsLib.getLoungeChatModel(deepseek.voiceFallback).provider, 'openai', 'a voice reply is OpenAI\'s');
   assert.equal(modelsLib.loungeAdultChatModel, 'deepseek/deepseek-v4.1-flash-1017-uncensored');

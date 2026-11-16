@@ -17,17 +17,19 @@
  * instructions and input as the others but not a JSON schema, so the schema goes into the instructions (see
  * deepseekReply in api/lounge.ts). Adult-mode turns go to NanoGPT instead (NANOGPT_API_KEY, loungeAdultChatModel).
  *
- * 2026-11-11: the picker offers the fast GPT, Gemini 3.8 Flash, GLM 5.3 Flash and DeepSeek Flash. GLM thinks on every
- * reply (its Flash model cannot turn thinking off), so a voice reply uses the fast GPT. `model` is the OpenAI model
- * name; Gemini and GLM names live below, and `stallModel` is the model that answers when a reasoning reply has not
+ * 2026-11-11: the picker offered the fast GPT, Gemini 3.8 Flash, GLM 5.3 Flash and DeepSeek Flash. `model` is the OpenAI
+ * model name; the Gemini names live below, and `stallModel` is the model that answers when a reasoning reply has not
  * begun in time.
+ *
+ * 2026-11-16: GLM is gone (a room still stored with 'glm-flash' answers with the fast GPT), and members no longer see
+ * the provider names: each model is shown under a code name (루미, 아리아, 오닉스). The ids and providers stay as they
+ * are, since rooms store the id.
  */
 export const loungeChatModels = [
-  { id: 'gpt', label: '빠른 대화', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
-  { id: 'gemini-flash', label: 'Gemini 3.8 Flash', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
-  { id: 'glm-flash', label: 'GLM 5.3 Flash', description: 'GLM 5.3 Flash · 빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'glm', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
-  { id: 'deepseek-flash', label: 'DeepSeek Flash', description: 'DeepSeek V4.1 Flash · 빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
-  { id: 'gemini-pro', label: 'Gemini Pro', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
+  { id: 'gpt', label: '루미', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
+  { id: 'gemini-flash', label: '아리아', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
+  { id: 'deepseek-flash', label: '오닉스', description: '빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
+  { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
 ] as const;
 export type LoungeChatModelId = typeof loungeChatModels[number]['id'];
 export const getLoungeChatModel = (id?: string | null) => loungeChatModels.find(model => model.id === id) ?? loungeChatModels[0];
@@ -36,9 +38,6 @@ export const loungeOfferedChatModels = loungeChatModels.filter(model => model.li
 
 /** Gemini model names; LOUNGE_GEMINI_FLASH_MODEL and LOUNGE_GEMINI_PRO_MODEL change them. */
 export const loungeGeminiChatModels = { 'gemini-flash': 'gemini-3.8-flash', 'gemini-pro': 'gemini-3.1-pro-preview' } as const;
-
-/** Z.ai model name for GLM 5.3 Flash; LOUNGE_GLM_MODEL changes it. */
-export const loungeGlmChatModel = 'glm-5.3-flash';
 
 /** NanoGPT model that answers adult-mode turns; LOUNGE_ADULT_MODEL changes it. */
 export const loungeAdultChatModel = 'deepseek/deepseek-v4.1-flash-1017-uncensored';

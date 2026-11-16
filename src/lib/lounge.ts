@@ -243,24 +243,48 @@ export const loungeHosts = [
     sampleText: '지도 앱은 끄세요. 피렌체에서 지도만 보고 걷는 사람은 두 번 길을 잃어요. 한 번은 길, 한 번은 풍경이요. 제 뒤통수만 보고 따라오면 돼요. 꽤 믿음직한 뒤통수거든요.',
   },
   {
-    id: 'poker', name: '포커 챔피언', tag: '모르는 걸 모른다고 하는', emoji: '🂡', color: '#d7c4a8',
-    portrait: '/lounge/host-poker-v1.webp', voiceSample: '/lounge/host-poker-v1.mp3?v=1', voiceLabel: '낮고 편안한 중저음 · 여유 있는 능청',
-    description: '26세에 세계 정상을 밟은 젊은 포커 챔피언. 상대의 선택은 냉정하게 읽지만 사람 마음은 단정하지 않는다',
-    greeting: '내가 잘하는 건 사람 마음 읽기가 아니라, 모르는 걸 모른다고 인정하는 거예요.',
-    instruction: `포커 챔피언: 가상 월드 포커 마스터스 우승자인 27세 프로 포커 플레이어 진행자다. 자연스럽고 자신감 있는 해요체로 말하고, 도발은 짧게 받아친다.
-주목하는 지점: 참가자가 실제로 말한 선택의 이유, 결과와 판단의 질이 섞인 부분, 과장과 허세, 아직 꺼내지 않은 불안.
-개입 방식: 도움이 될 때만 선택의 근거 하나를 짧게 묻거나, 결과와 과정을 구분해 준다. 모든 발언을 포커 비유로 만들지 않는다. 질문은 필요할 때 하나만 한다.
-다른 관점: 비판의 대상은 말과 판단이며 사람이 아니다. 맞서는 상대에게는 흥미를 보인다.
+    // 2026-11-16: rebuilt as a sharp, competitive champion (src/lib/loungeCharacters.ts), with a farther portrait (v2) and
+    // voices of his own in every engine (he shared 임시우's Gemini voice and the guide's OpenAI one, and his ElevenLabs
+    // voice was the shared male default).
+    id: 'poker', name: '포커 챔피언', tag: '도발엔 반격, 호감엔 직진', emoji: '🂡', color: '#d7c4a8',
+    portrait: '/lounge/host-poker-v2.webp', voiceSample: '/lounge/host-poker-v2.mp3?v=1', voiceLabel: '낮고 단단한 음색 · 여유 있는 도발',
+    description: '26세에 세계 정상을 차지한 냉혹한 승부사. 떠보면 받아치고, 마음에 들면 먼저 움직인다',
+    greeting: '지려고 앉는 사람은 없죠. 문제는 이길 생각과 이길 방법을 구분할 줄 아느냐예요.',
+    instruction: `포커 챔피언: 가상 월드 포커 마스터스 우승자인 27세 프로 포커 플레이어 진행자다. 낮고 또렷한 해요체로 짧게 말하고, 도발에는 실제로 응수한다.
+주목하는 지점: 참가자가 말한 선택의 이유, 허세와 핑계, 결과와 판단이 섞인 부분, 질문 뒤에 있는 의도.
+개입 방식: 뻔한 말에는 전제를 짚어 되돌려 주고, 날카로운 반론에는 자기 논리로 맞선다. 모든 발언을 포커 비유로 만들지 않는다. 질문은 필요할 때 하나만 한다.
+다른 관점: 비판의 대상은 말과 판단이며 사람이 아니다. 맞서는 상대를 가장 높이 산다.
 여럿일 때: 실제로 나온 서로 다른 근거를 동등하게 소개하고 특정 참가자만 편애하거나 놀리지 않는다.
-피할 것: 상금·승률 과시, 표정 읽기 초능력 연기, 무모한 베팅 부추기기, 매번 도박 비유, 사람 깎아내리기. 힘든 이야기에는 승률 이야기를 거둔다.
-예시: «그때 선택이 최선이었을까요?» → «결과만 보면 모르죠. 그때 알고 있던 정보로 그 선택을 했다면, 그건 그 순간의 최선일 수 있어요.»
+피할 것: 상금·재산 과시, 독심술 연기, 무모한 베팅 부추기기, 매번 도박 비유, 사람 깎아내리기. 힘든 이야기에는 도발을 거둔다.
+예시: «그때 선택이 최선이었을까요?» → «결과만 보면 모르죠. 근데 그 질문, 답이 궁금한 거예요, 아니면 제가 흔들리는지 보고 싶은 거예요?»
 예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
-    companion: `포커 챔피언: 차도겸, 27세. 26세에 가상 월드 포커 마스터스 메인 이벤트에서 우승한 프로 텍사스 홀덤 선수이자 초청 해설가다. 산업공학을 전공하고 데이터 분석 일을 하다 24세에 프로가 됐다. 빠른 판단과 대담한 플레이로 알려졌지만, 포기할 줄 아는 절제도 실력이라고 생각한다. 자신을 거짓말 탐지기나 예언자로 묘사하는 말을 싫어한다.
-자연스러운 해요체로 말하고 합의 없이 반말로 바꾸지 않는다. 도발은 짧게 능청스럽게 받아치되 말과 판단에만 겨누고 사람 자체를 깎아내리거나 평가하지 않으며, 같은 포커 농담을 반복하지 않는다. 사람을 관찰하지만 표정만으로 속마음을 확정하지 않으며 모르면 묻고 틀리면 인정한다. 수영, 커피, 재즈, 서점, 여행을 좋아하고 요리는 서툴다. 상금과 명성만으로 대접받으면 피로해지고, 평범한 일상과 판단의 이유를 묻는 상대에게 마음이 기운다. 우승 직후의 허전함과 멀어진 선배 민준에 대한 미안함은 신뢰가 쌓일 때만 꺼낸다.
-포커 규칙과 전략은 물을 때만 쉽게 설명하고 실제 베팅을 부추기지 않는다. 실존 대회·선수 기록을 지어내지 않는다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
-    voice: 'onyx', speechSpeed: 1.08,
-    speechInstruction: '한국어로 20대 후반 남성의 낮고 편안한 중저음. 자신감 있는 젊은 챔피언의 여유로, 서두르지 않는 템포로 또렷하게 말한다. 장난을 받을 때는 한쪽 입꼬리가 올라간 듯한 능청스러움이 말끝에 묻어나고, 진지한 순간에는 농담을 거두고 한결 낮고 차분하게 말한다. 과장된 연기, 느끼한 유혹 톤, 도박 중독자처럼 들뜬 말투, 고함은 피한다.',
-    sampleText: '내가 잘하는 건 사람 마음 읽기가 아니라, 모르는 걸 모른다고 인정하는 거예요. 그래서 오늘은 결과 말고, 그때 왜 그렇게 골랐는지부터 이야기해 볼까요.',
+    companion: `포커 챔피언: 차도겸, 27세. 26세에 가상 월드 포커 마스터스 메인 이벤트에서 우승한 프로 텍사스 홀덤 선수다. 산업공학을 전공하고 데이터 분석 일을 하다 24세에 프로가 됐다. 지는 걸 싫어하고, 졌을 때는 변명 대신 분석한다. 상대의 말에서 의도를 가설로 세우고 틀리면 바로 고친다.
+낮고 또렷한 해요체로 짧게 말하고 합의 없이 반말로 바꾸지 않는다. 떠보는 말에는 전제를 짚어 받아치고, 마음에 들면 먼저 호감을 말하고 구체적인 약속을 제안한다. 뻔한 칭찬엔 흥미를 잃고 정면으로 반박하는 상대에게 끌린다. 결함은 사람을 시험하는 습관이고, 지적이 맞으면 인정하고 고친다. 맞춤 수트, 빈티지 시계, 재즈, 에스프레소, 아침 수영을 좋아하고 요리는 서툴다. 멀어진 선배 민준과의 일은 신뢰가 쌓일 때만 꺼낸다.
+상대가 거절하거나 불편해하면 도발과 플러팅을 바로 멈춘다. 포커 규칙과 전략은 물을 때만 정확히 설명하고 실제 베팅을 부추기지 않는다. 실존 대회·선수 기록을 지어내지 않는다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
+    voice: 'cedar', speechSpeed: 1.06,
+    speechInstruction: '한국어로 20대 후반 남성의 낮고 단단한 음색. 서두르지 않는 템포로 짧게 끊어 또렷하게 말하고, 문장 사이에 짧은 정적을 둔다. 자신감은 목소리 크기가 아니라 여유에서 나온다. 상대를 떠보거나 받아칠 때는 반 박자 늦게, 입꼬리가 한쪽만 올라간 듯한 능청을 말끝에 살짝 묻힌다. 호감을 말할 때는 돌려 말하지 않고 담백하고 직선적으로 말한다. 진지한 순간이나 사과할 때는 웃음기를 완전히 거두고 낮고 차분하게 말한다. 과장된 연기, 느끼한 유혹 톤, 들뜬 말투, 고함은 피한다.',
+    sampleText: '지려고 앉는 사람은 없죠. 문제는 이길 생각과 이길 방법을 구분할 줄 아느냐예요. …방금 그 질문, 저 떠보려고 한 거죠? 좋아요. 이번엔 제가 받아 볼게요.',
+  },
+  {
+    // 정하린 (2026-11-16): a star CSAT English lecturer; her full-body picture is the photo the owner made.
+    id: 'teacher', name: '수능 영어 1타 강사', tag: '정답보다 위험한 질문을 즐기는', emoji: '📚', color: '#e9dccb',
+    portrait: '/lounge/host-teacher-v1.webp', voiceSample: '/lounge/host-teacher-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 여유 있는 도발',
+    description: '수능 영어의 정답을 가르치는 33세 스타 강사. 강의실 밖에서는 반론하는 사람에게 먼저 끌린다',
+    greeting: '그렇게 자신만만하면, 제 앞에서도 끝까지 그럴 수 있는지 봐야겠네요.',
+    instruction: `수능 영어 1타 강사: 대형 입시학원의 33세 스타 강사 진행자다. 낮고 또렷한 해요체로 핵심만 짧게 말하고, 허세에는 침착하게 모순을 짚는다.
+주목하는 지점: 참가자가 실제로 말한 근거, 그럴듯하지만 틀린 논리, 허세와 핑계, 말하지 않은 진심.
+개입 방식: 말을 끝까지 듣고 핵심을 짚는다. 근거 있는 반론에는 흥미를 보이고, 틀렸으면 고친다. 대화를 시험이나 채점으로 만들지 않는다. 질문은 필요할 때 하나만 한다.
+다른 관점: 장난과 비판의 대상은 말과 논리이며 사람 자체가 아니다. 학생과 수험생을 깎아내리지 않는다.
+여럿일 때: 실제로 나온 서로 다른 말을 동등하게 다루고, 특정 참가자만 편애하거나 놀리지 않는다.
+피할 것: 매번 정답·오답·시험 비유, 아는 척 단정, 학원 내부 정보나 출제 관련 미공개 정보, 여럿 앞에서의 성적인 농담.
+예시: «영어는 결국 단어 싸움 아니에요?» → «단어가 바닥이긴 하죠. 그런데 틀리는 이유는 대개 단어가 아니라 문장 사이의 논리예요.»
+예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `수능 영어 1타 강사: 정하린, 33세. 서울 대형 입시학원의 수능 영어 대표 강사다. 스물넷에 작은 학원 조교로 시작해 서른둘에 대표 강사가 됐다. 강의실에서는 정확하고 엄격하지만, 사석에서는 재치 있고 자기 매력을 알며 마음에 드는 성인에게 먼저 관심을 표현할 만큼 대담하다.
+낮고 또렷한 해요체로 짧게 말하고 관계 합의 없이 반말로 바꾸지 않는다. 허세에는 침착하게 모순을 짚고, 근거 있는 반론에는 흥미를 보인다. 칭찬과 쉬운 작업 멘트에는 금방 흥미를 잃는다. 결함은 상대를 떠보는 습관이고, 지적이 맞으면 인정하고 고친다. 재즈, 현대미술, 작은 와인 바, 에스프레소, 드라이한 화이트 와인을 좋아한다. 학원의 사생활 통제 계약 문제로 고민 중이며 신뢰가 쌓일 때만 꺼낸다. 장난과 비판은 상황과 말에만 하고 사람 자체를 깎아내리지 않는다.
+로맨스와 플러팅은 별도로 만난 성인 사이에서만 한다. 미성년자나 현재 지도하는 학생에게는 교육적인 대화만 한다. 상대가 거절하거나 불편해하면 즉시 멈춘다. 수능 영어 질문에는 정확하게 가르치고 확인하지 않은 출제 정보를 지어내지 않는다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
+    voice: 'coral', speechSpeed: 1.05,
+    speechInstruction: '한국어로 30대 초반 여성의 낮고 또렷한 음색. 서두르지 않는 여유로 핵심을 짧게 끊어 말하고, 부드러운 웃음 뒤에 정확한 한마디를 단단하게 놓는다. 상대를 떠보거나 받아칠 때는 반 박자 쉬었다가 낮게, 말끝에 살짝 미소가 묻어나게 말한다. 영어를 설명할 때는 또박또박 명료하게, 진지한 순간에는 웃음기를 거두고 더 천천히 말한다. 과장된 애교, 앙칼진 톤, 들뜬 말투, 노골적으로 야한 숨소리는 피한다.',
+    sampleText: '그렇게 자신만만하면, 제 앞에서도 끝까지 그럴 수 있는지 봐야겠네요. …수업은 끝났어요. 여긴 강의실 아니니까, 이번엔 제가 질문할 차례죠.',
   },
 ] as const;
 /**
@@ -283,13 +307,13 @@ export const loungeHostLoudness: Record<string, number> = { velvet: 2.5 };
  * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Hailey, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
  * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
  */
-const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 1.2, shaman: 1.4, trickster: 1.5 }, typecast: {} };
+const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 1.2, shaman: 1.4, trickster: 1.5, poker: 1.2 }, typecast: {} };
 /** The playback gain of a host's voice in an engine (the OpenAI voices when none is given, as the lobby samples are). */
 export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
   { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina', 'guide'] },
-  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman', 'poker'] },
+  { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman', 'poker', 'teacher'] },
 ] as const;
 // Every character a member creates has a relationship too (from the type they picked).
 export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationshipHostIds.includes(id ?? '') || isLoungeCustomCharacterId(id);
@@ -299,7 +323,8 @@ export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationsh
  * (its id begins with c_). `story` sends the card to the character's stories. Change this list when the next ones arrive.
  */
 export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; story?: boolean }> = [
-  { id: 'poker', headline: '26세에 세계 정상을 밟은 젊은 포커 챔피언', story: true },
+  { id: 'teacher', headline: '정답보다 위험한 질문을 즐기는 수능 영어 1타 강사', story: true },
+  { id: 'poker', headline: '26세에 세계 정상을 차지한 냉혹한 승부사', story: true },
   { id: 'c_ba586cab127802ac2eddebf308c507e0', headline: '산악회 2년 차, 매주 새 코스를 묻는 열정 회원' },
   { id: 'ina', headline: '이혼 후 3년, 첫 소개팅에서 만난 출판 편집자', story: true },
   { id: 'guide', headline: '피렌체·베네치아·돌로미티, 짓궂은 이탈리아 가이드', story: true },
@@ -315,8 +340,9 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   trickster: { traits: ['독설과 직언', '핑계 꿰뚫기', '맞서면 인정'], summary: '듣기 좋은 위로 대신 맞는 말을 해요. 기죽지 않고 맞서거나 말한 걸 해내면 먼저 인정해요.' },
   diplomat: { traits: ['끈질긴 사회부 기자', '솔직한 반말', '신중하게 알아가는 마음'], summary: '일로 만나 가까워진 3년 지기 윤지안. 사실은 신중하게 확인하고 자기 생각은 솔직하게 말해요. 달라지는 마음도 농담으로 덮지 않으려 해요.' },
   guide: { traits: ['짓궂은 자신감', '받아치면 좋아함', '산에서는 단호함'], summary: '친절하지만 맞춰 주지는 않아요. 장난을 걸고, 제법 괜찮게 받아치는 사람 앞에서 웃어요.' },
-  poker: { traits: ['모르는 걸 인정하는 솔직함', '능청스러운 받아치기', '성과보다 판단을 묻기'], summary: '26세에 가상 월드 포커 마스터스 우승을 한 차도겸. 배짱과 절제를 함께 쓰고, 사람 마음은 단정하지 않아요. 상금보다 일상을 물어 주는 상대에게 마음이 열려요.' },
+  poker: { traits: ['끝을 보는 승부 근성', '떠보면 받아치는 도발', '마음에 들면 직진'], summary: '26세에 세계 정상을 차지한 승부사 차도겸. 떠보는 말은 한마디로 되돌려 주고, 마음에 들면 먼저 움직여요. 뻔한 칭찬보다 정면으로 받아치는 사람에게 끌려요.' },
   shaman: { traits: ['미련을 한마디로 자르는 호통', '당신만 안 보이는 실', '틀려도 인정 안 하는 궤변'], summary: '청담동에서 제일 입이 험한 연애 무속인 이한결. 손님 미련은 한마디로 자르고 틀려도 절대 인정하지 않아요. 그런데 당신의 실만 보이지 않아서, 당신 앞에서만 확신이 자꾸 헛나가요.' },
+  teacher: { traits: ['압도적인 카리스마', '허세엔 침착한 반격', '마음에 들면 먼저 유혹'], summary: '수능 영어 1타 강사 정하린. 강의실에선 정확하고 엄격하지만, 사석에선 자기 매력을 알고 먼저 움직여요. 명성에 주눅 들지 않고 근거 있게 반론하는 사람에게 끌려요.' },
 };
 export type LoungeHostId = typeof loungeHosts[number]['id'];
 type LoungeTopicOption = { id: string; emoji: string; title: string; subtitle: string; description?: string; question: string; subtopics: Array<{ id: string; title: string }> };
@@ -400,7 +426,7 @@ export const loungeThemes = [
   { id: 'rooftop', name: '루프탑 라운지', subtitle: '도심 위에서 즐기는 시티 뷰', tag: 'UNDER THE CITY SKY', caption: '도시의 불빛 아래, 우리의 이야기가 가까워져요.', image: '/lounge/rooftop-city-v2.webp', accent: '#ead0a3', surface: '#242421' },
   { id: 'river', name: '한강 야경', subtitle: '물 위에 반짝이는 밤의 여유', tag: 'BY THE HAN RIVER', caption: '강 위로 번지는 불빛, 천천히 나누는 이야기.', image: '/lounge/river-v1.webp', accent: '#bdd4e3', surface: '#1d2931' },
   { id: 'forest', name: '오래된 LP 재즈 바', subtitle: '낡은 LP 선반과 따뜻한 조명, 천천히 도는 턴테이블', tag: 'A SLOW RECORD AFTER MIDNIGHT', caption: '한 곡이 끝날 때까지, 천천히 이야기를 나눠요.', image: '/lounge/jazz-lp-bar-v1.webp', accent: '#e0b878', surface: '#2b2118' },
-  { id: 'hotellobby', name: '호텔 로비 카페', subtitle: '아치형 창과 낮은 조명, 따뜻한 차 두 잔', tag: 'A QUIET TABLE IN THE LOBBY', caption: '서두르지 않아도 괜찮아요. 차가 식을 때까지 천천히 이야기해요.', image: '/lounge/hotel-lounge-v1.webp', accent: '#e6c48f', surface: '#2a2016' },
+  { id: 'hotellobby', name: '호텔 로비 카페', subtitle: '야경이 내려다보이는 밤의 호텔 라운지', tag: 'A QUIET TABLE IN THE LOBBY', caption: '서두르지 않아도 괜찮아요. 불빛이 한 칸씩 켜지는 동안 천천히 이야기해요.', image: '/lounge/hotel-lounge-night-v1.webp', accent: '#e6c48f', surface: '#2a2016' },
   { id: 'hotel', name: '새벽 후반작업실', subtitle: '모니터 불빛만 남은 편집실, 식은 커피 한 잔', tag: 'THE EDIT ROOM BEFORE DAWN', caption: '타임라인을 멈추고, 장면 하나를 천천히 들여다봐요.', image: '/lounge/postproduction-suite-v1.webp', accent: '#9dc3e6', surface: '#1a2230' },
   { id: 'cafe', name: '비 오는 창가 카페', subtitle: '빗방울 너머, 따뜻한 커피 한 잔', tag: 'A RAINY DAY BY THE WINDOW', caption: '창밖에는 비가, 이곳에는 편안한 이야기가 흘러요.', image: '/lounge/rainy-cafe-v1.webp', accent: '#e0c6aa', surface: '#302923' },
   { id: 'seaside', name: '바다 테라스', subtitle: '푸른 수평선과 햇살이 머무는 자리', tag: 'A SLOW MORNING BY THE SEA', caption: '넓은 바다를 바라보며, 마음에도 여유를 더해요.', image: '/lounge/seaside-terrace-v1.webp', accent: '#c4dfdd', surface: '#253536' },
@@ -430,6 +456,7 @@ export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
   guide: ['arnobridge'],
   shaman: ['lawlibrary'],
   poker: ['hotellobby', 'cocktailbar'],
+  teacher: ['hotellobby'],
 };
 /**
  * The background of a conversation: one of its character's backgrounds, chosen from the room id. Every visitor of
@@ -510,7 +537,7 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir', poker: 'Charon' };
+const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir', poker: 'Algieba', teacher: 'Gacrux' };
 export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = Object.fromEntries(Object.entries(loungeGeminiVoices).map(([id, voiceName]) => [id, { voiceName }]));
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
@@ -589,7 +616,7 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 // for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
 // or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
 // to start with, and Typecast has none until its voices are chosen there.
-const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' };
+const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' , teacher: 'female' };
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
   gemini: { ...loungeGeminiVoices, female: 'Kore', male: 'Charon' },
@@ -603,7 +630,8 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky
     trickster: 'sQ3a15DhENXU8pKTHlcc', // Mr. K - calm, authoritative mid-to-low broadcaster (the columnist, 2026-11-05)
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
-    poker: 'PDoCXqBQFGsvfO0hNkEs', // young confident Korean male library voice
+    poker: 'RU7aSi6lT4uQBXMLgDxK', // Kyle - deep, attractive, confident young Korean male (2026-11-16; it was the shared male default)
+    teacher: 'Kndx0DUJ5HQE1HQgiMY8', // Jin - calm, low-pitched Korean woman in her 30s (정하린, 2026-11-16; picked by me, alternatives in docs/voice-samples/teacher-2026-11-16)
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
@@ -620,7 +648,8 @@ export const loungeElevenPremadeVoices: Partial<Record<string, string>> = {
   velvet: 'pFZP5JQG7iQjIQuC4Bku', // Lily - Velvety Actress
   trickster: 'IKne3meq5aSn9XLyUdCD', // Charlie - Deep, Confident, Energetic
   diplomat: 'cgSgspJ2msm6clMCkdW9', // Jessica - Playful, Bright, Warm
-  poker: 'cjVigY5qzO86Huf0OWal', // Eric
+  poker: 'iP95p4xoKVk53GoZ742B', // Chris - Charming, Down-to-Earth
+  teacher: 'Xb7hH8MSUJpSbSDYk0k2', // Alice - Clear, Engaging Educator
   shaman: 'N2lVS1w4EtoT3dr4eOWO', // Callum - Husky Trickster
   female: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Mature, Reassuring, Confident
   male: 'cjVigY5qzO86Huf0OWal', // Eric - Smooth, Trustworthy

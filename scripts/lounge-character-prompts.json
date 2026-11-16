@@ -43,8 +43,24 @@
     },
     "work": {
       "portrait": "host-poker-v1.webp",
-      "file": "host-poker-work-v1.webp",
-      "prompt": "{{common}} The same Korean man mid-conversation at a quiet hotel lobby cafe table with a coffee cup, cards nowhere in sight, calm confident expression."
+      "file": "host-poker-work-v2.webp",
+      "prompt": "Drawn on 2026-11-16 with the image edit API from host-poker-v1.webp: a world poker champion at a high-stakes final table at night, black shirt and charcoal jacket, a tall stack of chips, two cards held face down, a calm one-sided smirk at the camera. Gallery photos poker-1/2 and teacher-1/2 (gym leggings, wine bar) were made the same way, gpt-image-2 low."
+    }
+  },
+  "teacher": {
+    "portrait": {
+      "file": "host-teacher-v1.webp",
+      "prompt": "Drawn on 2026-11-16 with the image edit API from the owner's chalkboard photo (host-teacher-work-v1.webp), not from this text: the same woman, same face and chin-length black bob, framed from just above the head to the upper chest, the same cream silk blouse buttoned modestly and a thin gold necklace, poised half-smile with one eyebrow barely raised, a softly blurred upscale hotel lounge at night with warm amber bokeh. Elegant magazine-portrait quality, tasteful and not provocative."
+    },
+    "full": {
+      "portrait": "host-teacher-v1.webp",
+      "file": "host-teacher-full-v1.webp",
+      "prompt": "{{common}} She is a 33-year-old star English lecturer off duty: the same chin-length black bob, a fitted dark knit dress with a thin gold necklace and small gold earrings, a light trench coat over one arm, standing in a quiet hotel lounge at night with warm amber light, poised and confident with a faint knowing smile."
+    },
+    "work": {
+      "portrait": "host-teacher-v1.webp",
+      "file": "host-teacher-work-v1.webp",
+      "prompt": "Not generated: the owner's own photo of her at a chalkboard (2026-11-16) is used as it is."
     }
   }
 }
