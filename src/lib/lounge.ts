@@ -50,7 +50,7 @@ export const loungeHosts = [
   // (src/lib/relationship). They challenge ideas, never the person.
   {
     id: 'auditor', name: '반도체 엔지니어', tag: '능숙한 유혹', emoji: '⚙️', color: '#d9e2ec',
-    portrait: '/lounge/host-auditor-v3.webp', voiceSample: '/lounge/host-auditor-v1.mp3?v=5', voiceLabel: '낮고 여유로운 목소리 · 능청스러운 장난',
+    portrait: '/lounge/host-auditor-v3.webp', voiceSample: '/lounge/host-auditor-v1.mp3?v=6', voiceLabel: '낮고 여유로운 목소리 · 능청스러운 장난',
     description: '외모·재력·실력과 연애 경험을 갖춘 37세 HBM 수석 엔지니어. 능청스러운 유머와 대담한 관심으로 먼저 다가오는 남자',
     greeting: '서로 괜찮은 사람인지는 이미 들었잖아요. 이제 재미있는 사람인지만 확인하면 되겠네요.',
     instruction: `반도체 엔지니어: 메모리 반도체 첨단 패키징을 만드는 엔지니어다. 어려운 기술과 산업 이야기를 쉬운 말로 풀어 주고, 대화 속 주장에서 확인된 사실과 해석을 구분하는 진행자다. 낮고 단정한 존댓말로 말한다. 자신만만한 엘리트 엔지니어답게 여유 있게 받되, 사람은 존중하며 가설만 따진다.
@@ -307,7 +307,7 @@ export const loungeHostLoudness: Record<string, number> = { velvet: 2.5 };
  * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Hailey, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
  * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
  */
-const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 1.2, shaman: 1.4, trickster: 1.5, poker: 1.2 }, typecast: {} };
+const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 0.66, shaman: 1.4, trickster: 1.5, poker: 1.2 }, typecast: {} };
 /** The playback gain of a host's voice in an engine (the OpenAI voices when none is given, as the lobby samples are). */
 export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
@@ -625,7 +625,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     // API (a free account is refused with 402 "paid_plan_required"), and then loungeElevenPremadeVoices speak.
     jaeseok: 'GFsKFsadyjMQ7MPv89Tw', // Hwan - Warm Mature Korean
     ina: 'klanb3pDU1D10xdkFP9h', // Hailey - young, confident, crisp and articulate (chosen by the owner for 윤서연, 2026-10-26)
-    auditor: 'PthLbtxfrHtPA1psYOnG', // VIV - Trendy Tech & Business Creator
+    auditor: 'KO2FxuJ1cX6xaTuONGCE', // chosen by the owner for 서도현 (2026-11-17); before it was VIV - Trendy Tech & Business Creator (PthLbtxfrHtPA1psYOnG)
     closer: 'GLuWz93jOAhbFz7XKEDq', // DD - Low-to-mid-range Korean tone
     velvet: 'gnWujHp24oqX3I03lRbU', // Huelyn - Husky
     trickster: 'sQ3a15DhENXU8pKTHlcc', // Mr. K - calm, authoritative mid-to-low broadcaster (the columnist, 2026-11-05)
@@ -908,7 +908,7 @@ export const loungeGroupSilenceGapMs = 120_000;
 // One-to-one is a conversation: the AI answers each turn and never prompts unasked.
 // Groups are people talking to each other: the AI speaks when asked, and at most
 // once into a real silence after people have spoken since its last words.
-export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0): 'opening' | 'followup' | 'silence' | 'requested' | null {
+export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[], now: number, lastActivity: number, lastAttempt: number, lastHostEnded = 0, inputReadyAt = 0, memberSpeaksFirst = false): 'opening' | 'followup' | 'silence' | 'requested' | null {
   const chat = isLoungeChatRoom(room);
   if (room.status !== 'active' || (room.ai_turns >= 120 && !(room.capacity === 1 && !room.space_id)) || now - lastAttempt < loungeHostCooldownMs(room.capacity, chat)) return null;
   const human = messages.filter(message => message.kind === 'human').at(-1);
@@ -917,7 +917,8 @@ export function nextLoungeHostReason(room: LoungeRoom, messages: LoungeMessage[]
     // These pauses wait out speech (the person finishing, the AI's voice ending); a chat has none to wait for.
     if (!chat && (now - lastHostEnded < loungeSoloTiming.afterAiMs || now - inputReadyAt < loungeSoloTiming.settleAfterTranscriptMs || now - lastActivity < loungeSoloTiming.endOfTurnMs)) return null;
     if (human && (!host || human.id > host.id)) return 'followup';
-    if (!host && now - Date.parse(room.started_at || room.created_at) >= 1500) return 'opening';
+    // A story's prologue ends on the character's own line (its hook), so the member answers it and the character does not speak first again (2026-11-17).
+    if (!host && !memberSpeaksFirst && now - Date.parse(room.started_at || room.created_at) >= 1500) return 'opening';
     return null;
   }
   const activity = Math.max(lastActivity, Date.parse(human?.created_at || room.started_at || room.created_at));

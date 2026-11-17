@@ -1628,6 +1628,26 @@ test('solo responds to a new human turn promptly, while group pacing and the roo
   assert.equal(lounge.loungeHostCooldownMs(1, true), 1000); assert.equal(lounge.loungeHostCooldownMs(1), 2000);
 });
 
+test('a story prologue ends on the character, so the member speaks first and the character answers (2026-11-17)', () => {
+  const now = Date.now();
+  const room = { status: 'active', capacity: 1, space_id: null, voice_on: false, ai_turns: 0, started_at: new Date(now - 10_000).toISOString() };
+  assert.equal(lounge.nextLoungeHostReason(room, [], now, now - 5000, 0), 'opening', 'a chat with no story card still greets first');
+  assert.equal(lounge.nextLoungeHostReason(room, [], now, now - 5000, 0, 0, 0, true), null, 'after a prologue the character stays quiet');
+  const said = [{ id: 1, kind: 'human', created_at: new Date(now - 2000).toISOString() }];
+  assert.equal(lounge.nextLoungeHostReason(room, said, now, now - 2000, 0, 0, 0, true), 'followup', 'the first message of the member is answered');
+  // Her voice is the one the owner chose (2026-11-17).
+  assert.equal(lounge.loungeEngineVoice('eleven', 'auditor'), 'KO2FxuJ1cX6xaTuONGCE');
+});
+
+test('the character answers a member who speaks first as the next moment after the prologue, not as a second opening', () => {
+  const messenger = readFileSync(new URL('../src/lib/loungeMessenger.ts', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  assert.match(messenger, /recent에 네 말이 아직 없고 사용자의 말이 첫 말이면, 프롤로그가 네 마지막 대사나 행동으로 끝났고/);
+  assert.match(api, /reason이 opening이 아닌데 recent에 네 말이 아직 없고 사용자의 말이 첫 말이면/);
+  // The first reply (the member's own, now that the character no longer opens) reads the prologue in full; the later ones do not.
+  assert.match(api, /scenario\?\.id !== loungePersonaStoryScenarioId && !storyEpisodes\.length && \(room\.ai_turns \?\? 0\) > 1;/);
+});
+
 test('human rooms wait through short pauses and never automatically follow up an ordinary participant utterance', () => {
   const now=Date.now();
   const room={status:'active',capacity:3,ai_turns:2,last_ai_at:new Date(now-130_000).toISOString(),started_at:new Date(now-200_000).toISOString()};
