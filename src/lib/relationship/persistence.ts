@@ -1,4 +1,4 @@
-import { restoreRelationship } from './engine.js';
+import { createClosestRelationship, restoreRelationship } from './engine.js';
 import { moodKeys, type Mood, type RelationshipConfig, type RelationshipRecord } from './types.js';
 
 /** A row of `voice_lounge_relationships`. */
@@ -8,8 +8,15 @@ export type RelationshipRow = {
   meaningful_turns: number; turn_count: number; last_interaction_at: string | null; version: number;
 };
 
-export function relationshipFromRow(config: RelationshipConfig, row?: RelationshipRow | null): RelationshipRecord {
-  if (!row) return restoreRelationship(config, null);
+/** Accounts that start every character at the closest stage when they have no relationship yet (the adult-mode beta tester), plus LOUNGE_CLOSEST_START_USERS (emails or user ids). */
+export const relationshipClosestStartAccounts = ['adult05@saseok.kr'];
+export function startsAtClosestStage(user: { id?: string; email?: string } | undefined, env: Record<string, string | undefined> = {}) {
+  const listed = [...relationshipClosestStartAccounts, ...(env.LOUNGE_CLOSEST_START_USERS || '').split(',')].map(value => value.trim().toLowerCase()).filter(Boolean);
+  return Boolean(user && (listed.includes((user.id ?? '').toLowerCase()) || (user.email && listed.includes(user.email.toLowerCase()))));
+}
+
+export function relationshipFromRow(config: RelationshipConfig, row?: RelationshipRow | null, options: { closest?: boolean } = {}): RelationshipRecord {
+  if (!row) return options.closest ? createClosestRelationship(config) : restoreRelationship(config, null);
   return restoreRelationship(config, {
     scores: row.scores, stage: row.stage, pending: row.pending, recentEvents: row.recent_events, memories: row.memories,
     meaningfulTurns: row.meaningful_turns, turnCount: row.turn_count, lastInteractionAt: row.last_interaction_at, version: row.version,

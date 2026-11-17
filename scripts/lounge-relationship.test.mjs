@@ -662,3 +662,23 @@ test('every character is guarded at its first stage, and only there', () => {
   }
 });
 
+test('a beta account that tests the closest stage starts every character there, and holds it (2026-11-17: adult05 had to be set by hand after each new chat)', () => {
+  for (const config of Object.values(configs)) {
+    const stages = config.stages.filter(stage => stage.enabled !== false);
+    if (stages.length < 4) continue;
+    const record = relationship.createClosestRelationship(config);
+    assert.equal(record.stage, stages[3].id, config.characterId);
+    assert.equal(relationship.relationshipFromRow(config, null, { closest: true }).stage, stages[3].id, 'no row: the closest stage');
+    assert.equal(relationship.relationshipFromRow(config, null).stage, stages[0].id, 'no row, any other account: the first stage');
+    for (const [metric, value] of Object.entries(stages[3].enter.min ?? {})) assert.ok(record.scores[metric] >= value, `${config.characterId}.${metric}`);
+    // A stored row is never replaced by the start.
+    const stored = { user_id: 'u', character_id: config.characterId, scores: { ...createRelationship(config).scores }, stage: stages[0].id, pending: { direction: null, turns: 0 }, recent_events: [], memories: [], meaningful_turns: 0, turn_count: 3, last_interaction_at: null, version: 4 };
+    assert.equal(relationship.relationshipFromRow(config, stored, { closest: true }).stage, stages[0].id, 'a row that exists is the member\'s own');
+    // Quiet turns keep it.
+    assert.equal(run(config, [[], [], []], record).record.stage, stages[3].id, `${config.characterId} holds the stage`);
+  }
+  assert.equal(relationship.startsAtClosestStage({ id: 'x', email: 'Adult05@Saseok.kr' }), true);
+  assert.equal(relationship.startsAtClosestStage({ id: 'x', email: 'beta05@saseok.kr' }), false);
+  assert.equal(relationship.startsAtClosestStage({ id: 'abc', email: 'other@example.com' }, { LOUNGE_CLOSEST_START_USERS: 'ABC, nobody@x.y' }), true, 'more accounts by the environment');
+  assert.equal(relationship.startsAtClosestStage(undefined), false);
+});
