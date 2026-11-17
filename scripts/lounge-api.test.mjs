@@ -4034,7 +4034,7 @@ test('ElevenLabs speaks only within the member\'s monthly allowance and its char
   const library = 'GFsKFsadyjMQ7MPv89Tw', premade = 'JBFqnCBsd6RMkjVDRZzb';
   const scenarios = {
     'within the allowance': { status: { member: 1200, total: 9000 }, eleven: [library], heard: pcm.length, recorded: [16] },
-    'a member who used the month': { status: { member: 5000, total: 5000 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
+    'a member past the former 5,000 characters (no limit in characters since 2026-11-18)': { status: { member: 50000, total: 50000 }, eleven: [library], heard: pcm.length, recorded: [16] },
     'everyone together used the month': { env: { LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' }, status: { member: 0, total: 100 }, eleven: [], heard: 0, recorded: [], notice: '이번 달' },
     'a larger allowance from the environment': { env: { LOUNGE_ELEVEN_MONTHLY_CHARS: '20000' }, status: { member: 5000, total: 5000 }, eleven: [library], heard: pcm.length, recorded: [16] },
     'a guest within the trial': { user: { id: 'user-1', is_anonymous: true }, status: { member: 600, total: 600 }, eleven: [library], heard: pcm.length, recorded: [16] },
@@ -4103,7 +4103,7 @@ test('the speech action tells the picker what each premium voice has left this m
         const { engines } = await response.json();
         assert.deepEqual(Object.keys(engines).sort(), ['eleven-v4-turbo', 'typecast']);
         const eleven = engines['eleven-v4-turbo'];
-        if (name === 'a member') assert.deepEqual(eleven, { available: true, member: true, allowed: true, used: 3300, left: 1700, limit: 5000 });
+        if (name === 'a member') assert.deepEqual([eleven.available, eleven.member, eleven.allowed, eleven.used], [true, true, true, 3300], 'a member has no limit in characters');
         if (name === 'a guest') assert.deepEqual([eleven.member, eleven.allowed, eleven.limit], [false, true, 1500], 'a guest has a short trial of the same voice');
         if (name === 'no key') assert.deepEqual([eleven.available, eleven.allowed], [false, true], 'the allowance is real; the engine is not set up');
         assert.equal(engines.typecast.available, false);
@@ -4228,8 +4228,8 @@ test('the premium voice of the super admin has no limit, on the email account an
       });
     } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ELEVENLABS_API_KEY']) delete process.env[key]; }
   }
-  // Anyone else past the allowance is not allowed.
-  Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ELEVENLABS_API_KEY: 'el-key' });
+  // Anyone else is not allowed once everyone together has used the month's total (a member has no limit of their own since 2026-11-18).
+  Object.assign(process.env, { SUPABASE_SERVICE_ROLE_KEY: 'service', ELEVENLABS_API_KEY: 'el-key', LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS: '100' });
   try {
     await run(async url => {
       if (url.includes('/auth/')) return result({ id: 'user-9', email: 'someone@example.com' });
@@ -4237,7 +4237,7 @@ test('the premium voice of the super admin has no limit, on the email account an
       if (url.includes('lounge_call_status')) return result({ seconds: 0, plan: null });
       throw new Error('Unexpected call ' + url);
     }, async () => { const { engines } = await (await handler(request({ action: 'speech', roomId }))).json(); assert.equal(engines['eleven-v4-turbo'].allowed, false); });
-  } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ELEVENLABS_API_KEY']) delete process.env[key]; }
+  } finally { for (const key of ['SUPABASE_SERVICE_ROLE_KEY', 'ELEVENLABS_API_KEY', 'LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS']) delete process.env[key]; }
 });
 
 test('a voice reply starts speaking its first sentence while the rest is still being written, and never says it twice', async () => {
