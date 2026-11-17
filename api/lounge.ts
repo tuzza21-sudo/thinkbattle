@@ -529,7 +529,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       // A guest hears the same voice for a short trial (LOUNGE_ELEVEN_GUEST_CHARS, 1500 characters, about 4 minutes; 0 for
       // members only), counted under the guest's own id, so the voice does not change or fall silent for someone who has not signed up.
       const guest = Boolean(user.is_anonymous), guestChars = Number(process.env.LOUNGE_ELEVEN_GUEST_CHARS?.trim() ? process.env.LOUNGE_ELEVEN_GUEST_CHARS : 1500);
-      const yours = guest ? Math.max(0, Number.isFinite(guestChars) ? Math.floor(guestChars) : 1500) : limits.member;
+      // 2026-11-18, by the owner: a member has no limit in characters (the month's minutes of calls are the limit); the characters are still counted, and the total for everyone (LOUNGE_ELEVEN_TOTAL_MONTHLY_CHARS, off unless set) still applies.
+      const yours = guest ? Math.max(0, Number.isFinite(guestChars) ? Math.floor(guestChars) : 1500) : Number.MAX_SAFE_INTEGER;
       const none = (extra: Record<string, unknown> = {}) => ({ available, member: !guest, allowed: false, used: 0, left: 0, limit: yours, ...extra });
       if (guest && yours <= 0) return none();
       if (!serviceHeaders) return none({ unavailable: true });
