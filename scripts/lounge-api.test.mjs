@@ -5036,3 +5036,13 @@ test('the sidebar can be folded away to the left and brought back; the page besi
   assert.match(css, /\.lounge-page\.has-chat-sidebar > \.lounge-lobby \{ width:100%; margin-inline:0;/);
   assert.match(css, /calc\(\(1160px - /);
 });
+
+test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 이야기할까요?" (2026-11-17)', () => {
+  assert.deepEqual(['jaeseok', 'auditor', 'closer', 'trickster', 'guide', 'shaman', 'poker'].map(id => lounge.loungeHouseGender(id)), Array(7).fill('male'));
+  assert.deepEqual(['ina', 'velvet', 'diplomat', 'teacher'].map(id => lounge.loungeHouseGender(id)), Array(4).fill('female'));
+  assert.equal(lounge.loungeHouseGender('c_someone'), undefined, 'a member\'s character has its own gender in its sheet');
+  const home = readFileSync(new URL('../src/components/LoungeSpaces.tsx', import.meta.url), 'utf8');
+  assert.match(home, /\{ id: 'all', label: '전체' \}, \{ id: 'male', label: '남성' \}, \{ id: 'female', label: '여성' \}, \{ id: 'new', label: '신규' \}/);
+  assert.match(home, /row\.sheet\.gender === castFilter/);
+  assert.match(home, /<LoungeRow key=\{castFilter\} label="캐릭터"/);
+});

@@ -10,7 +10,11 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
-import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
+import { loungeGroupRoomsEnabled, loungeHouseGender, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
+
+/** The buttons under "누구와 이야기할까요?": all, men, women, the new ones (2026-11-17). */
+export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
+export type LoungeCastFilter = typeof loungeCastFilters[number]['id'];
 
 /** With group rooms closed there are no open tables to fetch. */
 const noTables = async (): Promise<LoungeOpenTable[]> => [];
@@ -140,6 +144,16 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const memberCast = useMemberCast(user);
   const lobbyCast = [...loungeLobbyCastOrder.map(id => loungeCharacters.find(character => character.id === id)), ...loungeCharacters.filter(character => !loungeLobbyCastOrder.includes(character.id))]
     .filter((character): character is LoungeCharacter => Boolean(character) && !newIds.has(character!.id));
+  // The filter: "전체" is the row as it was; 남성/여성 look through the new characters too; 신규 shows the new ones, which also stay on their own row below.
+  const [castFilter, setCastFilter] = useState<LoungeCastFilter>('all');
+  const newHouseCast = loungeNewCharacters.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
+  const shownCast = castFilter === 'all' ? lobbyCast : castFilter === 'new' ? newHouseCast : [...lobbyCast, ...newHouseCast].filter(character => loungeHouseGender(character.id) === castFilter);
+  const shownMemberCast = memberCast.rows.filter(row => {
+    const isNewPublic = newIds.has(row.id) && row.status === 'public';
+    if (castFilter === 'all') return !isNewPublic;
+    if (castFilter === 'new') return isNewPublic;
+    return row.sheet.gender === castFilter;
+  });
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
   const openSheet = (id: string) => setParams({ character: id }, { state: { sheet: true } });
   const closeSheet = () => { if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1); else setParams({}, { replace: true }); };
@@ -177,8 +191,11 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
         </div>
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
-      <LoungeRow label="캐릭터" className="lounge-cast-row">
-        {lobbyCast.map(character => {
+      <div className="lounge-cast-filter" role="group" aria-label="캐릭터 필터">
+        {loungeCastFilters.map(filter => <button key={filter.id} type="button" aria-pressed={castFilter === filter.id} onClick={() => setCastFilter(filter.id)}>{filter.label}</button>)}
+      </div>
+      {shownCast.length + shownMemberCast.length === 0 ? <p className="lounge-cast-empty" role="status">조건에 맞는 캐릭터가 아직 없어요.</p> : <LoungeRow key={castFilter} label="캐릭터" className="lounge-cast-row">
+        {shownCast.map(character => {
           const host = getLoungeHost(character.id), count = tables?.filter(table => table.host_persona === character.id).length ?? 0;
           return <li key={character.id}>
             {loungeGroupRoomsEnabled ? <button type="button" className="lounge-cast-card" aria-haspopup="dialog" onClick={() => openSheet(character.id)}>{castCard(character, host)}</button>
@@ -187,7 +204,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
           </li>;
         })}
         {/* A character on the 신규 캐릭터 row (it is shown there once it is public) is not shown twice; one that is not public yet, or the member's own, stays here. */}
-        {memberCast.rows.filter(row => !(newIds.has(row.id) && row.status === 'public')).map(row => {
+        {shownMemberCast.map(row => {
           const portrait = loungeCustomPortrait(row), own = row.owner_id === memberCast.member;
           return <li key={row.id}>
             <Link to={`/lounge/characters/${row.id}`} className="lounge-cast-card">
@@ -197,7 +214,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
             {own && <p className="lounge-cast-count">내 캐릭터 · {memberCastStatus[row.status]}</p>}
           </li>;
         })}
-      </LoungeRow>
+      </LoungeRow>}
     </section>
     <LoungeNewCast topics={topics} />
     <footer className="lounge-footer"><span>AI로 만든 가상의 인물 사진과 합성 음성이에요.</span><span>사석 · 테스트 오픈</span></footer>
