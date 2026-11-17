@@ -83,22 +83,14 @@ export function personalizeLoungeStory(story: string, name?: string | null) {
     : part.replace(/당신(으로|이라|이랑|이었|이야|은|이|을|과)?/g, (_, particle?: string) => who + (particle ? particles[particle] : ''))).join('');
 }
 
-/** Paragraphs are told in blocks of about this many characters: one paragraph at a time was tiring to read (2026-10-27). */
-export const storyIntroBlockSize = 420;
 /**
- * How long a prologue's next block waits (2026-11-02): in proportion to the characters of the block just told, so a long
- * one is read before the next comes in. It used to be 1.4 s whatever the block, which was too quick to read.
+ * A story's prologue as the paragraphs of one page (2026-11-17). Prologues were written in different shapes (a blank line
+ * between every line, or lines run together), so one page cuts them the same way: every line is a paragraph, and it is
+ * told as dialogue ("..." or “...”), a note ([...]) or narration.
  */
-export const storyIntroReadMs = (block: readonly string[]) => Math.min(20_000, Math.max(3_000, block.join('').length * 40));
-export function storyIntroBlocks(paragraphs: readonly string[], size = storyIntroBlockSize) {
-  const blocks: string[][] = [];
-  let length = 0;
-  for (const paragraph of paragraphs) {
-    if (!blocks.length || length >= size) { blocks.push([]); length = 0; }
-    blocks[blocks.length - 1].push(paragraph); length += paragraph.length;
-  }
-  return blocks;
-}
+export type StoryPageParagraph = { text: string; kind: 'line' | 'note' | 'text' };
+export const storyPageParagraphs = (story: string): StoryPageParagraph[] => story.split(/\n+/).map(line => line.trim()).filter(Boolean)
+  .map(line => ({ text: line, kind: /^["“]/.test(line) ? 'line' : /^\[/.test(line) ? 'note' : 'text' }));
 
 const text = (value: unknown, max: number) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 /** A room's scenario as stored, or nothing when the room has none (or it is unreadable). */

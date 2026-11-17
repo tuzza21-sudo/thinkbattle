@@ -4552,24 +4552,20 @@ test('a story is told with the member\'s name: "당신" in the narration takes t
   assert.equal(scenariosLib.personalizeLoungeStory('당신은', ''), '당신은', 'no name, no change');
 });
 
-test('a story intro tells its paragraphs in blocks of several, not one line at a time', () => {
-  const paragraph = '가'.repeat(100);
-  const blocks = scenariosLib.storyIntroBlocks(Array.from({ length: 10 }, () => paragraph));
-  assert.ok(blocks.length >= 2 && blocks.length <= 3, 'a thousand characters come as two or three blocks');
-  assert.equal(blocks.flat().length, 10, 'no paragraph is lost');
-  assert.ok(blocks.slice(0, -1).every(block => block.join('').length >= scenariosLib.storyIntroBlockSize), 'a block fills up before the next starts');
-  assert.deepEqual(scenariosLib.storyIntroBlocks([]), []);
-  assert.equal(scenariosLib.storyIntroBlocks(['짧은 한 줄']).length, 1, 'a short story is one block');
-});
-
-test('the next block of a prologue waits in proportion to the block just told', () => {
-  const wait = length => scenariosLib.storyIntroReadMs(['가'.repeat(length)]);
-  assert.equal(wait(100), 4000);
-  assert.equal(wait(300), 12000);
-  assert.ok(wait(300) > wait(100) * 2, 'twice the text, about twice the wait');
-  assert.equal(wait(5), 3000, 'a short block still gets time to read');
-  assert.equal(wait(5000), 20000, 'and a long one is not waited on forever');
-  assert.equal(scenariosLib.storyIntroReadMs(['가'.repeat(100), '나'.repeat(100)]), 8000, 'a block counts all its paragraphs');
+test('a prologue is one page: every shape of prologue is cut into the same paragraphs (2026-11-17)', () => {
+  // A blank line between every line, or lines run together: both come out the same.
+  const spaced = '밤의 거리.\n\n“안녕.”\n\n“오래 기다렸어?”\n\n[7. 질문]\n\n그가 웃었다.';
+  const packed = '밤의 거리.\n“안녕.”\n“오래 기다렸어?”\n[7. 질문]\n그가 웃었다.';
+  assert.deepEqual(scenariosLib.storyPageParagraphs(spaced), scenariosLib.storyPageParagraphs(packed));
+  assert.deepEqual(scenariosLib.storyPageParagraphs(packed).map(paragraph => paragraph.kind), ['text', 'line', 'line', 'note', 'text']);
+  assert.deepEqual(scenariosLib.storyPageParagraphs('"곧은 따옴표"\n  \n끝').map(paragraph => [paragraph.text, paragraph.kind]), [['"곧은 따옴표"', 'line'], ['끝', 'text']]);
+  assert.deepEqual(scenariosLib.storyPageParagraphs(''), []);
+  // The old way told blocks one after another with a wait; the intro now shows the whole page at once.
+  const intro = readFileSync(new URL('../src/components/LoungeStoryIntro.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(intro, /setTimeout|storyIntroBlocks|storyIntroReadMs|useState/);
+  assert.match(intro, /storyPageParagraphs\(personalizeLoungeStory\(scenario\.prologue, memberName\)\)/);
+  assert.match(intro, /paragraphs\.map\(/);
+  assert.equal(scenariosLib.storyIntroBlocks, undefined);
 });
 
 test('a story room keeps what the member wrote about themselves, cut at the longest note', () => {
