@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, Plus, RefreshCw, Settings, Shield, Trash2, UserRound } from 'lucide-react';
+import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, PanelLeftClose, Plus, RefreshCw, Settings, Shield, Trash2, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeSpokenText, type LoungeHostId } from '../lib/lounge';
@@ -106,10 +106,10 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
 }
 
 /** On a computer: the same list, under the header at the left, so the conversations are always at hand (2026-11-17). */
-export function LoungeChatSidebar({ user }: { user: AppUser }) {
+export function LoungeChatSidebar({ user, onHide }: { user: AppUser; onHide: () => void }) {
   const state = useLoungeChats(user);
   return <aside className="lounge-chat-sidebar" aria-label="대화중인 사석">
-    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={15} /></button></div>
+    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onHide} aria-label="사석 목록 숨기기" title="숨기기"><PanelLeftClose size={16} /></button><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={15} /></button></div>
     <LoungeChatItems state={state} compact />
   </aside>;
 }
