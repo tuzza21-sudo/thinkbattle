@@ -5011,7 +5011,7 @@ test('the lounge tab for conversations is called 사석, its page 대화중인 �
   assert.doesNotMatch(tabs, /<h1>채팅<\/h1>/);
   assert.match(tabs, /export function LoungeChatSidebar/);
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
-  assert.match(page, /chatSidebar && <LoungeChatSidebar user=\{props\.user \?\? null\} onHide=/);
+  assert.match(page, /chatSidebar && <LoungeChatSidebar user=\{props\.user \?\? null\} collapsed=\{chatSidebarHidden\} onToggle=/);
 });
 
 test('the plans page: Pro is named Plus, the free plan has 20 chats a day and 2 사석, Plus has 10 사석 (2026-11-17)', () => {
@@ -5024,13 +5024,13 @@ test('the plans page: Pro is named Plus, the free plan has 20 chats a day and 2 
   assert.equal(plansLib.loungePlanGoodName(plansLib.loungePlans[1]), '사석 Plus 1년 이용권');
 });
 
-test('the sidebar can be folded away to the left and brought back; the page beside it fills its column so the row arrows stay on screen (2026-11-17)', () => {
+test('the sidebar folds into a rail and unfolds again; the page beside it fills its column so the row arrows stay on screen (2026-11-17)', () => {
   const tabs = readFileSync(new URL('../src/components/LoungeTabs.tsx', import.meta.url), 'utf8');
-  assert.match(tabs, /onClick=\{onHide\} aria-label="사석 목록 숨기기"/);
+  assert.match(tabs, /onClick=\{onToggle\} aria-label="사석 목록 접기"/);
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
   assert.match(page, /localStorage\.getItem\('lounge-chat-sidebar'\) === 'hidden'/);
-  assert.match(page, /const chatSidebar = chatSidebarPage && !chatSidebarHidden;/);
-  assert.match(page, /chatSidebarPage && chatSidebarHidden && <button type="button" className="lounge-chat-sidebar-show"/);
+  assert.match(page, /const chatSidebar = chatSidebarPage;/, 'folded, it is still there as a rail');
+  assert.doesNotMatch(page, /lounge-chat-sidebar-show/);
   const css = readFileSync(new URL('../src/components/LoungeTabs.css', import.meta.url), 'utf8');
   assert.match(css, /column-gap:18px/, 'the gap is the one between character cards');
   assert.match(css, /\.lounge-page\.has-chat-sidebar > \.lounge-lobby \{ width:100%; margin-inline:0;/);
@@ -5047,16 +5047,19 @@ test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 �
   assert.match(home, /<LoungeRow key=\{castFilter\} label="캐릭터"/);
 });
 
-test('the sidebar is a fixed rail of portraits only, with the hide button, shown to everyone on a computer (2026-11-17)', () => {
+test('the sidebar opens as the full list (with delete) and folds into a fixed rail of portraits that unfolds when pressed (2026-11-17)', () => {
   const tabs = readFileSync(new URL('../src/components/LoungeTabs.tsx', import.meta.url), 'utf8');
   const sidebar = tabs.slice(tabs.indexOf('export function LoungeChatSidebar'), tabs.indexOf('/** Settings:'));
-  assert.doesNotMatch(sidebar, /<h2>/, 'no title: only the portraits');
-  assert.match(sidebar, /lounge-chat-sidebar-hide/);
-  const railCss = readFileSync(new URL('../src/components/LoungeTabs.css', import.meta.url), 'utf8');
-  assert.match(railCss, /position:fixed; left:14px; top:96px/, 'fixed to the window, so it does not move with the page');
-  assert.match(railCss, /\.lounge-chat-sidebar \.lounge-chat-text[^}]*display:none/, 'names and last lines are hidden');
-  assert.doesNotMatch(sidebar, /새로고침/);
+  const folded = sidebar.slice(sidebar.indexOf('if (collapsed)'), sidebar.indexOf('return <aside className="lounge-chat-sidebar" '));
+  assert.match(sidebar, /<h2>대화중인 사석<\/h2>/, 'unfolded: the title and the full list');
   assert.match(sidebar, /user \? <LoungeChatItems state=\{state\} compact \/> : /);
+  assert.match(folded, /className="lounge-chat-rail"[^]*onClick=\{onToggle\}/, 'folded: pressing a portrait unfolds');
+  assert.doesNotMatch(folded, /<h2>|새로고침/);
+  assert.match(tabs, /className="lounge-chat-delete"/, 'delete stays in the list');
+  const css = readFileSync(new URL('../src/components/LoungeTabs.css', import.meta.url), 'utf8');
+  assert.match(css, /position:fixed; left:14px; top:96px; width:276px/, 'fixed to the window: it does not move with the page');
+  assert.match(css, /\.lounge-chat-sidebar\.is-collapsed \{ width:64px;/);
+  assert.match(css, /\.chat-sidebar-collapsed \{ grid-template-columns:88px/);
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
   assert.match(page, /const chatSidebarPage = Boolean\(!inRoom && \(/, 'not only for a signed-in member');
 });

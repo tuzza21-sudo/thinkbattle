@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, PanelLeftClose, Plus, RefreshCw, Settings, Shield, Trash2, UserRound } from 'lucide-react';
+import { ChevronRight, FileText, House, Info, LogIn, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, Settings, Shield, Trash2, UserRound } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeSpokenText, type LoungeHostId } from '../lib/lounge';
@@ -32,6 +32,11 @@ function chatTime(at: string) {
   if (days <= 0) return date.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
   if (days === 1) return '어제';
   return date.getFullYear() === now.getFullYear() ? `${date.getMonth() + 1}월 ${date.getDate()}일` : `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}.`;
+}
+
+function chatName(chat: LoungeChatSummary) {
+  if (isLoungeCustomCharacterId(chat.character_id)) return chat.character_name ?? '캐릭터';
+  return getLoungeCharacter(chat.character_id)?.name ?? getLoungeHost(chat.character_id).name;
 }
 
 function ChatPortrait({ chat }: { chat: LoungeChatSummary }) {
@@ -76,16 +81,15 @@ function LoungeChatItems({ state, compact = false }: { state: ReturnType<typeof 
   const { chats, error, deleting, removeChat } = state;
   return <>
     {error && <p className="lounge-error" role="alert">{error}</p>}
-    {chats === null && !error && !compact && <p className="lounge-tab-loading" role="status">대화를 불러오는 중…</p>}
-    {chats?.length === 0 && compact && <span className="lounge-chat-rail-empty" title="아직 나눈 사석이 없어요"><MessageCircle size={20} /></span>}
-    {chats?.length === 0 && !compact && <div className="lounge-tab-empty">{!compact && <MessageCircle size={34} />}{compact ? <h3>아직 나눈 사석이 없어요</h3> : <h2>아직 나눈 대화가 없어요</h2>}<p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p>{!compact && <Link to="/lounge" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link>}</div>}
+    {chats === null && !error && <p className="lounge-tab-loading" role="status">대화를 불러오는 중…</p>}
+    {chats?.length === 0 && <div className="lounge-tab-empty">{!compact && <MessageCircle size={34} />}{compact ? <h3>아직 나눈 사석이 없어요</h3> : <h2>아직 나눈 대화가 없어요</h2>}<p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p>{!compact && <Link to="/lounge" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link>}</div>}
     {chats && chats.length > 0 && <ul className="lounge-chat-list">
       {chats.map(chat => {
         const custom = isLoungeCustomCharacterId(chat.character_id);
         const house = custom ? undefined : getLoungeCharacter(chat.character_id);
         const name = custom ? chat.character_name ?? '캐릭터' : house?.name ?? getLoungeHost(chat.character_id).name;
         const said = chat.last_kind === 'host' ? loungeSpokenText(chat.last_text) || chat.last_text.replace(/\*/g, '') : chat.last_text;
-        return <li key={chat.room_id}><button type="button" disabled={Boolean(deleting)} onClick={() => navigate(`/lounge/${chat.room_id}`)} title={compact ? name : undefined} aria-label={compact ? `${name}와의 사석 이어가기` : undefined}>
+        return <li key={chat.room_id}><button type="button" disabled={Boolean(deleting)} onClick={() => navigate(`/lounge/${chat.room_id}`)}>
           <ChatPortrait chat={chat} />
           <span className="lounge-chat-text"><span className="lounge-chat-name"><strong>{name}</strong>{chat.story && <small>{chat.story}</small>}</span><span className="lounge-chat-last">{chat.last_kind === 'human' ? `나: ${said}` : said}</span></span>
           <time dateTime={chat.last_at}>{chatTime(chat.last_at)}</time>
@@ -101,16 +105,22 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
   if (!user) return <main className="lounge-lobby lounge-tab-page"><div className="lounge-tab-empty"><MessageCircle size={34} /><h1>대화중인 사석</h1><p>로그인하면 캐릭터와 나눈 대화가 여기에 모여요. 언제든 이어서 이야기할 수 있어요.</p><button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button></div></main>;
   return <main className="lounge-lobby lounge-tab-page lounge-chats-main">
     <div className="lounge-tab-head"><h1>대화중인 사석</h1><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={16} /></button></div>
+    <p className="lounge-chats-hint">왼쪽 목록에서 이어서 이야기할 사석을 골라 보세요.</p>
     <div className="lounge-chats-items"><LoungeChatItems state={state} /></div>
   </main>;
 }
 
 /** On a computer: the same list, under the header at the left, so the conversations are always at hand (2026-11-17). */
-export function LoungeChatSidebar({ user, onHide, onLoginRequest }: { user: AppUser | null; onHide: () => void; onLoginRequest?: () => void }) {
+export function LoungeChatSidebar({ user, collapsed = false, onToggle, onLoginRequest }: { user: AppUser | null; collapsed?: boolean; onToggle: () => void; onLoginRequest?: () => void }) {
   const state = useLoungeChats(user);
+  // Folded: a narrow rail of the portraits alone; pressing the rail unfolds the full list again.
+  if (collapsed) return <aside className="lounge-chat-sidebar is-collapsed" aria-label="대화중인 사석">
+    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 펼치기" title="펼치기"><PanelLeftOpen size={16} /></button></div>
+    {user && state.chats && state.chats.length > 0 && <ul className="lounge-chat-rail">{state.chats.map(chat => <li key={chat.room_id}><button type="button" onClick={onToggle} title={chatName(chat)} aria-label="사석 목록 펼치기"><ChatPortrait chat={chat} /></button></li>)}</ul>}
+  </aside>;
   return <aside className="lounge-chat-sidebar" aria-label="대화중인 사석">
-    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onHide} aria-label="사석 목록 숨기기" title="숨기기"><PanelLeftClose size={16} /></button></div>
-    {user ? <LoungeChatItems state={state} compact /> : onLoginRequest && <button type="button" className="lounge-chat-rail-empty" onClick={onLoginRequest} title="로그인하면 대화중인 사석이 여기에 모여요" aria-label="로그인"><LogIn size={20} /></button>}
+    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 접기" title="접기"><PanelLeftClose size={16} /></button></div>
+    {user ? <LoungeChatItems state={state} compact /> : <div className="lounge-tab-empty"><h3>로그인하면 여기에 모여요</h3><p>캐릭터와 나눈 대화가 쌓이고, 언제든 이어서 이야기할 수 있어요.</p>{onLoginRequest && <button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button>}</div>}
   </aside>;
 }
 
