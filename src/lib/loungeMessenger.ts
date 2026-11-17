@@ -1,4 +1,4 @@
-import { loungeDefaultAdultMode, type LoungeCharacterBible, type LoungeSceneEvent } from './loungeCharacters';
+import { loungeAdultDepth, loungeDefaultAdultMode, type LoungeCharacterBible, type LoungeSceneEvent } from './loungeCharacters';
 import { formatLoungeNarration, splitLoungeActions } from './lounge.js';
 import type { LoungeMemberPersona } from './loungePersonas';
 import type { LoungeRoomScenario } from './loungeScenarios';
@@ -537,10 +537,10 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     ...(proposal === 'elegant' && bible?.intimacyProposal ? { proposal: `방금 상대가 품위 있게 먼저 다가왔다. 허락과 받아치기를 함께 한다. 이 단계의 결: ${bible.intimacyProposal.elegant.byStage[stage]}` } : {}),
     // Adult mode: told directly only at the closest step, never in a turn the member said no. There is nothing left to
     // open there, so a crude reading of the request must not tell her to refuse it (2026-11-02: it did).
-    ...(adultExplicit && adult ? { explicit: adult.explicit } : {}),
+    ...(adultExplicit && adult ? { explicit: `${adult.explicit} ${loungeAdultDepth}` } : {}),
     // At the closest step nothing is left to open, so a crude reading never tells her to refuse (2026-11-03, every mode).
     ...(proposal === 'crude' && bible?.intimacyProposal && intimacyLevel < 4 ? { proposal: `방금 요구는 무례했다. 아무것도 열지 않는다. ${bible.intimacyProposal.crude.response}` } : {}),
-  } : stage && adultExplicit && adult ? { explicit: adult.explicit } : undefined;
+  } : stage && adultExplicit && adult ? { explicit: `${adult.explicit} ${loungeAdultDepth}` } : undefined;
   return {
     // A sincere no comes before everything else in the turn.
     ...(input.sincereRefusal ? { priority: '사용자가 진심으로 거절했다. 압박을 즉시 멈추고 물러난다. 물러난 것을 탓하지 않는다.' } : {}),

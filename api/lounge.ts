@@ -1,6 +1,6 @@
 import { drainLoungeTurns, type LoungePendingTurn, type LoungeTurnPayload, type LoungeTurnStore } from '../src/lib/loungeTurnPersistence';
 import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScenario, loungePersonaStoryScenarioId, loungeRoomPersona, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
-import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
+import { getLoungeCharacter, loungeAdultDepth, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
@@ -1145,7 +1145,7 @@ ${photoRule}`;
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
     const nanoKey = process.env.NANOGPT_API_KEY;
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
-    const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultVoiceNote}` : undefined;
+    const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultDepth} ${loungeAdultVoiceNote}` : undefined;
     // 2026-11-18: at the closest step the adult model answers only a sexual scene (the analyzer reads it from the recent talk and
     // holds it while the scene goes on); every other turn is the member's chosen model, which is not told the explicit text. An
     // analysis that did not say (down, or not run) keeps the earlier rule: the adult model.
