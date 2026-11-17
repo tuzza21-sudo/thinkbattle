@@ -401,7 +401,12 @@ export type LoungeSpace = { id: string; name: string; host_persona: LoungeHostId
  */
 export type LoungeSpaceTable = { id: string; topic: string | null; present_count: number; capacity: number; participants: string[]; mine: boolean; host_persona: LoungeHostId; male_count: number; female_count: number; owner: string | null; age_groups: LoungeAgeGroup[] };
 /** Age groups an owner can limit a room to. People's age group comes from a later profile step; none chosen means no limit. */
-export const loungeAgeGroups = [{ id: '20s', label: '20대' }, { id: '30s', label: '30대' }, { id: '40s', label: '40대' }, { id: '50s', label: '50대' }, { id: '60s', label: '60대 이상' }] as const;
+/** The age groups a member can choose (2026-11-17: 10s from 16 years old added, 60s removed). */
+export const loungeAgeGroups = [{ id: '10s', label: '10대' }, { id: '20s', label: '20대' }, { id: '30s', label: '30대' }, { id: '40s', label: '40대' }, { id: '50s', label: '50대' }] as const;
+/** Chosen before 2026-11-17: still shown and kept for those members, no longer offered. */
+export const loungeLegacyAgeGroups = [{ id: '60s', label: '60대 이상' }] as const;
+/** Under 18: the adult mode of the conversations stays closed to them. */
+export const loungeMinorAgeGroups: readonly string[] = ['10s'];
 export type LoungeAgeGroup = typeof loungeAgeGroups[number]['id'];
 export const isLoungeAgeGroup = (value: string): value is LoungeAgeGroup => loungeAgeGroups.some(group => group.id === value);
 export const loungeAgeLimitLabel = (groups: readonly string[]) => groups.length ? loungeAgeGroups.filter(group => groups.includes(group.id)).map(group => group.label).join(' · ') : '';

@@ -30,7 +30,8 @@ export type AppUser = {
 };
 
 export type AppUserGender = 'male' | 'female';
-export type AppUserAgeGroup = '20s' | '30s' | '40s' | '50s' | '60s';
+/** '60s' is no longer offered at sign-up (2026-11-17) but stays valid for the members who chose it before. */
+export type AppUserAgeGroup = '10s' | '20s' | '30s' | '40s' | '50s' | '60s';
 
 export type PersonaId = 'socrates' | 'jeong_yakyong' | 'kant' | 'nietzsche';
 export type GameMode = 'persona' | 'roundtable' | 'debate' | 'pvp';

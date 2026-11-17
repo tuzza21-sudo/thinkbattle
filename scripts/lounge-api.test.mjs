@@ -2965,6 +2965,18 @@ test('선우령 through the handler: a graceful proposal opens the step in the r
   }
 });
 
+test('sign-up offers 10s (from 16 years old) and no longer 60s; a member who chose 60s keeps it (2026-11-17)', () => {
+  assert.deepEqual(lounge.loungeAgeGroups.map(group => group.id), ['10s', '20s', '30s', '40s', '50s']);
+  assert.deepEqual(lounge.loungeLegacyAgeGroups.map(group => group.id), ['60s']);
+  assert.deepEqual(lounge.loungeMinorAgeGroups, ['10s']);
+  const fields = readFileSync(new URL('../src/components/LoungeProfileFields.tsx', import.meta.url), 'utf8');
+  assert.match(fields, /10대 \(16세 이상\)/);
+  assert.match(fields, /loungeLegacyAgeGroups\.filter\(group => group\.id === value\.ageGroup\)/);
+  const migration = readFileSync(new URL('../supabase/migrations/20261229000000_lounge_age_group_teens.sql', import.meta.url), 'utf8');
+  assert.match(migration, /age_group IN \('10s','20s','30s','40s','50s','60s'\)/);
+  assert.match(migration, /age_group = '10s'\) THEN RAISE EXCEPTION '만 18세 이상만 성인 인증/);
+});
+
 test('adult mode (test accounts only): explicit only at 선우령\'s closest step, for a listed account, never after a no; the hard limits stay', async t => {
   const allowlistMode = process.env.LOUNGE_ADULT_MODE;
   process.env.LOUNGE_ADULT_MODE = 'allowlist';
@@ -3033,10 +3045,12 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   t.after(() => { if (savedDirector === undefined) delete process.env.LOUNGE_DIRECTOR; else process.env.LOUNGE_DIRECTOR = savedDirector; });
   process.env.LOUNGE_DIRECTOR = 'auto';
   const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
-  for (const [email, row, explicit] of [['Tester@Example.com', closest, true], ['other@example.com', closest, false], ['tester@example.com', velvetRow, false]]) {
+  // A member whose age group is 10s (under 18) never gets it, even when listed; an adult age group or none changes nothing (2026-11-17).
+  for (const [email, row, explicit, age] of [['Tester@Example.com', closest, true], ['other@example.com', closest, false], ['tester@example.com', velvetRow, false], ['tester@example.com', closest, false, '10s'], ['tester@example.com', closest, true, '20s']]) {
     let reply, directed, relationshipSaved;
     await withServiceKey(() => run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1', email });
+      if (url.includes('/rest/v1/users?')) return result(age ? [{ age_group: age }] : []);
       if (url.includes('claim_voice_lounge_host')) return result('ticket');
       if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
       if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: { ...base, room_id: roomId } }]);
@@ -3052,8 +3066,8 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
       return result([]);
     }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
     const input = JSON.parse(reply.input);
-    assert.equal(Boolean(input.turn.intimacy.explicit), explicit, `${email} at ${row.stage}`);
-    assert.equal(/turn\.intimacy\.explicit가 있을 때만/.test(reply.instructions), email.toLowerCase() === 'tester@example.com', `${email}: the lifted rules`);
+    assert.equal(Boolean(input.turn.intimacy.explicit), explicit, `${email} at ${row.stage} ${age ?? ''}`);
+    assert.equal(/turn\.intimacy\.explicit가 있을 때만/.test(reply.instructions), email.toLowerCase() === 'tester@example.com' && age !== '10s', `${email} ${age ?? ''}: the lifted rules`);
     assert.match(reply.instructions, /어떤 경우에도 하지 않는다|성적 대상화는 하지 않는다/);
     // The director reads the same touch limit as the reply (2026-11-03: without it, it told her to stop the member's hand).
     const directorInput = JSON.parse(directed.input);
