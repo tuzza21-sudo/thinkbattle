@@ -703,6 +703,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   // A story opens with its prologue full screen, and the character speaks only once the member starts it (LoungeStoryIntro).
   const [storyStarted, setStoryStarted] = useState(() => { try { return sessionStorage.getItem(`lounge.storyStarted.${roomId}`) === '1'; } catch { return false; } });
   const storyIntroOpen = useRef(false);
+  const memberSpeaksFirst = useRef(false);
   const lastModeratorRequest = useRef<string | null>(null);
   const audioBlocked = useRef(false);
   const nextAudioAttempt = useRef(0);
@@ -750,13 +751,16 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const personaStory = room && personas && !isLoungeConsultRoom(room.scenario?.id, room.host_persona) ? loungeRoomPersonaStory(room.member_persona, personas, room.host_persona) : undefined;
   const roomScenario = personaStory && room && personas ? loungePersonaStoryScenario(personaStory, loungeRoomPersonaRow(room.member_persona, personas)) : room?.scenario ?? null;
   // Only a story that has not begun: once the character has spoken, the prologue stays as the box at the top of the chat.
-  const storyIntro = Boolean(room && roomScenario && !personasPending && isHost && room.capacity === 1 && !storyStarted && !messages.some(message => message.kind === 'host'));
+  const storyIntro = Boolean(room && roomScenario && !personasPending && isHost && room.capacity === 1 && !storyStarted && !messages.some(message => message.kind === 'host' || message.kind === 'human'));
   // A story in episodes: once an episode is done the next one opens full screen, and its first scene is told when the member starts it.
   const storyEpisodes = loungeStoryEpisodesOn ? roomScenario?.episodes ?? [] : [];
   const storyState = storyEpisodes.length ? normalizeLoungeStoryState(room?.story_state, storyEpisodes) : null;
   const [episodeShown, setEpisodeShown] = useState(() => { try { return Number(sessionStorage.getItem(`lounge.episodeShown.${roomId}`)) || 0; } catch { return 0; } });
   const episodeIntro = Boolean(storyState && isHost && room?.capacity === 1 && storyState.episode > 0 && !storyState.opened && episodeShown < storyState.episode);
   storyIntroOpen.current = storyIntro || episodeIntro;
+  // A story card's prologue ends on the character's own line, so the member starts the conversation. The member's own narrative
+  // (a persona story) and a consultation have no such line: the character still opens those.
+  memberSpeaksFirst.current = Boolean(room && room.scenario && !personaStory && !isLoungeConsultRoom(room.scenario.id, room.host_persona));
   // A story's background follows its episode (2026-10-30): when the background was not chosen for this episode (none
   // yet, one chosen in an earlier episode, or a new episode whose first scene is not told yet), the server picks a place
   // or a shared scene that fits, or makes one and shares it. Until it answers the room shows what it had. Once a room and
@@ -1415,7 +1419,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       const speech = state.audio.getSpeechActivity();
       // A chat answers each message and greets once; there is no voice to wait for.
       if (state.isHost && isLoungeChatRoom(state.room)) {
-        const reason = nextLoungeHostReason(state.room!, state.messages, Date.now(), lastActivity.current, lastAttempt.current, lastHostEnded.current, inputReadyAt.current);
+        const reason = nextLoungeHostReason(state.room!, state.messages, Date.now(), lastActivity.current, lastAttempt.current, lastHostEnded.current, inputReadyAt.current, memberSpeaksFirst.current);
         if (reason === 'opening' || reason === 'followup') void hostTurn(reason);
         return;
       }
@@ -1439,7 +1443,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
         if (state.messages.at(-1)?.kind === 'human') callPlaced.current = false;
         else { void hostTurn('opening', undefined, true); return; }
       }
-      const reason = nextLoungeHostReason(state.room, state.messages, Date.now(), Math.max(lastActivity.current, speech.lastVoiceAt), lastAttempt.current, lastHostEnded.current, inputReadyAt.current);
+      const reason = nextLoungeHostReason(state.room, state.messages, Date.now(), Math.max(lastActivity.current, speech.lastVoiceAt), lastAttempt.current, lastHostEnded.current, inputReadyAt.current, memberSpeaksFirst.current);
       // A one-to-one voice room that opens by itself (no chat before it) is answered as a phone call too.
       if (reason) void hostTurn(reason, undefined, reason === 'opening' && state.room.capacity === 1 && !state.room.space_id);
     }, viewRoom?.capacity === 1 ? loungeSoloTiming.pollMs : room?.guided_session ? 500 : 3000);
