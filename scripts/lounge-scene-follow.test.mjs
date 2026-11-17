@@ -126,3 +126,11 @@ test('the five new places are backgrounds with images, and the scene text for th
   assert.equal(follow.sceneForMatch(scene('차 안', '이동', { activity: '집에 데려다주는 중' }), '차 안').includes('집에 데려다주는 중'), true);
   assert.equal(follow.sceneForMatch(undefined, '도심 호텔 라운지'), '도심 호텔 라운지');
 });
+
+test('a call is never a place: "전화 통화 중" kept the background where it was (2026-11-17, a chat in a bar left for a bedroom)', () => {
+  for (const line of ['전화 통화 중', '통화 중', '전화 중', '휴대폰 통화 중', '통화', '각자 있는 곳에서 전화 통화 중']) assert.equal(follow.stateScenePlace(scene(line, '기타')), undefined, line);
+  assert.equal(follow.stateScenePlace(scene('집 침실', '집')), '집 침실');
+  assert.equal(follow.stateScenePlace(scene('통화 연결음이 울리는 사무실', '회사')), '통화 연결음이 울리는 사무실', 'a real place that mentions a call is still a place');
+  const kept = decide({ scene: scene('전화 통화 중', '기타'), follow: { key: '와인바', at: now - 60 * minute, place: '와인바' }, sceneTurns: 9 });
+  assert.equal(kept.action, 'keep');
+});

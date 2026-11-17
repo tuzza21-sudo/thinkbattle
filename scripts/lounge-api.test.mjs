@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { filmCard, filmMaterial, filmSource, filmStudyFixture } from './lounge-film-fixtures.mjs';
 import { fileURLToPath } from 'node:url';
@@ -5080,4 +5080,38 @@ test('정하린 is an adult English tutor, and romance with an adult student is 
   assert.match(JSON.stringify(config.core), /성인 수강생과는 튜터라는 이유만으로 선을 긋지 않고/);
   const migration = readFileSync(new URL('../supabase/migrations/20261230000000_lounge_teacher_adult_tutor.sql', import.meta.url), 'utf8');
   assert.match(migration, /WHERE id='teacher-after-the-lecture' AND character_id='teacher'/);
+});
+
+test('정하린 starts in the winebar: the background exists, is hers, and the story opens there (2026-11-17)', () => {
+  const winebar = lounge.loungeThemes.find(theme => theme.id === 'winebar');
+  assert.ok(winebar, 'the theme is listed');
+  assert.equal(winebar.image, '/lounge/wine-bar-night-v1.webp');
+  assert.ok(existsSync(new URL('../public/lounge/wine-bar-night-v1.webp', import.meta.url)), 'the picture is shipped');
+  assert.deepEqual([...lounge.loungeHostThemes.teacher], ['winebar']);
+  assert.equal(lounge.getLoungeTheme('winebar').id, 'winebar');
+  const story = JSON.parse(readFileSync(new URL('../docs/stories/teacher-after-the-lecture.json', import.meta.url), 'utf8'));
+  assert.equal(story.theme, 'winebar');
+  assert.equal(story.title, '퇴근 후, 와인바의 옆자리');
+  assert.doesNotMatch(story.hook + story.prologue, /수능/, 'she is an adult English tutor now');
+  const migration = readFileSync(new URL('../supabase/migrations/20261224000000_lounge_teacher_winebar.sql', import.meta.url), 'utf8');
+  assert.match(migration, /'arnobridge','winebar'/);
+});
+
+test('a stray Chinese word is caught in Korean and in English replies, and the rewrite keeps the language the member talks in (2026-11-17)', () => {
+  const korean = messengerLib.loungeNotKorean;
+  assert.equal(korean('Let me explain it simply. 好的, one more time.'), true, 'Chinese inside an English reply');
+  assert.equal(korean('그럼 같이 해볼까요? 我们开始吧'), true, 'Chinese after Korean');
+  assert.equal(korean('Sure. Let me explain it simply, one more time.'), false);
+  assert.equal(korean('좋아요. 오늘 와인은 Pinot Noir예요.'), false);
+  assert.equal(korean('순대국(順大)은 반칙이죠.'), false, 'a hanja gloss is not a leak');
+  assert.equal(korean('日主는 갑목이에요. 甲木이 강해요.', { allowHan: true }), false, '이한결 reads hanja; a member who writes Chinese script too');
+  assert.equal(korean('日主는 갑목이에요. 甲木이 강해요.'), true);
+  assert.equal(messengerLib.loungeEnglishReply('Tell me one thing about your day. Just one, and we start there.'), true);
+  assert.equal(messengerLib.loungeEnglishReply('하고 싶은 말부터 해봐요. Just one thing.'), false);
+  assert.match(messengerLib.loungeLanguageNote('Tell me one thing about your day, just one 好的 and we start.'), /영어로만/);
+  assert.match(messengerLib.loungeLanguageNote('좋아요, 같이 해봐요 好的'), /반드시 한국어로만/);
+  assert.equal(messengerLib.withoutStrayHan('Sure 好的, we can start. 순대국(順大) too.'), 'Sure , we can start. 순대국(順大) too.');
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  assert.match(api, /allowHan: host\.id === 'shaman' \|\| /, '이한결 may write hanja');
+  assert.match(api, /rewrite\(loungeLanguageNote\(/, 'the rewrite is asked in the language of the reply');
 });

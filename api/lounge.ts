@@ -4,7 +4,7 @@ import { getLoungeCharacter, loungeAdultVoiceNote, loungeCharacterRules, loungeD
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeNotKorean, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
@@ -1938,12 +1938,21 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown; character_life?: unknown };
             };
             // A reply in another language (Luna once answered whole in Japanese) is written once more, asked for Korean,
-            // and replaces what was shown; if that fails too, the first is kept.
-            if (loungeNotKorean(`${full?.text ?? early}\n${typeof full?.inner_voice === 'string' ? full.inner_voice : ''}`)) {
-              const again = await rewrite('이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다.').catch(() => undefined);
-              const fixed = Boolean(again?.text && !loungeNotKorean(`${again.text}\n${typeof again.inner_voice === 'string' ? again.inner_voice : ''}`));
-              console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes: ['not_korean'], rewritten: fixed }));
+            // and replaces what was shown; if that fails too, the first is kept. 2026-11-17: asked in the language the member is
+            // talking in (an English chat is not asked for Korean), a stray Chinese word counts, and if the rewrite still has
+            // one it is taken out of the text. 이한결 reads hanja for a living and a member may write Chinese script: allowed.
+            const languageOptions = { allowHan: host.id === 'shaman' || /[一-鿿]/.test(lastHuman) };
+            const languageText = (item?: { text?: string; inner_voice?: unknown }, fallback = '') => `${item?.text ?? fallback}\n${typeof item?.inner_voice === 'string' ? item.inner_voice : ''}`;
+            if (loungeNotKorean(languageText(full, early), languageOptions)) {
+              const again = await rewrite(loungeLanguageNote(full?.text ?? early)).catch(() => undefined);
+              const fixed = Boolean(again?.text && !loungeNotKorean(languageText(again), languageOptions));
+              console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes: ['not_korean'], english: loungeEnglishReply(full?.text ?? early), rewritten: fixed }));
               if (fixed) full = again;
+              else if (!languageOptions.allowHan) {
+                const base = again?.text ? again : full;
+                const cleaned = withoutStrayHan(base?.text ?? early);
+                if ((cleaned.match(/[가-힣A-Za-z]/g) ?? []).length >= 10) full = { ...(base ?? {}), text: cleaned, ...(typeof base?.inner_voice === 'string' ? { inner_voice: withoutStrayHan(base.inner_voice) } : {}) };
+              }
             }
             const review = (candidate: typeof full) => loungeCompanionReplyReview({ characterId: host.id, userText: lastHuman, text: candidate?.text ?? early, inner: innerVoiceMode === 'on' && typeof candidate?.inner_voice === 'string' ? candidate.inner_voice : '' });
             const repair = review(full);

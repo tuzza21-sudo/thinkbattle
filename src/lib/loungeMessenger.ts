@@ -690,13 +690,35 @@ export function cleanLoungeCompanionReply(text: string, characterName?: string):
 /**
  * Whether a reply is written in another language than Korean (2026-11-02: GPT-6 Luna once answered 서도현's turn whole in
  * Japanese, and began the next with it). Any kana counts, as does more Chinese script than Hangul; a foreign word in a
- * Korean sentence does not.
+ * Korean sentence does not. 2026-11-17: a stray Chinese word in an English or Korean reply (two characters or more, outside
+ * the brackets of a hanja gloss like 순대국(順大)) counts as well, unless the member wrote Chinese script or the character
+ * reads hanja for a living (`allowHan`: 이한결's sajus).
  */
-export function loungeNotKorean(text: string) {
+export function loungeNotKorean(text: string, options: { allowHan?: boolean } = {}) {
   const hangul = (text.match(/[가-힣]/g) ?? []).length;
   const kana = (text.match(/[぀-ヿ]/g) ?? []).length;
   const han = (text.match(/[一-鿿]/g) ?? []).length;
-  return kana > 0 || han > Math.max(4, hangul);
+  const strayHan = (text.replace(/[(（][一-鿿\s]+[)）]/g, '').match(/[一-鿿]/g) ?? []).length;
+  return kana > 0 || han > Math.max(4, hangul) || (!options.allowHan && strayHan >= 2);
+}
+/** Whether the reply is written in English: the member asked for it, and the rewrite of a wrong-language reply must keep it. */
+export function loungeEnglishReply(text: string) {
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  const hangul = (text.match(/[가-힣]/g) ?? []).length;
+  return latin >= 20 && latin > hangul * 2;
+}
+/** The note a wrong-language reply is written again with: in the language the member is talking in. */
+export function loungeLanguageNote(reply: string) {
+  return loungeEnglishReply(reply)
+    ? '이번 답은 영어로만 쓴다(사용자가 영어로 하자고 했다). 중국어·일본어 글자는 한 글자도 쓰지 않는다. 대사와 속마음 모두 영어다.'
+    : '이번 답은 반드시 한국어로만 쓴다. 대사와 속마음 모두 한국어다. 중국어·일본어 글자는 쓰지 않는다.';
+}
+/** The last resort when the rewrite still has Chinese script: it is taken out, so nothing in another language is shown. */
+export function withoutStrayHan(text: string) {
+  const glosses: string[] = [];
+  // The hanja glosses like 순대국(順大) are put aside under a marker (U+0001 around a number), the rest of the Chinese script is taken out, and the glosses come back.
+  const kept = text.replace(/[(（][一-鿿\s]+[)）]/g, match => `\u0001${glosses.push(match) - 1}\u0001`);
+  return kept.replace(/[一-鿿]+/g, '').replace(/\u0001(\d+)\u0001/g, (_, index) => glosses[Number(index)]).replace(/ {2,}/g, ' ');
 }
 const plain = (text: string) => text.replace(/[\s.,!?…~'"“”‘’()-]/g, '');
 /** Keep the complete inner voice; suppress only a verbatim duplicate of the reply or a recent thought. */
