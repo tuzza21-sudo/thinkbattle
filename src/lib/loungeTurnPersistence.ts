@@ -8,6 +8,10 @@ export type LoungeTurnPayload = {
   request?: Record<string, unknown>; recent?: LoungeTurnMessage[]; memories?: MemoryRow[];
   memoryRefs?: Array<[string, string]>; companion?: boolean; consult?: boolean;
   proposalRule?: boolean; closest?: boolean; boldMove?: { stage: number };
+  /** A member without a stored relationship starts at the closest stage (the beta account adult05, see startsAtClosestStage). */
+  closestStart?: boolean;
+  /** Adult mode at the closest step: the member's hands are not scored as crossing a line (2026-11-17). */
+  adultClosest?: boolean;
   /** State authored by the reply model, kept in the durable job even if recording must be recovered. */
   character_life?: unknown;
 };
@@ -44,12 +48,13 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   let change: { relationship: RelationshipView; change: RelationshipChange } | undefined;
   if (config && !payload.consult) {
     const now = new Date(job.created_at);
-    const record = applyDecay(relationshipFromRow(config, snapshot.relationship), config, now);
+    const record = applyDecay(relationshipFromRow(config, snapshot.relationship, { closest: payload.closestStart }), config, now);
     let events = answer?.events;
     if (payload.analysis?.is_sincere_refusal && Array.isArray(events)) {
       events = events.filter(event => !['FOLDS_EASILY', 'WAFFLES'].includes(event?.type));
     }
-    if (payload.closest && Array.isArray(events)) events = events.filter(event => event?.type !== 'MAKES_CRUDE_ADVANCE');
+    // 2026-11-17: in adult mode at the closest step the character never draws the line, so the member's hands are not "crossing a line" either.
+    if (payload.closest && Array.isArray(events)) events = events.filter(event => event?.type !== 'MAKES_CRUDE_ADVANCE' && !(payload.adultClosest && event?.type === 'VIOLATES_BOUNDARY'));
     else if (payload.proposalRule && !payload.analysis?.is_sincere_refusal) events = alignLoungeProposalEvents(events, payload.analysis?.intimacy_proposal);
     const result = processTurn({ record, config, mood: moodFromRoom(config, snapshot.mood), events, hasUserTurn: Boolean(job.user_text), now });
     relationship = relationshipState(result.record); mood = result.mood;

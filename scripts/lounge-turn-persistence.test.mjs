@@ -154,3 +154,29 @@ test('the room record takes only agreements and feelings, sends only what is act
   assert.equal(m.loungeRoomSpeechLevel({ room_memory: record }), 'casual', 'the agreement outlives newer feelings');
   assert.equal(record.some(item => item.summary === '서운함 14'), true);
 });
+
+test('a chat saves through the durable turn store: a beta account starts at the closest stage there, and adult mode there does not score crossing a line (2026-11-17)', () => {
+  const teacher = relationship.getRelationshipConfig('teacher');
+  const stages = teacher.stages.filter(stage => stage.enabled !== false);
+  const job = (payload, events = []) => ({ room_id: 'room', turn: 1, user_text: '안녕하세요.', reply: '반가워요.', status: 'ready', payload: { companion: true, answer: { memory: '', events }, ...payload }, created_at: '2026-11-17T00:00:00.000Z', updated_at: '2026-11-17T00:00:00.000Z' });
+  const snapshot = { relationship: null, state: null, stateVersion: 0, mood: {} };
+  const first = turns.reduceLoungeTurn('room', teacher, snapshot, job({ closestStart: true }));
+  assert.equal(first.commit.relationship.stage, stages[3].id, 'the first turn of a new chat of adult05 is saved at the closest stage');
+  assert.equal(first.commit.relationshipVersion, 0, 'a new row');
+  const other = turns.reduceLoungeTurn('room', teacher, snapshot, job({}));
+  assert.equal(other.commit.relationship.stage, stages[0].id, 'any other account starts at the first stage');
+  // A stored row is the member's own, whatever the flag says.
+  const row = { user_id: 'u', character_id: 'teacher', scores: { empathy: 40, romance: 25, tension: 30 }, stage: stages[0].id, pending: { direction: null, turns: 0 }, recent_events: [], memories: [], meaningful_turns: 0, turn_count: 1, last_interaction_at: null, version: 1 };
+  assert.equal(turns.reduceLoungeTurn('room', teacher, { ...snapshot, relationship: row }, job({ closestStart: true })).commit.relationship.stage, stages[0].id);
+  // Four turns of "crossing a line" took a stage 4 chat down to 2 (a 정하린 chat, adult05): in adult mode at the closest step they are not scored.
+  let record = relationship.createClosestRelationship(teacher);
+  const violates = [{ type: 'VIOLATES_BOUNDARY', confidence: 0.95, note: '' }];
+  let current = { ...snapshot, relationship: { ...row, scores: record.scores, stage: record.stage, version: 1 } };
+  for (let turn = 1; turn <= 4; turn++) {
+    const { commit } = turns.reduceLoungeTurn('room', teacher, current, { ...job({ closest: true, adultClosest: true }, violates), turn });
+    assert.equal(commit.relationship.stage, stages[3].id, `turn ${turn} stays at the closest stage`);
+    current = { ...current, relationship: { ...current.relationship, scores: commit.relationship.scores, stage: commit.relationship.stage, version: current.relationship.version + 1 } };
+  }
+  const scored = turns.reduceLoungeTurn('room', teacher, { ...snapshot, relationship: { ...row, scores: record.scores, stage: record.stage, version: 1 } }, job({ closest: true }, violates));
+  assert.ok(scored.commit.relationship.scores.empathy < record.scores.empathy, 'without adult mode it is scored as before');
+});

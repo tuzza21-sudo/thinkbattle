@@ -1385,6 +1385,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       memoryRefs: [...longMemory?.refs.entries() ?? []], memories: longMemory?.chosen ?? [], companion: companionStored,
       consult: consultRoom, proposalRule: Boolean(character?.bible?.intimacyProposal),
       closest: Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship?.config.adultFlirtation && stageNumber && stageNumber >= 4),
+      adultClosest: adultMode && (Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship?.config.adultFlirtation && stageNumber && stageNumber >= 4)),
+      closestStart: startsAtClosestStage(user, process.env),
       ...(character?.bible?.intimacyProposal && stageNumber && analysis?.intimacy_proposal === 'elegant' && !analysis.is_sincere_refusal ? { boldMove: { stage: stageNumber } } : {}),
     });
     const persistTurn = async (answer: AfterReply | undefined, request?: Record<string, unknown>) => {
