@@ -12,7 +12,7 @@ export function LoungeProfileFields({ value, onChange, disabled, required = fals
     <fieldset className="form-field lounge-profile-age" disabled={disabled}>
       <legend>나이대{required && <em className="lounge-required"> 필수</em>}</legend>
       <div>{groups.map(group => <label key={group.id}>
-        <input type="radio" name="profile-age-group" value={group.id} checked={value.ageGroup === group.id} required={required} onChange={() => onChange({ ...value, ageGroup: group.id })} /><span>{group.id === '10s' ? '10대 (16세 이상)' : group.label}</span></label>)}</div>
+        <input type="radio" name="profile-age-group" value={group.id} checked={value.ageGroup === group.id} required={required} onChange={() => onChange({ ...value, ageGroup: group.id })} /><span>{group.id === '10s' ? '10대 (18세 이상)' : group.label}</span></label>)}</div>
       <small className="lounge-account-field-note">연령대 제한이 있는 대화방에 들어갈 때 쓰여요.</small>
     </fieldset>
   </div>;

@@ -11,7 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { getLoungeHost, loungeMinorAgeGroups, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -304,25 +304,6 @@ export function replyTextPartial(output: string): string | undefined {
  * LOUNGE_ADULT_MODE=off kills it; =allowlist keeps LOUNGE_ADULT_MODE_USERS for local tests (web and app).
  */
 async function hasLoungeAdultMode(
-  user: { id: string; email?: string; is_anonymous?: boolean },
-  req: Request | undefined,
-  lookup: { url: string; headers: Record<string, string> } | undefined,
-) {
-  if (!(await loungeAdultModeSetting(user, req, lookup))) return false;
-  // A member under 18 (age group 10s, offered from 2026-11-17) never gets it, whatever the web default or the app's
-  // confirmation says. When the age cannot be read it stays closed.
-  if (!lookup) return true;
-  try {
-    const response = await fetchTimed(`${lookup.url}/rest/v1/users?id=eq.${encodeURIComponent(user.id)}&select=age_group`, { headers: lookup.headers }, 4_000);
-    if (!response.ok) return false;
-    const rows = await readJson<Array<{ age_group: string | null }>>(response, 'lounge');
-    return !loungeMinorAgeGroups.includes(rows[0]?.age_group ?? '');
-  } catch {
-    return false;
-  }
-}
-
-async function loungeAdultModeSetting(
   user: { id: string; email?: string; is_anonymous?: boolean },
   req: Request | undefined,
   lookup: { url: string; headers: Record<string, string> } | undefined,
