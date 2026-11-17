@@ -2984,13 +2984,13 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   const bible = charactersLib.loungeCharacters.find(character => character.id === 'velvet').bible;
   const base = messengerLib.normalizeLoungeCompanionState(null, 'room-1');
   const turn = (stage, extra = {}) => messengerLib.loungeTurnConditions({ bible, stage, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true, ...extra }).intimacy;
-  assert.equal(turn(4).explicit, bible.adultMode.explicit);
+  assert.equal(turn(4).explicit, `${bible.adultMode.explicit} ${charactersLib.loungeAdultDepth}`);
   assert.equal(turn(3).explicit, undefined, 'not before the closest step');
-  assert.equal(turn(3, { intimacyProposal: 'elegant' }).explicit, bible.adultMode.explicit, 'a graceful proposal at the third stage reaches it');
+  assert.equal(turn(3, { intimacyProposal: 'elegant' }).explicit, `${bible.adultMode.explicit} ${charactersLib.loungeAdultDepth}`, 'a graceful proposal at the third stage reaches it');
   assert.equal(turn(4, { adultMode: false }).explicit, undefined);
   assert.equal(turn(4, { sincereRefusal: true }).explicit, undefined, 'never in a turn the member said no');
   // 2026-11-02: at the top step a crude reading of the request used to add "아무것도 열지 않는다" next to the explicit rule, and she refused.
-  assert.equal(turn(4, { intimacyProposal: 'crude' }).explicit, bible.adultMode.explicit);
+  assert.equal(turn(4, { intimacyProposal: 'crude' }).explicit, `${bible.adultMode.explicit} ${charactersLib.loungeAdultDepth}`);
   assert.equal(turn(4, { intimacyProposal: 'crude' }).proposal, undefined, 'nothing is left to open, so nothing tells her to refuse');
   assert.match(turn(2, { intimacyProposal: 'crude' }).proposal, /아무것도 열지 않는다/, 'below the top step a crude request still opens nothing');
   assert.match(bible.adultMode.explicit, /상호 동의/); assert.match(bible.adultMode.explicit, /즉시 중단한다/); assert.match(bible.adultMode.explicit, /미성년이거나 미성년으로 보이는 설정, 강요·비동의, 실존 인물은 이 모드에서도 하지 않는다/);
@@ -2999,11 +2999,11 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
   // the shared text at its closest stage, and only there, never for an account without the mode, never after a no.
   const sharedMode = charactersLib.loungeDefaultAdultMode;
   const asAuditor = (stage, extra = {}) => messengerLib.loungeTurnConditions({ bible: auditor, stage, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true, ...extra });
-  assert.deepEqual(asAuditor(4).intimacy, { explicit: sharedMode.explicit });
+  assert.deepEqual(asAuditor(4).intimacy, { explicit: `${sharedMode.explicit} ${charactersLib.loungeAdultDepth}` });
   assert.equal(asAuditor(3).intimacy, undefined, 'one step before the closest');
   assert.equal(asAuditor(4, { adultMode: false }).intimacy, undefined);
   assert.equal(asAuditor(4, { sincereRefusal: true }).intimacy, undefined);
-  assert.equal(messengerLib.loungeTurnConditions({ stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy.explicit, sharedMode.explicit, 'a character with no sheet at all');
+  assert.equal(messengerLib.loungeTurnConditions({ stage: 4, state: base, turn: 3, decision: { progress: 'stay' }, innerVoice: 'on', adultMode: true }).intimacy.explicit, `${sharedMode.explicit} ${charactersLib.loungeAdultDepth}`, 'a character with no sheet at all');
   assert.equal(asAuditor(4).rule_break, undefined);
   for (const text of [bible.adultMode.explicit, sharedMode.explicit]) {
     for (const limit of ['미성년', '강요·비동의', '실존 인물', '그 자리에서 멈추고']) assert.ok(text.includes(limit), limit);
@@ -3145,7 +3145,7 @@ test('adult mode is for every built-in character with adult flirtation, answered
   const sheet = { name: '한지안', age: 31, gender: 'female', job: '새벽 라디오 PD', concept: '', role: '새벽 음악 방송을 만든다', tagline: '사연을 끝까지 듣는 새벽 라디오 PD',
     story: ['대학 방송국에서 처음 마이크를 잡았다.', '첫 생방송에서 사연을 잘못 읽은 적이 있다.'], personality: [{ label: '강점', text: '끝까지 듣는다' }, { label: '약점', text: '자기 이야기를 안 한다' }, { label: '모순', text: '귀찮아하면서 사연을 기다린다' }],
     habits: ['짧게 웃고 말한다.', '노래 제목을 붙여 준다.'], look: '검은 단발과 회색 니트', boundaries: ['빈말로 칭찬하지 않는다.', '모욕하지 않는다.'], greeting: '이 시간에 깨어 있네요.' };
-  const shared = charactersLib.loungeDefaultAdultMode.explicit;
+  const shared = `${charactersLib.loungeDefaultAdultMode.explicit} ${charactersLib.loungeAdultDepth}`;
   const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
   const answer = JSON.stringify({ text: '이리 와.', inner_voice: '' });
   const closestOf = host => relationshipLib.getRelationshipConfig(host).stages.filter(stage => stage.enabled !== false).at(-1).id;
@@ -3269,7 +3269,7 @@ test('adult mode: a DeepSeek answer that comes back blank is asked once more bef
   }
   assert.match(velvetMode, /주도성, 긴장감, 감정의 밀도를 우선/, 'hers keeps the lead, the tension and the feeling');
   assert.match(velvetMode, /최소 3~5문장 이상/);
-  assert.match(charactersLib.loungeDefaultAdultMode.explicit, /최소 3~5문장 이상, 보통 6~10문장/);
+  assert.match(charactersLib.loungeDefaultAdultMode.explicit, /최소 3~5문장 이상, 보통 8~12문장/);
   assert.match(messengerLib.loungeCompanionRules({ innerVoice: 'on' }), /turn\.intimacy가 있으면 이번 장면의 한도/);
   const note = charactersLib.loungeAdultVoiceNote;
   assert.match(note, /통화 중이라는 말\(통화, 전화, 전화 너머/);
