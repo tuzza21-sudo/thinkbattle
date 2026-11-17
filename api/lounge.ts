@@ -757,7 +757,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
     // Enable the larger private-chat limit only after its database migration. Older databases keep accepting replies.
-    const replyLimit = chat && room.capacity === 1 && !room.space_id && !room.guided_session && process.env.LOUNGE_EXTENDED_COMPANION_REPLIES === 'on' ? loungeCompanionReplyLimit : chat ? 1200 : 600;
+    const replyLimit = chat && room.capacity === 1 && !room.space_id && !room.guided_session && process.env.LOUNGE_EXTENDED_COMPANION_REPLIES === 'on' ? loungeCompanionReplyLimit : chat ? 1200 : room.capacity === 1 && !room.space_id ? 360 : 600;
     // A call (the voice of a one-to-one room) answers without the character's knowledge lookup, and its memories are
     // ranked by what was just said only when that ranking is already there; otherwise by importance, as before
     // embeddings. The long-term memories themselves are always used (2026-11-07: calls answered too slowly).
@@ -1019,7 +1019,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const roleInstruction = spaceInstruction + groupRelationshipInstruction + (solo ? `역할: 자기 삶과 시점으로 사람 한 명과 대화하는 인물이다. ${loungeBiblePrompt(character) || host.companion}
 상대의 말에 답하면서 그 말이 네 상황과 기분에 어떻게 닿는지 표현하고, 자기 경험·근황·관심사로 이야기를 확장한다. 질문받지 않은 이야기라도 먼저 꺼내고 궁금한 것을 묻거나 하고 싶은 일을 제안할 수 있다. 분량과 반응의 크기는 인물의 말투와 현재 할 말에 맡긴다. 실제 오류는 고치되 장난이나 다른 의견마다 입장을 거둘 필요는 없다.
 reason=opening이면 지금 상황에서 먼저 말을 건다. reason=requested이고 request_kind=topic이면 새 이야깃거리를 원한 것이다. 진행 방식·발언 순서·패스·버튼 안내를 하지 않는다.
-reply_medium=voice이면 목소리로 들리는 대화다. 지문과 별도 속마음을 읽지 않고 말투·침묵·말의 내용으로 마음을 드러낸다. 자기 이야기가 길어지는 것도 그 인물답게 자연스러우면 괜찮다. phone_call이 있고 together가 아니면 각자 있는 곳에서 통화하며, 그렇지 않으면 같은 장면을 곁에서 이어 간다.
+reply_medium=voice이면 목소리로 들리는 대화다. 지문과 별도 속마음을 읽지 않고 말투·침묵·말의 내용으로 마음을 드러낸다. 음성은 글보다 짧게 말한다: 한 번에 한두 문장(길어도 세 문장, 150자 안팎)이고, 할 말이 많아도 일부만 말하고 상대의 반응을 기다린다. 채팅처럼 길게 늘어놓지 않는다. phone_call이 있고 together가 아니면 각자 있는 곳에서 통화하며, 그렇지 않으면 같은 장면을 곁에서 이어 간다.
 reply_medium=chat이면 대사와 네 행동·심리를 글로 표현한다. 괄호 지문과 대사의 비중·순서·개수는 인물과 상황에 맡긴다. 사용자 행동·감정·선택·동의를 대신 쓰지 않는다. 장면과 확정된 사실·합의, 실제 거절은 유지한다. 사용자의 속생각을 직접 들은 것처럼 답하지 않는다.
 ${photoRule}` : `역할: 사람끼리 이야기하는 방에 함께 있는 ${characterName}이다. 대화의 주인공은 사람이고 너는 처음의 어색함을 풀고 공평하게 시작하도록 거든 뒤 뒤로 물러난다. 말투와 관점: ${host.instruction}
 participant_count는 지금 함께 있는 사람 수다. first_host_turn=true이면 이번 첫 인사에서만 패스해도 된다고 한 번 짧게 안내한다. first_host_turn=false이면 첫 인사는 이미 끝났다. 패스 가능, 발언 선택권, 말하기·마치기 버튼 사용 안내를 반복하지 않는다.
