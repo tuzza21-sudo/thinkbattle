@@ -5190,3 +5190,45 @@ test('a voice conversation within a day of the last message is the same chat by 
   const coldLater = await turn({ ago: 1000, memory: '지금 장면: 통화 중 — 각자 집' });
   assert.deepEqual(coldLater.input.phone_call, { just_connected: false }, 'the call that began apart stays a call');
 });
+
+test('adult mode at the closest step: the adult model answers a sexual scene only; any other turn is the chosen model, without the explicit text (2026-11-18)', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY, analyzer: process.env.LOUNGE_ANALYZER };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.nano], ['LOUNGE_ANALYZER', saved.analyzer]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key', LOUNGE_ANALYZER: 'on' });
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '이리 와요.', inner_voice: '' });
+  const reading = { subtext: '평범한 말', quote_hook: '', user_action: '', request: '', references_memory: '', scene_change_request: '', activity_finished: false, topic_stale: false, is_emotional_moment: false, is_repair_request: false, moves_character: false, is_sincere_refusal: false, intimacy_proposal: 'none' };
+  // [what the analyzer says about the scene, who answers]: not said (an older reading, or none) keeps the adult model.
+  for (const [sexual, expected] of [[true, 'adult'], [false, 'chosen'], [undefined, 'adult'], ['down', 'adult']]) {
+    let adultAsked = false, openaiAsked = false, replyInput;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+      if (url.includes('voice_lounge_relationships?')) return result([closest]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '오늘 뭐 했어요?', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === modelsLib.loungeAdultChatUrl) { adultAsked = true; return sse([{ choices: [{ delta: { content: answer.slice(0, 10) } }] }, { choices: [{ delta: { content: answer.slice(10) }, finish_reason: 'stop' }] }]); }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return sexual === 'down' ? result({ error: { message: 'down' } }, 500) : modelAnswer({ ...reading, ...(sexual === undefined ? {} : { sexual_scene: sexual }) });
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses')) { openaiAsked = true; replyInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.equal(adultAsked, expected === 'adult', `sexual=${sexual}: the adult model`);
+    assert.equal(openaiAsked, expected === 'chosen', `sexual=${sexual}: the chosen model`);
+    if (expected === 'chosen') assert.equal(replyInput.turn.intimacy?.explicit, undefined, 'the chosen model is not told the explicit text');
+  }
+  assert.equal(messengerLib.readLoungeAnalysis({ ...reading, sexual_scene: false }).sexual_scene, false);
+  assert.equal('sexual_scene' in messengerLib.readLoungeAnalysis(reading), false, 'missing stays missing');
+  assert.match(messengerLib.loungeAnalyzerInstructions, /sexual_scene: .*키스와 깊은 키스.*false다/);
+});

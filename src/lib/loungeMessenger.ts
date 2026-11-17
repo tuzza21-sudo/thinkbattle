@@ -80,15 +80,17 @@ export type LoungeAnalysis = {
   is_sincere_refusal: boolean;
   /** The member asking first to be closer, or answering an invitation (2026-11-02): with grace, crudely, or not at all. */
   intimacy_proposal: LoungeIntimacyProposal;
+  /** The scene is sexual contact or sex right now or has been in the last few turns and is not over (2026-11-18): adult mode's own model answers only these turns. Missing when the reading did not say. */
+  sexual_scene?: boolean;
 };
 const analysisText = ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request'] as const;
 export const loungeAnalyzerSchema = {
   type: 'object', additionalProperties: false,
-  required: ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_repair_request', 'moves_character', 'is_sincere_refusal', 'intimacy_proposal'],
+  required: ['subtext', 'quote_hook', 'user_action', 'request', 'references_memory', 'scene_change_request', 'activity_finished', 'topic_stale', 'is_emotional_moment', 'is_repair_request', 'moves_character', 'is_sincere_refusal', 'intimacy_proposal', 'sexual_scene'],
   properties: {
     subtext: { type: 'string' }, quote_hook: { type: 'string' }, user_action: { type: 'string' }, request: { type: 'string' },
     references_memory: { type: 'string' },
-    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_repair_request: { type: 'boolean' }, moves_character: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' }, intimacy_proposal: { type: 'string', enum: [...proposals] },
+    scene_change_request: { type: 'string' }, activity_finished: { type: 'boolean' }, topic_stale: { type: 'boolean' }, is_emotional_moment: { type: 'boolean' }, is_repair_request: { type: 'boolean' }, moves_character: { type: 'boolean' }, is_sincere_refusal: { type: 'boolean' }, intimacy_proposal: { type: 'string', enum: [...proposals] }, sexual_scene: { type: 'boolean' },
   },
 } as const;
 /** The same for every character, so one cache serves them all; who the character is goes in the input. */
@@ -108,6 +110,7 @@ latest는 이 기록 위에서 읽는다. 사용자의 성격과 설정(member)�
 - moves_character: 사용자의 말이나 행동이 캐릭터 본인의 마음을 크게 흔들 만하면 true(고백이나 진심 어린 칭찬·위로, 예상 밖의 다정함, 캐릭터가 감추던 것을 들킴, 상처나 약한 곳을 건드림, 관계의 첫 약속·첫 접촉). 가벼운 인사, 정보 교환, 평범한 칭찬과 농담은 false.
 - is_sincere_refusal: 사용자가 캐릭터의 제안이나 압박을 진심으로 거절하거나, 지치거나 불편해서 선을 그었으면 true(예: "진짜 피곤해요", "그만해요", "오늘은 싫어요"). 장난으로 튕기거나 버티는 말, 캐릭터의 허세에 맞서는 말은 false다.
 - intimacy_proposal: 사용자가 더 가까운 관계, 스킨십, 캐릭터가 이끄는 놀이를 먼저 제안하거나 캐릭터의 초대에 응한 방식. 정중하고 자신 있게 제안하거나 응하면 elegant다(캐릭터의 초대가 없었어도 사용자가 먼저 품위 있게 제안하면 elegant). 몸을 품평하거나 저급한 말로 요구하면 crude다. 가벼운 플러팅, 농담, 칭찬, 제안이 없는 말이면 none이다.
+- sexual_scene: 지금 장면이 성적 접촉이나 성행위이거나(애무, 옷을 벗기거나 옷 안으로 들어가는 손, 잠자리, 성행위나 노골적인 신체 묘사를 하거나 요구함) 직전 몇 턴이 그랬고 아직 끝나지 않았으면 true다. 이어지는 동안에는 사용자의 마지막 말이 짧아도 true로 둔다. 손잡기, 포옹, 키스와 깊은 키스, 가벼운 스킨십과 플러팅, 일상 대화는 false다. 장면이 끝나고 일상 이야기나 여운 대화로 돌아갔으면 false다.
 칸에 없는 설명은 쓰지 않는다.`;
 const clip = (value: unknown, max = 120) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 /** The analyzer's answer, or nothing when it is not usable (the reply then reads the member for itself). */
@@ -116,7 +119,7 @@ export function readLoungeAnalysis(raw: unknown): LoungeAnalysis | undefined {
   const value = raw as Record<string, unknown>;
   if (typeof value.subtext !== 'string') return undefined;
   const text = Object.fromEntries(analysisText.map(key => [key, clip(value[key], key === 'quote_hook' ? 40 : key === 'subtext' ? 120 : 80)])) as Record<typeof analysisText[number], string>;
-  return { ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_repair_request: value.is_repair_request === true, moves_character: value.moves_character === true, is_sincere_refusal: value.is_sincere_refusal === true, intimacy_proposal: proposals.find(item => item === value.intimacy_proposal) ?? 'none' };
+  return { ...text, activity_finished: value.activity_finished === true, topic_stale: value.topic_stale === true, is_emotional_moment: value.is_emotional_moment === true, is_repair_request: value.is_repair_request === true, moves_character: value.moves_character === true, is_sincere_refusal: value.is_sincere_refusal === true, intimacy_proposal: proposals.find(item => item === value.intimacy_proposal) ?? 'none', ...(typeof value.sexual_scene === 'boolean' ? { sexual_scene: value.sexual_scene } : {}) };
 }
 export type LoungeTurnMessage = { kind: string; text: string };
 type AnalyzerMessage = LoungeTurnMessage;
