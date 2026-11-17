@@ -5149,3 +5149,43 @@ test('the beta account adult05 starts a new chat at the closest stage, every oth
     assert.equal(saved.p_expected_version, version, `${email}: a new row`);
   }
 });
+
+test('a voice conversation within a day of the last message is the same chat by voice, side by side; later than that it is a phone call (2026-11-18)', async () => {
+  const hour = 3_600_000, now = Date.now();
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now), true, 'a call placed two hours after the last message');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 25 * hour }], '', true, now), false, 'a day and an hour');
+  assert.equal(lounge.loungeCallTogether([], '', true, now), false, 'nothing to continue');
+  assert.equal(lounge.loungeCallTogether([{ at: NaN }], '', true, now), false, 'unknown time');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 1000 }], '지금 장면: 와인바', false, now), true, 'later turns keep it');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 1000 }], '지금 장면: 통화 중 — 각자 집', false, now), false, 'a call that began apart stays one');
+  const turn = async ({ ago, reason = 'followup', callStart = false, memory = '' }) => {
+    let reply, after;
+    await run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory, capacity: 1, ai_turns: 6, voice_on: true }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, kind: 'human', nickname: '나', text: '응', created_at: new Date(Date.now() - ago).toISOString() }, { id: 1, kind: 'host', nickname: 'AI', text: '그래.', created_at: new Date(Date.now() - ago - 60_000).toISOString() }]);
+      if (url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+      if (url.endsWith('/responses') && isAfterReply(init)) { after = JSON.parse(init.body); return modelAnswer({ memory: '', events: [], memory_ops: [] }); }
+      if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '네.' }) }] }] }); }
+      if (url.endsWith('/audio/speech')) return new Response(new Uint8Array([1, 2]));
+      if (url.includes('finish_voice_lounge') || url.includes('save_voice_lounge')) return result(true);
+      throw new Error('Unexpected call ' + url);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason, stream: true, ...(callStart ? { callStart: true } : {}) }))).text(); });
+    return { input: JSON.parse(reply.input), instructions: reply.instructions, after };
+  };
+  const warm = await turn({ ago: 2 * hour, reason: 'opening', callStart: true });
+  assert.deepEqual(warm.input.phone_call, { just_connected: true, together: true });
+  assert.match(warm.instructions, /phone_call\.together=true이면 전화가 아니다/);
+  assert.match(warm.instructions, /같은 자리에서 곁에 앉아 이어서 말한다/);
+  assert.equal(warm.after.instructions.includes('이번 대화는 전화 통화다'), false, 'the summary does not become a call scene');
+  assert.equal(JSON.parse(warm.after.input).phone_call, undefined);
+  const warmLater = await turn({ ago: 1000 });
+  assert.deepEqual(warmLater.input.phone_call, { just_connected: false, together: true });
+  const cold = await turn({ ago: 2 * 24 * hour, reason: 'opening', callStart: true });
+  assert.deepEqual(cold.input.phone_call, { just_connected: true }, 'two days later it is a phone call');
+  assert.match(cold.after.instructions, /memory 첫 줄은 '지금 장면: 통화 중/);
+  assert.equal(JSON.parse(cold.after.input).phone_call, true);
+  const coldLater = await turn({ ago: 1000, memory: '지금 장면: 통화 중 — 각자 집' });
+  assert.deepEqual(coldLater.input.phone_call, { just_connected: false }, 'the call that began apart stays a call');
+});

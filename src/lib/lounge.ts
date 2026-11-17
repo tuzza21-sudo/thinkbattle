@@ -856,6 +856,18 @@ export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
   const hours = Math.round(gap / 3_600_000), days = Math.round(gap / 86_400_000);
   return hours < 24 ? `${hours}시간` : days < 30 ? `${days}일` : `${Math.round(days / 30)}달`;
 }
+/**
+ * A voice conversation placed while the chat is still warm (2026-11-18, by the owner): the member did not call someone far away,
+ * they spoke up in the same conversation, so the character is beside them and carries on the same scene by voice. Only a call
+ * placed a day or more after the last message is a phone call. The first turn decides by the time since the last message; the
+ * turns after it keep that decision (a call that began apart wrote its scene as '지금 장면: 통화 중' into the summary).
+ */
+export const loungeCallTogetherHours = 24;
+export function loungeCallTogether(messages: Array<{ at: number }>, memory: string, opening: boolean, now = Date.now()) {
+  if (!opening) return !/^\s*지금 장면:\s*통화 중/.test(memory) && messages.some(message => Number.isFinite(message.at));
+  const last = messages.length ? messages[messages.length - 1].at : NaN;
+  return Number.isFinite(last) && now - last < loungeCallTogetherHours * 3_600_000;
+}
 export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다. 입력에 time_away가 없으면 같은 자리에서 이어지는 대화로 본다.';
 /** scene_background in the JSON input; always kept in cached instructions so toggling a backdrop does not rewrite them. */
 export const loungeSceneBackgroundInstruction = 'scene_background는 사용자가 고른 지금 장면의 장소다. 입력에 있으면 지금 장면이 다른 곳이어도 둘이 자연스럽게 그곳으로 옮겨 온 것으로 이어 가고, 그곳의 분위기를 말과 행동에 묻힌다. 배경을 바꿨다는 사실 자체는 말하지 않는다. 입력에 없으면 이 규칙을 쓰지 않는다.';
@@ -864,11 +876,12 @@ export const loungeSceneBackgroundInstruction = 'scene_background는 사용자�
  * the chat, and the two are apart. It carries on the story and the relationship, as a call: no acting out of the scene
  * the chat was in, and talk that suits a call. Before, the voice simply went on with the chat's scene, face to face.
  */
-export const loungePhoneCallRules = `phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다. 사용자가 너에게 전화를 걸었다. 지금까지의 이야기와 관계, 감정은 그대로 이어지지만 통화는 각자 있는 곳에서 이루어진다. memory나 recent에서 둘이 같은 자리에 있었다면, 그 뒤 헤어진 다음에 걸려 온 전화로 받아들인다.
+export const loungePhoneCallRules = `phone_call.together=true이면 위 통화 규칙(떨어진 채 하는 전화, 전화를 받는 쪽, '여보세요', 같은 자리에 있는 것처럼 굴지 않기)은 모두 쓰지 않고 아래 마지막 문단만 따른다. 그 밖의 phone_call이 있으면 지금은 둘이 떨어진 채 하는 전화 통화다. 사용자가 너에게 전화를 걸었다. 지금까지의 이야기와 관계, 감정은 그대로 이어지지만 통화는 각자 있는 곳에서 이루어진다. memory나 recent에서 둘이 같은 자리에 있었다면, 그 뒤 헤어진 다음에 걸려 온 전화로 받아들인다.
 같은 자리에 있는 것처럼 굴지 않는다. 손을 잡거나 무엇을 건네거나 보여 주는 일은 할 수 없고, 목소리와 전화 너머로 들리는 것(네가 있는 곳의 소리, 하던 일)으로만 전한다.
 통화 중에도 recent에 있는 네 이전 대사를 다시 읽거나 되풀이하지 않는다. 특히 전화를 받는 첫마디에서는 recent 마지막에 있는 네 대사가 전화를 걸기 전 채팅에서 한 말이므로, 그것을 읽거나 이어서 말하지 않고 지금 전화를 받은 사람의 새 말로 한다. 그 이야기는 알고 있는 일로만 쓴다.
 phone_call.just_connected=true이면 방금 전화를 받은 순간이고, 이 답은 사용자를 맞이하는 첫마디다. 너는 전화를 받는 쪽이다. 사용자가 전화를 걸어 온 것을 알아보고 한두 마디로 짧게 받는다. 받는 말은 그 순간의 마음에 따라 달라진다: 기분이 좋으면 밝게 '안녕~'이나 '어, 너네?', 편한 사이면 '응, 여보세요~', 무심하거나 피곤하면 '응.'이나 '여보세요… 어.', 서운함이 남았으면 한 박자 늦게 '…여보세요.', 설렘이 있으면 목소리를 낮춰 '여보세요? …아, 너구나.', 놀랐으면 '어? 웬일이야.'. 예시를 그대로 옮기지 않고 캐릭터의 말버릇과 말투로 그 마음에 맞는 말을 새로 만든다. '전화했네'는 늘 쓰는 공식이 아니라 가끔만 쓰고, recent에 있는 네 이전 첫마디와 겹치지 않게 한다. 사용자를 부르는 이름이 있으면(member_persona.call_name, member_name) 그 이름으로 부르고, 말투는 relationship.speech_level을 따른다. 이때 네 마음은 relationship.mood와 room_memory의 감정, memory의 '둘 사이'와 '지금 장면', recent의 마지막 분위기(좋게 헤어졌는지, 서운함이 남았는지, 설렘이 이어지는지)를 반영한다. 반가움, 놀람, 짐짓 무심한 척, 아직 남은 서운함을 캐릭터답게 싣되 과장하지 않는다. '나야'처럼 전화를 건 사람이 하는 말은 하지 않고, 하던 장면의 대사를 이어 말하지 않으며, 받자마자 사건이나 일 이야기를 꺼내지 않는다. 방 소개나 주제 질문도 하지 않는다. reason=opening의 다른 규칙보다 이 규칙이 우선한다.
-통화 중에는 매 답에서 먼저 reply_to(사용자가 방금 한 말)에 답한다. 그 말이 질문이면 그 질문에 바로 답하고, 앞서 이미 답한 이야기나 그 앞의 질문으로 돌아가 다시 답하지 않는다. 자기 근황과 경험, 하고 있던 일이나 그 말에 떠오른 생각으로 이야기를 넓혀도 된다. 먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories를 기억하되, 통화의 화제를 전부 사용자에게 맡기지 않는다. 이야기 속 사건이나 일도 통화로 전할 수 있는 만큼 네 쪽에서 자연스럽게 이야기할 수 있다. 사용자가 끊으려 하면 통화답게 인사하고 끝낸다.`;
+통화 중에는 매 답에서 먼저 reply_to(사용자가 방금 한 말)에 답한다. 그 말이 질문이면 그 질문에 바로 답하고, 앞서 이미 답한 이야기나 그 앞의 질문으로 돌아가 다시 답하지 않는다. 자기 근황과 경험, 하고 있던 일이나 그 말에 떠오른 생각으로 이야기를 넓혀도 된다. 먼저 recent의 최근 대화와 memory의 '둘 사이', relationship.user_memories를 기억하되, 통화의 화제를 전부 사용자에게 맡기지 않는다. 이야기 속 사건이나 일도 통화로 전할 수 있는 만큼 네 쪽에서 자연스럽게 이야기할 수 있다. 사용자가 끊으려 하면 통화답게 인사하고 끝낸다.
+phone_call.together=true이면 전화가 아니다. 사용자는 하던 대화를 목소리로 바꾼 것이고, 너는 같은 자리에서 곁에 앉아 이어서 말한다. 전화를 걸었다·받았다·끊는다, 목소리만 들린다, 떨어져 있다는 말은 하지 않는다. recent와 memory의 '지금 장면'(장소, 하던 일, 분위기)과 relationship.stage의 거리를 그대로 이어 간다. phone_call.just_connected=true여도 인사나 '여보세요'로 받지 않고, 방금 하던 이야기의 다음 말을 한다(recent 마지막에 있는 네 대사를 다시 읽거나 되풀이하지 않는다). 목소리로 말하는 매체의 규칙(지문 없이 말투와 말로 전하기)은 그대로 따른다.`;
 /** The call just connected: the instruction closest to the input, as the chat's last line pulled the greeting into reading it out. */
 export const loungeCallGreetingRule = `지금은 사용자가 건 전화를 방금 받은 순간이다. 이번 답은 사용자를 맞이하는 한두 마디다. recent의 마지막 대사는 전화를 걸기 전 채팅이니 읽거나 이어 말하지 않는다. relationship.mood와 room_memory의 감정, 지금까지의 분위기에 맞는 받는 말로 한다(밝게 '안녕~', 편하게 '응, 여보세요~', 무심하게 '응.', 서운하면 '…여보세요.'). 늘 같은 말('전화했네')로 받지 않고, 이름과 말투는 캐릭터대로 쓴다.`;
 /** The chat after a call: the call is over, and the chat carries on from what was said in it. */
