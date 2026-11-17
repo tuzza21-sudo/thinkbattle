@@ -2051,7 +2051,7 @@ test('long moderator speech survives the former 25-second deadline and 3MB PCM c
   const originalSetTimeout = globalThis.setTimeout;
   const deadlines = [];
   globalThis.setTimeout = (callback, milliseconds, ...args) => { deadlines.push({ milliseconds }); return originalSetTimeout(callback, milliseconds, ...args); };
-  const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 600);
+  const text = '마지막 장면에서 서로 다른 선택을 하는 이유를 함께 이야기해 봐요. '.repeat(20).slice(0, 360);
   const spokenInputs = [];
   try {
     await run(async (url, init) => {
@@ -2590,7 +2590,7 @@ test('a character\'s reply shows its bracketed actions as actions and its inner 
   assert.equal(lounge.loungeSpokenText('(잔을 돌린다)\n좋아요.\n\n[속마음]\n들켰나.'), '좋아요.');
 });
 
-test('private chat keeps full expressive replies up to 3000 characters while voice retains 600 characters', async () => {
+test('private chat keeps full expressive replies up to 3000 characters while a one-to-one voice keeps replies to 360 characters', async () => {
   const long = '오늘 이야기 정말 재밌었어요. '.repeat(90);
   const chat = await chatTurn({ voiceOn: false, replyText: long, host: plainLengthHost });
   assert.equal(chat.events[0].text, long.trimEnd());
@@ -2599,9 +2599,10 @@ test('private chat keeps full expressive replies up to 3000 characters while voi
   assert.match(expanded.events[0].text, /[.!?]$/);
   assert.match(chat.instructions, /말의 길이.*캐릭터의 호흡에 맡긴다/);
   const voice = await chatTurn({ voiceOn: true, replyText: long, host: plainLengthHost });
-  assert.equal(voice.events[0].text.length, 600);
+  assert.equal(voice.events[0].text.length, 360, "a one-to-one voice reply is short (2026-11-18)");
   assert.match(voice.instructions, /reply_medium=voice이면 목소리로 들리는 대화/);
   assert.match(voice.instructions, /말투·침묵·말의 내용으로 마음을 드러낸다/);
+  assert.match(voice.instructions, /음성은 글보다 짧게 말한다: 한 번에 한두 문장/);
 });
 
 test('narration handles inline and multiline legacy brackets, partial typing and spoken technical explanations', () => {

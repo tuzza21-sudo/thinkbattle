@@ -60,10 +60,10 @@ export function LoungeCall(props: LoungeCallProps) {
     return () => window.clearTimeout(timer);
   }, [soundBlocked]);
   const showConnect = props.needsConnection && !props.connecting && !props.starting && (!props.connected || soundBlockedLong || (props.connected && props.audioReady));
-  const status = props.ringing && !props.preview ? '전화 거는 중…'
+  const status = props.ringing && !props.preview ? '음성모드로 전환중…'
     : props.connecting ? '연결 중…'
-    : props.needsConnection ? !props.connected ? '연결이 끊겼어요' : !props.audioReady ? (soundBlockedLong ? '소리를 켜면 통화가 시작돼요' : '연결 중…') : props.lobby ? '전화 거는 중…' : '통화가 잠시 멈췄어요'
-    : props.lobby ? '전화 거는 중…'
+    : props.needsConnection ? !props.connected ? '연결이 끊겼어요' : !props.audioReady ? (soundBlockedLong ? '소리를 켜면 통화가 시작돼요' : '연결 중…') : props.lobby ? '음성모드로 전환중…' : '통화가 잠시 멈췄어요'
+    : props.lobby ? '음성모드로 전환중…'
     : props.hostSpeaking ? '말하는 중'
     : props.userSpeaking ? '듣고 있어요'
     // A slow reply looks like any wait ("…"): the page keeps trying by itself, so there is nothing to say about it.
