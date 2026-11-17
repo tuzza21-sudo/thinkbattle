@@ -5013,3 +5013,13 @@ test('the lounge tab for conversations is called 사석, its page 대화중인 �
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
   assert.match(page, /chatSidebar && props\.user && <LoungeChatSidebar user=\{props\.user\} \/>/);
 });
+
+test('the plans page: Pro is named Plus, the free plan has 20 chats a day and 2 사석, Plus has 10 사석 (2026-11-17)', () => {
+  assert.deepEqual(plansLib.loungeFreePlan.features, ['일 채팅 20회', '사석 2개까지', '이한결 사주 일 1회 제공']);
+  assert.deepEqual(plansLib.loungePlans.map(plan => plan.name), ['Plus 월간', 'Plus 연간']);
+  assert.deepEqual(plansLib.loungePlans.map(plan => plan.id), ['pro', 'pro'], 'the id stays: the database knows it by that');
+  for (const plan of plansLib.loungePlans) assert.ok(plan.features.includes('사석 10개까지') && plan.features.includes('채팅 무제한'));
+  assert.equal(plansLib.loungePlanReceiptName('pro', 'SS123'), 'Plus 1개월 이용권');
+  assert.equal(plansLib.loungePlanReceiptName('plus', 'SY123'), 'Plus 1년 이용권');
+  assert.equal(plansLib.loungePlanGoodName(plansLib.loungePlans[1]), '사석 Plus 1년 이용권');
+});

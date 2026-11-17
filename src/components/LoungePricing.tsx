@@ -54,7 +54,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   return <section className="lounge-home-section lounge-pricing" id="pricing" aria-labelledby="lounge-pricing-title">
     <header className="lounge-home-subhead">
       <h2 id="lounge-pricing-title">요금제(안)</h2>
-      <p>무료로 시작하고, 더 오래 통화하고 캐릭터가 나를 더 잘 알게 하고 싶다면 Pro를 골라 보세요.</p>
+      <p>무료로 시작하고, 더 오래 통화하고 캐릭터가 나를 더 잘 알게 하고 싶다면 Plus를 골라 보세요.</p>
       <p className="lounge-pricing-draft">지금 보이는 요금제는 안이에요. 테스트 오픈 중에는 요금과 이용 한도가 바뀔 수 있고, 바뀌면 서비스 화면으로 미리 알려 드려요.</p>
     </header>
     <ul className="lounge-pricing-grid">

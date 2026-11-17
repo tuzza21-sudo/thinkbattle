@@ -52,8 +52,8 @@ export const seoGuides: readonly SeoGuide[] = [
           '기억: 취향, 약속, 고민, 함께 쓴 이야기를 기억하고 다음 대화에서 먼저 꺼냅니다. 캐릭터가 기억한 내용은 설정에서 보고 고칠 수 있고, 한 캐릭터의 기억은 다른 캐릭터에게 전해지지 않아요.',
           '관계: 어색한 첫 만남에서 시작해 친구, 설렘, 로맨스로 천천히 가까워집니다. 무엇을 말하고 어떻게 대하느냐에 따라 캐릭터의 반응이 달라져요.',
           '채팅과 통화: 글로 이야기하다 목소리가 듣고 싶으면 전화로 바꾸고, 통화가 끝나면 그 이야기가 다시 채팅으로 이어집니다.',
-          `사진: 대화 중에 캐릭터가 지금 있는 곳의 모습을 사진으로 보내 줘요(무료 월 ${loungePhotoMonthly.free}장, Pro 월 ${loungePhotoMonthly.pro}장).`,
-          '나만의 캐릭터: 이름과 직업만 적어도 AI가 성격과 말투를 채워 주고, 직접 시나리오를 써서 오늘 밤의 무대를 정할 수 있어요(Pro).',
+          `사진: 대화 중에 캐릭터가 지금 있는 곳의 모습을 사진으로 보내 줘요(무료 월 ${loungePhotoMonthly.free}장, Plus 월 ${loungePhotoMonthly.pro}장).`,
+          '나만의 캐릭터: 이름과 직업만 적어도 AI가 성격과 말투를 채워 주고, 직접 시나리오를 써서 오늘 밤의 무대를 정할 수 있어요(Plus).',
         ],
       },
       {
@@ -66,7 +66,7 @@ export const seoGuides: readonly SeoGuide[] = [
     ],
     faq: [
       { question: 'AI 컴패니언이 뭔가요?', answer: '대화 상대가 되어 주는 AI입니다. 정보를 찾아 주는 비서가 아니라, 나를 기억하고 이야기를 이어 가며 가까워지는 캐릭터와 대화하는 서비스예요. 사석은 한국어 AI 컴패니언 서비스입니다.' },
-      { question: '사석은 무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작은 Pro 이용권(월 ${won(pro.price)}, 연 ${won(proYear.price)})에서 쓸 수 있어요.` },
+      { question: '사석은 무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작은 Plus 이용권(월 ${won(pro.price)}, 연 ${won(proYear.price)})에서 쓸 수 있어요.` },
       { question: '캐릭터가 나를 정말 기억하나요?', answer: '네. 취향과 약속, 고민, 함께 쓴 이야기를 기억해 다음 대화에서 이어 갑니다. 기억한 내용은 직접 확인하고 고칠 수 있고, 건강이나 연락처 같은 민감한 이야기는 기억하지 않아요.' },
       { question: '실제 사람과 대화하는 건가요?', answer: '아니요. 캐릭터와 사진, 목소리는 모두 AI로 만든 가상의 인물이며 실제 사람이 아닙니다.' },
       { question: '몇 살부터 이용할 수 있나요?', answer: '사석은 만 18세 이상을 위한 서비스입니다.' },
@@ -101,7 +101,7 @@ export const seoGuides: readonly SeoGuide[] = [
       {
         heading: '통화 시간과 요금',
         paragraphs: [
-          `통화 시간은 통화한 시간을 초 단위로 세어 한 달 기준으로 계산합니다. Pro 이용권은 월 ${callMinutes}분이고, 이용권별 시간은 요금제 화면에서 확인할 수 있어요. 통화 시간을 다 써도 채팅은 계속 이어 갈 수 있습니다.`,
+          `통화 시간은 통화한 시간을 초 단위로 세어 한 달 기준으로 계산합니다. Plus 이용권은 월 ${callMinutes}분이고, 이용권별 시간은 요금제 화면에서 확인할 수 있어요. 통화 시간을 다 써도 채팅은 계속 이어 갈 수 있습니다.`,
           '목소리 부담이 있거나 조용한 곳에서는 언제든 ‘채팅으로 대화’로 바꿀 수 있어요.',
         ],
       },
@@ -114,7 +114,7 @@ export const seoGuides: readonly SeoGuide[] = [
     ],
     faq: [
       { question: 'AI 전화는 어떻게 거나요?', answer: '사석에서 캐릭터를 골라 대화방에 들어간 뒤 ‘전화 연결’ 버튼을 누르고 마이크를 허용하면 됩니다. 말하면 캐릭터가 실시간으로 대답해요.' },
-      { question: 'AI 통화는 무료인가요?', answer: `통화 시간은 이용권에 따라 달라요. Pro 이용권(월 ${won(pro.price)})은 월 ${callMinutes}분 통화할 수 있고, 무료 이용 범위의 통화 시간은 베타 기간에 바뀔 수 있어 요금제 화면에서 확인해 주세요.` },
+      { question: 'AI 통화는 무료인가요?', answer: `통화 시간은 이용권에 따라 달라요. Plus 이용권(월 ${won(pro.price)})은 월 ${callMinutes}분 통화할 수 있고, 무료 이용 범위의 통화 시간은 베타 기간에 바뀔 수 있어 요금제 화면에서 확인해 주세요.` },
       { question: '통화 내용이 저장되나요?', answer: '말한 내용은 대화를 위해 글로 전사되어 대화 기록에 남지만, 원본 음성은 저장하지 않습니다. 기록과 계정은 설정에서 직접 삭제할 수 있어요.' },
       { question: '전화 상대는 실제 사람인가요?', answer: '아니요. 목소리까지 모두 AI가 합성한 가상의 인물입니다.' },
       { question: '통화 중에 앱을 닫아도 되나요?', answer: '안드로이드 앱에서는 화면이 꺼지거나 잠겨도 통화가 이어집니다. 웹에서는 통화 화면을 열어 둔 동안 통화가 유지돼요.' },
@@ -158,7 +158,7 @@ export const seoGuides: readonly SeoGuide[] = [
       { question: '음성 채팅과 글 채팅을 섞어 쓸 수 있나요?', answer: '네. 같은 대화 안에서 언제든 음성과 글을 오갈 수 있고, 음성으로 한 이야기도 대화 기록에 글로 남습니다.' },
       { question: '목소리는 실제 사람인가요?', answer: '캐릭터의 목소리는 AI가 합성한 음성입니다. 실제 성우나 사람의 통화가 아니에요.' },
       { question: '한국어로 대화할 수 있나요?', answer: '사석은 한국어 서비스이고, 캐릭터는 자연스러운 한국어 말투로 대화합니다.' },
-      { question: '음성 대화에 요금이 드나요?', answer: `음성 통화는 Pro 이용권(월 ${won(pro.price)}, 월 ${callMinutes}분)에서 본격적으로 쓸 수 있고, 채팅은 가입하면 무료로 시작할 수 있어요.` },
+      { question: '음성 대화에 요금이 드나요?', answer: `음성 통화는 Plus 이용권(월 ${won(pro.price)}, 월 ${callMinutes}분)에서 본격적으로 쓸 수 있고, 채팅은 가입하면 무료로 시작할 수 있어요.` },
     ],
     related: ['/ai-call', '/ai-companion', '/character-chat'],
   },
@@ -189,13 +189,13 @@ export const seoGuides: readonly SeoGuide[] = [
       {
         heading: '나만의 캐릭터 만들기',
         paragraphs: [
-          '이름과 나이, 직업만 적어도 AI가 살아온 이야기와 성격, 말투를 채워 줍니다. 나를 소개하는 페르소나와 첫 장면을 적으면 캐릭터가 그것을 알고 다가와요. 목소리까지 골라 입힌 뒤 검수를 거쳐 공개하면 다른 사람도 내 캐릭터와 이야기할 수 있습니다. 나만의 캐릭터 제작은 Pro 이용권에서 제공돼요.',
+          '이름과 나이, 직업만 적어도 AI가 살아온 이야기와 성격, 말투를 채워 줍니다. 나를 소개하는 페르소나와 첫 장면을 적으면 캐릭터가 그것을 알고 다가와요. 목소리까지 골라 입힌 뒤 검수를 거쳐 공개하면 다른 사람도 내 캐릭터와 이야기할 수 있습니다. 나만의 캐릭터 제작은 Plus 이용권에서 제공돼요.',
         ],
       },
     ],
     faq: [
-      { question: 'AI 캐릭터 채팅은 무료인가요?', answer: `가입하면 ${loungeFreePlan.features[0]}로 무료로 시작할 수 있어요. 채팅 무제한은 Pro 이용권(월 ${won(pro.price)})에서 제공됩니다.` },
-      { question: '캐릭터를 직접 만들 수 있나요?', answer: '네. 이름, 나이, 직업만 적어도 AI가 성격과 말투를 채우고, 시나리오와 목소리까지 정할 수 있습니다(Pro). 검수를 거쳐 공개하면 다른 사람도 이용할 수 있어요.' },
+      { question: 'AI 캐릭터 채팅은 무료인가요?', answer: `가입하면 ${loungeFreePlan.features[0]}로 무료로 시작할 수 있어요. 채팅 무제한은 Plus 이용권(월 ${won(pro.price)})에서 제공됩니다.` },
+      { question: '캐릭터를 직접 만들 수 있나요?', answer: '네. 이름, 나이, 직업만 적어도 AI가 성격과 말투를 채우고, 시나리오와 목소리까지 정할 수 있습니다(Plus). 검수를 거쳐 공개하면 다른 사람도 이용할 수 있어요.' },
       { question: '롤플레이도 되나요?', answer: '네. 대사와 *행동*을 함께 쓰는 롤플레이를 지원하고, 준비된 시나리오로 시작하거나 직접 첫 장면을 쓸 수 있어요.' },
       { question: '캐릭터와 계속 이야기하면 달라지나요?', answer: '네. 지난 대화를 기억하고, 함께한 시간과 대화에 따라 관계가 천천히 깊어지며 반응도 달라집니다.' },
       { question: '캐릭터는 실제 인물인가요?', answer: '아니요. 모든 캐릭터는 AI로 만든 가상의 인물이고, 사진도 AI가 만든 이미지입니다.' },
@@ -208,8 +208,8 @@ export const seoGuideByPath = (path: string) => seoGuides.find(guide => guide.pa
 
 export const seoHomeFaq: readonly SeoFaq[] = [
   { question: '사석은 어떤 서비스인가요?', answer: '사석은 나를 기억하고 함께한 시간만큼 가까워지는 AI 컴패니언 서비스입니다. AI 캐릭터와 채팅하고, 전화를 걸어 목소리로 대화하고, 나만의 캐릭터와 시나리오를 만들 수 있어요.' },
-  { question: 'AI 전화나 AI 통화도 할 수 있나요?', answer: `네. 대화방에서 ‘전화 연결’을 누르면 캐릭터와 실시간으로 목소리 대화를 합니다. Pro 이용권은 월 ${callMinutes}분 통화할 수 있어요.` },
-  { question: '무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. Pro 이용권은 월 ${won(pro.price)}, 연 ${won(proYear.price)}이고 자동으로 다시 결제되지 않아요.` },
+  { question: 'AI 전화나 AI 통화도 할 수 있나요?', answer: `네. 대화방에서 ‘전화 연결’을 누르면 캐릭터와 실시간으로 목소리 대화를 합니다. Plus 이용권은 월 ${callMinutes}분 통화할 수 있어요.` },
+  { question: '무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. Plus 이용권은 월 ${won(pro.price)}, 연 ${won(proYear.price)}이고 자동으로 다시 결제되지 않아요.` },
   { question: '캐릭터는 실제 사람인가요?', answer: '아니요. 캐릭터와 사진, 목소리는 모두 AI로 만든 가상의 인물입니다. 사석은 만 18세 이상을 위한 서비스예요.' },
   { question: '어디서 이용하나요?', answer: '웹 브라우저에서 saseok.kr로 접속해 이용합니다. PC와 모바일 모두 쓸 수 있어요.' },
 ];
@@ -229,7 +229,7 @@ export const seoHome = {
     ] },
     { heading: '이용 방법과 요금', paragraphs: [
       `1) 가입하고 마음이 가는 캐릭터를 고릅니다. 2) 준비된 이야기로 시작하거나 나를 소개하고 나만의 이야기를 엽니다. 3) 채팅으로 천천히, 또는 전화로 목소리를 들으며 대화합니다.`,
-      `무료로 시작할 수 있고(${loungeFreePlan.features.join(', ')}), Pro 이용권은 월 ${won(pro.price)} 또는 연 ${won(proYear.price)}입니다. Pro는 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작을 포함해요.`,
+      `무료로 시작할 수 있고(${loungeFreePlan.features.join(', ')}), Plus 이용권은 월 ${won(pro.price)} 또는 연 ${won(proYear.price)}입니다. Plus는 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작을 포함해요.`,
     ] },
     { heading: '안심하고 이용하세요', paragraphs: [seoVirtualNotice] },
   ] as readonly SeoSection[],
@@ -261,7 +261,7 @@ export function seoCharacterPage(character: LoungeCharacter) {
     voice,
     faq: [
       { question: `${character.name}는 실제 인물인가요?`, answer: `아니요. ${character.name}는 사석이 AI로 만든 가상의 캐릭터이고, 사진과 목소리도 AI가 만든 것입니다.` },
-      { question: `${character.name}와 전화로 대화할 수 있나요?`, answer: `네. 대화방에서 ‘전화 연결’을 누르면 ${character.name}${voice ? `의 목소리(${voice})` : ''}로 실시간 대화를 할 수 있어요. 통화 시간은 이용권에 따라 달라요(Pro 월 ${callMinutes}분).` },
+      { question: `${character.name}와 전화로 대화할 수 있나요?`, answer: `네. 대화방에서 ‘전화 연결’을 누르면 ${character.name}${voice ? `의 목소리(${voice})` : ''}로 실시간 대화를 할 수 있어요. 통화 시간은 이용권에 따라 달라요(Plus 월 ${callMinutes}분).` },
       { question: `${character.name}는 저를 기억하나요?`, answer: '네. 지난 대화에서 나눈 취향과 약속, 이야기를 기억하고 다음 대화에서 이어 갑니다. 기억은 설정에서 보고 고칠 수 있어요.' },
     ] as readonly SeoFaq[],
   };
