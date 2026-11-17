@@ -36,18 +36,24 @@ export const loungePlanReceiptName = (id: unknown, oid: unknown) => id === 'pro'
 /**
  * Minutes of voice calls a month (the month in Korea), counted as the time spent in calls, not as characters spoken.
  * A member with no plan has LOUNGE_FREE_CALL_MINUTES (5 when unset), but only one who signed up after the limit began
- * (lounge_call_limits.applies_from); a beta tester has LOUNGE_TESTER_CALL_MINUTES (30); the earlier members and the super
- * admin have no limit (lounge_call_exempt in the database). The limit is applied unless LOUNGE_CALL_LIMITS=off.
+ * (lounge_call_limits.applies_from); a beta tester has LOUNGE_TESTER_CALL_MINUTES (30); the earlier members have 60
+ * (LOUNGE_LEGACY_CALL_MINUTES, lounge_call_legacy); only the super admin has no limit (lounge_call_exempt in the database). The limit is applied unless LOUNGE_CALL_LIMITS=off.
  */
 export const loungeCallMinutes: Record<LoungePlanId, number> = { plus: 60, pro: 100 };
 export const loungeFreeCallMinutesDefault = 5;
 /** A beta tester without a plan: 30 minutes a month (LOUNGE_TESTER_CALL_MINUTES). */
 export const loungeTesterCallMinutesDefault = 30;
-export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>, tester = false) {
+/** A member from before the limit began, without a plan: 60 minutes a month since 2026-11-17 (LOUNGE_LEGACY_CALL_MINUTES); they were unlimited before. */
+export const loungeLegacyCallMinutesDefault = 60;
+export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>, tester = false, legacy = false) {
   if (plan === 'plus' || plan === 'pro') return loungeCallMinutes[plan];
   if (tester) {
     const value = Number(env.LOUNGE_TESTER_CALL_MINUTES);
     return env.LOUNGE_TESTER_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeTesterCallMinutesDefault;
+  }
+  if (legacy) {
+    const value = Number(env.LOUNGE_LEGACY_CALL_MINUTES);
+    return env.LOUNGE_LEGACY_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeLegacyCallMinutesDefault;
   }
   const value = Number(env.LOUNGE_FREE_CALL_MINUTES);
   return env.LOUNGE_FREE_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeFreeCallMinutesDefault;

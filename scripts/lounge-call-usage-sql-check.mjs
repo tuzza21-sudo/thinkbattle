@@ -13,7 +13,7 @@ try {
     CREATE TABLE public.users(id uuid PRIMARY KEY,email text,nickname text);
     CREATE FUNCTION public.is_super_admin() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT current_setting('test.admin',true)='yes' $$;`);
   await db.exec('CREATE TABLE public.lounge_beta_testers(user_id uuid PRIMARY KEY)');
-  for (const file of ['20261111000000_lounge_speech_usage.sql', '20261209000000_lounge_payments.sql', '20261210000000_lounge_call_usage.sql', '20261210040000_lounge_call_exempt.sql', '20261210060000_lounge_call_testers_limited.sql']) {
+  for (const file of ['20261111000000_lounge_speech_usage.sql', '20261209000000_lounge_payments.sql', '20261210000000_lounge_call_usage.sql', '20261210040000_lounge_call_exempt.sql', '20261210060000_lounge_call_testers_limited.sql', '20261231000000_lounge_call_legacy_sixty.sql']) {
     try { await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8')); } catch (error) { throw new Error(`${file}: ${error.message}`); }
   }
   for (const [id, name] of [[a, '가'], [b, '나']]) {
@@ -23,7 +23,7 @@ try {
 
   // The first tick only starts the clock.
   let status = (await one('select tick_lounge_call($1,true) s', [a])).s;
-  assert.deepEqual(status, { seconds: 0, plan: null, exempt: false, tester: false });
+  assert.deepEqual(status, { seconds: 0, plan: null, exempt: false, tester: false, legacy: false });
   // A later tick adds the time since the last one.
   await db.query("update lounge_call_usage set last_tick_at = now() - interval '30 seconds' where user_id=$1", [a]);
   status = (await one('select tick_lounge_call($1,false) s', [a])).s;
@@ -73,7 +73,12 @@ try {
   await db.query('insert into lounge_beta_testers(user_id) values($1)', [tester]);
   await pay(paid, 'plus', 'paid', new Date(Date.now() + 864e5), 'o9');
   const exempt = async id => (await one('select lounge_call_exempt($1) e', [id])).e;
-  assert.equal(await exempt(early), true, 'a member from before the limit');
+  assert.equal(await exempt(early), false, 'a member from before the limit has 60 minutes since 2026-11-17, not none');
+  const legacy = async id => (await one('select lounge_call_legacy($1) l', [id])).l;
+  assert.equal(await legacy(early), true, 'a member from before the limit, no plan, not a tester');
+  assert.equal(await legacy(late), false, 'a new member is not legacy');
+  assert.equal(await legacy(tester), false, 'a tester is a tester, not legacy');
+  assert.equal(await legacy(admin), false, 'the admin has no limit');
   assert.equal(await exempt(late), false, 'a new member');
   assert.equal(await exempt(tester), false, 'a beta tester has 30 minutes, not none');
   assert.equal((await one('select lounge_call_tester($1) t', [tester])).t, true);
@@ -84,10 +89,12 @@ try {
   assert.equal(await exempt(paid), false, 'a new member with a plan');
   await db.query("update auth.users set created_at = now() - interval '10 days' where id=$1", [paid]);
   assert.equal(await exempt(paid), false, 'a plan always has its minutes, even for an earlier member');
-  assert.deepEqual((await one('select lounge_call_status($1) s', [late])).s, { seconds: 0, plan: null, exempt: false, tester: false });
+  assert.equal(await legacy(paid), false, 'an earlier member with a plan has the plan, not the legacy minutes');
+  assert.deepEqual((await one('select lounge_call_status($1) s', [early])).s, { seconds: 0, plan: null, exempt: false, tester: false, legacy: true });
+  assert.deepEqual((await one('select lounge_call_status($1) s', [late])).s, { seconds: 0, plan: null, exempt: false, tester: false, legacy: false });
   assert.equal((await one('select lounge_call_status($1) s', [tester])).s.tester, true);
   await db.exec("select set_config('test.admin','yes',false)");
   const members = (await one('select admin_list_lounge_usage(null) r')).r.members;
-  assert.ok(members.every(member => typeof member.exempt === 'boolean' && typeof member.tester === 'boolean'), 'the list says who is exempt and who is a tester');
+  assert.ok(members.every(member => typeof member.exempt === 'boolean' && typeof member.tester === 'boolean' && typeof member.legacy === 'boolean'), 'the list says who is exempt, a tester or legacy');
   console.log('lounge call usage SQL checks passed');
 } finally { await db.close(); }
