@@ -106,11 +106,11 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
 }
 
 /** On a computer: the same list, under the header at the left, so the conversations are always at hand (2026-11-17). */
-export function LoungeChatSidebar({ user, onHide }: { user: AppUser; onHide: () => void }) {
+export function LoungeChatSidebar({ user, onHide, onLoginRequest }: { user: AppUser | null; onHide: () => void; onLoginRequest?: () => void }) {
   const state = useLoungeChats(user);
   return <aside className="lounge-chat-sidebar" aria-label="대화중인 사석">
-    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onHide} aria-label="사석 목록 숨기기" title="숨기기"><PanelLeftClose size={16} /></button><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={15} /></button></div>
-    <LoungeChatItems state={state} compact />
+    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onHide} aria-label="사석 목록 숨기기" title="숨기기"><PanelLeftClose size={16} /></button></div>
+    {user ? <LoungeChatItems state={state} compact /> : <div className="lounge-tab-empty"><h3>로그인하면 여기에 모여요</h3><p>캐릭터와 나눈 대화가 쌓이고, 언제든 이어서 이야기할 수 있어요.</p>{onLoginRequest && <button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button>}</div>}
   </aside>;
 }
 

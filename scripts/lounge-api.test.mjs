@@ -5011,7 +5011,7 @@ test('the lounge tab for conversations is called 사석, its page 대화중인 �
   assert.doesNotMatch(tabs, /<h1>채팅<\/h1>/);
   assert.match(tabs, /export function LoungeChatSidebar/);
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
-  assert.match(page, /chatSidebar && props\.user && <LoungeChatSidebar user=\{props\.user\} onHide=/);
+  assert.match(page, /chatSidebar && <LoungeChatSidebar user=\{props\.user \?\? null\} onHide=/);
 });
 
 test('the plans page: Pro is named Plus, the free plan has 20 chats a day and 2 사석, Plus has 10 사석 (2026-11-17)', () => {
@@ -5045,4 +5045,14 @@ test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 �
   assert.match(home, /\{ id: 'all', label: '전체' \}, \{ id: 'male', label: '남성' \}, \{ id: 'female', label: '여성' \}, \{ id: 'new', label: '신규' \}/);
   assert.match(home, /row\.sheet\.gender === castFilter/);
   assert.match(home, /<LoungeRow key=\{castFilter\} label="캐릭터"/);
+});
+
+test('the sidebar has the hide button at the right of its head (no refresh) and shows to everyone on a computer, with a login note when signed out (2026-11-17)', () => {
+  const tabs = readFileSync(new URL('../src/components/LoungeTabs.tsx', import.meta.url), 'utf8');
+  const sidebar = tabs.slice(tabs.indexOf('export function LoungeChatSidebar'), tabs.indexOf('/** Settings:'));
+  assert.ok(sidebar.indexOf('<h2>대화중인 사석</h2>') < sidebar.indexOf('lounge-chat-sidebar-hide'), 'title first, hide button after it');
+  assert.doesNotMatch(sidebar, /새로고침/);
+  assert.match(sidebar, /user \? <LoungeChatItems state=\{state\} compact \/> : /);
+  const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /const chatSidebarPage = Boolean\(!inRoom && \(/, 'not only for a signed-in member');
 });
