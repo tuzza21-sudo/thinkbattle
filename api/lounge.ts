@@ -17,7 +17,7 @@ import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, lo
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
 import { loungeReplyInstructions, loungeReplySchema, readLoungeReplies } from '../src/lib/loungeReplies';
 import { loungeSessionPrompt, loungeSessionStagesForTopic, type LoungeSession } from '../src/lib/loungeSession';
-import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, selectMemoriesForPrompt, relationshipRecentChanges, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
+import { applyDecay, describeRelationship, describeTurnChange, getRelationshipConfig, moodFromRoom, processTurn, relationshipEventInstructionsFor, relationshipEventsSchema, relationshipFromRow, startsAtClosestStage, relationshipAdultModeText, relationshipPromptContext, relationshipReplyInstructionsFor, relationshipResponseInstructionsFor, relationshipState, longMemoryInstructions, longMemoryUseInstructions, longMemoryWriteInstructions, longMemoryStoryUseInstructions, longMemoryStoryWriteInstructions, memoriesForView, memoryEmbeddingText, memoryKindLabels, memoryOpsSchema, normalizeMemoryOps, openingFollowUp, selectMemoriesForPrompt, relationshipRecentChanges, type MemoryRow, type RelationshipChange, type RelationshipRow, type RelationshipView } from '../src/lib/relationship';
 
 export const config = { runtime: 'edge' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -626,7 +626,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!config) return json({ enabled: false });
       const stored = await readRelationship(user.id, config.characterId);
       if (!stored.ok) return json({ enabled: false });
-      const record = applyDecay(relationshipFromRow(config, stored.row), config, new Date());
+      const record = applyDecay(relationshipFromRow(config, stored.row, { closest: startsAtClosestStage(user, process.env) }), config, new Date());
       const developer = isRelationshipDeveloper(user);
       const view = describeRelationship(record, config, { mood: moodFromRoom(config, room.ai_mood), debug: developer });
       // What this character remembers about the user: long-term memories first, then moments from the relationship.
@@ -839,7 +839,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const storedRelationships = relationshipConfig ? await relationshipRows : null;
     const relationship = relationshipConfig && storedRelationships ? (() => {
       const now = new Date();
-      const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId)), relationshipConfig, now);
+      const record = applyDecay(relationshipFromRow(relationshipConfig, storedRelationships.find(row => row.character_id === relationshipConfig.characterId), { closest: startsAtClosestStage(user, process.env) }), relationshipConfig, now);
       return { config: relationshipConfig, record, mood: moodFromRoom(relationshipConfig, room.ai_mood), now };
     })() : undefined;
     // Every consumer gets the same scenario-aware relationship: a contract date is not a new relationship proposal.
@@ -1460,7 +1460,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       let saved: { relationship: RelationshipView; change: RelationshipChange } | undefined;
       try {
         const stored = fresh ? await readRelationship(user.id, relationship.config.characterId) : undefined;
-        const record = stored?.ok ? applyDecay(relationshipFromRow(relationship.config, stored.row), relationship.config, new Date()) : relationship.record;
+        const record = stored?.ok ? applyDecay(relationshipFromRow(relationship.config, stored.row, { closest: startsAtClosestStage(user, process.env) }), relationship.config, new Date()) : relationship.record;
         // A sincere no is never folding or waffling, whatever the call after the reply made of it.
         const refused = analysis?.is_sincere_refusal && Array.isArray(answer?.events) ? answer.events.filter(event => !['FOLDS_EASILY', 'WAFFLES'].includes((event as { type?: unknown })?.type as string)) : answer?.events;
         // For a character with a proposal rule, a proposal is scored as the analyzer read it (common events 4-2). At the

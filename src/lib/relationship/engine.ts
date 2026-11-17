@@ -49,6 +49,20 @@ export const relationshipMetrics = (config: RelationshipConfig) => [...commonMet
 const effectFor = (config: RelationshipConfig, type: RelationshipEventType) => config.events[type] ?? defaultEventEffects[type];
 const enabledStages = (config: RelationshipConfig) => config.stages.filter(stage => stage.enabled !== false);
 
+/**
+ * A record that starts at the closest (fourth) stage, with the scores that stage asks for plus a margin so it holds: for the
+ * accounts of the beta that test the closest stage (2026-11-17: adult05, who had to be set by hand after every new chat,
+ * because a new chat deletes the character's relationship). A character with fewer than four stages starts as any other.
+ */
+export function createClosestRelationship(config: RelationshipConfig): RelationshipRecord {
+  const fresh = createRelationship(config), stage = enabledStages(config)[3];
+  if (!stage) return fresh;
+  const scores = { ...fresh.scores };
+  for (const [metric, value] of Object.entries(stage.enter.min ?? {})) scores[metric] = clampScore((value ?? 0) + 6);
+  for (const [metric, value] of Object.entries(stage.enter.max ?? {})) scores[metric] = Math.min(scores[metric], clampScore((value ?? 100) - 1));
+  return { ...fresh, scores, stage: stage.id };
+}
+
 export function createRelationship(config: RelationshipConfig): RelationshipRecord {
   return {
     characterId: config.characterId,

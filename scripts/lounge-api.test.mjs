@@ -5124,3 +5124,28 @@ test('a stray Chinese word is caught in Korean and in English replies, and the r
   assert.match(api, /allowHan: host\.id === 'shaman' \|\| /, '이한결 may write hanja');
   assert.match(api, /rewrite\(loungeLanguageNote\(/, 'the rewrite is asked in the language of the reply');
 });
+
+test('the beta account adult05 starts a new chat at the closest stage, every other account at the first (2026-11-17)', async () => {
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  for (const [email, stage, version] of [['adult05@saseok.kr', 'DRAWN_IN', 0], ['other@example.com', 'DISMISSIVE', 0]]) {
+    let saved;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: { ...base, room_id: roomId } }]);
+      if (url.includes('voice_lounge_relationships?')) return result([]);
+      if (url.includes('save_voice_lounge_relationship')) { saved = JSON.parse(init.body); return result(1); }
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '안녕하세요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses')) return modelAnswer({ text: '들어와요.', inner_voice: '' });
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.ok(saved, `${email}: the relationship is saved`);
+    assert.equal(saved.p_state.stage, stage, email);
+    assert.equal(saved.p_expected_version, version, `${email}: a new row`);
+  }
+});
