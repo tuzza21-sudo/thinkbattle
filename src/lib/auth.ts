@@ -13,7 +13,7 @@ type AppUserProvider = AppUser['provider'];
 
 const readGender = (value: unknown): AppUserGender | undefined => value === 'male' || value === 'female' ? value : undefined;
 
-const ageGroups: readonly AppUserAgeGroup[] = ['20s', '30s', '40s', '50s', '60s'];
+const ageGroups: readonly AppUserAgeGroup[] = ['10s', '20s', '30s', '40s', '50s', '60s'];
 export const readAgeGroup = (value: unknown): AppUserAgeGroup | undefined => ageGroups.find(group => group === value);
 const readText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
 /** The optional profile fields other members see on the profile card. */

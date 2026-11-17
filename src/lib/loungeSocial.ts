@@ -1,6 +1,6 @@
 import { loungeRpc } from './loungeApi';
 import { loadLoungeAvatarUrls } from './loungeAvatar';
-import { loungeAgeGroups } from './lounge';
+import { loungeAgeGroups, loungeLegacyAgeGroups } from './lounge';
 import { readAgeGroup } from './auth';
 import type { AppUserAgeGroup } from '../types';
 
@@ -17,7 +17,7 @@ export const loungeNoteLimit = 500;
 export const loungeBioLimit = 200;
 export const loungeRegionLimit = 30;
 
-export const loungeAgeLabel = (group?: string) => loungeAgeGroups.find(item => item.id === group)?.label;
+export const loungeAgeLabel = (group?: string) => [...loungeAgeGroups, ...loungeLegacyAgeGroups].find(item => item.id === group)?.label;
 
 const messages: Array<[RegExp, string]> = [
   [/registered account required/i, '회원가입한 계정으로 로그인하면 쓸 수 있어요. 게스트는 이용할 수 없어요.'],

@@ -2965,6 +2965,17 @@ test('선우령 through the handler: a graceful proposal opens the step in the r
   }
 });
 
+test('sign-up offers 10s (18 and over) and 50s as 50 and over, no longer 60s; a member who chose 60s keeps it (2026-11-17)', () => {
+  assert.deepEqual(lounge.loungeAgeGroups.map(group => [group.id, group.label]), [['10s', '10대'], ['20s', '20대'], ['30s', '30대'], ['40s', '40대'], ['50s', '50대 이상']]);
+  assert.deepEqual(lounge.loungeLegacyAgeGroups.map(group => group.id), ['60s']);
+  const fields = readFileSync(new URL('../src/components/LoungeProfileFields.tsx', import.meta.url), 'utf8');
+  assert.match(fields, /10대 \(18세 이상\)/);
+  assert.match(fields, /loungeLegacyAgeGroups\.filter\(group => group\.id === value\.ageGroup\)/);
+  const migration = readFileSync(new URL('../supabase/migrations/20261229000000_lounge_age_group_teens.sql', import.meta.url), 'utf8');
+  assert.match(migration, /age_group IN \('10s','20s','30s','40s','50s','60s'\)/);
+  assert.doesNotMatch(migration, /confirm_lounge_adult/, 'adult mode is not touched');
+});
+
 test('adult mode (test accounts only): explicit only at 선우령\'s closest step, for a listed account, never after a no; the hard limits stay', async t => {
   const allowlistMode = process.env.LOUNGE_ADULT_MODE;
   process.env.LOUNGE_ADULT_MODE = 'allowlist';
