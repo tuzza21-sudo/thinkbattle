@@ -22,7 +22,8 @@ export const sceneFollowRules = {
 
 const normalized = (text: string) => text.toLowerCase().replace(/[\s.,，。·—–\-~!?'"“”‘’()（）]/g, '');
 /** Words that say nothing about where: the engine's stand-ins when it does not know the place. */
-const vaguePlace = /각자|어딘가|알 수 없|모르|있는 곳|^기타$|^통화$|^전화$|전화 통화$/;
+// 2026-11-17: "전화 통화 중" got through (only a line ending in "전화 통화" was caught) and was followed as a place: the background left the bar for a bedroom.
+const vaguePlace = /각자|어딘가|알 수 없|모르|있는 곳|^기타$|^(?:(?:전화|휴대폰)\s*)?통화(?:\s*중)?$|^전화(?:\s*중)?$|전화\s*통화(?:\s*중)?$/;
 
 /** The place of the engine's scene when it is a stated one; undefined when it is only "where each is". */
 export function stateScenePlace(scene: Pick<SceneForFollow, 'location'> | undefined) {
