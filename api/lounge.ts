@@ -1467,7 +1467,11 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         // closest step (the stage's, or adult mode's) explicit words are not crude, whoever read them so (2026-11-03:
         // four such turns took 선우령's interest and trust down with her stage).
         const closestTurn = Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship.config.adultFlirtation && stageNumber && stageNumber >= 4);
-        const events = closestTurn && Array.isArray(refused) ? refused.filter(event => (event as { type?: unknown })?.type !== 'MAKES_CRUDE_ADVANCE')
+        // 2026-11-17: in adult mode at the closest step the character never draws the line, so the member's hands are not "crossing
+        // a line" either. A 정하린 chat (first turns at stage 1, a thigh she had not allowed) was read so four turns running,
+        // took empathy 82 to 53 and the stage 4 to 2, and adult mode went off with it.
+        const adultClosest = adultMode && closestTurn;
+        const events = closestTurn && Array.isArray(refused) ? refused.filter(event => { const type = (event as { type?: unknown })?.type; return type !== 'MAKES_CRUDE_ADVANCE' && !(adultClosest && type === 'VIOLATES_BOUNDARY'); })
           : character?.bible?.intimacyProposal && !analysis?.is_sincere_refusal ? alignLoungeProposalEvents(refused, analysis?.intimacy_proposal) : refused;
         const turn = processTurn({ record, config: relationship.config, mood: relationship.mood, events, hasUserTurn: recent.at(-1)?.kind === 'human', now: stored?.ok ? new Date() : relationship.now });
         console.info('[Lounge relationship]', JSON.stringify({ character: relationship.config.characterId, events: turn.log.accepted.map(event => event.type), ignored: turn.log.ignored, delta: turn.log.delta, stage: turn.log.stageAfter, change: turn.log.stageChange }));

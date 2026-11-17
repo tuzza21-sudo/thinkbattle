@@ -3056,7 +3056,7 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
       if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
       if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
       if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') { directed = JSON.parse(init.body); return result({ error: { message: 'down' } }, 500); }
-      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [{ type: 'MAKES_CRUDE_ADVANCE', confidence: 0.9, note: '' }], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [{ type: 'MAKES_CRUDE_ADVANCE', confidence: 0.9, note: '' }, { type: 'VIOLATES_BOUNDARY', confidence: 0.9, note: '' }], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
       if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_director') { directed = JSON.parse(init.body); return modelAnswer({}); }
       if (url.endsWith('/responses')) { reply = JSON.parse(init.body); return modelAnswer({ text: '들어와요.', inner_voice: '' }); }
       if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
@@ -3074,6 +3074,8 @@ test('adult mode (test accounts only): explicit only at 선우령\'s closest ste
     // Explicit words are not scored as crude at the closest step, with or without adult mode, and still are before it.
     const scored = relationshipSaved.p_state.recentEvents.map(event => event.type);
     assert.equal(scored.includes('MAKES_CRUDE_ADVANCE'), row !== closest, `${email}: ${scored.join()}`);
+    // 2026-11-17: in adult mode at the closest step "crossing a line" is not scored either (a stage 4 chat fell to stage 2 on it); elsewhere it still is.
+    assert.equal(scored.includes('VIOLATES_BOUNDARY'), !explicit, `${email}: ${scored.join()}`);
   }
 });
 
