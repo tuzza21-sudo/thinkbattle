@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Headphones, LoaderCircle, MessageCircle, Mic, MicOff, PhoneOff, Sparkles } from 'lucide-react';
+import { Headphones, LoaderCircle, PhoneOff } from 'lucide-react';
 import type { LoungeHostId } from '../lib/lounge';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { useScreenWakeLock } from '../lib/useScreenWakeLock';
@@ -68,7 +68,6 @@ export function LoungeCall(props: LoungeCallProps) {
     : props.userSpeaking ? '듣고 있어요'
     // A slow reply looks like any wait ("…"): the page keeps trying by itself, so there is nothing to say about it.
     : props.pending || props.replyDelayed ? '…'
-    : !props.micOn && !props.preview ? '음소거 중이에요'
     : '';
   const connectLabel = props.connecting ? '연결 중…' : !props.connected ? '다시 연결' : !props.audioReady ? '소리 켜기' : props.starting ? '준비 중…' : '통화 이어가기';
   return <section className={`lounge-call-screen ${props.hostSpeaking ? 'host-speaking' : ''} ${props.userSpeaking ? 'user-speaking' : ''}`} aria-label={`${props.name}와 통화`}>
@@ -90,13 +89,6 @@ export function LoungeCall(props: LoungeCallProps) {
     <div className="lounge-call-dock">
       {props.error && <p className="lounge-call-error" role="alert">{props.error}</p>}
       {props.options && <div className="lounge-room-controls lounge-call-options">{props.options}</div>}
-      <div className="lounge-call-buttons">
-        <button type="button" className={`lounge-call-button ${props.micOn || props.ringing ? '' : 'muted'}`} onClick={props.onMic} disabled={props.micDisabled} aria-pressed={!props.micOn && !props.ringing}>
-          <span>{props.micOn || props.ringing ? <Mic size={24} /> : <MicOff size={24} />}</span>{props.micOn || props.ringing ? '음소거' : '음소거 해제'}
-        </button>
-        <button type="button" className="lounge-call-button" onClick={props.onTopic} disabled={props.topicDisabled}><span><Sparkles size={24} /></span>화제 던지기</button>
-        {props.onChat && <button type="button" className="lounge-call-button" onClick={props.onChat} disabled={props.chatDisabled}><span>{props.chatBusy ? <LoaderCircle size={24} className="lounge-spin" /> : <MessageCircle size={24} />}</span>채팅으로</button>}
-      </div>
       <button type="button" className="lounge-call-hangup" onClick={props.onHangUp} aria-label="통화 종료"><PhoneOff size={28} /></button>
     </div>
   </section>;
