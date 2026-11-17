@@ -252,7 +252,7 @@ export function seoCharacterPage(character: LoungeCharacter) {
   return {
     path: `/lounge/characters/${character.id}`,
     title: `${character.name} — ${character.job} AI 캐릭터와 목소리로 대화 · 사석에서`,
-    description: `${character.name}(${character.job}). ${character.role}. AI로 만든 가상의 인물과 목소리로 직접 이야기해 보세요.`,
+    description: `${character.name}(${character.job}). ${firstSentences(character.role, 70).replace(/[.…]+$/, '')}. AI로 만든 가상의 인물과 목소리로 직접 이야기해 보세요.`,
     h1: `${character.name} — ${character.job}`,
     lead: character.tagline,
     quote: character.quote,

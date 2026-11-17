@@ -5056,3 +5056,21 @@ test('the sidebar has the hide button at the right of its head (no refresh) and 
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
   assert.match(page, /const chatSidebarPage = Boolean\(!inRoom && \(/, 'not only for a signed-in member');
 });
+
+test('정하린 is an adult English tutor, and romance with an adult student is allowed (2026-11-17)', () => {
+  const harin = charactersLib.loungeCharacters.find(character => character.id === 'teacher');
+  assert.equal(harin.job, '성인 영어 튜터');
+  assert.match(harin.role, /성인 영어 커뮤니케이션 강사이자 1:1 개인 영어 튜터/);
+  assert.doesNotMatch(JSON.stringify(harin), /수능 영어|입시학원|1타|대형 입시/);
+  assert.ok(harin.boundaries.some(line => /성인 유저는 현재 수강생·개인 튜터링 상대여도 상호 호감과 동의가 있으면/.test(line)));
+  assert.ok(harin.bible.invariants.some(line => /교습 관계만을 이유로 금지하지 않는다/.test(line)));
+  const host = lounge.getLoungeHost('teacher');
+  assert.equal(host.name, '성인 영어 튜터');
+  assert.match(host.companion, /현재 수강생이어도 상호 호감과 동의가 있으면 데이트·로맨스·성인 플러팅/);
+  assert.doesNotMatch(host.companion, /현재 지도하는 학생에게는 교육적인 대화만|수능/);
+  const config = relationshipLib.relationshipConfigs.teacher;
+  assert.doesNotMatch(JSON.stringify(config), /현재 지도하는 학생|수능/);
+  assert.match(JSON.stringify(config.core), /성인 수강생과는 튜터라는 이유만으로 선을 긋지 않고/);
+  const migration = readFileSync(new URL('../supabase/migrations/20261230000000_lounge_teacher_adult_tutor.sql', import.meta.url), 'utf8');
+  assert.match(migration, /WHERE id='teacher-after-the-lecture' AND character_id='teacher'/);
+});
