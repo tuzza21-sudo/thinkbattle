@@ -1,5 +1,6 @@
 /**
- * The one paid plan (2026-11-08): Pro, sold by the month or by the year. The server charges the price defined here, never
+ * The one paid plan (2026-11-08): sold by the month or by the year, named Plus since 2026-11-17 (its id stays 'pro': the
+ * database, the receipts and the limits know it by that). The server charges the price defined here, never
  * one sent by the browser. 'plus' is what the first buyers have in the database (60 minutes of calls a month); it is no
  * longer sold, but stays a plan id so their running months, refunds and limits keep working.
  */
@@ -8,25 +9,29 @@ export type LoungePlanTerm = 'month' | 'year';
 
 export type LoungePlan = { id: LoungePlanId; term: LoungePlanTerm; key: string; name: string; price: number; tagline: string; featured?: boolean; badge?: string; perMonth?: string; features: string[] };
 
+/** Chats a day and the number of 사석 (characters a member has a conversation with) the plans promise on the page. */
+export const loungeFreeDailyChats = 20;
+export const loungeChatLimits = { free: 2, plus: 10 } as const;
+
 /** The plan every member has: shown on the left of the plans; nothing to buy. */
 export const loungeFreePlan = {
   name: '무료', price: 0, tagline: '가볍게 이야기를 시작해 보고 싶다면',
-  features: ['일 채팅 30회', '이한결 사주 일 1회 제공'],
+  features: [`일 채팅 ${loungeFreeDailyChats}회`, `사석 ${loungeChatLimits.free}개까지`, '이한결 사주 일 1회 제공'],
 };
 
-const proFeatures = ['음성 통화 월 100분', '채팅 무제한', '이한결 무속인의 타로(카드점)·사주 등 운명 상담 포함', '유저와의 대화 맥락 장기기억 유지 기능', '나만의 캐릭터 제작 기능', '내 페르소나 설정(서사 포함) 최대 3,000자', '이미지 전송 월 30장(캐릭터가 보낸 사진·직접 만든 사진 포함)', '새 캐릭터와 기능 먼저 만나기', '자율형 능동 에이전트형 캐릭터 (준비중)'];
+const proFeatures = ['음성 통화 월 100분', '채팅 무제한', `사석 ${loungeChatLimits.plus}개까지`, '이한결 무속인의 타로(카드점)·사주 등 운명 상담 포함', '유저와의 대화 맥락 장기기억 유지 기능', '나만의 캐릭터 제작 기능', '내 페르소나 설정(서사 포함) 최대 3,000자', '이미지 전송 월 30장(캐릭터가 보낸 사진·직접 만든 사진 포함)', '새 캐릭터와 기능 먼저 만나기', '자율형 능동 에이전트형 캐릭터 (준비중)'];
 
 export const loungePlans: LoungePlan[] = [
-  { id: 'pro', term: 'month', key: 'pro-month', name: 'Pro 월간', price: 20_000, tagline: '더 길게, 더 깊게 이야기하고 싶다면', features: proFeatures },
-  { id: 'pro', term: 'year', key: 'pro-year', name: 'Pro 연간', price: 150_000, tagline: '1년 동안 꾸준히, 더 저렴하게', featured: true, badge: '연 90,000원 절약', perMonth: '월 12,500원 꼴', features: proFeatures },
+  { id: 'pro', term: 'month', key: 'pro-month', name: 'Plus 월간', price: 20_000, tagline: '더 길게, 더 깊게 이야기하고 싶다면', features: proFeatures },
+  { id: 'pro', term: 'year', key: 'pro-year', name: 'Plus 연간', price: 150_000, tagline: '1년 동안 꾸준히, 더 저렴하게', featured: true, badge: '연 90,000원 절약', perMonth: '월 12,500원 꼴', features: proFeatures },
 ];
 
 /** The year in a plan's name and receipts: an order id from a year plan starts with SY, a month's with SS. */
 export const loungeOrderPrefix: Record<LoungePlanTerm, string> = { month: 'SS', year: 'SY' };
 export const loungeOrderTerm = (oid: unknown): LoungePlanTerm => typeof oid === 'string' && oid.startsWith(loungeOrderPrefix.year) ? 'year' : 'month';
 export const loungeTermLabel = (term: LoungePlanTerm) => term === 'year' ? '1년' : '1개월';
-/** The plan as a receipt names it: "Pro 1개월 이용권"; Plus for the first buyers. */
-export const loungePlanReceiptName = (id: unknown, oid: unknown) => id === 'pro' || id === 'plus' ? `${id === 'pro' ? 'Pro' : 'Plus'} ${loungeTermLabel(loungeOrderTerm(oid))} 이용권` : String(id ?? '');
+/** The plan as a receipt names it: "Plus 1개월 이용권" (the first buyers' plan is Plus too). */
+export const loungePlanReceiptName = (id: unknown, oid: unknown) => id === 'pro' || id === 'plus' ? `Plus ${loungeTermLabel(loungeOrderTerm(oid))} 이용권` : String(id ?? '');
 
 /**
  * Minutes of voice calls a month (the month in Korea), counted as the time spent in calls, not as characters spoken.
@@ -99,4 +104,4 @@ export const loungePhotoMonthlyFor = (plan: unknown): number => loungePhotoMonth
 export const getLoungePlan = (id: unknown, term: unknown = 'month') => loungePlans.find(plan => plan.id === id && plan.term === (term === 'year' ? 'year' : 'month'));
 
 /** What the payment window shows as the product name. */
-export const loungePlanGoodName = (plan: LoungePlan) => `사석 Pro ${loungeTermLabel(plan.term)} 이용권`;
+export const loungePlanGoodName = (plan: LoungePlan) => `사석 Plus ${loungeTermLabel(plan.term)} 이용권`;

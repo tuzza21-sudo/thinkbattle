@@ -3,7 +3,7 @@ import { Clock } from 'lucide-react';
 import { listLoungeUsage, type LoungeUsageMember } from '../lib/superAdmin';
 import { loungeCallDuration, loungeCallMinutes, loungeFreeCallMinutesDefault, loungeTesterCallMinutesDefault } from '../lib/loungePlans';
 
-const planLabel = { plus: 'Plus', pro: 'Pro' } as const;
+const planLabel = { plus: 'Plus(초기)', pro: 'Plus' } as const;
 const number = (value: number) => value.toLocaleString('ko-KR');
 const monthStart = (back: number) => {
   const now = new Date(Date.now() + 9 * 3600_000);
@@ -42,7 +42,7 @@ export const LoungeAdminUsage = () => {
     </div>
     <p className="admin-lead">
       통화는 연결된 시간을 서버가 30초마다 세어 분으로 보여 주고, 크레딧은 프리미엄 목소리(ElevenLabs·Typecast)로 말한 글자 수입니다(한 글자에 1크레딧).
-      한도는 Plus {loungeCallMinutes.plus}분, Pro {loungeCallMinutes.pro}분이고, 이용권이 없는 새 회원은 {loungeFreeCallMinutesDefault}분, 베타테스터는 {loungeTesterCallMinutesDefault}분입니다(각각 LOUNGE_FREE_CALL_MINUTES, LOUNGE_TESTER_CALL_MINUTES로 바꿀 수 있음). 슈퍼 관리자와 한도가 생기기 전에 가입한 이용권 없는 회원은 무제한이고, 서버에서 LOUNGE_CALL_LIMITS=off이면 아무도 제한하지 않습니다.
+      한도는 Plus(초기 구매자) {loungeCallMinutes.plus}분, Plus {loungeCallMinutes.pro}분이고, 이용권이 없는 새 회원은 {loungeFreeCallMinutesDefault}분, 베타테스터는 {loungeTesterCallMinutesDefault}분입니다(각각 LOUNGE_FREE_CALL_MINUTES, LOUNGE_TESTER_CALL_MINUTES로 바꿀 수 있음). 슈퍼 관리자와 한도가 생기기 전에 가입한 이용권 없는 회원은 무제한이고, 서버에서 LOUNGE_CALL_LIMITS=off이면 아무도 제한하지 않습니다.
     </p>
     {error && <div className="super-admin-notice error" role="alert">{error}</div>}
     {members && <p className="admin-lead"><b>{month.slice(0, 7)}</b> · 이용 회원 {number(members.length)}명 · 통화 합계 <b>{loungeCallDuration(total.seconds)}</b> · 크레딧 합계 <b>{number(total.credits)}</b></p>}
