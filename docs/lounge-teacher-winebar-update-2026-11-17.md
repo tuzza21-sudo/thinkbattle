@@ -8,7 +8,7 @@
 
 `winebar` 배경을 추가해 정하린의 캐릭터 기본 장소와 이야기 시작 배경으로 연결했다. 기존 `hotellobby`와 `cocktailbar`는 유지한다.
 
-- 파일: [public/lounge/wine-bar-night-v1.webp](../public/lounge/wine-bar-night-v1.webp)
+- 파일: [public/lounge/wine-bar-night-v2.webp](../public/lounge/wine-bar-night-v2.webp)
 - 크기: 1536 × 1024, WebP
 - 생성: 기본 제공 `image_gen` 도구. 이미지 생성 스킬의 built-in 모드 사용.
 - 내용: 인물 없는 와인바, 낮은 호박빛 조명, 와인 진열장, 나란한 바 의자, 화이트 와인 잔·메뉴·올리브 접시.

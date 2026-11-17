@@ -5085,8 +5085,8 @@ test('정하린 is an adult English tutor, and romance with an adult student is 
 test('정하린 starts in the winebar: the background exists, is hers, and the story opens there (2026-11-17)', () => {
   const winebar = lounge.loungeThemes.find(theme => theme.id === 'winebar');
   assert.ok(winebar, 'the theme is listed');
-  assert.equal(winebar.image, '/lounge/wine-bar-night-v1.webp');
-  assert.ok(existsSync(new URL('../public/lounge/wine-bar-night-v1.webp', import.meta.url)), 'the picture is shipped');
+  assert.equal(winebar.image, '/lounge/wine-bar-night-v2.webp');
+  assert.ok(existsSync(new URL('../public/lounge/wine-bar-night-v2.webp', import.meta.url)), 'the picture is shipped');
   assert.deepEqual([...lounge.loungeHostThemes.teacher], ['winebar']);
   assert.equal(lounge.getLoungeTheme('winebar').id, 'winebar');
   const story = JSON.parse(readFileSync(new URL('../docs/stories/teacher-after-the-lecture.json', import.meta.url), 'utf8'));
