@@ -4620,7 +4620,7 @@ test('a story in episodes: the character leads the current episode, the checkpoi
 
 test('the picker offers the fast GPT, Gemini 3.8 Flash and DeepSeek Flash under code names, and no GLM', () => {
   assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gemini-flash', 'deepseek-flash']);
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['루미', '아리아', '오닉스']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['하루', '아리아', '오닉스']);
   for (const model of modelsLib.loungeChatModels) assert.doesNotMatch(`${model.label} ${model.description}`, /GPT|Gemini|DeepSeek|GLM|딥시크|제미나이/i, 'members never see a provider name');
   const gemini = modelsLib.getLoungeChatModel('gemini-flash');
   assert.equal(gemini.provider, 'gemini'); assert.equal(gemini.listed, true);

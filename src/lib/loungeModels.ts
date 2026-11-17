@@ -22,11 +22,11 @@
  * begun in time.
  *
  * 2026-11-16: GLM is gone (a room still stored with 'glm-flash' answers with the fast GPT), and members no longer see
- * the provider names: each model is shown under a code name (루미, 아리아, 오닉스). The ids and providers stay as they
+ * the provider names: each model is shown under a code name (하루, 아리아, 오닉스). The ids and providers stay as they
  * are, since rooms store the id.
  */
 export const loungeChatModels = [
-  { id: 'gpt', label: '루미', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
+  { id: 'gpt', label: '하루', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gemini-flash', label: '아리아', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'deepseek-flash', label: '오닉스', description: '빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
   { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
