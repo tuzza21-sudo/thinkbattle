@@ -620,6 +620,8 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 // or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
 // to start with, and Typecast has none until its voices are chosen there.
 const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' , teacher: 'female' };
+/** A house character's gender, for the filter on the home (2026-11-17); undefined for a character that is not a house one. */
+export const loungeHouseGender = (id: string): 'female' | 'male' | undefined => houseVoiceGender[id];
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);
 export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partial<Record<string, string>>> = {
   gemini: { ...loungeGeminiVoices, female: 'Kore', male: 'Charon' },
