@@ -19,7 +19,7 @@ export function LoungeTabBar({ unread }: { unread: number }) {
     <Link to={to} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined}><span>{icon}{badge ? <em aria-label={`안 읽은 쪽지 ${badge}개`}>{badge > 99 ? '99+' : badge}</em> : null}</span>{label}</Link>;
   return <nav className="lounge-tabbar" aria-label="라운지 메뉴">
     {item('home', '/lounge', '홈', <House size={22} />)}
-    {item('chats', '/lounge/chats', '채팅', <MessageCircle size={22} />)}
+    {item('chats', '/lounge/chats', '사석', <MessageCircle size={22} />)}
     {item('settings', '/lounge/settings', '설정', <Settings size={22} />, unread)}
   </nav>;
 }
@@ -46,8 +46,7 @@ function ChatPortrait({ chat }: { chat: LoungeChatSummary }) {
  * The chat list: every character the member has talked with, newest first, with the last thing said. Opening one
  * continues that conversation where it was left (the room page opens it again).
  */
-export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest: () => void }) {
-  const navigate = useNavigate();
+function useLoungeChats(user: AppUser | null) {
   const [chats, setChats] = useState<LoungeChatSummary[] | null>(null);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -68,12 +67,17 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
     document.addEventListener('visibilitychange', refresh);
     return () => document.removeEventListener('visibilitychange', refresh);
   }, [user, load]);
-  if (!user) return <main className="lounge-lobby lounge-tab-page"><div className="lounge-tab-empty"><MessageCircle size={34} /><h1>채팅</h1><p>로그인하면 캐릭터와 나눈 대화가 여기에 모여요. 언제든 이어서 이야기할 수 있어요.</p><button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button></div></main>;
-  return <main className="lounge-lobby lounge-tab-page">
-    <div className="lounge-tab-head"><h1>채팅</h1><button type="button" className="lounge-tab-refresh" onClick={() => void load()} aria-label="새로고침"><RefreshCw size={16} /></button></div>
+  return { chats, error, deleting, load, removeChat };
+}
+
+/** The loading note, the empty note and the list of chats; `compact` is the narrow sidebar of a computer. */
+function LoungeChatItems({ state, compact = false }: { state: ReturnType<typeof useLoungeChats>; compact?: boolean }) {
+  const navigate = useNavigate();
+  const { chats, error, deleting, removeChat } = state;
+  return <>
     {error && <p className="lounge-error" role="alert">{error}</p>}
     {chats === null && !error && <p className="lounge-tab-loading" role="status">대화를 불러오는 중…</p>}
-    {chats?.length === 0 && <div className="lounge-tab-empty"><MessageCircle size={34} /><h2>아직 나눈 대화가 없어요</h2><p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p><Link to="/lounge" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link></div>}
+    {chats?.length === 0 && <div className="lounge-tab-empty">{!compact && <MessageCircle size={34} />}{compact ? <h3>아직 나눈 사석이 없어요</h3> : <h2>아직 나눈 대화가 없어요</h2>}<p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p>{!compact && <Link to="/lounge" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link>}</div>}
     {chats && chats.length > 0 && <ul className="lounge-chat-list">
       {chats.map(chat => {
         const custom = isLoungeCustomCharacterId(chat.character_id);
@@ -87,7 +91,27 @@ export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null
         </button><button type="button" className="lounge-chat-delete" aria-label={`${name} 대화 삭제`} disabled={Boolean(deleting)} onClick={() => void removeChat(chat, name)}><Trash2 size={17} /></button></li>;
       })}
     </ul>}
+  </>;
+}
+
+/** The page behind the "사석" tab: the sasoks (conversations) the member is in, to go on with where they were left. */
+export function LoungeChatsPage({ user, onLoginRequest }: { user: AppUser | null; onLoginRequest: () => void }) {
+  const state = useLoungeChats(user);
+  if (!user) return <main className="lounge-lobby lounge-tab-page"><div className="lounge-tab-empty"><MessageCircle size={34} /><h1>대화중인 사석</h1><p>로그인하면 캐릭터와 나눈 대화가 여기에 모여요. 언제든 이어서 이야기할 수 있어요.</p><button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button></div></main>;
+  return <main className="lounge-lobby lounge-tab-page lounge-chats-main">
+    <div className="lounge-tab-head"><h1>대화중인 사석</h1><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={16} /></button></div>
+    <p className="lounge-chats-hint">왼쪽 목록에서 이어서 이야기할 사석을 골라 보세요.</p>
+    <div className="lounge-chats-items"><LoungeChatItems state={state} /></div>
   </main>;
+}
+
+/** On a computer: the same list, under the header at the left, so the conversations are always at hand (2026-11-17). */
+export function LoungeChatSidebar({ user }: { user: AppUser }) {
+  const state = useLoungeChats(user);
+  return <aside className="lounge-chat-sidebar" aria-label="대화중인 사석">
+    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh" onClick={() => void state.load()} aria-label="새로고침"><RefreshCw size={15} /></button></div>
+    <LoungeChatItems state={state} compact />
+  </aside>;
 }
 
 /** Settings: the member's profile, the service's pages, and signing out (friends and making a character are off, 2026-11-03). */

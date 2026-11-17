@@ -5003,3 +5003,13 @@ test('홍실당 운세: the form is computed on the server, the interpreter gets
   assert.match(input.chart.me.explained.day_master, /^일간 무토\(戊土\)/);
   assert.deepEqual([patch.story_state.module, patch.story_state.last, patch.story_state.chart.extra.label, patch.story_state.birth.date], ['fortune', 'reading', '오늘', '1990-05-03']);
 });
+
+test('the lounge tab for conversations is called 사석, its page 대화중인 사석, with a sidebar of them on a computer (2026-11-17)', () => {
+  const tabs = readFileSync(new URL('../src/components/LoungeTabs.tsx', import.meta.url), 'utf8');
+  assert.match(tabs, /item\('chats', '\/lounge\/chats', '사석'/);
+  assert.match(tabs, /<h1>대화중인 사석<\/h1>/);
+  assert.doesNotMatch(tabs, /<h1>채팅<\/h1>/);
+  assert.match(tabs, /export function LoungeChatSidebar/);
+  const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /chatSidebar && props\.user && <LoungeChatSidebar user=\{props\.user\} \/>/);
+});
