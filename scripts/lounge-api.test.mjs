@@ -4141,8 +4141,12 @@ test('voice calls are timed by the server in minutes, shown against the plan, st
   assert.deepEqual(tester.body.call, { usedSeconds: 1860, limitMinutes: 30, plan: null, tester: true, enforced: true, exhausted: true }, 'a beta tester has 30 minutes a month, not unlimited');
   assert.equal((await tick({ state: { seconds: 29 * 60, plan: null, tester: true } })).body.call.exhausted, false, 'one minute of the 30 is left');
   assert.equal((await tick({ state: { seconds: 0, plan: 'pro', tester: true } })).body.call.limitMinutes, 100, 'a tester with a plan has the plan\'s minutes');
+  const legacyMember = await tick({ state: { seconds: 61 * 60, plan: null, legacy: true } });
+  assert.deepEqual(legacyMember.body.call, { usedSeconds: 3660, limitMinutes: 60, plan: null, tester: false, legacy: true, enforced: true, exhausted: true }, 'a member from before the limit has 60 minutes a month since 2026-11-17, not unlimited');
+  assert.equal((await tick({ state: { seconds: 59 * 60, plan: null, legacy: true } })).body.call.exhausted, false, 'one minute of the 60 is left');
+  assert.equal((await tick({ state: { seconds: 0, plan: 'pro', legacy: true } })).body.call.limitMinutes, 100, 'a plan comes before the legacy minutes');
   const exempt = await tick({ state: { seconds: 99999, plan: null, exempt: true } });
-  assert.deepEqual(exempt.body.call, { usedSeconds: 99999, limitMinutes: null, plan: null, enforced: true, exhausted: false, unlimited: true }, 'the admin or an earlier member: no limit');
+  assert.deepEqual(exempt.body.call, { usedSeconds: 99999, limitMinutes: null, plan: null, enforced: true, exhausted: false, unlimited: true }, 'the super admin: no limit');
   for (const [name, options] of [['a chat', { roomRow: room({ voice_on: false }) }], ['someone else room', { roomRow: room({ host_id: 'other' }) }], ['a group room', { roomRow: room({ capacity: 4 }) }], ['an ended room', { roomRow: room({ status: 'ended' }) }], ['a guest', { user: { id: 'user-1', is_anonymous: true } }]]) {
     const outcome = await tick(options);
     assert.deepEqual(outcome.body, { call: null }, name); assert.deepEqual(outcome.seen, [], `${name}: nothing is counted`);
@@ -4192,8 +4196,11 @@ test('voice calls are timed by the server in minutes, shown against the plan, st
   const testerReply = await reply({ state: { seconds: 30 * 60, plan: null, tester: true } });
   assert.match(testerReply.events.at(-1).error, /베타테스터 통화 시간을 다 썼어요.*글로/, 'a tester\'s 30 minutes are used');
   assert.ok(spoke((await reply({ state: { seconds: 29 * 60, plan: null, tester: true } })).events), 'one minute of the 30 is left');
+  const legacyReply = await reply({ state: { seconds: 60 * 60, plan: null, legacy: true } });
+  assert.match(legacyReply.events.at(-1).error, /이번 달 통화 시간을 다 썼어요.*글로/, 'an earlier member\'s 60 minutes are used');
+  assert.ok(spoke((await reply({ state: { seconds: 59 * 60, plan: null, legacy: true } })).events), 'one minute of the 60 is left');
   const exemptReply = await reply({ state: { seconds: 999 * 60, plan: null, exempt: true } });
-  assert.ok(spoke(exemptReply.events) && exemptReply.events.at(-1).type === 'done', 'no limit for the admin or an earlier member');
+  assert.ok(spoke(exemptReply.events) && exemptReply.events.at(-1).type === 'done', 'no limit for the super admin');
   const off = await reply({ state: { seconds: 999 * 60, plan: null }, limits: false });
   assert.ok(spoke(off.events), 'no limit when it is switched off'); assert.equal(off.calls.status, 0, 'and nothing is looked up');
   const chat = await reply({ state: { seconds: 999 * 60, plan: null }, limits: true, voiceOn: false });
