@@ -3134,7 +3134,7 @@ test('adult mode: the turns it opens are answered by DeepSeek when its key is se
   }
 });
 
-test('adult mode is for every built-in character with adult flirtation, answered by DeepSeek at its closest stage; a character a member made never has it', async t => {
+test('adult mode is for every built-in character with adult flirtation, answered by DeepSeek at its closest stage; a character a member made has it too when it flirts (2026-11-18)', async t => {
   const allowlistMode = process.env.LOUNGE_ADULT_MODE;
   process.env.LOUNGE_ADULT_MODE = 'allowlist';
   t.after(() => { if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode; });
@@ -3149,11 +3149,13 @@ test('adult mode is for every built-in character with adult flirtation, answered
   const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
   const answer = JSON.stringify({ text: '이리 와.', inner_voice: '' });
   const closestOf = host => relationshipLib.getRelationshipConfig(host).stages.filter(stage => stage.enabled !== false).at(-1).id;
+  const customTemplate = relationshipLib.relationshipFromTemplate('slow_burn', { characterId: customId, displayName: '한지안', flirtation: true, core: [] });
+  const customClosest = customTemplate.stages.filter(stage => stage.enabled !== false).at(-1).id;
   // [host, the stage it is at, the stage before its closest, who answers]
   for (const [host, stage, who] of [['auditor', closestOf('auditor'), 'deepseek'], ['diplomat', closestOf('diplomat'), 'deepseek'], ['closer', closestOf('closer'), 'deepseek'],
-    ['jaeseok', closestOf('jaeseok'), 'deepseek'], ['diplomat', relationshipLib.getRelationshipConfig('diplomat').stages[2].id, 'openai'], [customId, 'DRAWN_IN', 'openai']]) {
+    ['jaeseok', closestOf('jaeseok'), 'deepseek'], ['diplomat', relationshipLib.getRelationshipConfig('diplomat').stages[2].id, 'openai'], [customId, customClosest, 'deepseek']]) {
     const config = host === customId ? undefined : relationshipLib.getRelationshipConfig(host);
-    const row = { ...velvetRow, character_id: host, stage, scores: config ? Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) : velvetRow.scores };
+    const row = { ...velvetRow, character_id: host, stage, scores: config ? Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) : Object.fromEntries(Object.keys(customTemplate.initial).map(key => [key, 90])) };
     let asked, openaiAsked = false;
     await withServiceKey(() => run(async (url, init) => {
       if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });

@@ -869,9 +869,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
 
     // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
     const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
-    // Every built-in character with adult flirtation has it; a character a member made does not (nobody can check its age).
+    // Every character with adult flirtation has it, a character a member made included (2026-11-18, by the owner): its sheet is an adult of 20 to 80 and the AI review at creation turns away anyone who reads as a minor; the member chose flirtation for it.
     // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
-    const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && !isLoungeCustomCharacterId(host.id) && await adultUnlocked);
+    const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && await adultUnlocked);
     // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
     const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
