@@ -381,6 +381,9 @@ export type LoungeCompanionState = {
   fallback_replies?: string[];
   /** What the member had forgotten from the room's memory (the memory sheet): the reply and the recorder do not take it up again, even where the recent talk still shows it. */
   forgotten?: string[];
+  /** The last turn read as a sexual scene, and how many turns in a row the analyzer has been skipped since (2026-11-18: a scene that goes on is not read again every turn, which took 2.5 to 4.5 s). */
+  sexual_turn?: number;
+  sexual_skips?: number;
 };
 /** What makes a turn matter for the inner voice: read by the analyzer and the scene engine before the reply is written. */
 export const loungeInnerVoiceMatters = (analysis: LoungeAnalysis | undefined, decision?: Pick<LoungeSceneDecision, 'event'>) =>
@@ -422,6 +425,7 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(turnNumber(value.last_inner_turn) !== undefined ? { last_inner_turn: turnNumber(value.last_inner_turn) } : {}),
     ...(strings(value.fallback_replies, 8, 80).length ? { fallback_replies: strings(value.fallback_replies, 8, 80) } : {}),
     ...(strings(value.forgotten, 8, 120).length ? { forgotten: strings(value.forgotten, 8, 120) } : {}),
+    ...(turnNumber(value.sexual_turn) !== undefined ? { sexual_turn: turnNumber(value.sexual_turn), sexual_skips: turnNumber(value.sexual_skips) ?? 0 } : {}),
   };
 }
 function readSceneChange(value: unknown) {
@@ -590,6 +594,14 @@ export const loungeCompanionUpdateSchema = {
   next_intent: { type: 'string' },
 } as const;
 /** The member forgot something from the room's memory (the memory sheet): the reply does not take it up again. */
+/**
+ * Whether this turn may skip the analyzer (2026-11-18): adult mode at the closest step, the last recorded turn was a sexual scene, at most
+ * three turns in a row (the fourth reads again, so the end of a scene is noticed), and never when the member's words may be a stop.
+ */
+export const loungeStopWords = /그만|멈춰|멈추|싫어|하지\s*마|아파|아프|잠깐|stop/i;
+export function loungeSkipsAnalyzer(state: LoungeCompanionState | undefined, adultAtClosest: boolean, latestText: string) {
+  return Boolean(state && adultAtClosest && state.sexual_turn !== undefined && state.sexual_turn === state.source_turn && (state.sexual_skips ?? 0) < 3 && !loungeStopWords.test(latestText));
+}
 export const loungeForgottenInstruction = 'forgotten은 사용자가 이 방의 기억에서 지운 내용이다. recent나 memory에 비슷한 말이 남아 있어도 지금의 약속·제한·감정으로 따르지 않고, 없던 일로 대한다. 사용자가 다시 직접 말하기 전에는 꺼내지 않는다. 입력에 forgotten이 없으면 쓰지 않는다.';
 export const loungeCompanionUpdateFields = Object.keys(loungeCompanionUpdateSchema);
 export const loungeCompanionUpdateInstructions = `scene: 방금 답까지 반영한 지금 장면이다. 입력의 scene이 직전 장면이고, 없으면 scenario의 첫 장면과 memory, recent에서 처음 정한다. location은 구체적인 장소(30자 이내), scene_type은 장소의 종류 하나, activity는 둘이 하고 있는 일, time_of_day는 때(아침, 점심, 오후, 저녁, 밤, 새벽 등), season은 계절이나 날씨(모르면 빈 문자열), objects는 지금 장면에 실제로 있는 물건 0~6개(예: 순대국 두 그릇, 물잔)다. 바뀌지 않은 칸은 직전 장면 그대로 쓴다. 다 먹은 음식, 놓고 온 물건은 objects에서 뺀다.
@@ -634,7 +646,7 @@ const uniqueTail = (items: readonly string[], max: number) => [...new Set([...it
 export const loungeEndsOnQuestion = (reply: string) => /[?？]\s*$/.test(splitLoungeActions(reply, { parens: true }).filter(part => !part.action).map(part => part.text).join('').trim());
 const carried = (value: unknown, turn: number) => { const what = clip(value, 60); return what ? { what, turn } : undefined; };
 /** The state after a turn: the scene the call after the reply wrote, the event that came, what was used. */
-export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number; braked?: boolean }): LoungeCompanionState {
+export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number; braked?: boolean; sexual?: boolean; analyzerSkipped?: boolean }): LoungeCompanionState {
   const { state, decision, turn } = input;
   // A reply that stepped in when the adult model was down wrote the character's own brake (a limit, a range, a stop): it is not written into the room (2026-11-18).
   const update = input.braked && input.update ? Object.fromEntries(Object.entries(input.update).filter(([key]) => !['lingering', 'next_intent', 'room_memory_ops'].includes(key))) as LoungeCompanionUpdate : input.update;
@@ -685,6 +697,8 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     // until loungeCarryTurns have passed.
     lingering: update && 'lingering' in update ? carried(update.lingering, turn) : state.lingering,
     next_intent: update && 'next_intent' in update ? carried(update.next_intent, turn) : state.next_intent,
+    // A sexual scene goes on (read so, or the analyzer skipped for it); a reading that says it is over ends it; no reading keeps it as it was.
+    ...(input.analyzerSkipped ? { sexual_turn: turn, sexual_skips: (state.sexual_skips ?? 0) + 1 } : input.sexual === true ? { sexual_turn: turn, sexual_skips: 0 } : input.sexual === false ? { sexual_turn: undefined, sexual_skips: undefined } : {}),
     ...(input.braked ? { fallback_replies: uniqueTail([...(state.fallback_replies ?? []), input.reply.replace(/\s+/g, ' ').trim().slice(0, 60)].filter(item => item.length >= 8), 8) } : {}),
   };
 }

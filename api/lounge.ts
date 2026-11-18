@@ -4,7 +4,7 @@ import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdu
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
-import { loungeForgottenInstruction, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
@@ -282,6 +282,22 @@ export function replyTextStart(output: string): number {
     else if (char === ',' && depth === 1) lastKey = '';
   }
   return -1;
+}
+
+/**
+ * What the adult model reads anew each turn (2026-11-18): the cached instructions stay as they are; the turn's input is shorter, the last
+ * ten messages with the older of them cut to 400 characters, and no character knowledge cards (they are for ordinary talk).
+ */
+export function loungeAdultModelInput(input: string) {
+  try {
+    const value = JSON.parse(input) as Record<string, unknown>;
+    if (Array.isArray(value.recent)) {
+      const recent = (value.recent as Array<Record<string, unknown>>).slice(-10);
+      value.recent = recent.map((item, index) => index < recent.length - 4 && typeof item?.text === 'string' && item.text.length > 400 ? { ...item, text: `${item.text.slice(0, 400)}…` } : item);
+    }
+    delete value.character_knowledge;
+    return JSON.stringify(value);
+  } catch { return input; }
 }
 
 /** The reply sentence as soon as its JSON string is closed, wherever `text` is among the outer keys. */
@@ -985,7 +1001,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const memoryLimits = loungeMemoryLimits;
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance, memoryLimits) : undefined;
     const analyzerStarted = performance.now();
-    const analyzerRead = companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
+    const skipAnalyzer = loungeSkipsAnalyzer(companionState, adultMode && stageNumber === 4, messages[0]?.kind === 'human' ? String(messages[0].text ?? '') : '');
+    const analyzerRead = !skipAnalyzer && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
       const state = currentRelationshipContext();
       const characterReading = companionCharacter ? { name: companionCharacter.name, role: companionCharacter.role,
         personality: companionCharacter.personality, lens: companionCharacter.bible?.interpretationLens,
@@ -1229,7 +1246,7 @@ ${photoRule}`;
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     const turnApplied: { current?: { provider: string; model: string } } = {};
     const braked = () => adultReply && turnApplied.current?.provider === 'openai';
-    if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, sexual: analysis.sexual_scene, adult_model: adultReply, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
+    if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ...(skipAnalyzer ? { skipped: 'sexual scene goes on' } : {}), ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, sexual: analysis.sexual_scene, adult_model: adultReply, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
     // What this adds to a reply is only the wait left after the other context has loaded.
     const knowledgeWaitStarted = performance.now();
     requestPhase = 'knowledge-wait';
@@ -1364,7 +1381,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       const bold = analysis ? analysis.intimacy_proposal === 'elegant' && !analysis.is_sincere_refusal
         : Array.isArray(answer?.events) && answer.events.some(event => (event as { type?: unknown })?.type === 'MAKES_BOLD_MOVE' && Number((event as { confidence?: unknown })?.confidence ?? 1) >= 0.6);
       const boldMove = character?.bible?.intimacyProposal && stageNumber && bold ? { stage: stageNumber } : undefined;
-      const state = nextLoungeCompanionState({ state: companionState, update: authoredLife ? { ...answer, character_life: authoredLife } : answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, userText: lastHuman, recent: turnMessages.recent, boldMove, emotional: analysis?.is_emotional_moment === true, braked: braked() });
+      const state = nextLoungeCompanionState({ state: companionState, update: authoredLife ? { ...answer, character_life: authoredLife } : answer, decision: sceneDecision, turn: companionTurn, reply: said, inner, userText: lastHuman, recent: turnMessages.recent, boldMove, emotional: analysis?.is_emotional_moment === true, braked: braked(), sexual: analysis?.sexual_scene, analyzerSkipped: skipAnalyzer });
       try {
         const response = await fetchTimed(`${url}/rest/v1/voice_lounge_companion_state?on_conflict=user_id,character_id`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: user.id, character_id: host.id, state, updated_at: new Date().toISOString() }) });
         console.info('[Lounge companion]', JSON.stringify({ host: host.id, saved: response.ok, scene: state.scene?.location ?? null, sceneTurns: state.scene_turns, ...(sceneDecision.event ? { event: sceneDecision.event.id } : {}), reaction: state.reactions.at(-1) ?? null }));
@@ -1465,7 +1482,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       },
     };
     const turnPayload = (request?: Record<string, unknown>): LoungeTurnPayload => ({
-      ...(request ? { request } : {}), ...(authoredLife ? { character_life: authoredLife } : {}), ...(braked() ? { braked: true } : {}), analysis, decision: sceneDecision, recent: turnMessages.recent,
+      ...(request ? { request } : {}), ...(authoredLife ? { character_life: authoredLife } : {}), ...(braked() ? { braked: true } : {}), ...(skipAnalyzer ? { analyzerSkipped: true } : {}), analysis, decision: sceneDecision, recent: turnMessages.recent,
       memoryRefs: [...longMemory?.refs.entries() ?? []], memories: longMemory?.chosen ?? [], companion: companionStored,
       consult: consultRoom, proposalRule: Boolean(character?.bible?.intimacyProposal),
       closest: Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship?.config.adultFlirtation && stageNumber && stageNumber >= 4),
@@ -1905,7 +1922,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
-                  { role: 'user', content: modelRequest.input },
+                  { role: 'user', content: adult ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
                 ],
               }),
             }, 30_000);
@@ -1913,7 +1930,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               console.warn('[Lounge model] deepseek failed', JSON.stringify({ model, status: response.status }));
               throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'deepseek_rate_limit' : 'deepseek_request_failed', true, 5);
             }
-            type DeepSeekChunk = { choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number } };
+            type DeepSeekChunk = { choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
             let output = '', finish = '', usage: DeepSeekChunk['usage'];
             for await (const raw of readModelEvents(response.body)) {
               const chunk = raw as unknown as DeepSeekChunk, choice = chunk.choices?.[0];
@@ -1927,7 +1944,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             }
             if (finish === 'content_filter') throw new LoungeUpstreamError('이 모델이 이번 답을 건너뛰었어요. 다시 말을 걸어 주세요.', 502, 'deepseek_blocked', true, 5);
             const final: ModelResult = { status: finish === 'length' ? 'incomplete' : 'completed', ...(finish === 'length' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
-              usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: usage?.prompt_cache_hit_tokens ?? 0 } } };
+              usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: Math.max(usage?.prompt_cache_hit_tokens ?? 0, usage?.prompt_tokens_details?.cached_tokens ?? 0) } } }; // NanoGPT reports its cache in prompt_tokens_details (2026-11-18: it showed 0 though 98% was cached)
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
             // A reply its JSON mode could not read comes back as spaces.
             return parseHostAnswer(output.trim() || undefined, final, false);

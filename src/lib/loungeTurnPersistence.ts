@@ -12,6 +12,8 @@ export type LoungeTurnPayload = {
   closestStart?: boolean;
   /** The reply stepped in when the adult model was down: nothing it said is written into the room's memory (2026-11-18). */
   braked?: boolean;
+  /** The analyzer was skipped for a sexual scene that goes on (2026-11-18). */
+  analyzerSkipped?: boolean;
   /** Adult mode at the closest step: the member's hands are not scored as crossing a line (2026-11-17). */
   adultClosest?: boolean;
   /** State authored by the reply model, kept in the durable job even if recording must be recovered. */
@@ -44,7 +46,7 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   const state = normalizeLoungeCompanionState(snapshot.state, roomId);
   const nextState = nextLoungeCompanionState({ state, update: payload.character_life ? { ...answer, character_life: payload.character_life } : answer, decision: payload.decision ?? { progress: 'stay' },
     turn: job.turn, reply, inner, userText: job.user_text, recent: payload.recent,
-    boldMove: payload.boldMove, braked: payload.braked, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
+    boldMove: payload.boldMove, braked: payload.braked, sexual: payload.analysis?.sexual_scene, analyzerSkipped: payload.analyzerSkipped, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
   let relationship: LoungeTurnCommit['relationship'] = null;
   let mood = snapshot.mood;
   let change: { relationship: RelationshipView; change: RelationshipChange } | undefined;
