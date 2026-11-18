@@ -350,31 +350,38 @@ async function hasLoungeAdultMode(
   user: { id: string; email?: string; is_anonymous?: boolean },
   req: Request | undefined,
   lookup: { url: string; headers: Record<string, string> } | undefined,
+  /** Why it answered as it did (2026-11-19: off in the middle of a room, and the log could not say whether the app's confirmation was missing or its lookup failed). */
+  gate: { reason?: string } = {},
 ) {
   const mode = (process.env.LOUNGE_ADULT_MODE || 'web').trim().toLowerCase();
-  if (mode === 'off') return false;
+  if (mode === 'off') { gate.reason = 'killed'; return false; }
   if (mode === 'allowlist') {
     const allowed = (process.env.LOUNGE_ADULT_MODE_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
-    return allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
+    const listed = allowed.includes(user.id.toLowerCase()) || Boolean(user.email && allowed.includes(user.email.toLowerCase()));
+    gate.reason = listed ? 'allowlisted' : 'not_allowlisted';
+    return listed;
   }
   // Web: on for every member. App: only after the member confirmed (migration 20261218).
-  if (!(req && isSaseokAppRequest(req))) return true;
-  if (user.is_anonymous || !lookup) return false;
+  if (!(req && isSaseokAppRequest(req))) { gate.reason = 'web'; return true; }
+  if (user.is_anonymous) { gate.reason = 'app_guest'; return false; }
+  if (!lookup) { gate.reason = 'app_no_lookup'; return false; }
   try {
     const response = await fetchTimed(
       `${lookup.url}/rest/v1/lounge_adult_verification?user_id=eq.${encodeURIComponent(user.id)}&select=verified_at`,
       { headers: lookup.headers },
       4_000,
     );
-    if (!response.ok) return false;
+    if (!response.ok) { gate.reason = `app_lookup_http_${response.status}`; return false; }
     const rows = await readJson<Array<{ verified_at: string | null }>>(response, 'lounge');
-    return Boolean(rows[0]?.verified_at);
-  } catch {
+    const verified = Boolean(rows[0]?.verified_at);
+    gate.reason = verified ? 'app_verified' : 'app_not_verified';
+    return verified;
+  } catch (error) {
+    gate.reason = error instanceof Error && error.name === 'TimeoutError' ? 'app_lookup_timeout' : 'app_lookup_failed';
     return false;
   }
 }
 
-/** A request from the 사석 app: its user agent carries "SaseokApp" (capacitor.config.ts). */
 const isSaseokAppRequest = (req: Request) => (req.headers.get('user-agent') || '').includes('SaseokApp');
 
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
@@ -432,7 +439,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
   let requestPhase = 'start';
   // What is known of this turn so far, for the record of a turn that gave no reply (2026-11-19, by the owner: three spoken messages
   // in a call got nothing and the turn left no trace, so no one could say whether a model refused or the request never reached one).
-  const turnNote: { user_id?: string; character_id?: string; turn?: number; medium?: 'chat' | 'voice'; stage?: number | null; adult_mode?: boolean; adult_routed?: boolean; chosen_model?: string; reason?: string } = {};
+  const turnNote: { user_id?: string; character_id?: string; turn?: number; medium?: 'chat' | 'voice'; stage?: number | null; adult_mode?: boolean; adult_why?: string; adult_routed?: boolean; chosen_model?: string; reason?: string } = {};
   const requestStartedAt = performance.now();
   const requestClient: 'app' | 'web' = isSaseokAppRequest(req) ? 'app' : 'web';
   let noteTurnFailure: ((outcome: 'skipped' | 'failed', detail: { phase: string; error?: unknown; attempts?: unknown[] }) => Promise<void>) | undefined;
@@ -574,7 +581,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const error = detail.error;
       const upstream = error instanceof LoungeUpstreamError ? error : undefined;
       const row = { room_id: requestRoom, user_id: turnNote.user_id ?? null, character_id: turnNote.character_id ?? null, turn: turnNote.turn ?? null, medium: turnNote.medium ?? null, stage: turnNote.stage ?? null,
-        adult_mode: turnNote.adult_mode ?? null, adult_routed: turnNote.adult_routed ?? null, chosen_model: turnNote.chosen_model ?? null, client: requestClient, reason: turnNote.reason ?? null,
+        adult_mode: turnNote.adult_mode ?? null, adult_why: turnNote.adult_why ?? null, adult_routed: turnNote.adult_routed ?? null, chosen_model: turnNote.chosen_model ?? null, client: requestClient, reason: turnNote.reason ?? null,
         outcome, phase: detail.phase, error_code: upstream?.code ?? (error instanceof Error ? error.name : null), error_status: upstream?.status ?? null, upstream_status: upstream?.upstreamStatus ?? null,
         error_message: error instanceof Error ? error.message.slice(0, 200) : null, attempts: detail.attempts ?? [], ms: Math.round(performance.now() - requestStartedAt) };
       await fetchTimed(`${url}/rest/v1/lounge_turn_failures`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(row) }, 3_000)
@@ -823,7 +830,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
         .catch(error => (console.warn('[Lounge relationship] read failed', error instanceof Error ? error.name : 'error'), null))
       : Promise.resolve(null);
     // App adult unlock (web is always on): start with the other lookups so a verification row adds no wait.
-    const adultUnlocked = hasLoungeAdultMode(user, req, serviceHeaders ? { url, headers: serviceHeaders } : undefined);
+    const adultGate: { reason?: string } = {};
+    const adultUnlocked = hasLoungeAdultMode(user, req, serviceHeaders ? { url, headers: serviceHeaders } : undefined, adultGate);
     adultUnlocked.catch(() => false);
     // Long-term memory and the previous one-to-one conversation, read in parallel; LOUNGE_LONG_MEMORY=off turns both off.
     const memoryRowsRead = readMemoryRows(user.id);
@@ -981,6 +989,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // Every character with adult flirtation has it, a character a member made included (2026-11-18, by the owner): its sheet is an adult of 20 to 80 and the AI review at creation turns away anyone who reads as a minor; the member chose flirtation for it.
     // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
     const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && await adultUnlocked);
+    // Why adult mode is on or off in this turn, for the turn's record: the character or the room does not offer it, or what the member's gate said.
+    const adultWhy = !relationship?.config.adultFlirtation ? 'character_without_it' : !solo || room.space_id ? 'not_one_to_one' : adultGate.reason ?? 'unknown';
     // The stage as the sheet counts it, from 1 (the first stage) to 4 (the closest).
     const enabledStages = relationship ? relationship.config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id) : [];
     const stageNumber = relationship ? Math.max(1, enabledStages.indexOf(relationship.record.stage) + 1) : undefined;
@@ -1269,7 +1279,7 @@ ${photoRule}`;
     const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey));
     const adultReply = Boolean((deepseekKey || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
-    Object.assign(turnNote, { character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode, adult_routed: adultReply, chosen_model: chosenChat.id });
+    Object.assign(turnNote, { character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode, adult_why: adultWhy, adult_routed: adultReply, chosen_model: chosenChat.id });
     const turnApplied: { current?: { provider: string; model: string } } = {};
     const braked = () => adultReply && turnApplied.current?.provider === 'openai';
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ...(skipAnalyzer ? { skipped: 'sexual scene goes on' } : {}), ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, sexual: analysis.sexual_scene, adult_model: adultReply, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
@@ -2180,9 +2190,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const turnModel = { user_id: user.id, room_id: roomId, character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode,
               chosen_model: chosenModel.id, sexual: analysis?.sexual_scene ?? null, adult_routed: adultReply, applied_provider: trace.applied?.provider ?? null, applied_model: trace.applied?.model ?? null,
               fallback: trace.attempts.length > 1, attempts: trace.attempts, chars: firstText.length };
-            const turnModelRow = { ...turnModel, client: requestClient };
+            const turnModelRow = { ...turnModel, client: requestClient, adult_why: adultWhy };
             console.info('[Lounge turn model]', JSON.stringify({ ...turnModel, user_id: undefined, room_id: undefined }));
-            // The record carries which client asked (app or web); a database without that column (migration 20270102) answers 400, and the record is written again without it.
+            // The record carries which client asked (app or web) and why adult mode was on or off; a database without those columns (migration 20270102) answers 400, and the record is written again without it.
             const writeTurnModel = (row: object) => fetchTimed(`${url}/rest/v1/lounge_turn_models`, { method: 'POST', headers: { ...serviceHeaders!, Prefer: 'return=minimal' }, body: JSON.stringify(row) }, 3_000);
             const traceWrite = serviceHeaders ? writeTurnModel(turnModelRow)
               .then(response => response.status === 400 ? writeTurnModel(turnModel) : response)
