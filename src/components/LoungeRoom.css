@@ -968,6 +968,9 @@
 .has-room .lounge-one-to-one .lounge-scene-heading { gap:0; }
 .lounge-label-short { display:none; }
 .has-room .lounge-room-top-actions .lounge-background-trigger { display:inline-flex; align-items:center; gap:5px; }
+.lounge-background-pager { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin:8px 0 4px; }
+.lounge-background-pager button { min-width:32px; height:32px; padding:0 8px; border-radius:10px; border:1px solid #ffffff2e; background:transparent; color:inherit; font:inherit; font-size:13px; cursor:pointer; }
+.lounge-background-pager button[aria-current="page"] { background:#e6c48f; color:#231a10; border-color:transparent; font-weight:700; }
 .lounge-background-backdrop { position:fixed; inset:0; z-index:3000; background:#0b130f8c; }
 .lounge-background-sheet { position:fixed; z-index:3001; left:0; right:0; bottom:0; display:grid; gap:12px; max-height:min(86dvh,720px); overflow-y:auto; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; background:var(--lounge-surface,#242421); border-top:1px solid #ffffff2e; box-shadow:0 -12px 40px #0008; color:#fff5e8; text-shadow:none; }
 @media (min-width:761px) { .lounge-background-sheet { left:50%; right:auto; bottom:auto; top:50%; width:min(620px,calc(100vw - 32px)); transform:translate(-50%,-50%); border-radius:20px; border:1px solid #ffffff2e; } }

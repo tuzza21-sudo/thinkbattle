@@ -65,7 +65,9 @@ test('without an explicit move the background changes only after the scene has s
   const next = scene('한강 변', '외출');
   assert.equal(decide({ scene: next, sceneTurns: 1, follow: was(60) }).reason, 'too_soon', 'only just arrived');
   assert.equal(decide({ scene: next, sceneTurns: 5, follow: was(5) }).reason, 'too_soon', 'changed lately');
-  const settled = decide({ scene: next, sceneTurns: 5, follow: was(30) });
+  const settled = decide({ scene: next, sceneTurns: 5, follow: was(45) }); // 2026-11-18: 40 minutes and five turns (it was 20 and three)
+  assert.equal(decide({ scene: next, sceneTurns: 4, follow: was(45) }).reason, 'too_soon', 'four turns are not five');
+  assert.equal(decide({ scene: next, sceneTurns: 5, follow: was(30) }).reason, 'too_soon', '30 minutes are not 40');
   assert.equal(settled.action, 'apply'); assert.equal(settled.reason, 'moved');
   assert.equal(decide({ scene: next, sceneTurns: 5, change: { turn: 3, at: now - 3 * minute, explicit: false }, follow: was(5) }).action, 'keep');
 });
@@ -133,4 +135,50 @@ test('a call is never a place: "전화 통화 중" kept the background where it 
   assert.equal(follow.stateScenePlace(scene('통화 연결음이 울리는 사무실', '회사')), '통화 연결음이 울리는 사무실', 'a real place that mentions a call is still a place');
   const kept = decide({ scene: scene('전화 통화 중', '기타'), follow: { key: '와인바', at: now - 60 * minute, place: '와인바' }, sceneTurns: 9 });
   assert.equal(kept.action, 'keep');
+});
+
+// 2026-11-18, by the owner: one place is one background; the wording of a spot in it is not a move.
+const placeLib = loadTs(fileURLToPath(new URL('../src/lib/loungeScenePlace.ts', import.meta.url)));
+
+test('a motel or a hotel the two are in is one room, however the spot in it is worded (2026-11-18)', () => {
+  for (const wording of ['모텔 방', '모텔 방 안', '모텔 침대 위', '근처 모텔 방 소파', '근처 모텔', '모텔 객실 침대 곁', '모텔']) assert.equal(placeLib.canonicalScenePlace(wording), '모텔 방', wording);
+  for (const wording of ['호텔 객실', '호텔 스위트', '호텔 객실 침대 위', '호텔 방']) assert.equal(placeLib.canonicalScenePlace(wording), '호텔 객실', wording);
+  // Somewhere else in it, or outside it, is another place.
+  for (const wording of ['호텔 로비 카페', '호텔 수영장', '호텔 연회장 복도', '모텔 주차장', '모텔 앞']) assert.notEqual(placeLib.canonicalScenePlace(wording), '호텔 객실', wording);
+  assert.equal(placeLib.canonicalScenePlace('호텔 로비 카페의 낮은 소파 자리'), '호텔 로비 카페');
+  assert.equal(placeLib.canonicalScenePlace('와인바 창가 자리'), '와인바');
+  assert.equal(placeLib.canonicalScenePlace('와인바 앞'), '와인바 앞', 'outside is not the bar');
+  assert.ok(placeLib.sameScenePlace('모텔 침대 위', '모텔 방'));
+  assert.ok(!placeLib.sameScenePlace('모텔 방', '집 거실'));
+  // The background does not follow a change of wording, and a name that says nothing of where is not a place.
+  assert.equal(follow.sceneFollowKey(undefined, '모텔 침대 위'), follow.sceneFollowKey(undefined, '근처 모텔 방 소파'));
+  assert.equal(follow.stateScenePlace({ location: '저녁의 조용한 실내' }), undefined);
+  assert.equal(follow.stateScenePlace({ location: '모텔 방' }), '모텔 방');
+  const was = { key: follow.sceneFollowKey(undefined, '모텔 방'), at: now - 5 * 60 * minute, place: '모텔 방' };
+  assert.equal(decide({ scene: scene('모텔 침대 위', '기타'), sceneTurns: 9, follow: was }).reason, 'same', 'a long time later, still the same room');
+});
+
+test('the engine keeps one wording for one place and counts it as no move (2026-11-18)', () => {
+  const base = messenger.normalizeLoungeCompanionState(null, 'room-1');
+  const at = (state, location, extra = {}, turn = 2) => messenger.nextLoungeCompanionState({ state, update: { scene: { location, scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] } }, decision: { progress: 'stay' }, turn, reply: '답이에요 길게 쓴 답', inner: '', ...extra });
+  const first = at(base, '근처 모텔 방 소파', {}, 1);
+  assert.equal(first.scene.location, '모텔 방', 'a motel is named by its room');
+  const second = at(first, '모텔 침대 위', {}, 2);
+  assert.equal(second.scene.location, '모텔 방', 'the wording it had is kept');
+  assert.equal(second.scene_turns, first.scene_turns + 1, 'the scene did not move');
+  assert.equal(second.scene_change, first.scene_change, 'and nothing is noted as a change');
+  const gone = at(second, '집 거실', {}, 3);
+  assert.equal(gone.scene.location, '집 거실'); assert.equal(gone.scene_turns, 0);
+  assert.match(messenger.loungeCompanionUpdateInstructions, /location은 방이나 건물 단위의 장소.*침대 위, 소파, 창가 자리.*activity에 쓰고.*직전 scene의 location을 표현까지 그대로/);
+});
+
+test('numbered pages of twenty, and a shared list that does not repeat itself (2026-11-18)', () => {
+  const items = Array.from({ length: 45 }, (_, index) => index + 1);
+  assert.deepEqual([placeLib.pageOf(items, 1).items.length, placeLib.pageOf(items, 3).items, placeLib.pageOf(items, 1).pages], [20, [41, 42, 43, 44, 45], 3]);
+  assert.equal(placeLib.pageOf(items, 99).page, 3, 'a page that is not there is the last');
+  assert.deepEqual(placeLib.pageOf([], 1), { items: [], pages: 1, page: 1 });
+  const scenes = [{ id: 'a', name: '밤의 모텔 객실', description: '' }, { id: 'b', name: '저녁의 조용한 실내', description: '' }, { id: 'c', name: '새벽의 호텔 객실', description: '' }, { id: 'd', name: '저녁의 모텔 객실', description: '' }, { id: 'e', name: '', description: '' }, { id: 'f', name: '촛불 켜진 밤 침실', description: '' }];
+  assert.deepEqual(placeLib.distinctSharedScenes(scenes).map(scene => scene.id), ['a', 'c', 'f'], 'a name that says nothing of where, and a second motel room, are left out');
+  assert.equal(placeLib.isGenericPlaceName('저녁의 조용한 실내'), true);
+  assert.equal(placeLib.isGenericPlaceName('호텔 로비 카페'), false);
 });

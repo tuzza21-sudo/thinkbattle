@@ -25,7 +25,8 @@ const modelsLib = compile('../src/lib/loungeModels.ts');
 const storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts');
-const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('lounge.js') ? lounge : undefined);
+const scenePlaceLib = compile('../src/lib/loungeScenePlace.ts');
+const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('lounge.js') ? lounge : path.endsWith('loungeScenePlace.js') ? scenePlaceLib : undefined);
 // The analyzer is a call of its own before each one-to-one chat reply (engine v4, 2026-11-02); the tests that fake the
 // model answer one call per turn, so it is off here except in its own tests.
 process.env.LOUNGE_ANALYZER ??= 'off';
