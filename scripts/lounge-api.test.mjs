@@ -2603,6 +2603,7 @@ test('private chat keeps full expressive replies up to 3000 characters while a o
   assert.match(voice.instructions, /reply_medium=voice이면 목소리로 들리는 대화/);
   assert.match(voice.instructions, /말투·침묵·말의 내용으로 마음을 드러낸다/);
   assert.match(voice.instructions, /음성은 글보다 짧게 말한다: 한 번에 한두 문장/);
+  assert.match(charactersLib.loungeAdultDepth, /1인칭으로 바로 말한다.*높임말 없는 반말 평서체.*3인칭 서술/, 'the scene is told in her own first person, without honorifics (2026-11-18)');
 });
 
 test('narration handles inline and multiline legacy brackets, partial typing and spoken technical explanations', () => {
