@@ -1001,7 +1001,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const memoryLimits = loungeMemoryLimits;
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance, memoryLimits) : undefined;
     const analyzerStarted = performance.now();
-    const skipAnalyzer = loungeSkipsAnalyzer(companionState, adultMode && stageNumber === 4, messages[0]?.kind === 'human' ? String(messages[0].text ?? '') : '');
+    const skipAnalyzer = loungeSkipsAnalyzer(companionState, adultMode && stageNumber === 4, messages[0]?.kind === 'human' ? String(messages[0].text ?? '') : '', companionTurn);
     const analyzerRead = !skipAnalyzer && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
       const state = currentRelationshipContext();
       const characterReading = companionCharacter ? { name: companionCharacter.name, role: companionCharacter.role,
@@ -1242,10 +1242,10 @@ ${photoRule}`;
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy && analysis?.sexual_scene === false) delete turnConditions.intimacy.explicit;
     // In a sexual scene the narration, the inner voice and the lines are in plain speech, whatever the room agreed (the agreed level comes back after it).
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) Object.assign(turnConditions, { speech: loungeAdultSceneSpeech });
-    // A room on 오닉스 (DeepSeek Flash) has its adult scenes answered by DeepSeek's own model (2026-11-18, by the owner: to see if it writes them as
-    // well, and faster); any other model has them answered by NanoGPT's. Each is the other's first fallback.
-    const adultViaDeepseek = Boolean(deepseekKey && getLoungeChatModel(solo ? room.ai_model : null).provider === 'deepseek');
-    const adultReply = Boolean((adultViaDeepseek || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
+    // An adult scene in a chat is answered by DeepSeek's own model first, whatever model the room has, and by NanoGPT's when it fails; on a call
+    // NanoGPT's comes first (2026-11-18, by the owner: DeepSeek's JSON mode answered empty on half of the call's turns). Each is the other's first fallback.
+    const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey));
+    const adultReply = Boolean((deepseekKey || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     const turnApplied: { current?: { provider: string; model: string } } = {};
     const braked = () => adultReply && turnApplied.current?.provider === 'openai';
@@ -1949,7 +1949,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const final: ModelResult = { status: finish === 'length' ? 'incomplete' : 'completed', ...(finish === 'length' ? { incomplete_details: { reason: 'max_output_tokens' } } : {}),
               usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: Math.max(usage?.prompt_cache_hit_tokens ?? 0, usage?.prompt_tokens_details?.cached_tokens ?? 0) } } }; // NanoGPT reports its cache in prompt_tokens_details (2026-11-18: it showed 0 though 98% was cached)
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
-            // A reply its JSON mode could not read comes back as spaces.
+            // A reply its JSON mode could not read comes back as spaces (DeepSeek's documentation says it may sometimes return empty content); the log says how it ended.
+            if (!output.trim()) console.warn('[Lounge model] empty answer', JSON.stringify({ backend: adult ? 'nanogpt' : 'deepseek', model, finish: finish || null, outputTokens: usage?.completion_tokens ?? null, inputTokens: usage?.prompt_tokens ?? null, medium: chat ? 'chat' : 'voice' }));
             return parseHostAnswer(output.trim() || undefined, final, false);
           };
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
