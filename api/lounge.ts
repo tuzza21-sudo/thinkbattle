@@ -430,6 +430,12 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
   let claimedTicket: string | null = null, requestAction = '', requestRoom = '';
   // Where a failing turn stopped (it is in the failure log): a bare "internal error" on 2026-11-09 said nothing else.
   let requestPhase = 'start';
+  // What is known of this turn so far, for the record of a turn that gave no reply (2026-11-19, by the owner: three spoken messages
+  // in a call got nothing and the turn left no trace, so no one could say whether a model refused or the request never reached one).
+  const turnNote: { user_id?: string; character_id?: string; turn?: number; medium?: 'chat' | 'voice'; stage?: number | null; adult_mode?: boolean; adult_routed?: boolean; chosen_model?: string; reason?: string } = {};
+  const requestStartedAt = performance.now();
+  const requestClient: 'app' | 'web' = isSaseokAppRequest(req) ? 'app' : 'web';
+  let noteTurnFailure: ((outcome: 'skipped' | 'failed', detail: { phase: string; error?: unknown; attempts?: unknown[] }) => Promise<void>) | undefined;
   try {
     const raw = await req.text();
     if (new TextEncoder().encode(raw).length > MAX_BYTES) return json({ error: '음성이 너무 길어요.' }, 413);
@@ -563,6 +569,17 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // Relationship state is read and written only with the server role, never from the browser.
     const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const serviceHeaders = service ? { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' } : undefined;
+    // A skipped claim or a failed reply goes into lounge_turn_failures (the table is optional: a database without it is ignored).
+    if (serviceHeaders && requestRoom) noteTurnFailure = async (outcome, detail) => {
+      const error = detail.error;
+      const upstream = error instanceof LoungeUpstreamError ? error : undefined;
+      const row = { room_id: requestRoom, user_id: turnNote.user_id ?? null, character_id: turnNote.character_id ?? null, turn: turnNote.turn ?? null, medium: turnNote.medium ?? null, stage: turnNote.stage ?? null,
+        adult_mode: turnNote.adult_mode ?? null, adult_routed: turnNote.adult_routed ?? null, chosen_model: turnNote.chosen_model ?? null, client: requestClient, reason: turnNote.reason ?? null,
+        outcome, phase: detail.phase, error_code: upstream?.code ?? (error instanceof Error ? error.name : null), error_status: upstream?.status ?? null, upstream_status: upstream?.upstreamStatus ?? null,
+        error_message: error instanceof Error ? error.message.slice(0, 200) : null, attempts: detail.attempts ?? [], ms: Math.round(performance.now() - requestStartedAt) };
+      await fetchTimed(`${url}/rest/v1/lounge_turn_failures`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(row) }, 3_000)
+        .then(response => { if (!response.ok && response.status !== 404) console.warn('[Lounge turn failure] not saved', response.status); }).catch(() => {});
+    };
     // What a member has left in a premium voice engine this month. A guest has none, and an allowance that cannot be read
     // (the table is missing, the server role is not set) counts as used, so a premium voice is never spent unchecked.
     const readSpeechAllowance = async (engine: LoungePremiumSpeechEngine, user: { id: string; email?: string; is_anonymous?: boolean }) => {
@@ -792,9 +809,13 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     })();
     queryEmbedding.catch(() => {});
     const ticket = await rpc<string | null>('claim_voice_lounge_host', { p_room: roomId, p_reason: body.reason }).catch(error => { lookupGiveUp.abort(); throw error; });
-    if (!ticket) { lookupGiveUp.abort(); return json({ skipped: true }); }
+    // A silence tick is skipped all the time by design; a member's message that was skipped (the previous turn's 60-second ticket, a
+    // reply too soon after the last) is what the record is for.
+    turnNote.reason = typeof body.reason === 'string' ? body.reason : undefined;
+    if (!ticket) { lookupGiveUp.abort(); if (body.reason !== 'silence') await noteTurnFailure?.('skipped', { phase: 'claim' }); return json({ skipped: true }); }
     claimedTicket = ticket; requestPhase = 'claimed';
     const user = await readJson<{ id: string; email?: string; is_anonymous?: boolean }>(auth, 'lounge');
+    turnNote.user_id = user.id;
     // Read in parallel with the room so a relationship adds no round trip; a failure only disables it.
     const relationshipRows = serviceHeaders
       ? fetchTimed(`${url}/rest/v1/voice_lounge_relationships?user_id=eq.${encodeURIComponent(user.id)}&select=*`, { headers: serviceHeaders })
@@ -1248,6 +1269,7 @@ ${photoRule}`;
     const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey));
     const adultReply = Boolean((deepseekKey || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
+    Object.assign(turnNote, { character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode, adult_routed: adultReply, chosen_model: chosenChat.id });
     const turnApplied: { current?: { provider: string; model: string } } = {};
     const braked = () => adultReply && turnApplied.current?.provider === 'openai';
     if (companionState) console.info('[Lounge analyzer]', JSON.stringify({ host: host.id, ...(skipAnalyzer ? { skipped: 'sexual scene goes on' } : {}), ms: analyzerRead ? Math.round(performance.now() - analyzerStarted) : 0, used: Boolean(analysis), ...(analysis ? { emotional: analysis.is_emotional_moment, stale: analysis.topic_stale, sexual: analysis.sexual_scene, adult_model: adultReply, ...(analysis.intimacy_proposal !== 'none' ? { proposal: analysis.intimacy_proposal } : {}) } : {}), ...(character?.bible?.adultMode ? { stage: stageNumber, adult: adultMode, explicit: Boolean(turnConditions?.intimacy?.explicit), step: turnConditions?.intimacy?.now ? Number(Object.values(character.bible.intimacyLadder ?? {}).indexOf(turnConditions.intimacy.now)) + 1 : undefined } : {}), progress: sceneDecision?.progress, ...(sceneDecision?.event ? { event: sceneDecision.event.id } : {}), scene: Boolean(companionState.scene) }));
@@ -2158,8 +2180,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const turnModel = { user_id: user.id, room_id: roomId, character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode,
               chosen_model: chosenModel.id, sexual: analysis?.sexual_scene ?? null, adult_routed: adultReply, applied_provider: trace.applied?.provider ?? null, applied_model: trace.applied?.model ?? null,
               fallback: trace.attempts.length > 1, attempts: trace.attempts, chars: firstText.length };
+            const turnModelRow = { ...turnModel, client: requestClient };
             console.info('[Lounge turn model]', JSON.stringify({ ...turnModel, user_id: undefined, room_id: undefined }));
-            const traceWrite = serviceHeaders ? fetchTimed(`${url}/rest/v1/lounge_turn_models`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(turnModel) }, 3_000)
+            // The record carries which client asked (app or web); a database without that column (migration 20270102) answers 400, and the record is written again without it.
+            const writeTurnModel = (row: object) => fetchTimed(`${url}/rest/v1/lounge_turn_models`, { method: 'POST', headers: { ...serviceHeaders!, Prefer: 'return=minimal' }, body: JSON.stringify(row) }, 3_000);
+            const traceWrite = serviceHeaders ? writeTurnModel(turnModelRow)
+              .then(response => response.status === 400 ? writeTurnModel(turnModel) : response)
               .then(response => { if (!response.ok && response.status !== 404) console.warn('[Lounge turn model] not saved', response.status); }).catch(() => {}) : Promise.resolve();
             await speech;
             await traceWrite;
@@ -2188,6 +2214,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             console.error('[Lounge API] reply failed', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code, status: error.status } : { name: error instanceof Error ? error.name : 'error', message: error instanceof Error ? error.message.slice(0, 120) : undefined }));
             // A turn that ended without a saved reply gives its claim back at once; otherwise the room took no new turn
             // for 60 seconds and the conversation looked frozen after a failure or a page reload.
+            if (!replySaved) await noteTurnFailure?.('failed', { phase: 'reply', error, attempts: trace.attempts });
             if (!replySaved) await rpc<void>('release_voice_lounge_host', { p_room: roomId, p_ticket: ticket }, true)
               .catch(failure => { if (!(failure instanceof LoungeUpstreamError && failure.code === 'lounge_schema_not_ready')) console.warn('[Lounge API] turn not released', failure instanceof LoungeUpstreamError ? failure.code : 'error'); });
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
@@ -2259,6 +2286,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
   } catch (error) {
     // Server-side diagnostics: a 502 should always leave a cause in the logs. No request bodies or keys.
     if (claimedTicket) await rpc<void>('release_voice_lounge_host', { p_room: requestRoom, p_ticket: claimedTicket }, true).catch(() => {});
+    if (claimedTicket && requestAction === 'host') await noteTurnFailure?.('failed', { phase: requestPhase, error });
     console.error('[Lounge API] request failed', JSON.stringify(error instanceof LoungeUpstreamError
       ? { action: requestAction, phase: requestPhase, released: Boolean(claimedTicket), code: error.code, status: error.status, rpc: error.rpc, databaseCode: error.databaseCode, upstreamStatus: error.upstreamStatus }
       : { action: requestAction, phase: requestPhase, released: Boolean(claimedTicket), name: error instanceof Error ? error.name : typeof error, message: error instanceof Error ? error.message.slice(0, 160) : undefined, cause: (error as { cause?: { code?: string } } | undefined)?.cause?.code,

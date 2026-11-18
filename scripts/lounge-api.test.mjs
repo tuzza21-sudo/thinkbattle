@@ -5568,3 +5568,59 @@ test('on a call an adult scene is answered by NanoGPT first and DeepSeek\'s own 
     assert.deepEqual(asked, order, `${call ? 'call' : 'chat'} deepseek=${deepseekWorks} nano=${nanoWorks}`);
   }
 });
+
+test('a skipped claim and a turn that ended without a reply are recorded with the client and every attempt (2026-11-19)', async t => {
+  // A member's message whose claim was refused is recorded as skipped; a silence tick, which is skipped all the time, is not.
+  for (const [reason, userAgent, recordedClient] of [['followup', 'Mozilla/5.0', 'web'], ['followup', 'SaseokApp/1.0', 'app'], ['silence', 'Mozilla/5.0', undefined]]) {
+    let failure;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1' });
+      if (url.includes('lounge_turn_failures')) { failure = JSON.parse(init.body); return result(null, 201); }
+      return result(null);
+    }, async () => {
+      const response = await handler(new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: 'Bearer example', 'Content-Type': 'application/json', 'User-Agent': userAgent }, body: JSON.stringify({ action: 'host', roomId, reason }) }));
+      assert.deepEqual(await response.json(), { skipped: true });
+    }));
+    if (!recordedClient) { assert.equal(failure, undefined, 'a silence tick is not recorded'); continue; }
+    assert.equal(failure?.outcome, 'skipped'); assert.equal(failure.phase, 'claim'); assert.equal(failure.room_id, roomId);
+    assert.equal(failure.client, recordedClient); assert.equal(failure.reason, reason);
+  }
+
+  // Every model fails: nothing is saved as a reply, and the failure keeps the turn's facts and each attempt in order.
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, deepseek: process.env.DEEPSEEK_API_KEY, nano: process.env.NANOGPT_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['DEEPSEEK_API_KEY', saved.deepseek], ['NANOGPT_API_KEY', saved.nano], ['GEMINI_API_KEY', saved.gemini]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', DEEPSEEK_API_KEY: 'deepseek-key', NANOGPT_API_KEY: 'nano-key' });
+  delete process.env.GEMINI_API_KEY;
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  let failure, turnRecorded = false, released = false;
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('release_voice_lounge_host')) { released = true; return result(null); }
+    if (url.includes('lounge_turn_failures')) { failure = JSON.parse(init.body); return result(null, 201); }
+    if (url.includes('lounge_turn_models')) { turnRecorded = true; return result(null, 201); }
+    if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+    if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+    if (url.includes('voice_lounge_relationships?')) return result([closest]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+    if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+    if (url === modelsLib.loungeAdultChatUrl || url === 'https://api.deepseek.com/chat/completions') return result({ error: { message: 'down' } }, 503);
+    if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
+    if (url.endsWith('/responses')) return result({ error: { message: 'down' } }, 503);
+    return result([]);
+  }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  assert.ok(failure, 'the failed turn is recorded');
+  assert.equal(failure.outcome, 'failed'); assert.equal(failure.phase, 'reply');
+  assert.equal(failure.character_id, 'velvet'); assert.equal(failure.user_id, 'user-1'); assert.equal(failure.turn, 4);
+  assert.equal(failure.medium, 'chat'); assert.equal(failure.adult_routed, true); assert.equal(failure.client, 'web');
+  assert.ok(failure.attempts.length >= 2 && failure.attempts.every(item => item.ok === false && Number.isInteger(item.ms)), 'every attempt is kept');
+  assert.equal(failure.attempts[0].provider, 'deepseek'); assert.ok(failure.error_code);
+  assert.equal(turnRecorded, false, 'no model record for a turn without a reply');
+  assert.equal(released, true, 'the claim is still given back');
+});
