@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Check, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { addMyLoungeMemory, editMyLoungeMemory, forgetMyLoungeEvent, forgetMyLoungeMemory, getMyLoungeMemory, type LoungeMemoryBook, type LoungeMemoryItem } from '../lib/loungeApi';
+import { addMyLoungeMemory, editMyLoungeMemory, forgetLoungeRoomMemory, forgetMyLoungeEvent, forgetMyLoungeMemory, getMyLoungeMemory, loadLoungeRoomMemory, type LoungeMemoryBook, type LoungeMemoryItem, type LoungeRoomMemory } from '../lib/loungeApi';
 import { getRelationshipConfig, memoryKindLabels, relationshipEventLabels, type RelationshipEventType } from '../lib/relationship';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -15,17 +15,19 @@ const subject = (name: string) => { const code = name.charCodeAt(name.length - 1
  * corrected, forgotten, or added by the member), the important moments of the relationship, and how the relationship
  * went stage by stage. The character brings up the memories that fit what is being talked about (6 to 8 a reply).
  */
-export function LoungeMemorySheet({ characterId, characterName, onClose, sample }: { characterId: string; characterName: string; onClose: () => void; /** The preview's example: shown instead of the member's, and not changed. */ sample?: LoungeMemoryBook }) {
+export function LoungeMemorySheet({ characterId, characterName, onClose, sample, roomId }: { characterId: string; characterName: string; onClose: () => void; /** The room the sheet is opened from: its own memory (summary, agreements, what is on her mind) can be forgotten here. */ roomId?: string; /** The preview's example: shown instead of the member's, and not changed. */ sample?: LoungeMemoryBook }) {
   const [book, setBook] = useState<LoungeMemoryBook | null>(sample ?? null);
   const [tab, setTab] = useState<Tab>('memories');
   const [editing, setEditing] = useState<{ id?: string; kind: string; summary: string; follow_up: string } | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const titleId = useId();
+  const [roomBook, setRoomBook] = useState<LoungeRoomMemory | null>(null);
   const config = getRelationshipConfig(characterId);
   const stageLabel = (id: string | null | undefined) => config?.stages.find(stage => stage.id === id)?.label ?? id ?? '';
   const load = () => getMyLoungeMemory(characterId).then(result => setBook(result ?? { memories: [], relationship: null, milestones: [], limit: 40 }), err => { setBook({ memories: [], relationship: null, milestones: [], limit: 40 }); setError(errorText(err)); });
   useEffect(() => { if (!sample) void load(); }, [characterId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!sample && roomId) void loadLoungeRoomMemory(roomId).then(setRoomBook, () => setRoomBook(null)); }, [roomId, sample]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
@@ -42,6 +44,16 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample 
     if (done) setEditing(null);
   };
   const forget = (memory: LoungeMemoryItem) => { if (window.confirm('이 기억을 지울까요? 캐릭터가 더는 떠올리지 않아요.')) void run(memory.id, () => forgetMyLoungeMemory(memory.id)); };
+  const forgetRoom = (target: 'summary' | 'item' | 'lingering' | 'next_intent', id?: string) => {
+    if (!roomId || !window.confirm('이 기억을 지울까요? 캐릭터가 이 대화에서 더는 떠올리지 않아요.')) return;
+    void run(`room-${target}-${id ?? ''}`, async () => { setRoomBook(await forgetLoungeRoomMemory(roomId, target, id)); });
+  };
+  const roomRows = roomBook ? [
+    ...roomBook.summary.map(line => ({ key: `summary-${line.id}`, label: '대화 요약', text: line.text, target: 'summary' as const, id: line.id })),
+    ...roomBook.items.map(item => ({ key: `item-${item.id}`, label: ({ agreement: '합의', feeling: '감정의 원인', promise: '약속', fact: '함께한 이야기' } as Record<string, string>)[item.kind] ?? '이야기', text: item.summary, target: 'item' as const, id: item.id })),
+    ...(roomBook.lingering ? [{ key: 'lingering', label: '마음에 남은 것', text: roomBook.lingering, target: 'lingering' as const, id: undefined }] : []),
+    ...(roomBook.next_intent ? [{ key: 'next_intent', label: '다음에 하려던 것', text: roomBook.next_intent, target: 'next_intent' as const, id: undefined }] : []),
+  ] : [];
   const events = [...(book?.relationship?.events ?? [])].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const editor = editing && <form className="lounge-memory-editor" onSubmit={event => { event.preventDefault(); void save(); }}>
     {!editing.id && <label><span>종류</span><select value={editing.kind} onChange={event => setEditing({ ...editing, kind: event.target.value })}>{kinds.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>}
@@ -69,7 +81,8 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample 
             </>}
           </li>)}</ul> : <p className="lounge-memory-empty">아직 기억하는 이야기가 없어요. 다음에도 이어 갈 만한 이야기를 나누면 여기에 남아요.</p>}
           {editing && !editing.id ? editor : <button type="button" className="lounge-memory-add" disabled={Boolean(busy) || Boolean(editing)} onClick={() => setEditing({ kind: 'preference', summary: '', follow_up: '' })}><Plus size={15} /> 기억 직접 남기기</button>}
-          {Boolean(book.conversation?.length) && <><p className="lounge-memory-note">이 대화에서 나눈 합의와 마음에 남은 일이에요. 지켜야 할 약속은 위의 기억에 남아요.</p><ul className="lounge-memory-list">{book.conversation!.map(memory => <li key={memory.id}><div><span className="lounge-memory-kind">{({ agreement: '합의', promise: '약속', feeling: '감정의 원인', fact: '함께한 이야기' } as Record<string, string>)[memory.kind] ?? '이야기'}{memory.status === 'resolved' ? ' · 마무리됨' : ''}</span><p>{memory.summary}</p></div></li>)}</ul></>}
+          {roomId && roomRows.length > 0 && <><p className="lounge-memory-note">이 대화방의 기억이에요. 지우면 캐릭터가 이 대화에서 더는 떠올리지 않고, 지운 내용은 이후 대화에서도 다시 쓰이지 않아요.</p><ul className="lounge-memory-list">{roomRows.map(row => <li key={row.key}><div><span className="lounge-memory-kind">{row.label}</span><p>{row.text}</p></div><div className="lounge-memory-actions"><button type="button" title="지우기" disabled={Boolean(busy)} onClick={() => forgetRoom(row.target, row.id)}>{busy === `room-${row.target}-${row.id ?? ''}` ? <LoaderCircle size={14} className="lounge-spin" /> : <Trash2 size={14} />}</button></div></li>)}</ul></>}
+          {!roomId && Boolean(book.conversation?.length) && <><p className="lounge-memory-note">이 대화에서 나눈 합의와 마음에 남은 일이에요. 지켜야 할 약속은 위의 기억에 남아요.</p><ul className="lounge-memory-list">{book.conversation!.map(memory => <li key={memory.id}><div><span className="lounge-memory-kind">{({ agreement: '합의', promise: '약속', feeling: '감정의 원인', fact: '함께한 이야기' } as Record<string, string>)[memory.kind] ?? '이야기'}{memory.status === 'resolved' ? ' · 마무리됨' : ''}</span><p>{memory.summary}</p></div></li>)}</ul></>}
           <p className="lounge-memory-fine">채팅을 삭제하면 기억과 관계도 함께 초기화돼요. 건강, 종교, 연락처 같은 민감한 이야기는 장기 기억에 남기지 않아요.</p>
         </div>}
         {tab === 'events' && <div className="lounge-memory-panel">

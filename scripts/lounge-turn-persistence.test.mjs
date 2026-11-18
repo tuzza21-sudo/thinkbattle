@@ -180,3 +180,15 @@ test('a chat saves through the durable turn store: a beta account starts at the 
   const scored = turns.reduceLoungeTurn('room', teacher, { ...snapshot, relationship: { ...row, scores: record.scores, stage: record.stage, version: 1 } }, job({ closest: true }, violates));
   assert.ok(scored.commit.relationship.scores.empathy < record.scores.empathy, 'without adult mode it is scored as before');
 });
+
+test('a chat turn answered by the fallback model for the adult model writes no summary, no agreement and nothing on her mind (2026-11-18)', () => {
+  const teacher = relationship.getRelationshipConfig('teacher');
+  const job = payload => ({ room_id: 'room', turn: 1, user_text: '안녕하세요.', reply: '미안해요, 방금 장면은 제가 너무 앞서 갔어요. 속도를 늦출게요.', status: 'ready', payload: { companion: true, answer: { memory: '하린이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기' }, ...payload }, created_at: '2026-11-18T00:00:00.000Z', updated_at: '2026-11-18T00:00:00.000Z' });
+  const snapshot = { relationship: null, state: null, stateVersion: 0, mood: {} };
+  const normal = turns.reduceLoungeTurn('room', teacher, snapshot, job({}));
+  assert.equal(normal.commit.memory, '하린이 정한 범위를 지키는 것'); assert.equal(normal.commit.state.lingering?.what, '멈춰 달라는 말을 지켜 주길 바람');
+  const braked = turns.reduceLoungeTurn('room', teacher, snapshot, job({ braked: true }));
+  assert.equal(braked.commit.memory, null, 'the summary is not rewritten');
+  assert.equal(braked.commit.state.lingering, undefined); assert.equal(braked.commit.state.next_intent, undefined);
+  assert.equal(braked.commit.state.fallback_replies.length, 1, 'its start is kept to leave it out of what the next replies read');
+});
