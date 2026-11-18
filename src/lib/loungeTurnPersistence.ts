@@ -10,6 +10,8 @@ export type LoungeTurnPayload = {
   proposalRule?: boolean; closest?: boolean; boldMove?: { stage: number };
   /** A member without a stored relationship starts at the closest stage (the beta account adult05, see startsAtClosestStage). */
   closestStart?: boolean;
+  /** The reply stepped in when the adult model was down: nothing it said is written into the room's memory (2026-11-18). */
+  braked?: boolean;
   /** Adult mode at the closest step: the member's hands are not scored as crossing a line (2026-11-17). */
   adultClosest?: boolean;
   /** State authored by the reply model, kept in the durable job even if recording must be recovered. */
@@ -42,7 +44,7 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   const state = normalizeLoungeCompanionState(snapshot.state, roomId);
   const nextState = nextLoungeCompanionState({ state, update: payload.character_life ? { ...answer, character_life: payload.character_life } : answer, decision: payload.decision ?? { progress: 'stay' },
     turn: job.turn, reply, inner, userText: job.user_text, recent: payload.recent,
-    boldMove: payload.boldMove, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
+    boldMove: payload.boldMove, braked: payload.braked, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
   let relationship: LoungeTurnCommit['relationship'] = null;
   let mood = snapshot.mood;
   let change: { relationship: RelationshipView; change: RelationshipChange } | undefined;
@@ -62,7 +64,7 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   }
   const commit: LoungeTurnCommit = {
     turn: job.turn, relationshipVersion: snapshot.relationship?.version ?? 0, stateVersion: snapshot.stateVersion,
-    relationship, mood, state: nextState, memory: answer?.memory?.trim() || null,
+    relationship, mood, state: nextState, memory: payload.braked ? null : answer?.memory?.trim() || null,
     memoryOps: job.user_text.trim() ? normalizeMemoryOps(answer?.memory_ops, new Map(payload.memoryRefs ?? []), payload.memories ?? []) : [],
   };
   return { commit, change };

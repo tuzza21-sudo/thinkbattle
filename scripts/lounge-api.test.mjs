@@ -5288,3 +5288,107 @@ test('when the adult model is down the turn goes to DeepSeek, then Gemini, then 
     assert.ok(recorded.attempts.every(item => typeof item.model === 'string' && Number.isInteger(item.ms)), name);
   }
 });
+
+test('a reply that stepped in for the adult model writes nothing into the room, and is left out of what the next replies read (2026-11-18)', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY, deepseek: process.env.DEEPSEEK_API_KEY };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.nano], ['DEEPSEEK_API_KEY', saved.deepseek]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
+  delete process.env.DEEPSEEK_API_KEY;
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const brake = '미안해요, 방금 장면은 제가 너무 앞서 갔어요. 속도를 늦출게요.';
+  for (const adultDown of [true, false]) {
+    const base = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), fallback_replies: ['예전에 끼어든 답의 시작이에요 그만해요'], forgotten: ['지운 약속'] };
+    let companionSaved, summarySaved = false, replyInput, afterInput;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') { companionSaved = JSON.parse(init.body).state; return result(null, 201); }
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+      if (url.includes('voice_lounge_relationships?')) return result([closest]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('save_voice_lounge_room_memory')) { summarySaved = true; return result(true); }
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([
+        { id: 4, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:03Z' },
+        { id: 3, user_id: null, nickname: 'AI', kind: 'host', text: '예전에 끼어든 답의 시작이에요 그만해요. 여기까지만 해요.', created_at: '2026-11-02T00:00:02Z' },
+        { id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '안녕', created_at: '2026-11-02T00:00:01Z' },
+      ]);
+      if (url === modelsLib.loungeAdultChatUrl) {
+        if (adultDown) return result({ error: { message: 'down' } }, 503);
+        const said = JSON.stringify({ text: '이리 와요.', inner_voice: '' });
+        replyInput = JSON.parse(JSON.parse(init.body).messages[1].content);
+        return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: said }, finish_reason: 'stop' }] })}
+
+data: [DONE]
+
+`, { headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) { afterInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ memory: '하린이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기', room_memory_ops: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' }); }
+      if (url.endsWith('/responses')) { replyInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ text: adultDown ? brake : '들어와요.', inner_voice: '' }); }
+      if (url.includes('finish_voice_lounge_reply')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    // The reply read neither the earlier step-back reply nor, as a promise, what the member forgot.
+    assert.equal(JSON.stringify(replyInput.recent).includes('예전에 끼어든 답의 시작이에요'), false, 'the earlier reply that stepped in is not read');
+    assert.deepEqual(replyInput.forgotten, ['지운 약속'], 'what the member forgot is told');
+    assert.deepEqual(afterInput.forgotten, ['지운 약속'], 'and to the recorder');
+    assert.ok(companionSaved, 'the state is saved');
+    if (adultDown) {
+      assert.equal(summarySaved, false, 'the summary is not rewritten from a reply that stepped in');
+      assert.equal(companionSaved.lingering, undefined, 'nothing is left on her mind from it');
+      assert.equal(companionSaved.next_intent, undefined);
+      assert.ok(companionSaved.fallback_replies.some(start => brake.startsWith(start.slice(0, 20))), 'its start is kept to leave it out next time');
+    } else {
+      assert.equal(summarySaved, true, 'a reply of the chosen model is recorded as before');
+      assert.equal(companionSaved.lingering?.what, '멈춰 달라는 말을 지켜 주길 바람');
+    }
+  }
+  // The pieces: the brake turn keeps the room as it was; the recorder is told whose limits are agreements.
+  const state = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  const next = messengerLib.nextLoungeCompanionState({ state, update: { lingering: '남은 마음', next_intent: '하려던 일', room_memory_ops: [] }, decision: { progress: 'stay' }, turn: 3, reply: '미안해요, 방금 장면은 제가 너무 앞서 갔어요.', inner: '', braked: true });
+  assert.equal(next.lingering, undefined); assert.equal(next.next_intent, undefined); assert.equal(next.fallback_replies?.length, 1);
+  assert.equal(messengerLib.nextLoungeCompanionState({ state, update: { lingering: '남은 마음' }, decision: { progress: 'stay' }, turn: 3, reply: '평범한 답이에요, 길게 쓴 답', inner: '' }).lingering?.what, '남은 마음');
+  assert.match(messengerLib.loungeRoomMemoryInstructions, /캐릭터가 스스로 정한 속도·허용 범위·멈춤.*기록하지 않는다/);
+  assert.match(messengerLib.loungeCompanionUpdateInstructions, /캐릭터가 접촉을 멈추게 하거나 자기가 정한 범위를 지키려는 뜻은/);
+  assert.match(messengerLib.loungeForgottenInstruction, /사용자가 이 방의 기억에서 지운 내용/);
+  assert.deepEqual(messengerLib.normalizeLoungeCompanionState({ room_id: roomId, forgotten: ['a'.repeat(200), 3], fallback_replies: ['b'] }, roomId).forgotten, ['a'.repeat(120)]);
+});
+
+test('the member sees what the character carries of this room and can forget any of it; it is told not to be taken up again (2026-11-18)', async () => {
+  const room = { host_id: 'user-1', host_persona: 'teacher', capacity: 1, space_id: null, memory: '지금 장면: 모텔 방\n둘 사이: 끌리는 사이\n남은 것: 하린이 정한 범위를 지키는 것' };
+  const stateOf = () => ({ ...messengerLib.normalizeLoungeCompanionState(null, roomId), room_memory: [{ id: 't46-0', kind: 'feeling', turn: 49, status: 'active', summary: '하린은 허용 범위를 밝혔고 경계를 지키길 바란다.', human_quote: '', character_quote: '' }], lingering: { what: '멈춰 달라는 말을 지켜 주길 바람', turn: 49 }, next_intent: { what: '경계를 지키기', turn: 49 } });
+  const act = async (body, { owner = 'user-1' } = {}) => {
+    const writes = { state: undefined, memory: undefined };
+    let response;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: owner });
+      if (url.includes('voice_lounge_rooms?') && init?.method === 'PATCH') { writes.memory = JSON.parse(init.body).memory; return result(null, 200); }
+      if (url.includes('voice_lounge_rooms?')) return result([room]);
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') { writes.state = JSON.parse(init.body).state; return result(null, 201); }
+      if (url.includes('voice_lounge_companion_state')) return result([{ state: stateOf() }]);
+      return result([]);
+    }, async () => { const answered = await handler(request({ roomId, ...body })); response = { status: answered.status, body: await answered.json() }; }));
+    return { ...response, writes };
+  };
+  const view = await act({ action: 'room-memory' });
+  assert.equal(view.status, 200);
+  assert.deepEqual(view.body.summary.map(line => line.text), ['지금 장면: 모텔 방', '둘 사이: 끌리는 사이', '남은 것: 하린이 정한 범위를 지키는 것']);
+  assert.equal(view.body.items[0].id, 't46-0'); assert.equal(view.body.lingering, '멈춰 달라는 말을 지켜 주길 바람'); assert.equal(view.body.next_intent, '경계를 지키기');
+  assert.equal((await act({ action: 'room-memory' }, { owner: 'someone-else' })).status, 403, 'only the room\'s own member');
+  const item = await act({ action: 'room-memory-forget', target: 'item', id: 't46-0' });
+  assert.equal(item.writes.state.room_memory.length, 0); assert.deepEqual(item.writes.state.forgotten, ['하린은 허용 범위를 밝혔고 경계를 지키길 바란다.']);
+  const lingering = await act({ action: 'room-memory-forget', target: 'lingering' });
+  assert.equal(lingering.writes.state.lingering, undefined); assert.equal(lingering.writes.state.forgotten[0], '멈춰 달라는 말을 지켜 주길 바람');
+  assert.equal((await act({ action: 'room-memory-forget', target: 'next_intent' })).writes.state.next_intent, undefined);
+  const line = await act({ action: 'room-memory-forget', target: 'summary', id: '2' });
+  assert.equal(line.writes.memory, '지금 장면: 모텔 방\n둘 사이: 끌리는 사이'); assert.equal(line.writes.state.forgotten[0], '남은 것: 하린이 정한 범위를 지키는 것');
+  assert.equal((await act({ action: 'room-memory-forget', target: 'summary', id: '9' })).status, 404);
+  assert.equal((await act({ action: 'room-memory-forget', target: 'item', id: 'nope' })).status, 404);
+  assert.equal((await act({ action: 'room-memory-forget', target: 'nothing' })).status, 400);
+});
