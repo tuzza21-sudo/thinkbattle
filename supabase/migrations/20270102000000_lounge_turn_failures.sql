@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.lounge_turn_failures(
   medium text CHECK (medium IS NULL OR medium IN ('chat','voice')),
   stage integer,
   adult_mode boolean,
+  adult_why text,
   adult_routed boolean,
   chosen_model text,
   client text CHECK (client IS NULL OR client IN ('app','web')),
@@ -35,3 +36,7 @@ GRANT ALL ON TABLE public.lounge_turn_failures TO service_role;
 
 -- Which client asked (the store app or the web): the app's adult mode needs the member's confirmation, the web's does not, so this tells why adult mode was off in a turn.
 ALTER TABLE public.lounge_turn_models ADD COLUMN IF NOT EXISTS client text CHECK (client IS NULL OR client IN ('app','web'));
+
+-- Why adult mode was on or off in the turn: web, app_verified, app_not_verified (the member has not confirmed in the app), app_lookup_timeout / app_lookup_failed / app_lookup_http_<status> (the confirmation could not be read),
+-- app_guest, killed / allowlisted / not_allowlisted (LOUNGE_ADULT_MODE), character_without_it, not_one_to_one.
+ALTER TABLE public.lounge_turn_models ADD COLUMN IF NOT EXISTS adult_why text;

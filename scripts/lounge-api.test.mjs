@@ -5618,9 +5618,47 @@ test('a skipped claim and a turn that ended without a reply are recorded with th
   assert.ok(failure, 'the failed turn is recorded');
   assert.equal(failure.outcome, 'failed'); assert.equal(failure.phase, 'reply');
   assert.equal(failure.character_id, 'velvet'); assert.equal(failure.user_id, 'user-1'); assert.equal(failure.turn, 4);
-  assert.equal(failure.medium, 'chat'); assert.equal(failure.adult_routed, true); assert.equal(failure.client, 'web');
+  assert.equal(failure.medium, 'chat'); assert.equal(failure.adult_routed, true); assert.equal(failure.client, 'web'); assert.equal(failure.adult_why, 'allowlisted'); assert.equal(failure.adult_mode, true);
   assert.ok(failure.attempts.length >= 2 && failure.attempts.every(item => item.ok === false && Number.isInteger(item.ms)), 'every attempt is kept');
   assert.equal(failure.attempts[0].provider, 'deepseek'); assert.ok(failure.error_code);
   assert.equal(turnRecorded, false, 'no model record for a turn without a reply');
   assert.equal(released, true, 'the claim is still given back');
+});
+
+test('the record of a turn says why adult mode was on or off, so an app turn without it can be told from a failed lookup (2026-11-19)', async t => {
+  const saved = { mode: process.env.LOUNGE_ADULT_MODE, deepseek: process.env.DEEPSEEK_API_KEY, nano: process.env.NANOGPT_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  t.after(() => { for (const [name, value] of [['LOUNGE_ADULT_MODE', saved.mode], ['DEEPSEEK_API_KEY', saved.deepseek], ['NANOGPT_API_KEY', saved.nano], ['GEMINI_API_KEY', saved.gemini]]) if (value === undefined) delete process.env[name]; else process.env[name] = value; });
+  for (const name of ['LOUNGE_ADULT_MODE', 'DEEPSEEK_API_KEY', 'NANOGPT_API_KEY', 'GEMINI_API_KEY']) delete process.env[name];
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  // [the client, what the confirmation lookup answers, adult mode, the reason recorded]
+  for (const [userAgent, lookup, adultOn, why] of [
+    ['Mozilla/5.0', 'none', true, 'web'],
+    ['SaseokApp/1.0', 'verified', true, 'app_verified'],
+    ['SaseokApp/1.0', 'empty', false, 'app_not_verified'],
+    ['SaseokApp/1.0', 'error', false, 'app_lookup_http_500'],
+    ['SaseokApp/1.0', 'throws', false, 'app_lookup_failed'],
+  ]) {
+    let failure;
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('lounge_turn_failures')) { failure = JSON.parse(init.body); return result(null, 201); }
+      if (url.includes('lounge_adult_verification')) {
+        if (lookup === 'throws') throw new Error('network');
+        return lookup === 'error' ? result({ message: 'down' }, 500) : result(lookup === 'verified' ? [{ verified_at: '2026-11-18T00:00:00Z' }] : []);
+      }
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+      if (url.includes('voice_lounge_relationships?')) return result([closest]);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url.endsWith('/responses')) return result({ error: { message: 'down' } }, 503);
+      return result([]);
+    }, async () => {
+      await (await handler(new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: 'Bearer example', 'Content-Type': 'application/json', 'User-Agent': userAgent }, body: JSON.stringify({ action: 'host', roomId, reason: 'followup', stream: true }) }))).text();
+    }));
+    assert.ok(failure, `${why}: the turn is recorded`);
+    assert.equal(failure.adult_why, why); assert.equal(failure.adult_mode, adultOn, why); assert.equal(failure.client, userAgent.startsWith('Saseok') ? 'app' : 'web');
+  }
 });
