@@ -1,0 +1,22 @@
+.lounge-photo-form { display: grid; gap: 8px; padding: 4px 2px 2px; }
+.lounge-photo-form label { display: grid; gap: 6px; font-size: 13px; }
+.lounge-photo-form textarea { width: 100%; resize: vertical; min-height: 120px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(0, 0, 0, 0.25); color: inherit; font: inherit; line-height: 1.5; box-sizing: border-box; }
+.lounge-photo-form small { font-size: 12px; opacity: 0.72; line-height: 1.45; }
+.lounge-photo-left { opacity: 0.9; }
+.lounge-photo-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.lounge-photo-actions button { padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.lounge-photo-actions button.primary { background: #e6c48f; color: #231a10; border-color: transparent; font-weight: 700; }
+.lounge-photo-actions button:disabled { opacity: 0.5; cursor: default; }
+.lounge-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; margin: 6px 0; }
+.lounge-photo-grid figure { position: relative; margin: 0; }
+.lounge-photo-grid figure > button:first-child { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.lounge-photo-grid img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; }
+.lounge-photo-grid figcaption { display: grid; gap: 2px; margin-top: 4px; font-size: 11px; opacity: 0.8; }
+.lounge-photo-grid figcaption span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lounge-photo-delete { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 0; background: rgba(0, 0, 0, 0.6); color: #fff; cursor: pointer; }
+.lounge-photo-delete:disabled { opacity: 0.6; cursor: default; }
+.lounge-photo-viewer { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(0, 0, 0, 0.88); padding: 16px; }
+.lounge-photo-viewer figure { margin: 0; max-width: min(96vw, 560px); display: grid; gap: 8px; }
+.lounge-photo-viewer img { max-width: 100%; max-height: 80vh; border-radius: 12px; display: block; margin: 0 auto; }
+.lounge-photo-viewer figcaption { color: #eee; font-size: 14px; text-align: center; }
+.lounge-photo-viewer-close { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 0; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; }

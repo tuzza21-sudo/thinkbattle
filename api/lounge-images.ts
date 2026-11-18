@@ -102,6 +102,20 @@ async function upload(context: Context, bucket: string, path: string, bytes: Uin
 }
 
 /**
+ * Deleting a photo the member was sent (2026-11-18): the picture goes from storage and the post loses its address, so it shows nowhere;
+ * the row stays, so the day's and month's count is not given back by deleting.
+ */
+async function deletePhoto(context: Context, userId: string, postId: string) {
+  const found = await timed(`${context.base}/rest/v1/lounge_character_posts?id=eq.${postId}&user_id=eq.${encodeURIComponent(userId)}&visibility=eq.private&select=id,image_path`, { headers: serviceHeaders(context) });
+  const [post] = found.ok ? await found.json() as Array<{ id: string; image_path: string | null }> : [];
+  if (!post) return json({ error: '이미 없는 사진이에요.', code: 'lounge_photo_gone', retryable: false }, 404);
+  if (post.image_path) await timed(`${context.base}/storage/v1/object/${loungePhotoBuckets.private}/${post.image_path}`, { method: 'DELETE', headers: serviceHeaders(context) }).catch(() => undefined);
+  const cleared = await timed(`${context.base}/rest/v1/lounge_character_posts?id=eq.${postId}&user_id=eq.${encodeURIComponent(userId)}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json' }), body: JSON.stringify({ image_path: null }) });
+  if (!cleared.ok) throw new LoungePhotoError('사진을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'lounge_photo_delete');
+  return json({ ok: true });
+}
+
+/**
  * The plan the photo limits go by (2026-11-07): 'admin' for the super admin, 'plus' or 'pro', null for a member without a
  * plan, and 'unknown' when the plan could not be read (then a photo the member asked for counts as Plus, and none is
  * sent first). A photo the character sends first is for Plus, Pro and the admin; one the member asked for is for every
@@ -459,9 +473,16 @@ async function handle(req: Request) {
     const authorization = req.headers.get('authorization');
     if (!authorization?.startsWith('Bearer ')) return json({ error: '로그인이 필요합니다.' }, 401);
     const raw = await req.text();
-    if (raw.length > 2000) return json({ error: '요청이 너무 큽니다.' }, 413);
-    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown; auto?: unknown; enabled?: unknown };
+    if (raw.length > 3000) return json({ error: '요청이 너무 큽니다.' }, 413);
+    let body: { action?: string; roomId?: string; source?: string; request?: unknown; imageModel?: unknown; auto?: unknown; enabled?: unknown; postId?: unknown };
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
+    if (body.action === 'delete-photo') {
+      const postId = typeof body.postId === 'string' ? body.postId : '';
+      if (!/^[0-9a-f-]{36}$/.test(postId)) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
+      const login = await timed(`${base}/auth/v1/user`, { headers: { apikey: anon, Authorization: authorization } });
+      if (!login.ok) return json({ error: '로그인 세션이 만료됐어요.' }, 401);
+      return await deletePhoto(context, (await login.json() as { id: string }).id, postId);
+    }
     const roomId = body.roomId;
     const background = body.action === 'background' || body.action === 'scene' || body.action === 'scene_auto';
     if ((body.action !== 'photo' && !background) || typeof roomId !== 'string' || !/^lounge-[a-f0-9-]{36}$/.test(roomId) || (!background && !['request', 'character'].includes(body.source ?? ''))) return json({ error: '올바르지 않은 사진 요청이에요.' }, 400);
@@ -470,7 +491,7 @@ async function handle(req: Request) {
     const user = await auth.json() as { id: string; email?: string; is_anonymous?: boolean };
     // Photos are kept per member, so a guest without an account cannot receive them.
     if (user.is_anonymous) return json({ error: background ? '배경 만들기는 로그인한 회원만 쓸 수 있어요.' : '사진은 로그인한 회원만 받을 수 있어요.', code: 'lounge_photo_member_only', retryable: false }, 403);
-    const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 200) : '';
+    const request = typeof body.request === 'string' ? body.request.replace(/\s+/g, ' ').trim().slice(0, background ? 300 : 500) : '';
     const model: LoungeImageModel = 'gpt';
     if (body.action === 'scene') return await sceneBackground(context, user.id, roomId, body.auto === true);
     if (body.action === 'scene_auto') return await setSceneAuto(context, user.id, roomId, body.enabled !== false);

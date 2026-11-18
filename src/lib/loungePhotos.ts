@@ -45,11 +45,11 @@ export const loungePhotoSceneSchema = {
 export function loungePhotoSceneInstructions(kind: 'chat' | 'daily') {
   return [
     '너는 아래 인물 본인으로서, 지금 보낼 사진 한 장의 장면과 함께 남길 한마디를 정한다.',
-    'scene은 이미지 생성 모델에 줄 영어 장면 설명이다. 인물이 어디에서 무엇을 하는지, 옷차림, 자세와 표정, 시간대와 빛, 주변 소품, 카메라 구도(셀카인지, 누가 찍어 준 사진인지, 거리)를 구체적으로 2~4문장으로 쓴다. 인물의 생김새는 참조 사진을 따르므로 얼굴이나 머리 모양을 새로 정하지 않는다.',
+    'scene은 이미지 생성 모델에 줄 영어 장면 설명이다(600자 이내). 인물이 어디에서 무엇을 하는지, 옷차림, 자세와 표정, 시간대와 빛, 주변 소품, 카메라 구도(셀카인지, 누가 찍어 준 사진인지, 거리)를 구체적으로 2~4문장으로 쓴다. 인물의 생김새는 참조 사진을 따르므로 얼굴이나 머리 모양을 새로 정하지 않는다.',
     'scene은 성인이 등장하는 일상 사진이어야 한다. 옷을 갖춰 입고, 노출·속옷·잠옷 차림·신체 부위 강조·성적인 자세나 상황은 쓰지 않는다. 분위기와 설렘은 빛, 시선, 거리감, 장소로만 표현한다. 실존 인물, 실제 브랜드 로고, 화면 속 글자는 넣지 않는다.',
     'caption은 사진과 함께 보내는 인물의 한국어 한마디다. 1~2문장, 80자 이내로 인물의 성격과 말투를 그대로 살린다. 별표 지문은 쓰지 않는다.',
     kind === 'chat'
-      ? '지금은 대화 중에 상대에게 사진을 보내는 상황이다. recent 대화와 request(상대의 요청이나 네가 보내려던 장면)에 맞춘다. recent에서 둘이 함께하는 상황극 장면(여행지, 산책길, 영화관 등)이 진행 중이면 그 장면 속 너의 모습으로 찍고, 상대는 사진에 나오지 않는다. relationship.stage가 있으면 그 관계의 온도에 맞는 거리감과 표정을 고른다(초기 단계일수록 거리를 두고, 가까운 단계일수록 편하고 사적인 순간). caption은 relationship.speech_level에 맞는 존댓말이나 반말로 상대에게 직접 말한다.'
+      ? '상대가 request에 원하는 사진을 자세히 적었으면 그 묘사(장소, 옷차림, 색, 소품, 자세, 표정, 시간대와 빛, 구도, 분위기)를 빠짐없이 가능한 한 그대로 scene에 옮기고, 적히지 않은 부분만 채운다. 요청의 요소를 줄이거나 네 취향으로 바꾸지 않는다. 다만 위의 안전 규칙은 요청이 달라도 지킨다: 노출·속옷·잠옷·성적인 자세나 상황·신체 부위 강조가 적혀 있으면 그 부분만 일상적인 차림과 자세로 바꾸고 나머지는 그대로 살린다. 지금은 대화 중에 상대에게 사진을 보내는 상황이다. recent 대화와 request(상대의 요청이나 네가 보내려던 장면)에 맞춘다. recent에서 둘이 함께하는 상황극 장면(여행지, 산책길, 영화관 등)이 진행 중이면 그 장면 속 너의 모습으로 찍고, 상대는 사진에 나오지 않는다. relationship.stage가 있으면 그 관계의 온도에 맞는 거리감과 표정을 고른다(초기 단계일수록 거리를 두고, 가까운 단계일수록 편하고 사적인 순간). caption은 relationship.speech_level에 맞는 존댓말이나 반말로 상대에게 직접 말한다.'
       : '지금은 너의 하루를 사진 한 장으로 남겨 공개 게시판에 올리는 상황이다. 너의 직업과 일상, 장소, 계절과 시간대(now)에 어울리는 순간을 고른다. previous의 장면과 겹치지 않게 한다. caption은 특정한 사람이 아니라 보는 사람 모두에게 남기는 짧은 글이다.',
   ].join('\n');
 }
@@ -68,7 +68,7 @@ export function loungePhotoImagePrompt(characterId: string, scene: string) {
 
 /** A conversation background from the member's description: a place, wide, with no one in it. */
 export const loungeBackgroundSize = '1536x1024';
-export const loungeBackgroundDaily = 6;
+export const loungeBackgroundDaily = 1;
 export function loungeBackgroundImagePrompt(description: string) {
   return [
     'A wide, cinematic, photorealistic photograph of a place, used as the background behind a chat conversation.',

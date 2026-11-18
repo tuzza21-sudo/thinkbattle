@@ -285,10 +285,16 @@ export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 're
  * character sends one on their own. Takes 20 to 60 seconds. `skipped` means the character's own photos for today are used up.
  */
 export async function requestLoungePhoto(roomId: string, source: 'request' | 'character', request?: string) {
-  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, ...(request ? { request: request.slice(0, 200) } : {}) }) }, '사진 서버');
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'photo', roomId, source, ...(request ? { request: request.slice(0, 500) } : {}) }) }, '사진 서버');
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 10);
   return payload as { post?: LoungeCharacterPost; left?: number; skipped?: boolean };
+}
+/** Deletes a photo the character sent: the picture is removed and it shows nowhere; the day's count is not given back. */
+export async function deleteLoungePhoto(postId: string) {
+  const response = await loungeAuthorizedFetch('/api/lounge-images', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete-photo', postId }) }, '사진 서버');
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new LoungeApiError(typeof payload?.error === 'string' ? payload.error : '사진을 지우지 못했어요. 잠시 뒤 다시 시도해 주세요.', typeof payload?.code === 'string' ? payload.code : `lounge_photo_http_${response.status}`, payload?.retryable !== false, 5);
 }
 /** The background of the member's own one-to-one conversation: one of the places, or null for the conversation's own. */
 export const setLoungeRoomBackground = (roomId: string, theme: LoungeThemeId | null) => loungeRpc<void>('set_lounge_room_background', { p_room: roomId, p_theme: theme });
