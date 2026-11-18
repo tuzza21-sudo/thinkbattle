@@ -4414,6 +4414,7 @@ test('a one-to-one voice conversation is a phone call: the character answers fir
   assert.match(answered.instructions, /같은 자리에 있는 것처럼 굴지 않는다/);
   assert.match(answered.instructions, /phone_call\.just_connected=true이면 방금 전화를 받은 순간이고/, 'greeting is the cached phone rule keyed by input');
   assert.match(answered.instructions, /relationship\.mood와 room_memory의 감정/);
+  assert.match(answered.instructions, /reply_medium=voice이면 감정을 말과 소리에 실어 훨씬 풍부하게 드러낸다/, 'a call carries its feeling in how it is said (2026-11-18)');
   assert.match(answered.instructions, /---cache-breakpoint---/);
   assert.match(answered.after.instructions, /memory 첫 줄은 '지금 장면: 통화 중/);
   const onCall = await turn({ voiceOn: true });
