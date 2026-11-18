@@ -5,26 +5,37 @@ import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
 const { loungeChatsInProgress } = loadTs(fileURLToPath(new URL('../src/lib/loungeChatList.ts', import.meta.url)));
+const preference = loadTs(fileURLToPath(new URL('../src/lib/loungePersonaPreference.ts', import.meta.url)));
+const read = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const chat = (room_id, last_kind) => ({ room_id, last_kind });
 
-test('the chat list keeps only conversations that are going on (2026-11-18)', async () => {
-  const chats = [chat('answered-twice', 'host'), chat('never-spoken', 'host'), chat('member-last', 'human'), chat('one-answer-spoken', 'host'), chat('one-answer-opening', 'host'), chat('unknown', 'host')];
-  const turns = [{ id: 'answered-twice', ai_turns: 2 }, { id: 'never-spoken', ai_turns: 0 }, { id: 'member-last', ai_turns: 0 }, { id: 'one-answer-spoken', ai_turns: 1 }, { id: 'one-answer-opening', ai_turns: 1 }];
+test('the chat list keeps every room the member has spoken in, even once, and leaves out the rest (2026-11-18)', async () => {
+  const chats = [chat('spoke-long-ago', 'host'), chat('never-spoken', 'host'), chat('member-last', 'human'), chat('unreadable', 'host')];
   const asked = [];
-  const kept = await loungeChatsInProgress(chats, async () => turns, async id => { asked.push(id); return id === 'one-answer-spoken' ? 3 : 0; });
-  assert.deepEqual(kept.map(item => item.room_id), ['answered-twice', 'member-last', 'one-answer-spoken', 'unknown'], 'an unspoken room is out; a room whose answers cannot be read is kept');
-  assert.deepEqual(asked.sort(), ['one-answer-opening', 'one-answer-spoken'], 'only a room with one answer is asked whether the member spoke');
-  // A failure never empties the list.
-  assert.equal((await loungeChatsInProgress(chats, async () => null, async () => 0)).length, chats.length);
-  assert.equal((await loungeChatsInProgress(chats, async () => { throw new Error('down'); }, async () => 0)).length, chats.length);
-  assert.deepEqual(await loungeChatsInProgress([], async () => { throw new Error('not asked'); }, async () => 0), []);
-  // The count of the member's messages failing keeps the room.
-  assert.equal((await loungeChatsInProgress([chat('x', 'host')], async () => [{ id: 'x', ai_turns: 1 }], async () => { throw new Error('down'); })).length, 1);
+  const kept = await loungeChatsInProgress(chats, async id => { asked.push(id); if (id === 'unreadable') throw new Error('down'); return id === 'spoke-long-ago'; });
+  assert.deepEqual(kept.map(item => item.room_id), ['spoke-long-ago', 'member-last', 'unreadable'], 'a room that cannot be asked is kept');
+  assert.ok(!asked.includes('member-last'), 'a room whose last message is the member\'s is not asked');
+  assert.deepEqual(await loungeChatsInProgress([], async () => { throw new Error('not asked'); }), []);
+  assert.equal((await loungeChatsInProgress([chat('a', 'host')], async () => false)).length, 0);
 });
 
-test('the chat sidebar is not held on the screen: it scrolls with the page, open or folded (2026-11-18)', () => {
-  const css = readFileSync(fileURLToPath(new URL('../src/components/LoungeTabs.css', import.meta.url)), 'utf8');
-  const rules = css.split('\n').filter(line => line.includes('.lounge-page.has-chat-sidebar > .lounge-chat-sidebar'));
-  assert.ok(rules.length >= 2);
-  for (const rule of rules) assert.doesNotMatch(rule, /position:\s*(sticky|fixed)/, rule.slice(0, 80));
+test('the open chat sidebar goes with the page, and the folded rail stays fixed on the screen (2026-11-18)', () => {
+  const css = read('../src/components/LoungeTabs.css');
+  const open = css.split('\n').find(line => /\.has-chat-sidebar > \.lounge-chat-sidebar \{/.test(line));
+  const folded = css.split('\n').find(line => /\.has-chat-sidebar > \.lounge-chat-sidebar\.is-collapsed \{/.test(line));
+  assert.doesNotMatch(open, /position:\s*(sticky|fixed)/, 'open: scrolls with the page');
+  assert.match(folded, /position:fixed; left:14px; top:96px;/, 'folded: fixed on the screen');
+});
+
+test('the persona of a conversation: picked on the character\'s page and in the conversation\'s settings (2026-11-18)', () => {
+  const ids = ['p1', 'p2'];
+  assert.deepEqual(preference.loungePersonaToApply('p2', ids), { id: 'p2' });
+  assert.deepEqual(preference.loungePersonaToApply('none', ids), { none: true });
+  assert.equal(preference.loungePersonaToApply('', ids), undefined, 'the default is left to the default');
+  assert.equal(preference.loungePersonaToApply('gone', ids), undefined, 'a deleted persona is not applied');
+  const page = read('../src/components/LoungeCharacterPage.tsx');
+  assert.match(page, /<LoungePersonaPicker characterId=\{character\.id\} characterName=\{character\.name\} \/>/, 'the character page has the picker');
+  const room = read('../src/components/LoungePage.tsx');
+  assert.match(room, /title="대화 속 나 \(페르소나\)"/, 'the conversation\'s settings have the choice');
+  assert.match(room, /loungePersonaToApply\(loadLoungePersonaPreference\(room\.host_persona\)/, 'a new conversation takes the pick once');
 });
