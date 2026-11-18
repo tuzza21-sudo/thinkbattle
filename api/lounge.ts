@@ -1,6 +1,6 @@
 import { drainLoungeTurns, type LoungePendingTurn, type LoungeTurnPayload, type LoungeTurnStore } from '../src/lib/loungeTurnPersistence';
 import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScenario, loungePersonaStoryScenarioId, loungeRoomPersona, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
-import { getLoungeCharacter, loungeAdultDepth, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
+import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
@@ -1191,11 +1191,13 @@ ${photoRule}`;
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
     const nanoKey = process.env.NANOGPT_API_KEY;
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
-    const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultDepth} ${loungeAdultVoiceNote}` : undefined;
+    const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultDepth} 통화에서도 높임말 없이 반말로 말한다(말투 합의가 존댓말이어도 이 장면 안에서는 반말). ${loungeAdultVoiceNote}` : undefined;
     // 2026-11-18: at the closest step the adult model answers only a sexual scene (the analyzer reads it from the recent talk and
     // holds it while the scene goes on); every other turn is the member's chosen model, which is not told the explicit text. An
     // analysis that did not say (down, or not run) keeps the earlier rule: the adult model.
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy && analysis?.sexual_scene === false) delete turnConditions.intimacy.explicit;
+    // In a sexual scene the narration, the inner voice and the lines are in plain speech, whatever the room agreed (the agreed level comes back after it).
+    if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) Object.assign(turnConditions, { speech: loungeAdultSceneSpeech });
     const adultReply = Boolean(nanoKey && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     const turnApplied: { current?: { provider: string; model: string } } = {};
