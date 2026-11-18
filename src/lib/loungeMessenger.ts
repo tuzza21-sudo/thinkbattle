@@ -1,5 +1,6 @@
 import { loungeAdultDepth, loungeDefaultAdultMode, type LoungeCharacterBible, type LoungeSceneEvent } from './loungeCharacters';
 import { formatLoungeNarration, splitLoungeActions } from './lounge.js';
+import { canonicalScenePlace, sameScenePlace } from './loungeScenePlace.js';
 import type { LoungeMemberPersona } from './loungePersonas';
 import type { LoungeRoomScenario } from './loungeScenarios';
 
@@ -606,7 +607,7 @@ export function loungeSkipsAnalyzer(state: LoungeCompanionState | undefined, adu
 }
 export const loungeForgottenInstruction = 'forgotten은 사용자가 이 방의 기억에서 지운 내용이다. recent나 memory에 비슷한 말이 남아 있어도 지금의 약속·제한·감정으로 따르지 않고, 없던 일로 대한다. 사용자가 다시 직접 말하기 전에는 꺼내지 않는다. 입력에 forgotten이 없으면 쓰지 않는다.';
 export const loungeCompanionUpdateFields = Object.keys(loungeCompanionUpdateSchema);
-export const loungeCompanionUpdateInstructions = `scene: 방금 답까지 반영한 지금 장면이다. 입력의 scene이 직전 장면이고, 없으면 scenario의 첫 장면과 memory, recent에서 처음 정한다. location은 구체적인 장소(30자 이내), scene_type은 장소의 종류 하나, activity는 둘이 하고 있는 일, time_of_day는 때(아침, 점심, 오후, 저녁, 밤, 새벽 등), season은 계절이나 날씨(모르면 빈 문자열), objects는 지금 장면에 실제로 있는 물건 0~6개(예: 순대국 두 그릇, 물잔)다. 바뀌지 않은 칸은 직전 장면 그대로 쓴다. 다 먹은 음식, 놓고 온 물건은 objects에서 뺀다.
+export const loungeCompanionUpdateInstructions = `scene: 방금 답까지 반영한 지금 장면이다. 입력의 scene이 직전 장면이고, 없으면 scenario의 첫 장면과 memory, recent에서 처음 정한다. location은 방이나 건물 단위의 장소(30자 이내, 예: 모텔 방, 와인바, 집 거실, 호텔 객실)다. 그 안의 자리(침대 위, 소파, 창가 자리)는 location이 아니라 activity에 쓰고, 둘이 실제로 다른 곳으로 가기 전에는 직전 scene의 location을 표현까지 그대로 쓴다. scene_type은 장소의 종류 하나, activity는 둘이 하고 있는 일(자리 포함), time_of_day는 때(아침, 점심, 오후, 저녁, 밤, 새벽 등), season은 계절이나 날씨(모르면 빈 문자열), objects는 지금 장면에 실제로 있는 물건 0~6개(예: 순대국 두 그릇, 물잔)다. 바뀌지 않은 칸은 직전 장면 그대로 쓴다. 다 먹은 음식, 놓고 온 물건은 objects에서 뺀다.
 reaction_type: 방금 캐릭터 답의 반응 유형 하나.
 used_phrases: 방금 캐릭터 답에서 다시 쓰면 반복으로 티가 날 특징적인 표현 0~2개(원문 그대로 20자 이내). 평범한 말은 넣지 않는다.
 exception_formula_used: 방금 답이 '보통 사람들은 이 캐릭터를 이렇게 대하는데 이 사람은 다르다'는 대비를 대사나 속마음으로 드러냈으면 true.
@@ -653,7 +654,11 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
   // A reply that stepped in when the adult model was down wrote the character's own brake (a limit, a range, a stop): it is not written into the room (2026-11-18).
   const update = input.braked && input.update ? Object.fromEntries(Object.entries(input.update).filter(([key]) => !['lingering', 'next_intent', 'room_memory_ops'].includes(key))) as LoungeCompanionUpdate : input.update;
   if (state.source_turn !== undefined && turn <= state.source_turn) return state;
-  const scene = readScene(update?.scene);
+  const read = readScene(update?.scene);
+  // The same place named another way (모텔 방, then 모텔 침대 위) keeps the wording it had, and a motel or a hotel the two are in is named by its room:
+  // the scene did not move, so nothing follows it (2026-11-18, by the owner).
+  const scene = !read ? undefined : state.scene && sameScenePlace(read.location, state.scene.location) ? { ...read, location: state.scene.location, scene_type: state.scene.scene_type }
+    : ['모텔 방', '호텔 객실'].includes(canonicalScenePlace(read.location)) ? { ...read, location: canonicalScenePlace(read.location) } : read;
   // A graceful proposal opens one step in this place; asking again while it is open opens no more.
   const place = (scene ?? state.scene)?.location;
   const held = activeBoost(state, turn) && place === state.intimacy_boost?.location ? state.intimacy_boost : undefined;

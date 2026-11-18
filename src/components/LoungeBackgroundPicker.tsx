@@ -3,6 +3,7 @@ import { Check, Image as ImageIcon, LoaderCircle, Sparkles, Wand2, X } from 'luc
 import { getLoungeTheme, loungeBlankScene, loungeThemes, type LoungeRoomBackground, type LoungeThemeId } from '../lib/lounge';
 import type { LoungeBackgroundChoice } from '../lib/loungeApi';
 import { loadLoungeSharedScenes, type LoungeSharedScene } from '../lib/loungeGallery';
+import { distinctSharedScenes, pageOf } from '../lib/loungeScenePlace';
 import { loungeBackgroundDaily } from '../lib/loungePhotos';
 
 const tile = (image: string) => ({ backgroundImage: image.includes('gradient(') ? image : `url('${image}')`, backgroundSize: 'cover', backgroundPosition: 'center' });
@@ -27,6 +28,9 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, onMa
   const [error, setError] = useState('');
   const [shared, setShared] = useState<LoungeSharedScene[]>([]);
   const [search, setSearch] = useState('');
+  // Numbered pages of 20 (2026-11-18, by the owner): what is added later goes to the next page, not under the list.
+  const [themePage, setThemePage] = useState(1);
+  const [sharedPage, setSharedPage] = useState(1);
   const trigger = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const close = useCallback(() => { if (controlled) onOpenChange?.(false); else setOpenHere(false); trigger.current?.focus(); }, [controlled, onOpenChange]);
@@ -39,7 +43,7 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, onMa
   useEffect(() => {
     if (!open) return;
     let live = true;
-    const timer = window.setTimeout(() => { void loadLoungeSharedScenes(30, search).then(list => { if (live) setShared(list); }).catch(() => { if (live) setShared([]); }); }, search ? 250 : 0);
+    const timer = window.setTimeout(() => { void loadLoungeSharedScenes(200, search).then(list => { if (live) { setShared(distinctSharedScenes(list)); setSharedPage(1); } }).catch(() => { if (live) setShared([]); }); }, search ? 250 : 0);
     return () => { live = false; window.clearTimeout(timer); };
   }, [open, search]);
   const selected = current?.blank ? 'blank' : current?.scene ? `scene:${current.scene}` : current?.image ? 'image' : current?.theme === ownTheme ? null : current?.theme ?? null;
@@ -54,6 +58,11 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, onMa
     void run('make', () => onMake(value), '배경을 만들지 못했어요.');
   };
   const own = getLoungeTheme(ownTheme);
+  const places = [{ key: 'own', name: own.name, hint: '이 대화의 기본', image: own.image, choice: null as LoungeBackgroundChoice | null, on: selected === null },
+    { key: 'blank', name: loungeBlankScene.name, hint: '아무것도 없는 배경', image: loungeBlankScene.image, choice: { blank: true } as LoungeBackgroundChoice, on: selected === 'blank' },
+    ...loungeThemes.filter(theme => theme.id !== ownTheme).map(theme => ({ key: theme.id, name: theme.name, hint: '', image: theme.image, choice: { theme: theme.id } as LoungeBackgroundChoice, on: selected === theme.id }))];
+  const placePage = pageOf(places, themePage), scenePage = pageOf(shared, sharedPage);
+  const pager = (pages: number, page: number, go: (page: number) => void, label: string) => pages > 1 && <nav className="lounge-background-pager" aria-label={label}>{Array.from({ length: pages }, (_, index) => <button key={index} type="button" aria-current={index + 1 === page ? 'page' : undefined} onClick={() => go(index + 1)}>{index + 1}</button>)}</nav>;
   return <>
     {!controlled && <button type="button" ref={trigger} className="lounge-background-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)} title="배경 바꾸기"><ImageIcon size={16} /><span>배경</span></button>}
     {open && <>
@@ -65,24 +74,20 @@ export function LoungeBackgroundPicker({ current, ownTheme, onPick, onMake, onMa
           {busy === 'match' ? <><LoaderCircle size={15} className="lounge-spin" />지금 장면에 맞는 배경을 찾는 중… 없으면 새로 만들어요</> : <><Wand2 size={15} />지금 장면에 맞추기</>}
         </button>}
         <div className="lounge-background-grid" role="radiogroup" aria-label="배경 고르기">
-          <button type="button" role="radio" aria-checked={selected === null} disabled={Boolean(busy)} onClick={() => void pick(null)} style={tile(own.image)}>
-            <span>{own.name}<small>이 대화의 기본</small></span>{selected === null && <Check size={16} />}
-          </button>
-          <button type="button" role="radio" aria-checked={selected === 'blank'} disabled={Boolean(busy)} onClick={() => void pick({ blank: true })} style={tile(loungeBlankScene.image)}>
-            <span>{loungeBlankScene.name}<small>아무것도 없는 배경</small></span>{selected === 'blank' && <Check size={16} />}
-          </button>
-          {loungeThemes.filter(theme => theme.id !== ownTheme).map(theme => <button key={theme.id} type="button" role="radio" aria-checked={selected === theme.id} disabled={Boolean(busy)} onClick={() => void pick({ theme: theme.id })} style={tile(theme.image)}>
-            <span>{theme.name}</span>{selected === theme.id && <Check size={16} />}
+          {placePage.items.map(place => <button key={place.key} type="button" role="radio" aria-checked={place.on} disabled={Boolean(busy)} onClick={() => void pick(place.choice)} style={tile(place.image)}>
+            <span>{place.name}{place.hint && <small>{place.hint}</small>}</span>{place.on && <Check size={16} />}
           </button>)}
         </div>
+        {pager(placePage.pages, placePage.page, setThemePage, '기본 배경 페이지')}
         <label className="lounge-background-label">공용 배경 찾기<input type="search" className="lounge-background-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="예: 밤 호텔, 숲길, 버스" /></label>
         {shared.length > 0 && <>
           <p className="lounge-background-label">다른 대화에서 만들어진 장면</p>
           <div className="lounge-background-grid" role="radiogroup" aria-label="함께 쓰는 장면 고르기">
-            {shared.map(scene => <button key={scene.id} type="button" role="radio" aria-checked={selected === `scene:${scene.id}`} disabled={Boolean(busy)} onClick={() => void pick({ scene: scene.id })} style={tile(scene.url)} title={scene.name ? `${scene.name} — ${scene.description}` : scene.description}>
+            {scenePage.items.map(scene => <button key={scene.id} type="button" role="radio" aria-checked={selected === `scene:${scene.id}`} disabled={Boolean(busy)} onClick={() => void pick({ scene: scene.id })} style={tile(scene.url)} title={scene.name ? `${scene.name} — ${scene.description}` : scene.description}>
               <span>{(() => { const label = scene.name || scene.description; return label.length > 28 ? `${label.slice(0, 27)}…` : label; })()}</span>{selected === `scene:${scene.id}` && <Check size={16} />}
             </button>)}
           </div>
+          {pager(scenePage.pages, scenePage.page, setSharedPage, '공용 배경 페이지')}
         </>}
         <form className="lounge-background-make" onSubmit={event => { event.preventDefault(); make(); }}>
           <label htmlFor={`${titleId}-prompt`}><Sparkles size={14} /> 원하는 장소를 직접 적어서 만들기</label>

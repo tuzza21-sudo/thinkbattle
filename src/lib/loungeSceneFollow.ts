@@ -7,6 +7,8 @@
  * The server (api/lounge-images.ts, action "scene" with auto) decides with this and remembers what it did in the room's
  * background (`follow`); a background the member chose is never touched.
  */
+import { canonicalScenePlace, isGenericPlaceName } from './loungeScenePlace.js';
+
 export type SceneForFollow = { location: string; scene_type: string; activity?: string; time_of_day?: string };
 /** What the background was last chosen for (kept in the room's background, under `follow`). */
 export type SceneFollow = { key: string; at: number; place: string };
@@ -14,10 +16,10 @@ export type SceneFollow = { key: string; at: number; place: string };
 export type SceneChangeNote = { turn: number; at: number; explicit: boolean };
 
 export const sceneFollowRules = {
-  /** After a change, another that is not explicit waits this long. */
-  minIntervalMs: 20 * 60_000,
-  /** and the scene must have stayed in the new place for this many turns (scene_turns). */
-  stableTurns: 3,
+  /** After a change, another that is not explicit waits this long (2026-11-18, by the owner: places are not to be changed so often; was 20 minutes). */
+  minIntervalMs: 40 * 60_000,
+  /** and the scene must have stayed in the new place for this many turns (scene_turns; was 3). */
+  stableTurns: 5,
 } as const;
 
 const normalized = (text: string) => text.toLowerCase().replace(/[\s.,，。·—–\-~!?'"“”‘’()（）]/g, '');
@@ -28,7 +30,7 @@ const vaguePlace = /각자|어딘가|알 수 없|모르|있는 곳|^기타$|^(?:
 /** The place of the engine's scene when it is a stated one; undefined when it is only "where each is". */
 export function stateScenePlace(scene: Pick<SceneForFollow, 'location'> | undefined) {
   const place = scene?.location?.replace(/\s+/g, ' ').trim();
-  return place && place.length >= 2 && !vaguePlace.test(place) ? place : undefined;
+  return place && place.length >= 2 && !vaguePlace.test(place) && !isGenericPlaceName(place) ? place : undefined;
 }
 
 const timeWords = /^(?:이른\s*|늦은\s*|한\s*)?(?:새벽|아침|오전|낮|점심|오후|저녁|밤|한밤|심야|해\s*질\s*녘)(?:\s*\S*?\s*시)?\s*[,，·\-—–]?\s*/;
@@ -41,7 +43,7 @@ export function placeFromSceneLine(line: string | undefined) {
   if (text.length < 4 || /^통화 중/.test(text)) return undefined;
   for (let guard = 0; guard < 2; guard += 1) text = text.replace(timeWords, '');
   const place = text.split(/[.。;；]|\s[—–-]\s/)[0].trim().slice(0, 60);
-  return place.length >= 3 && !vaguePlace.test(place) ? place : undefined;
+  return place.length >= 3 && !vaguePlace.test(place) && !isGenericPlaceName(place) ? place : undefined;
 }
 
 export type SceneFollowInput = {
@@ -61,7 +63,8 @@ export type SceneFollowDecision =
 
 export function sceneFollowKey(scene: SceneForFollow | undefined, place: string) {
   void scene;
-  return normalized(place).slice(0, 30);
+  // The room or building, not the spot in it: 모텔 방 and 모텔 침대 위 are one place with one background.
+  return normalized(canonicalScenePlace(place)).slice(0, 30);
 }
 
 /** A place that is only passed through on the way to another (a corridor, an elevator, stairs): it never gets a background of its own. */
