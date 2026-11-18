@@ -437,3 +437,51 @@ test('photos are counted by the month by plan: Plus 10, Pro 30, no plan 3, the a
   assert.equal(stopped.status, 429); assert.equal(stopped.body.code, 'lounge_photo_month_limit'); assert.match(stopped.body.error, /이번 달 받을 수 있는 사진 10장/);
   assert.deepEqual((await ask({ source: 'character', plan: 'plus', state: 'month_limit' })).body, { skipped: true }, 'one sent first is dropped quietly');
 });
+
+test('a photo is asked for with a long description that reaches the scene writer as written, which is told to keep every element and the safety rules (2026-11-18)', async () => {
+  const wanted = '비 오는 저녁 창가 자리에서 베이지 트렌치코트를 입고 와인잔을 든 채, 고개를 살짝 기울여 웃는 모습. 가까이서 찍은 느낌으로. '.repeat(3).trim();
+  assert.ok(wanted.length > 200 && wanted.length <= 500);
+  let asked, claimed;
+  await run(async (url, init = {}) => {
+    if (url.includes('/auth/')) return result({ id: userId });
+    if (url.includes('claim_lounge_character_photo')) { claimed = JSON.parse(init.body); return result({ state: 'claimed', id: 'post-1', character: 'velvet', left: 1 }); }
+    if (url.includes('voice_lounge_messages?')) return result([]);
+    if (url.includes('voice_lounge_relationships?')) return result([]);
+    if (url.endsWith('/responses')) { asked = JSON.parse(init.body); return result(sceneOutput({ scene: 'A woman in a beige trench coat at a rainy window seat holding a wine glass, head tilted, smiling, close framing, evening light.', caption: '이런 느낌 맞죠?' })); }
+    if (url.startsWith('https://app.test/lounge/')) return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/webp' } });
+    if (url.endsWith('/v1/images/edits')) return result({ data: [{ b64_json: Buffer.from('webp-bytes').toString('base64') }] });
+    if (url.includes('/storage/v1/object/lounge-character-private/')) return result({ Key: 'ok' });
+    if (url.includes('lounge_character_posts?id=eq.post-1') && init.method === 'PATCH') return result([{ id: 'post-1', ...JSON.parse(init.body), created_at: '2026-11-18T12:00:00Z', visibility: 'private' }]);
+    throw new Error(`Unexpected ${url}`);
+  }, async () => { assert.equal((await handler(request({ action: 'photo', roomId, source: 'request', request: wanted }))).status, 200); });
+  assert.equal(claimed.p_scene, wanted, 'the whole description, not the first 200 characters');
+  assert.equal(JSON.parse(asked.input).request, wanted);
+  assert.match(asked.instructions, /빠짐없이 가능한 한 그대로 scene에 옮기고/);
+  assert.match(asked.instructions, /노출·속옷·잠옷·성적인 자세나 상황·신체 부위 강조가 적혀 있으면 그 부분만 일상적인 차림과 자세로 바꾸고/);
+  assert.equal(photos.loungeBackgroundDaily, 1, 'one background a day');
+});
+
+test('a member deletes a photo the character sent: the picture goes, the post loses its address, the count is kept, and only the owner can (2026-11-18)', async () => {
+  const post = { id: '11111111-1111-4111-8111-111111111111', image_path: `${userId}/11111111-1111-4111-8111-111111111111.webp` };
+  for (const owner of [true, false]) {
+    const seen = { storage: undefined, patch: undefined, deleted: false };
+    let response;
+    await run(async (url, init = {}) => {
+      if (url.includes('/auth/')) return result({ id: owner ? userId : 'someone-else' });
+      if (url.includes('lounge_character_posts?id=eq.') && !init.method) return result(url.includes(`user_id=eq.${userId}`) ? [post] : []);
+      if (url.includes('/storage/v1/object/lounge-character-private/') && init.method === 'DELETE') { seen.storage = url; return result({}); }
+      if (url.includes('lounge_character_posts?id=eq.') && init.method === 'PATCH') { seen.patch = JSON.parse(init.body); return result([]); }
+      if (init.method === 'DELETE') { seen.deleted = true; return result({}); }
+      throw new Error(`Unexpected ${url}`);
+    }, async () => { response = await handler(request({ action: 'delete-photo', postId: post.id })); });
+    if (owner) {
+      assert.equal(response.status, 200);
+      assert.equal(seen.storage, `https://db.test/storage/v1/object/lounge-character-private/${post.image_path}`);
+      assert.deepEqual(seen.patch, { image_path: null }, 'the row stays (the day\'s count is not given back), without an address');
+      assert.equal(seen.deleted, false, 'the post row is not deleted');
+    } else {
+      assert.equal(response.status, 404); assert.equal(seen.storage, undefined, 'nobody else\'s photo');
+    }
+  }
+  await run(async () => { throw new Error('no call'); }, async () => { assert.equal((await handler(request({ action: 'delete-photo', postId: 'nope' }))).status, 400); });
+});
