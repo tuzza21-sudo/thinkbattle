@@ -123,11 +123,11 @@ export function LoungeChatSidebar({ user, collapsed = false, onToggle, onLoginRe
   const state = useLoungeChats(user);
   // Folded: a narrow rail of the portraits alone; pressing the rail unfolds the full list again.
   if (collapsed) return <aside className="lounge-chat-sidebar is-collapsed" aria-label="대화중인 사석">
-    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 펼치기" title="펼치기"><PanelLeftOpen size={16} /></button></div>
+    <div className="lounge-chat-sidebar-head"><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 펼치기" title="펼치기"><PanelLeftOpen size={19} strokeWidth={1.7} /></button></div>
     {user && state.chats && state.chats.length > 0 && <ul className="lounge-chat-rail">{state.chats.map(chat => <li key={chat.room_id}><button type="button" onClick={onToggle} title={chatName(chat)} aria-label="사석 목록 펼치기"><ChatPortrait chat={chat} /></button></li>)}</ul>}
   </aside>;
   return <aside className="lounge-chat-sidebar" aria-label="대화중인 사석">
-    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 접기" title="접기"><PanelLeftClose size={16} /></button></div>
+    <div className="lounge-chat-sidebar-head"><h2>대화중인 사석</h2><button type="button" className="lounge-tab-refresh lounge-chat-sidebar-hide" onClick={onToggle} aria-label="사석 목록 접기" title="접기"><PanelLeftClose size={19} strokeWidth={1.7} /></button></div>
     {user ? <LoungeChatItems state={state} compact /> : <div className="lounge-tab-empty"><h3>로그인하면 여기에 모여요</h3><p>캐릭터와 나눈 대화가 쌓이고, 언제든 이어서 이야기할 수 있어요.</p>{onLoginRequest && <button type="button" className="lounge-primary" onClick={onLoginRequest}><LogIn size={16} />로그인</button>}</div>}
   </aside>;
 }

@@ -66,7 +66,9 @@
 .lounge-chat-sidebar.is-collapsed { scrollbar-width:none; }
 .lounge-chat-sidebar.is-collapsed::-webkit-scrollbar { display:none; }
 .lounge-chat-sidebar-head h2 { flex:1; margin:0 8px 0 0; font-size:16px; font-weight:800; letter-spacing:-.3px; }
-.lounge-chat-sidebar .lounge-tab-refresh { width:32px; height:32px; border-radius:10px; }
+/* The fold button is just the icon, small, with a soft patch on hover (2026-11-18, by the owner: no box around it). */
+.lounge-chat-sidebar .lounge-tab-refresh { width:30px; height:30px; border:0; border-radius:8px; background:transparent; color:var(--l-muted,#73756c); cursor:pointer; transition:background .15s,color .15s; }
+.lounge-chat-sidebar .lounge-tab-refresh:hover { background:#3236291a; color:var(--l-ink,#32352e); }
 .lounge-chat-sidebar .lounge-chat-list button { grid-template-columns:44px minmax(0,1fr); gap:10px; padding:10px 6px; }
 .lounge-chat-sidebar .lounge-chat-portrait { width:44px; height:44px; border-radius:15px; }
 .lounge-chat-sidebar .lounge-chat-list time { display:none; }
@@ -87,7 +89,7 @@
   /* Open: the sidebar is its own column of the page, as first built, and scrolls with the page: it is not held on the screen (2026-11-18). */
   .lounge-page.has-chat-sidebar > .lounge-chat-sidebar { display:block; grid-column:1; grid-row:2 / span 12; align-self:start; padding:24px 14px 24px 24px; border-right:1px solid var(--l-line,#e7e6df); }
   /* Folded: a small rail fixed to the window (2026-11-18, by the owner: the open list goes with the page, the rail stays); its grid column is only the room it takes. */
-  .lounge-page.has-chat-sidebar > .lounge-chat-sidebar.is-collapsed { position:fixed; left:14px; top:96px; width:64px; max-height:calc(100vh - 116px); z-index:20; padding:10px 0; border:1px solid var(--l-line,#e7e6df); border-radius:20px; background:var(--l-paper,#fffefb); box-shadow:0 6px 18px #3236290f; }
+  .lounge-page.has-chat-sidebar > .lounge-chat-sidebar.is-collapsed { position:fixed; left:14px; top:96px; width:64px; max-height:calc(100vh - 116px); z-index:20; padding:4px 0 10px; border:0; background:transparent; }
   /* The list is at the left, so the "사석" page itself keeps only its title and a note. */
   .lounge-chats-main .lounge-chats-items, .lounge-chats-main .lounge-tab-refresh { display:none; }
   .lounge-chats-main .lounge-chats-hint { display:block; color:var(--l-muted,#73756c); font-size:14px; line-height:1.7; }
