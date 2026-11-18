@@ -272,9 +272,9 @@
 .lounge-cast-card-empty { display:grid; place-items:center; width:100%; height:100%; font-size:42px; background:linear-gradient(160deg,#3a3a30,#22221c); }
 @media(max-width:760px) { .lounge-home-subhead.with-action { flex-direction:column; align-items:flex-start; } }
 
-/* The filter under "누구와 이야기할까요?" (2026-11-17); in the font of the header brand, Cafe24 Ssurround, with softer buttons (2026-11-18). */
+/* The filter under "누구와 이야기할까요?" (2026-11-17); in the plain font of the header's right side, with softer buttons (2026-11-18). */
 .lounge-cast-filter { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 16px; }
-.lounge-cast-filter button { min-width:64px; padding:9px 20px; border:1px solid var(--l-line,#e7e6df); border-radius:99px; background:var(--l-paper,#fffefb); color:var(--l-muted,#73756c); font-family:'Cafe24 Ssurround','Pretendard','Noto Sans KR',sans-serif; font-size:15px; font-weight:400; letter-spacing:-.01em; line-height:1.2; cursor:pointer; box-shadow:0 1px 2px #32352e14; transition:color .18s,border-color .18s,background .18s,box-shadow .18s,transform .18s; }
+.lounge-cast-filter button { min-width:64px; padding:9px 20px; border:1px solid var(--l-line,#e7e6df); border-radius:99px; background:var(--l-paper,#fffefb); color:var(--l-muted,#73756c); font-family:'Pretendard','Noto Sans KR',system-ui,sans-serif; font-size:14px; font-weight:700; line-height:1.2; cursor:pointer; box-shadow:0 1px 2px #32352e14; transition:color .18s,border-color .18s,background .18s,box-shadow .18s,transform .18s; }
 .lounge-cast-filter button:hover { color:var(--l-ink,#32352e); border-color:var(--l-green,#425c44); transform:translateY(-1px); box-shadow:0 4px 10px #32352e1f; }
 .lounge-cast-filter button:active { transform:translateY(0); }
 .lounge-cast-filter button:focus-visible { outline:2px solid var(--l-green,#425c44); outline-offset:2px; }
