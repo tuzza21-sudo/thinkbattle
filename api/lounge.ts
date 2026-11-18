@@ -1242,7 +1242,10 @@ ${photoRule}`;
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy && analysis?.sexual_scene === false) delete turnConditions.intimacy.explicit;
     // In a sexual scene the narration, the inner voice and the lines are in plain speech, whatever the room agreed (the agreed level comes back after it).
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) Object.assign(turnConditions, { speech: loungeAdultSceneSpeech });
-    const adultReply = Boolean(nanoKey && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
+    // A room on 오닉스 (DeepSeek Flash) has its adult scenes answered by DeepSeek's own model (2026-11-18, by the owner: to see if it writes them as
+    // well, and faster); any other model has them answered by NanoGPT's. Each is the other's first fallback.
+    const adultViaDeepseek = Boolean(deepseekKey && getLoungeChatModel(solo ? room.ai_model : null).provider === 'deepseek');
+    const adultReply = Boolean((adultViaDeepseek || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     const turnApplied: { current?: { provider: string; model: string } } = {};
     const braked = () => adultReply && turnApplied.current?.provider === 'openai';
@@ -1911,7 +1914,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // `quiet` is a rewrite that shows nothing while it is written (a reply that came back in another language).
           const deepseekReply = async (note = '', quiet = false, backend?: 'nano' | 'deepseek') => {
             if (!quiet) partialLength = 0;
-            const adult = backend ? backend === 'nano' : adultReply;
+            const adult = backend ? backend === 'nano' : adultReply && !adultViaDeepseek;
             const model = adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
             const key = adult ? nanoKey : deepseekKey;
             const response = await fetchTimed(adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
@@ -1922,7 +1925,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
-                  { role: 'user', content: adult ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
+                  { role: 'user', content: adultReply ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
                 ],
               }),
             }, 30_000);
@@ -1952,10 +1955,11 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReplyRaw = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReplyRaw = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             if (provider === 'deepseek') return deepseekReply();
             if (provider === 'deepseek-plain') return deepseekReply('', false, 'deepseek');
+            if (provider === 'nanogpt') return deepseekReply('', false, 'nano');
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -1993,8 +1997,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // Every attempt at this turn's reply is kept (2026-11-18, by the owner: to see whether the adult model is unstable): which
           // model, whether it answered, how long it took, and why not. The last one that answered is the one that was applied.
           const trace: { attempts: Array<{ provider: string; model: string; ok: boolean; ms: number; status?: string }>; applied?: { provider: string; model: string } } = { attempts: [] };
-          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' = 'openai', fast = false, inCharacter = false) => {
-            const adultBackend = provider === 'deepseek' && adultReply;
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' = 'openai', fast = false, inCharacter = false) => {
+            const adultBackend = provider === 'nanogpt' || (provider === 'deepseek' && adultReply && !adultViaDeepseek);
             const label = {
               provider: adultBackend ? 'nanogpt' : provider === 'deepseek-plain' ? 'deepseek' : provider,
               model: provider === 'gemini' ? String(chatModel.id === 'gemini-pro' ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'])
@@ -2029,9 +2033,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                     console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                     try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
                     // The adult model (NanoGPT) is down: DeepSeek's own model, then Gemini, before OpenAI, which steps back from an adult scene (2026-11-18: GPT's "I went too far" turns became the room's agreement).
-                    if (adultReply && deepseekKey) {
-                      console.warn('[Lounge API] adult model failed, answering with DeepSeek');
-                      try { return await attemptReply('deepseek-plain'); } catch (plain) { if (found || earlySpeech || replyStop.aborted) throw plain; }
+                    // The other adult backend: DeepSeek's own model for NanoGPT's turn, NanoGPT's for a room on 오닉스.
+                    if (adultReply && (adultViaDeepseek ? nanoKey : deepseekKey)) {
+                      console.warn(`[Lounge API] adult model failed, answering with ${adultViaDeepseek ? 'NanoGPT' : 'DeepSeek'}`);
+                      try { return await attemptReply(adultViaDeepseek ? 'nanogpt' : 'deepseek-plain'); } catch (other) { if (found || earlySpeech || replyStop.aborted) throw other; }
                     }
                     if (adultReply && geminiKey) {
                       console.warn('[Lounge API] adult model and DeepSeek failed, answering with Gemini');

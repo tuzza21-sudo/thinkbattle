@@ -5465,3 +5465,55 @@ test('a sexual scene that goes on skips the analyzer for up to three turns, neve
   assert.ok(logged.some(line => line.includes('[Lounge analyzer]') && line.includes('sexual scene goes on')), 'the skip is in the log');
   assert.ok(logged.some(line => line.includes('[Lounge model]') && line.includes('"cachedTokens":7000')), 'NanoGPT\'s cache is counted');
 });
+
+test('a room on 오닉스 has its adult scenes answered by DeepSeek\'s own model, any other room by NanoGPT, and each is the other\'s first fallback (2026-11-18)', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY, deepseek: process.env.DEEPSEEK_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.nano], ['DEEPSEEK_API_KEY', saved.deepseek], ['GEMINI_API_KEY', saved.gemini]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key', DEEPSEEK_API_KEY: 'deepseek-key' });
+  delete process.env.GEMINI_API_KEY;
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const base = messengerLib.normalizeLoungeCompanionState(null, roomId);
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '이리 와.', inner_voice: '' });
+  const works = () => sse([{ choices: [{ delta: { content: answer.slice(0, 10) } }] }, { choices: [{ delta: { content: answer.slice(10) }, finish_reason: 'stop' }] }]);
+  // [the room's model, DeepSeek works, NanoGPT works, the attempts in order]
+  for (const [aiModel, deepseekWorks, nanoWorks, attempts] of [
+    ['deepseek-flash', true, true, ['deepseek:ok']],
+    ['deepseek-flash', false, true, ['deepseek:fail', 'deepseek:fail', 'nanogpt:ok']],
+    ['deepseek-flash', false, false, ['deepseek:fail', 'deepseek:fail', 'nanogpt:fail', 'openai:ok']],
+    [undefined, true, true, ['nanogpt:ok']],
+    [undefined, true, false, ['nanogpt:fail', 'nanogpt:fail', 'deepseek:ok']],
+  ]) {
+    let recorded, requests = [];
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: base }]);
+      if (url.includes('voice_lounge_relationships?')) return result([closest]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('lounge_turn_models')) { recorded = JSON.parse(init.body); return result(null, 201); }
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4, ai_model: aiModel }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === modelsLib.loungeAdultChatUrl) { requests.push({ who: 'nanogpt', auth: init.headers.Authorization, model: JSON.parse(init.body).model }); return nanoWorks ? works() : result({ error: { message: 'down' } }, 503); }
+      if (url === 'https://api.deepseek.com/chat/completions') { requests.push({ who: 'deepseek', auth: init.headers.Authorization, model: JSON.parse(init.body).model }); return deepseekWorks ? works() : result({ error: { message: 'down' } }, 503); }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses')) return modelAnswer({ text: '들어와요.', inner_voice: '' });
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    const name = `${aiModel ?? 'gpt'} deepseek=${deepseekWorks} nano=${nanoWorks}`;
+    assert.deepEqual(recorded.attempts.map(item => `${item.provider}:${item.ok ? 'ok' : 'fail'}`), attempts, name);
+    assert.equal(recorded.adult_routed, true, name);
+    const first = requests[0];
+    assert.equal(first.who, aiModel === 'deepseek-flash' ? 'deepseek' : 'nanogpt', `${name}: asked first`);
+    assert.equal(first.auth, aiModel === 'deepseek-flash' ? 'Bearer deepseek-key' : 'Bearer nano-key', name);
+    if (aiModel === 'deepseek-flash') assert.equal(first.model, 'deepseek-flash', name);
+  }
+});
