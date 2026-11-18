@@ -5068,7 +5068,7 @@ test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 �
   assert.match(home, /<LoungeRow key=\{castFilter\} label="캐릭터"/);
 });
 
-test('the sidebar opens as the full list (with delete, in its own column) and folds into a fixed rail of portraits that unfolds when pressed (2026-11-17)', () => {
+test('the sidebar opens as the full list (with delete, in its own column) and folds into a rail of portraits that unfolds when pressed; neither is held on the screen (2026-11-17, 2026-11-18)', () => {
   const tabs = readFileSync(new URL('../src/components/LoungeTabs.tsx', import.meta.url), 'utf8');
   const sidebar = tabs.slice(tabs.indexOf('export function LoungeChatSidebar'), tabs.indexOf('/** Settings:'));
   const folded = sidebar.slice(sidebar.indexOf('if (collapsed)'), sidebar.indexOf('return <aside className="lounge-chat-sidebar" '));
@@ -5078,8 +5078,8 @@ test('the sidebar opens as the full list (with delete, in its own column) and fo
   assert.doesNotMatch(folded, /<h2>|새로고침/);
   assert.match(tabs, /className="lounge-chat-delete"/, 'delete stays in the list');
   const css = readFileSync(new URL('../src/components/LoungeTabs.css', import.meta.url), 'utf8');
-  assert.match(css, /\.lounge-chat-sidebar \{ display:block; grid-column:1; grid-row:2 \/ span 12; align-self:start; position:sticky;/, 'open: its own column of the page, as first built');
-  assert.match(css, /\.lounge-chat-sidebar\.is-collapsed \{ position:fixed; left:14px; top:96px; width:64px;/, 'folded: a rail fixed to the window');
+  assert.match(css, /\.lounge-chat-sidebar \{ display:block; grid-column:1; grid-row:2 \/ span 12; align-self:start; padding:24px 14px 24px 24px;/, 'open: its own column of the page, scrolling with it');
+  assert.match(css, /\.lounge-chat-sidebar\.is-collapsed \{ width:64px; margin:24px 0 0 14px;/, 'folded: a rail in its column, scrolling with the page');
   assert.match(css, /\.chat-sidebar-collapsed \{ grid-template-columns:88px/);
   const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
   assert.match(page, /const chatSidebarPage = Boolean\(!inRoom && \(/, 'not only for a signed-in member');
