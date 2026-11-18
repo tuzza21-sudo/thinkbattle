@@ -10,6 +10,7 @@ import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { LoungeCharacterGallery } from './LoungeCharacterGallery';
+import { LoungePersonaPicker } from './LoungePersonaPicker';
 import { LoungeScenarioCards } from './LoungeScenarioCards';
 import { useLoungeScenarios } from '../lib/useLoungeScenarios';
 import './LoungeCharacter.css';
@@ -101,6 +102,7 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
             <button type="button" className="lounge-character-cta" onClick={toStories}><MessageCircle size={17} />대화 시작하기</button>
             <span className="lounge-character-cta-note">{scenarios ? `함께할 이야기 ${scenarios.length}개 중에서 골라요` : '이야기를 불러오는 중…'}</span>
           </div>}
+        {user && !user.isAnonymous && <div className="lounge-character-actions"><LoungePersonaPicker characterId={character.id} characterName={character.name} /></div>}
       </div>
     </section>
 
