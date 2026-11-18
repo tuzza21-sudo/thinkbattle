@@ -5,6 +5,8 @@ import type { AppUser } from '../types';
 import { getLoungeHost, isLoungeCustomCharacterId, loungeSpokenText, type LoungeHostId } from '../lib/lounge';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
 import { deleteLoungeChat, listLoungeChats, type LoungeChatSummary } from '../lib/loungeApi';
+import { loungeChatsInProgress, type LoungeChatRoomTurns } from '../lib/loungeChatList';
+import { supabase } from '../lib/supabase';
 import { loungeCustomPortrait } from '../lib/loungeCustomClient';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import './LoungeTabs.css';
@@ -47,15 +49,25 @@ function ChatPortrait({ chat }: { chat: LoungeChatSummary }) {
   return <span className="lounge-chat-portrait"><LoungeHostPortrait hostId={chat.character_id as LoungeHostId} /></span>;
 }
 
+/** How many times each room's character has answered (the rooms the member can read), and whether the member has said anything in one. */
+const readRooms = async (ids: string[]) => {
+  const { data, error } = await supabase.from('voice_lounge_rooms').select('id,ai_turns').in('id', ids);
+  return error ? null : data as LoungeChatRoomTurns;
+};
+const humanMessages = async (roomId: string) => {
+  const { count, error } = await supabase.from('voice_lounge_messages').select('id', { count: 'exact', head: true }).eq('room_id', roomId).eq('kind', 'human');
+  return error ? 1 : count ?? 0;
+};
+
 /**
- * The chat list: every character the member has talked with, newest first, with the last thing said. Opening one
+ * The chat list: the conversations that are going on, newest first, with the last thing said (a room the member has not spoken in is left out). Opening one
  * continues that conversation where it was left (the room page opens it again).
  */
 function useLoungeChats(user: AppUser | null) {
   const [chats, setChats] = useState<LoungeChatSummary[] | null>(null);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
-  const load = useCallback(() => listLoungeChats().then(rows => { setChats(rows); setError(''); }, err => setError(errorText(err))), []);
+  const load = useCallback(() => listLoungeChats().then(async rows => { setChats(await loungeChatsInProgress(rows, readRooms, humanMessages)); setError(''); }, err => setError(errorText(err))), []);
   const removeChat = async (chat: LoungeChatSummary, name: string) => {
     if (!window.confirm(`${name}와의 대화를 삭제할까요? 대화 기록, 기억, 관계 점수가 모두 삭제되며 되돌릴 수 없어요.`)) return;
     setDeleting(chat.room_id); setError('');
