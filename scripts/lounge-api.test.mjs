@@ -5401,3 +5401,67 @@ test('the member sees what the character carries of this room and can forget any
   assert.equal((await act({ action: 'room-memory-forget', target: 'item', id: 'nope' })).status, 404);
   assert.equal((await act({ action: 'room-memory-forget', target: 'nothing' })).status, 400);
 });
+
+test('a sexual scene that goes on skips the analyzer for up to three turns, never on a stop; the adult model reads a shorter turn and its cache is counted (2026-11-18)', async t => {
+  // The rule.
+  const base = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), source_turn: 5 };
+  const going = { ...base, sexual_turn: 5, sexual_skips: 0 };
+  assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, '더 깊이'), true);
+  assert.equal(messengerLib.loungeSkipsAnalyzer(going, false, '더 깊이'), false, 'only adult mode at the closest step');
+  assert.equal(messengerLib.loungeSkipsAnalyzer({ ...going, sexual_skips: 3 }, true, '더 깊이'), false, 'the fourth turn reads again');
+  assert.equal(messengerLib.loungeSkipsAnalyzer({ ...going, sexual_turn: 4 }, true, '더 깊이'), false, 'only when the last turn was the scene');
+  for (const stop of ['그만해', '잠깐만', '아파', '하지 마', 'stop']) assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, stop), false, stop);
+  assert.equal(messengerLib.loungeSkipsAnalyzer(base, true, '더 깊이'), false);
+  // The state follows the reading.
+  const after = update => messengerLib.nextLoungeCompanionState({ state: { ...going }, decision: { progress: 'stay' }, turn: 6, reply: '답이에요 길게 쓴 답', inner: '', ...update });
+  assert.deepEqual([after({ analyzerSkipped: true }).sexual_turn, after({ analyzerSkipped: true }).sexual_skips], [6, 1]);
+  assert.deepEqual([after({ sexual: true }).sexual_turn, after({ sexual: true }).sexual_skips], [6, 0]);
+  assert.equal(after({ sexual: false }).sexual_turn, undefined, 'a reading that says it is over ends it');
+  assert.equal(after({}).sexual_turn, 5, 'no reading keeps it');
+
+  // Through the handler: the analyzer is not asked, the adult model reads the shorter input, and its cache is counted.
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.nano]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
+  const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
+  const state = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), source_turn: 3, sexual_turn: 3, sexual_skips: 0 };
+  const long = '긴 지난 답이에요. '.repeat(60);
+  const history = Array.from({ length: 14 }, (_, index) => ({ id: 20 - index, user_id: index % 2 ? null : 'user-1', nickname: index % 2 ? 'AI' : '지수', kind: index % 2 ? 'host' : 'human', text: index === 0 ? '더 깊이' : long, created_at: new Date(Date.UTC(2026, 10, 2, 0, 0, 30 - index)).toISOString() }));
+  let analyzerAsked = false, adultInput, logged = [];
+  const info = console.info; console.info = (...args) => { logged.push(args.join(' ')); };
+  try {
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state }]);
+      if (url.includes('voice_lounge_relationships?')) return result([closest]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result(history);
+      if (url === modelsLib.loungeAdultChatUrl) {
+        adultInput = JSON.parse(JSON.parse(init.body).messages[1].content);
+        const said = JSON.stringify({ text: '이리 와.', inner_voice: '' });
+        return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: said }, finish_reason: 'stop' }] })}\n\ndata: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 9000, completion_tokens: 40, prompt_tokens_details: { cached_tokens: 7000 } } })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') { analyzerAsked = true; return result({ error: { message: 'down' } }, 500); }
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses')) return modelAnswer({ text: '들어와요.', inner_voice: '' });
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+  } finally { console.info = info; }
+  assert.equal(analyzerAsked, false, 'the analyzer is skipped while the scene goes on');
+  assert.ok(adultInput, 'the adult model answered');
+  assert.ok(adultInput.recent.length <= 10, `the last ten messages (${adultInput.recent.length})`);
+  assert.ok(adultInput.recent.slice(0, -4).every(item => item.text.length <= 401), 'the older ones cut to 400 characters');
+  assert.equal(adultInput.character_knowledge, undefined);
+  assert.equal(adultInput.recent.at(-1).text, '더 깊이', 'the latest message is whole');
+  assert.ok(logged.some(line => line.includes('[Lounge analyzer]') && line.includes('sexual scene goes on')), 'the skip is in the log');
+  assert.ok(logged.some(line => line.includes('[Lounge model]') && line.includes('"cachedTokens":7000')), 'NanoGPT\'s cache is counted');
+});
