@@ -2021,7 +2021,11 @@ test('the reply sentence is read from a partial JSON stream only once its string
   assert.equal(replyTextSoFar('{"text":"그건 \\"근거\\"가 아니야.\\n다시'), undefined);
   assert.equal(replyTextSoFar('{"text":"그건 \\"근거\\"가 아니야.\\n다시.","mem'), '그건 "근거"가 아니야.\n다시.');
   assert.equal(replyTextSoFar('{ "text" : "끝\\\\", "memory": ""}'), '끝\\');
-  assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), undefined, 'another key first waits for the full reply');
+  // 2026-11-18: a chat's reply writes character_life first; its text is shown as soon as it begins, wherever it is among the outer keys.
+  assert.equal(replyTextSoFar('{"memory":"먼저","text":"나중"}'), '나중', 'another key first: the text is still found');
+  assert.equal(replyTextSoFar('{"character_life":{"feeling":"설렘","text":"안쪽"},"text":"바깥, \\"따옴표\\" 포함","inner_voice":""}'), '바깥, "따옴표" 포함', 'a nested text key does not count');
+  assert.equal(replyTextSoFar('{"character_life":{"feeling":"설렘"},"text":"아직'), undefined, 'not closed yet');
+  assert.equal(replyTextSoFar('{"note":"\\"text\\": \\"속임\\"","text":"진짜"}'), '진짜', 'a quoted text key inside a value does not count');
 });
 
 test('a reply that runs on past its end with a brace and garbage is cut there, as it streams and when saved', () => {
@@ -2038,12 +2042,14 @@ test('a chat shows the reply sentence while it is written, decoding escapes and 
   const { replyTextPartial } = compile('../api/lounge.ts', path => path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : lounge);
   assert.equal(replyTextPartial('{"tex'), undefined);
   assert.equal(replyTextPartial('{"text":"'), '');
+  assert.equal(replyTextPartial('{"character_life":{"feeling":"설렘","want":"다가가기"},"text":"*잔을 내려놓는다* 들어'), '*잔을 내려놓는다* 들어', 'a chat reply shows its text while character_life comes first');
+  assert.equal(replyTextPartial('{"character_life":{"feeling":"설'), undefined, 'nothing before the text begins');
   assert.equal(replyTextPartial('{"text":"*잔을 내려놓으며* 그건 \\"근거\\"'), '*잔을 내려놓으며* 그건 "근거"');
   assert.equal(replyTextPartial('{"text":"줄바꿈\\'), '줄바꿈', 'a backslash whose letter has not arrived waits');
   assert.equal(replyTextPartial('{"text":"하트 \\u2764'), '하트 ❤');
   assert.equal(replyTextPartial('{"text":"하트 \\u27'), '하트 ', 'a half-arrived \\u escape waits');
   assert.equal(replyTextPartial('{"text":"다 썼어.","memory":"'), '다 썼어.', 'stops at the end of the sentence');
-  assert.equal(replyTextPartial('{"memory":"먼저","text":"나중"'), undefined);
+  assert.equal(replyTextPartial('{"memory":"먼저","text":"나중"'), '나중', 'another key first: the text is still shown (2026-11-18)');
 });
 
 test('long moderator speech survives the former 25-second deadline and 3MB PCM cap', async () => {
