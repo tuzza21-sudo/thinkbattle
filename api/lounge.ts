@@ -2100,16 +2100,16 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // Where a turn's wait went, from the request: the context (claim, reads, lookups), the first words of a chat,
             // the whole reply, and the save that lets the next turn start.
             console.info('[Lounge turn]', JSON.stringify({ host: host.id, model: chatModel.id, medium: chat ? 'chat' : 'voice', contextMs: Math.round(modelStarted - contextStarted), ...(firstPartialAt ? { firstTextMs: Math.round(firstPartialAt - contextStarted) } : {}), textMs: Math.round(textAt - contextStarted), savedMs: Math.round(performance.now() - contextStarted), chars: firstText.length }));
-            // The record of this turn's model: chosen, the reading of the scene, what was applied and every attempt (see lounge_turn_models).
+            if (savedOk) send({ type: 'saved', saveMs: Math.round(performance.now() - saving) });
+            else console.warn('[Lounge API] spoken reply was not saved');
+            await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); });
+            // The record of this turn's model, once the reply has finished (a voice reply speaks its first sentence before then): chosen, the reading of the scene, what was applied and every attempt (see lounge_turn_models).
             const turnModel = { user_id: user.id, room_id: roomId, character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode,
               chosen_model: chosenModel.id, sexual: analysis?.sexual_scene ?? null, adult_routed: adultReply, applied_provider: trace.applied?.provider ?? null, applied_model: trace.applied?.model ?? null,
               fallback: trace.attempts.length > 1, attempts: trace.attempts, chars: firstText.length };
             console.info('[Lounge turn model]', JSON.stringify({ ...turnModel, user_id: undefined, room_id: undefined }));
             const traceWrite = serviceHeaders ? fetchTimed(`${url}/rest/v1/lounge_turn_models`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(turnModel) }, 3_000)
               .then(response => { if (!response.ok && response.status !== 404) console.warn('[Lounge turn model] not saved', response.status); }).catch(() => {}) : Promise.resolve();
-            if (savedOk) send({ type: 'saved', saveMs: Math.round(performance.now() - saving) });
-            else console.warn('[Lounge API] spoken reply was not saved');
-            await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); });
             await speech;
             await traceWrite;
             const { answer, relationship: relationshipSaved, story: storySaved } = await after;
