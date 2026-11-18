@@ -255,18 +255,45 @@ export function withoutRunawayTail(text: string): string {
 }
 
 /**
- * The reply sentence as soon as its JSON string is closed. Structured outputs follow the
- * schema's key order, so `text` arrives before the memory and events that come after it.
+ * Where the reply's `text` string begins in the JSON being written: just after its opening quote, or -1 while it has not
+ * begun. Only a key of the outer object counts (2026-11-18: a chat's reply writes `character_life` first, and the text, which
+ * used to be looked for only as the first key, was never shown or spoken before the whole reply had arrived, 10 to 15 s).
  */
+export function replyTextStart(output: string): number {
+  // `before` is the last character outside a string that is not a space: a string right after `{` or `,` is a key, after `:` a value.
+  let depth = 0, inString = false, escaped = false, keyStart = -1, lastKey = '', before = '';
+  for (let index = 0; index < output.length; index++) {
+    const char = output[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') { inString = false; before = '"'; if (keyStart >= 0) { lastKey = output.slice(keyStart, index); keyStart = -1; } }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      if (depth === 1 && (before === '{' || before === ',')) keyStart = index + 1;
+      else if (depth === 1 && before === ':' && lastKey === 'text') return index + 1;
+      continue;
+    }
+    if (char !== ' ' && char !== '\n' && char !== '\r' && char !== '\t') before = char;
+    if (char === '{' || char === '[') depth++;
+    else if (char === '}' || char === ']') depth--;
+    else if (char === ',' && depth === 1) lastKey = '';
+  }
+  return -1;
+}
+
+/** The reply sentence as soon as its JSON string is closed, wherever `text` is among the outer keys. */
 export function replyTextSoFar(output: string): string | undefined {
-  const start = /^\s*\{\s*"text"\s*:\s*"/.exec(output);
-  if (!start) return undefined;
+  const from = replyTextStart(output);
+  if (from < 0) return undefined;
   let escaped = false;
-  for (let index = start[0].length; index < output.length; index++) {
+  for (let index = from; index < output.length; index++) {
     const char = output[index];
     if (escaped) escaped = false;
     else if (char === '\\') escaped = true;
-    else if (char === '"') { try { return withoutRunawayTail(JSON.parse(output.slice(start[0].length - 1, index + 1)) as string); } catch { return undefined; } }
+    else if (char === '"') { try { return withoutRunawayTail(JSON.parse(output.slice(from - 1, index + 1)) as string); } catch { return undefined; } }
   }
   return undefined;
 }
@@ -277,10 +304,10 @@ const jsonEscapes: Record<string, string> = { n: '\n', t: '\t', r: '', b: '', f:
  * an escape that has not fully arrived. A chat shows it as it grows instead of waiting for the whole sentence.
  */
 export function replyTextPartial(output: string): string | undefined {
-  const start = /^\s*\{\s*"text"\s*:\s*"/.exec(output);
-  if (!start) return undefined;
+  const from = replyTextStart(output);
+  if (from < 0) return undefined;
   let text = '';
-  for (let index = start[0].length; index < output.length; index++) {
+  for (let index = from; index < output.length; index++) {
     const char = output[index];
     if (char === '"') return text;
     // A brace is where a runaway reply goes on past its end (see `withoutRunawayTail`): nothing after it is shown.
