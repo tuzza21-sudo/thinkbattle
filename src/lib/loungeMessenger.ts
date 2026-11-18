@@ -381,9 +381,8 @@ export type LoungeCompanionState = {
   fallback_replies?: string[];
   /** What the member had forgotten from the room's memory (the memory sheet): the reply and the recorder do not take it up again, even where the recent talk still shows it. */
   forgotten?: string[];
-  /** The last turn read as a sexual scene, and how many turns in a row the analyzer has been skipped since (2026-11-18: a scene that goes on is not read again every turn, which took 2.5 to 4.5 s). */
+  /** The turn the analyzer last read as a sexual scene (2026-11-18): the six turns after it are not read again (2.5 to 4.5 s each), the seventh is. */
   sexual_turn?: number;
-  sexual_skips?: number;
 };
 /** What makes a turn matter for the inner voice: read by the analyzer and the scene engine before the reply is written. */
 export const loungeInnerVoiceMatters = (analysis: LoungeAnalysis | undefined, decision?: Pick<LoungeSceneDecision, 'event'>) =>
@@ -425,7 +424,7 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(turnNumber(value.last_inner_turn) !== undefined ? { last_inner_turn: turnNumber(value.last_inner_turn) } : {}),
     ...(strings(value.fallback_replies, 8, 80).length ? { fallback_replies: strings(value.fallback_replies, 8, 80) } : {}),
     ...(strings(value.forgotten, 8, 120).length ? { forgotten: strings(value.forgotten, 8, 120) } : {}),
-    ...(turnNumber(value.sexual_turn) !== undefined ? { sexual_turn: turnNumber(value.sexual_turn), sexual_skips: turnNumber(value.sexual_skips) ?? 0 } : {}),
+    ...(turnNumber(value.sexual_turn) !== undefined ? { sexual_turn: turnNumber(value.sexual_turn) } : {}),
   };
 }
 function readSceneChange(value: unknown) {
@@ -595,12 +594,15 @@ export const loungeCompanionUpdateSchema = {
 } as const;
 /** The member forgot something from the room's memory (the memory sheet): the reply does not take it up again. */
 /**
- * Whether this turn may skip the analyzer (2026-11-18): adult mode at the closest step, the last recorded turn was a sexual scene, at most
- * three turns in a row (the fourth reads again, so the end of a scene is noticed), and never when the member's words may be a stop.
+ * Whether this turn may skip the analyzer (2026-11-18, by the owner): adult mode at the closest step, within six turns of the turn the analyzer
+ * read as a sexual scene (the seventh turn reads again, so the end of a scene is noticed), and never when the member's words may be a stop.
+ * Turns are counted as the room counts them, a call's included.
  */
+export const loungeSexualSkipTurns = 6;
 export const loungeStopWords = /그만|멈춰|멈추|싫어|하지\s*마|아파|아프|잠깐|stop/i;
-export function loungeSkipsAnalyzer(state: LoungeCompanionState | undefined, adultAtClosest: boolean, latestText: string) {
-  return Boolean(state && adultAtClosest && state.sexual_turn !== undefined && state.sexual_turn === state.source_turn && (state.sexual_skips ?? 0) < 3 && !loungeStopWords.test(latestText));
+export function loungeSkipsAnalyzer(state: LoungeCompanionState | undefined, adultAtClosest: boolean, latestText: string, turn: number) {
+  const since = state?.sexual_turn === undefined ? Infinity : turn - state.sexual_turn;
+  return Boolean(adultAtClosest && since >= 1 && since <= loungeSexualSkipTurns && !loungeStopWords.test(latestText));
 }
 export const loungeForgottenInstruction = 'forgotten은 사용자가 이 방의 기억에서 지운 내용이다. recent나 memory에 비슷한 말이 남아 있어도 지금의 약속·제한·감정으로 따르지 않고, 없던 일로 대한다. 사용자가 다시 직접 말하기 전에는 꺼내지 않는다. 입력에 forgotten이 없으면 쓰지 않는다.';
 export const loungeCompanionUpdateFields = Object.keys(loungeCompanionUpdateSchema);
@@ -698,7 +700,7 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     lingering: update && 'lingering' in update ? carried(update.lingering, turn) : state.lingering,
     next_intent: update && 'next_intent' in update ? carried(update.next_intent, turn) : state.next_intent,
     // A sexual scene goes on (read so, or the analyzer skipped for it); a reading that says it is over ends it; no reading keeps it as it was.
-    ...(input.analyzerSkipped ? { sexual_turn: turn, sexual_skips: (state.sexual_skips ?? 0) + 1 } : input.sexual === true ? { sexual_turn: turn, sexual_skips: 0 } : input.sexual === false ? { sexual_turn: undefined, sexual_skips: undefined } : {}),
+    ...(input.analyzerSkipped ? {} : input.sexual === true ? { sexual_turn: turn } : input.sexual === false ? { sexual_turn: undefined } : {}),
     ...(input.braked ? { fallback_replies: uniqueTail([...(state.fallback_replies ?? []), input.reply.replace(/\s+/g, ' ').trim().slice(0, 60)].filter(item => item.length >= 8), 8) } : {}),
   };
 }

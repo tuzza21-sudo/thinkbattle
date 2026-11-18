@@ -3127,12 +3127,12 @@ test('adult mode: the turns it opens are answered by DeepSeek when its key is se
     const said = JSON.stringify(lines);
     if (row === velvetRow && !aiModel) { assert.equal(asked, undefined, 'before the closest step DeepSeek is not asked'); assert.ok(openaiAsked); continue; }
     const adultTurn = row === closest;
-    assert.equal(asked.auth, adultTurn ? 'Bearer nano-key' : 'Bearer deepseek-key');
-    assert.equal(asked.url, adultTurn ? modelsLib.loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions');
-    assert.equal(asked.body.model, adultTurn ? modelsLib.loungeAdultChatModel : 'deepseek-flash');
+    // 2026-11-18: an adult scene in a chat is answered by DeepSeek's own model first, like a room that picked it.
+    assert.equal(asked.auth, 'Bearer deepseek-key');
+    assert.equal(asked.url, 'https://api.deepseek.com/chat/completions');
+    assert.equal(asked.body.model, 'deepseek-flash');
     assert.deepEqual(asked.body.response_format, { type: 'json_object' });
-    if (adultTurn) { assert.deepEqual(asked.body.reasoning, { exclude: true }); assert.equal(asked.body.thinking, undefined); }
-    else assert.deepEqual(asked.body.thinking, { type: 'disabled' });
+    assert.deepEqual(asked.body.thinking, { type: 'disabled' });
     assert.equal(asked.body.stream, true);
     if (row === closest) assert.match(asked.body.messages[0].content, /turn\.intimacy\.explicit/);
     assert.match(asked.body.messages[0].content, /json 객체 하나로만 쓴다/);
@@ -5259,11 +5259,12 @@ test('when the adult model is down the turn goes to DeepSeek, then Gemini, then 
   const answer = JSON.stringify({ text: '이리 와요.', inner_voice: '' });
   const works = () => sse([{ choices: [{ delta: { content: answer.slice(0, 10) } }] }, { choices: [{ delta: { content: answer.slice(10) }, finish_reason: 'stop' }] }]);
   // [the adult model works, DeepSeek works, a Gemini key is set, who applied, the attempts in order]
-  for (const [nanoWorks, deepseekWorks, gemini, applied, attempts] of [
-    [true, true, false, 'nanogpt', ['nanogpt:ok']],
-    [false, true, false, 'deepseek', ['nanogpt:fail', 'nanogpt:fail', 'deepseek:ok']],
-    [false, false, true, 'openai', ['nanogpt:fail', 'nanogpt:fail', 'deepseek:fail', 'gemini:fail', 'openai:ok']],
-    [false, false, false, 'openai', ['nanogpt:fail', 'nanogpt:fail', 'deepseek:fail', 'openai:ok']],
+  // 2026-11-18, by the owner: DeepSeek's own model first in a chat, then NanoGPT's, then Gemini, then OpenAI.
+  for (const [deepseekWorks, nanoWorks, gemini, applied, attempts] of [
+    [true, true, false, 'deepseek', ['deepseek:ok']],
+    [false, true, false, 'nanogpt', ['deepseek:fail', 'deepseek:fail', 'nanogpt:ok']],
+    [false, false, true, 'openai', ['deepseek:fail', 'deepseek:fail', 'nanogpt:fail', 'gemini:fail', 'openai:ok']],
+    [false, false, false, 'openai', ['deepseek:fail', 'deepseek:fail', 'nanogpt:fail', 'openai:ok']],
   ]) {
     if (gemini) process.env.GEMINI_API_KEY = 'gemini-key'; else delete process.env.GEMINI_API_KEY;
     let recorded, asked = [];
@@ -5402,20 +5403,21 @@ test('the member sees what the character carries of this room and can forget any
   assert.equal((await act({ action: 'room-memory-forget', target: 'nothing' })).status, 400);
 });
 
-test('a sexual scene that goes on skips the analyzer for up to three turns, never on a stop; the adult model reads a shorter turn and its cache is counted (2026-11-18)', async t => {
+test('a sexual scene that goes on skips the analyzer for six turns and the seventh reads it again, never on a stop; the adult model reads a shorter turn and its cache is counted (2026-11-18)', async t => {
   // The rule.
+  // 2026-11-18, by the owner: once the analyzer reads a sexual scene, the next six turns skip it and the seventh reads again.
   const base = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), source_turn: 5 };
-  const going = { ...base, sexual_turn: 5, sexual_skips: 0 };
-  assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, '더 깊이'), true);
-  assert.equal(messengerLib.loungeSkipsAnalyzer(going, false, '더 깊이'), false, 'only adult mode at the closest step');
-  assert.equal(messengerLib.loungeSkipsAnalyzer({ ...going, sexual_skips: 3 }, true, '더 깊이'), false, 'the fourth turn reads again');
-  assert.equal(messengerLib.loungeSkipsAnalyzer({ ...going, sexual_turn: 4 }, true, '더 깊이'), false, 'only when the last turn was the scene');
-  for (const stop of ['그만해', '잠깐만', '아파', '하지 마', 'stop']) assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, stop), false, stop);
-  assert.equal(messengerLib.loungeSkipsAnalyzer(base, true, '더 깊이'), false);
+  const going = { ...base, sexual_turn: 5 };
+  for (let turn = 6; turn <= 11; turn++) assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, '더 깊이', turn), true, `turn ${turn} skips`);
+  assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, '더 깊이', 12), false, 'the seventh turn reads again');
+  assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, '더 깊이', 5), false, 'the turn it was read is not a skipped one');
+  assert.equal(messengerLib.loungeSkipsAnalyzer(going, false, '더 깊이', 6), false, 'only adult mode at the closest step');
+  for (const stop of ['그만해', '잠깐만', '아파', '하지 마', 'stop']) assert.equal(messengerLib.loungeSkipsAnalyzer(going, true, stop, 6), false, stop);
+  assert.equal(messengerLib.loungeSkipsAnalyzer(base, true, '더 깊이', 6), false, 'no scene read');
   // The state follows the reading.
   const after = update => messengerLib.nextLoungeCompanionState({ state: { ...going }, decision: { progress: 'stay' }, turn: 6, reply: '답이에요 길게 쓴 답', inner: '', ...update });
-  assert.deepEqual([after({ analyzerSkipped: true }).sexual_turn, after({ analyzerSkipped: true }).sexual_skips], [6, 1]);
-  assert.deepEqual([after({ sexual: true }).sexual_turn, after({ sexual: true }).sexual_skips], [6, 0]);
+  assert.equal(after({ analyzerSkipped: true }).sexual_turn, 5, 'a skipped turn keeps the turn it was read, so the window does not move');
+  assert.equal(after({ sexual: true }).sexual_turn, 6, 'a new reading of a scene opens the next six');
   assert.equal(after({ sexual: false }).sexual_turn, undefined, 'a reading that says it is over ends it');
   assert.equal(after({}).sexual_turn, 5, 'no reading keeps it');
 
@@ -5429,7 +5431,7 @@ test('a sexual scene that goes on skips the analyzer for up to three turns, neve
   });
   Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key' });
   const closest = { ...velvetRow, stage: 'DRAWN_IN', scores: { empathy: 62, romance: 76, boldness: 80 } };
-  const state = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), source_turn: 3, sexual_turn: 3, sexual_skips: 0 };
+  const state = { ...messengerLib.normalizeLoungeCompanionState(null, roomId), source_turn: 3, sexual_turn: 3 };
   const long = '긴 지난 답이에요. '.repeat(60);
   const history = Array.from({ length: 14 }, (_, index) => ({ id: 20 - index, user_id: index % 2 ? null : 'user-1', nickname: index % 2 ? 'AI' : '지수', kind: index % 2 ? 'host' : 'human', text: index === 0 ? '더 깊이' : long, created_at: new Date(Date.UTC(2026, 10, 2, 0, 0, 30 - index)).toISOString() }));
   let analyzerAsked = false, adultInput, logged = [];
@@ -5466,7 +5468,7 @@ test('a sexual scene that goes on skips the analyzer for up to three turns, neve
   assert.ok(logged.some(line => line.includes('[Lounge model]') && line.includes('"cachedTokens":7000')), 'NanoGPT\'s cache is counted');
 });
 
-test('a room on 오닉스 has its adult scenes answered by DeepSeek\'s own model, any other room by NanoGPT, and each is the other\'s first fallback (2026-11-18)', async t => {
+test('an adult scene in a chat is answered by DeepSeek\'s own model first whatever model the room has, and NanoGPT\'s is its first fallback (2026-11-18)', async t => {
   const allowlistMode = process.env.LOUNGE_ADULT_MODE;
   process.env.LOUNGE_ADULT_MODE = 'allowlist';
   const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY, deepseek: process.env.DEEPSEEK_API_KEY, gemini: process.env.GEMINI_API_KEY };
@@ -5486,8 +5488,9 @@ test('a room on 오닉스 has its adult scenes answered by DeepSeek\'s own model
     ['deepseek-flash', true, true, ['deepseek:ok']],
     ['deepseek-flash', false, true, ['deepseek:fail', 'deepseek:fail', 'nanogpt:ok']],
     ['deepseek-flash', false, false, ['deepseek:fail', 'deepseek:fail', 'nanogpt:fail', 'openai:ok']],
-    [undefined, true, true, ['nanogpt:ok']],
-    [undefined, true, false, ['nanogpt:fail', 'nanogpt:fail', 'deepseek:ok']],
+    [undefined, true, true, ['deepseek:ok']],
+    [undefined, false, true, ['deepseek:fail', 'deepseek:fail', 'nanogpt:ok']],
+    ['gemini-flash', true, true, ['deepseek:ok']],
   ]) {
     let recorded, requests = [];
     await withServiceKey(() => run(async (url, init) => {
@@ -5512,8 +5515,54 @@ test('a room on 오닉스 has its adult scenes answered by DeepSeek\'s own model
     assert.deepEqual(recorded.attempts.map(item => `${item.provider}:${item.ok ? 'ok' : 'fail'}`), attempts, name);
     assert.equal(recorded.adult_routed, true, name);
     const first = requests[0];
-    assert.equal(first.who, aiModel === 'deepseek-flash' ? 'deepseek' : 'nanogpt', `${name}: asked first`);
-    assert.equal(first.auth, aiModel === 'deepseek-flash' ? 'Bearer deepseek-key' : 'Bearer nano-key', name);
-    if (aiModel === 'deepseek-flash') assert.equal(first.model, 'deepseek-flash', name);
+    assert.equal(first.who, 'deepseek', `${name}: asked first`);
+    assert.equal(first.auth, 'Bearer deepseek-key', name);
+    assert.equal(first.model, 'deepseek-flash', name);
+  }
+});
+
+test('on a call an adult scene is answered by NanoGPT first and DeepSeek\'s own model after it; in a chat it is the other way round (2026-11-18)', async t => {
+  const allowlistMode = process.env.LOUNGE_ADULT_MODE;
+  process.env.LOUNGE_ADULT_MODE = 'allowlist';
+  const saved = { users: process.env.LOUNGE_ADULT_MODE_USERS, nano: process.env.NANOGPT_API_KEY, deepseek: process.env.DEEPSEEK_API_KEY, gemini: process.env.GEMINI_API_KEY };
+  t.after(() => {
+    if (allowlistMode === undefined) delete process.env.LOUNGE_ADULT_MODE; else process.env.LOUNGE_ADULT_MODE = allowlistMode;
+    for (const [name, value] of [['LOUNGE_ADULT_MODE_USERS', saved.users], ['NANOGPT_API_KEY', saved.nano], ['DEEPSEEK_API_KEY', saved.deepseek], ['GEMINI_API_KEY', saved.gemini]]) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
+  Object.assign(process.env, { LOUNGE_ADULT_MODE_USERS: 'tester@example.com', NANOGPT_API_KEY: 'nano-key', DEEPSEEK_API_KEY: 'deepseek-key' });
+  delete process.env.GEMINI_API_KEY;
+  const sse = chunks => new Response(chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+  const answer = JSON.stringify({ text: '거기, 이리 와요.', memory: '' });
+  const closestId = relationshipLib.getRelationshipConfig('velvet').stages.filter(stage => stage.enabled !== false).at(-1).id;
+  const config = relationshipLib.getRelationshipConfig('velvet');
+  const row = { ...velvetRow, character_id: 'velvet', stage: closestId, scores: Object.fromEntries(Object.keys(config.initial).map(key => [key, 80])) };
+  // [a call, DeepSeek works, NanoGPT works, who is asked, in this order]
+  for (const [call, deepseekWorks, nanoWorks, order] of [
+    [true, true, true, ['nanogpt']],
+    [true, true, false, ['nanogpt', 'nanogpt', 'deepseek']],
+    [true, false, true, ['nanogpt']],
+    [false, true, true, ['deepseek']],
+    [false, false, true, ['deepseek', 'deepseek', 'nanogpt']],
+  ]) {
+    const asked = [];
+    await withServiceKey(() => run(async (url, init) => {
+      if (url.includes('/auth/')) return result({ id: 'user-1', email: 'tester@example.com' });
+      if (url.includes('claim_voice_lounge_host')) return result('ticket');
+      if (url.includes('voice_lounge_companion_state') && init?.method === 'POST') return result(null, 201);
+      if (url.includes('voice_lounge_companion_state')) return result([{ character_id: 'velvet', state: messengerLib.normalizeLoungeCompanionState(null, roomId) }]);
+      if (url.includes('voice_lounge_relationships?')) return result([row]);
+      if (url.includes('save_voice_lounge_relationship')) return result(null);
+      if (url.includes('voice_lounge_rooms?')) return result([{ topic: '라운지', host_persona: 'velvet', memory: '', capacity: 1, space_id: null, voice_on: call, ai_turns: 4 }]);
+      if (url.includes('voice_lounge_messages?')) return result([{ id: 2, user_id: 'user-1', nickname: '지수', kind: 'human', text: '올라가요.', created_at: '2026-11-02T00:00:00Z' }]);
+      if (url === modelsLib.loungeAdultChatUrl) { asked.push('nanogpt'); return nanoWorks ? sse([{ choices: [{ delta: { content: answer }, finish_reason: 'stop' }] }]) : result({ error: { message: 'down' } }, 503); }
+      if (url === 'https://api.deepseek.com/chat/completions') { asked.push('deepseek'); return deepseekWorks ? sse([{ choices: [{ delta: { content: answer }, finish_reason: 'stop' }] }]) : result({ error: { message: 'down' } }, 503); }
+      if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
+      if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' });
+      if (url.endsWith('/responses')) return modelAnswer({ text: '들어와요.', memory: '' });
+      if (url.endsWith('/audio/speech')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(4_800)); controller.close(); } }));
+      if (url.includes('finish_voice_lounge_reply') || url.includes('save_voice_lounge_room_memory')) return result(true);
+      return result([]);
+    }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); }));
+    assert.deepEqual(asked, order, `${call ? 'call' : 'chat'} deepseek=${deepseekWorks} nano=${nanoWorks}`);
   }
 });
