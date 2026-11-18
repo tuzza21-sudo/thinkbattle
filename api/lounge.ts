@@ -1813,9 +1813,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // JSON shape. A picked DeepSeek Flash still uses DeepSeek's API. JSON mode takes no schema, so the instructions
           // carry it; a failed or blank answer falls back to OpenAI.
           // `quiet` is a rewrite that shows nothing while it is written (a reply that came back in another language).
-          const deepseekReply = async (note = '', quiet = false) => {
+          const deepseekReply = async (note = '', quiet = false, backend?: 'nano' | 'deepseek') => {
             if (!quiet) partialLength = 0;
-            const adult = adultReply;
+            const adult = backend ? backend === 'nano' : adultReply;
             const model = adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
             const key = adult ? nanoKey : deepseekKey;
             const response = await fetchTimed(adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
@@ -1856,9 +1856,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReplyRaw = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             if (provider === 'deepseek') return deepseekReply();
+            if (provider === 'deepseek-plain') return deepseekReply('', false, 'deepseek');
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -1893,6 +1894,26 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               throw error;
             } finally { clearTimeout(stallTimer); }
           };
+          // Every attempt at this turn's reply is kept (2026-11-18, by the owner: to see whether the adult model is unstable): which
+          // model, whether it answered, how long it took, and why not. The last one that answered is the one that was applied.
+          const trace: { attempts: Array<{ provider: string; model: string; ok: boolean; ms: number; status?: string }>; applied?: { provider: string; model: string } } = { attempts: [] };
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' = 'openai', fast = false, inCharacter = false) => {
+            const adultBackend = provider === 'deepseek' && adultReply;
+            const label = {
+              provider: adultBackend ? 'nanogpt' : provider === 'deepseek-plain' ? 'deepseek' : provider,
+              model: provider === 'gemini' ? String(chatModel.id === 'gemini-pro' ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'])
+                : adultBackend ? String(process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel) : provider === 'openai' ? String(modelRequest.model ?? 'openai') : 'deepseek-flash',
+            };
+            const started = performance.now();
+            try {
+              const answer = await attemptReplyRaw(provider, fast, inCharacter);
+              trace.attempts.push({ ...label, ok: true, ms: Math.round(performance.now() - started) }); trace.applied = label;
+              return answer;
+            } catch (error) {
+              trace.attempts.push({ ...label, ok: false, ms: Math.round(performance.now() - started), status: error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error' });
+              throw error;
+            }
+          };
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
@@ -1911,6 +1932,15 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                   if (provider === 'deepseek') {
                     console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                     try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                    // The adult model (NanoGPT) is down: DeepSeek's own model, then Gemini, before OpenAI, which steps back from an adult scene (2026-11-18: GPT's "I went too far" turns became the room's agreement).
+                    if (adultReply && deepseekKey) {
+                      console.warn('[Lounge API] adult model failed, answering with DeepSeek');
+                      try { return await attemptReply('deepseek-plain'); } catch (plain) { if (found || earlySpeech || replyStop.aborted) throw plain; }
+                    }
+                    if (adultReply && geminiKey) {
+                      console.warn('[Lounge API] adult model and DeepSeek failed, answering with Gemini');
+                      try { return await attemptReply('gemini'); } catch (gemini) { if (found || earlySpeech || replyStop.aborted) throw gemini; }
+                    }
                   }
                   console.warn(`[Lounge API] ${provider} reply failed, answering with openai`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                   return await attemptReply('openai');
@@ -2018,10 +2048,18 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // Where a turn's wait went, from the request: the context (claim, reads, lookups), the first words of a chat,
             // the whole reply, and the save that lets the next turn start.
             console.info('[Lounge turn]', JSON.stringify({ host: host.id, model: chatModel.id, medium: chat ? 'chat' : 'voice', contextMs: Math.round(modelStarted - contextStarted), ...(firstPartialAt ? { firstTextMs: Math.round(firstPartialAt - contextStarted) } : {}), textMs: Math.round(textAt - contextStarted), savedMs: Math.round(performance.now() - contextStarted), chars: firstText.length }));
+            // The record of this turn's model: chosen, the reading of the scene, what was applied and every attempt (see lounge_turn_models).
+            const turnModel = { user_id: user.id, room_id: roomId, character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode,
+              chosen_model: chosenModel.id, sexual: analysis?.sexual_scene ?? null, adult_routed: adultReply, applied_provider: trace.applied?.provider ?? null, applied_model: trace.applied?.model ?? null,
+              fallback: trace.attempts.length > 1, attempts: trace.attempts, chars: firstText.length };
+            console.info('[Lounge turn model]', JSON.stringify({ ...turnModel, user_id: undefined, room_id: undefined }));
+            const traceWrite = serviceHeaders ? fetchTimed(`${url}/rest/v1/lounge_turn_models`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(turnModel) }, 3_000)
+              .then(response => { if (!response.ok && response.status !== 404) console.warn('[Lounge turn model] not saved', response.status); }).catch(() => {}) : Promise.resolve();
             if (savedOk) send({ type: 'saved', saveMs: Math.round(performance.now() - saving) });
             else console.warn('[Lounge API] spoken reply was not saved');
             await reply.catch(error => { console.error('[Lounge API] reply finished incompletely after speech started', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); });
             await speech;
+            await traceWrite;
             const { answer, relationship: relationshipSaved, story: storySaved } = await after;
             // The chat's status card: the new stage and scores, and what the member's message changed.
             if (relationshipSaved) send({ type: 'relationship', ...relationshipSaved });
