@@ -4652,8 +4652,12 @@ test('a story in episodes: the character leads the current episode, the checkpoi
 });
 
 test('the picker offers the fast GPT, Gemini 3.8 Flash and DeepSeek Flash under code names, and no GLM', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gemini-flash', 'deepseek-flash']);
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['노바', '아리아', '오닉스']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gpt', 'gemini-flash', 'deepseek-flash', 'deepseek-raccoon']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['노바', '아리아', '오닉스', '라쿤']);
+  // 라쿤 is DeepSeek's for a call as well: no fallback to the fast GPT on a call, and DeepSeek first for an adult scene on a call
+  const raccoon = modelsLib.getLoungeChatModel('deepseek-raccoon');
+  assert.equal(raccoon.provider, 'deepseek'); assert.equal(raccoon.voiceFallback, null);
+  assert.ok(readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8').includes("adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey || chosenChat.id === 'deepseek-raccoon'))"));
   for (const model of modelsLib.loungeChatModels) assert.doesNotMatch(`${model.label} ${model.description}`, /GPT|Gemini|DeepSeek|GLM|딥시크|제미나이/i, 'members never see a provider name');
   const gemini = modelsLib.getLoungeChatModel('gemini-flash');
   assert.equal(gemini.provider, 'gemini'); assert.equal(gemini.listed, true);
