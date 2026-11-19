@@ -388,6 +388,10 @@ async function hasLoungeAdultMode(
 
 const isSaseokAppRequest = (req: Request) => (req.headers.get('user-agent') || '').includes('SaseokApp');
 
+// When the memories were last read without the `pinned` column because the database has no such column yet (migration 20270103): for ten
+// minutes after that the read goes straight to the old form, so a database without the migration does not answer a failing request every turn.
+let pinnedColumnMissingAt = 0;
+
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
 function isRelationshipDeveloper(user: { id: string; email?: string }) {
   const allowed = (process.env.LOUNGE_RELATIONSHIP_DEBUG_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
@@ -646,8 +650,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       try {
         // Pinned memories first, so the forty read always hold them (migration 20270103); a database without the column is read as before.
         const read = (pinned: boolean) => fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&source_room=eq.${encodeURIComponent(roomId)}${characterId ? `&character_id=eq.${encodeURIComponent(characterId)}` : ''}&status=eq.active&order=${pinned ? 'pinned.desc,' : ''}importance.desc,updated_at.desc&limit=40&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at${pinned ? ',pinned' : ''}`, { headers: serviceHeaders! });
-        let response = await read(true);
-        if (response.status === 400) response = await read(false);
+        let response = Date.now() - pinnedColumnMissingAt < 600_000 ? await read(false) : await read(true);
+        if (response.status === 400 && Date.now() - pinnedColumnMissingAt >= 600_000) { pinnedColumnMissingAt = Date.now(); response = await read(false); }
         if (!response.ok) { console.warn('[Lounge memory] read failed', response.status); return null; }
         return await readJson<MemoryRow[]>(response, 'lounge');
       } catch { return null; }
