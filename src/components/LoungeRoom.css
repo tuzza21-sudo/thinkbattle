@@ -1220,6 +1220,8 @@
 .has-room .lounge-participant-log .lounge-tappable { cursor:pointer; transition:background-color .15s ease; -webkit-tap-highlight-color:transparent; }
 .has-room .lounge-participant-log .lounge-tappable:hover,.has-room .lounge-participant-log .lounge-tappable[aria-expanded="true"] { background:#00000038; }
 .has-room .lounge-participant-log .lounge-tappable:focus-visible { outline:2px solid #fff5e9aa; outline-offset:2px; }
+/* While 되감기 is being confirmed, what it would take back is dimmed (the menu itself is not). */
+.has-room .lounge-participant-log .lounge-rewind-marked > :not(.lounge-message-actions) { opacity:.38; transition:opacity .15s ease; }
 .lounge-message-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; max-width:100%; margin:6px 2px 0; }
 .lounge-message-actions.own { justify-content:flex-end; }
 .lounge-message-actions button { display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:6px 12px; border-radius:999px; border:1px solid #ffffff40; background:#0000005c; color:#fff5e9; font:inherit; font-size:12px; line-height:1; cursor:pointer; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); text-shadow:none; }

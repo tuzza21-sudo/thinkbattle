@@ -10,7 +10,7 @@ import { readLoungeStream } from '../lib/loungeStream';
 import { LoungeChatComposer, LoungeMessageText, LoungeTypewriterText } from './LoungeChatComposer';
 import { LoungeReportDialog } from './LoungeReportDialog';
 import { LoungeMessageActions, type LoungeMessageActionKind } from './LoungeMessageActions';
-import { loungeLastReplyIds, loungeRewindableIds } from '../lib/loungeMessageActions';
+import { loungeLastReplyIds, loungeRewindPoints } from '../lib/loungeMessageActions';
 import { loadLoungeRoomPhotos, signLoungeBackground, withPhotoUrls, type LoungePhotoView } from '../lib/loungeGallery';
 import { LoungeBackgroundPicker } from './LoungeBackgroundPicker';
 import { LoungeChatSettings, LoungeSettingsChoice, type LoungeSettingsItem } from './LoungeChatSettings';
@@ -305,7 +305,10 @@ function RoomView(props: RoomViewProps) {
   const player = useRef<HTMLAudioElement | null>(null);
   // A voice's address, kept for the hour it lasts: heard again, it plays at once (a phone plays only within the tap).
   const voiceUrls = useRef(new Map<number, { url: string; at: number }>());
-  const rewindable = useMemo(() => loungeRewindableIds(recordMessages), [recordMessages]);
+  // 되감기 takes back whole exchanges: the member's message and the reply to it (at most five of them).
+  const rewindPoints = useMemo(() => loungeRewindPoints(recordMessages), [recordMessages]);
+  // While going back is being confirmed, the messages it would take back are dimmed.
+  const [rewindMarked, setRewindMarked] = useState<number | null>(null);
   const lastReply = useMemo(() => loungeLastReplyIds(recordMessages), [recordMessages]);
   const stopVoice = useCallback(() => { player.current?.pause(); player.current = null; setPlaying(null); }, []);
   useEffect(() => stopVoice, [stopVoice]);
@@ -318,10 +321,12 @@ function RoomView(props: RoomViewProps) {
   }, [actionFor]);
   // A message that is gone (gone back from) has no menu open.
   const menuFor = actionFor !== null && recordMessages.some(message => message.id === actionFor) ? actionFor : null;
+  const markedFrom = menuFor !== null && rewindMarked !== null ? rewindMarked : null;
+  const marked = (message: LoungeMessage) => markedFrom !== null && message.id >= markedFrom && (message.kind === 'host' || message.kind === 'human');
   const toggleActions = (id: number, host: boolean) => {
     // Selecting words to copy them is not a tap.
     if (window.getSelection?.()?.toString()) return;
-    setActionNote('');
+    setActionNote(''); setRewindMarked(null);
     setActionFor(open => open === id ? null : id);
     if (host && !voiceUsage) void actions?.usage().then(usage => setVoiceUsage(usage)).catch(() => { /* The line under the button is left out. */ });
   };
@@ -356,14 +361,15 @@ function RoomView(props: RoomViewProps) {
         stopVoice();
         const from = kind === 'regenerate' ? await actions.regenerate(message.id) : await actions.goBack(message.id);
         setHistory(previous => ({ ...previous, list: previous.list.filter(item => item.id < from) }));
-        setActionFor(null);
+        setActionFor(null); setRewindMarked(null);
       }
     } catch (err) { setActionNote(errorText(err)); }
     finally { setActionBusy(null); }
   };
-  const tappable = (message: LoungeMessage) => Boolean(actions && (message.kind === 'host' || (actions.rewind && rewindable.has(message.id))));
+  const tappable = (message: LoungeMessage) => Boolean(actions && (message.kind === 'host' || (actions.rewind && rewindPoints.has(message.id))));
   const actionMenu = (message: LoungeMessage) => actions && menuFor === message.id ? <LoungeMessageActions name={hostCharacter?.name ?? host.name} own={message.kind !== 'host'}
-    regenerate={actions.rewind && message.kind === 'host' && lastReply.has(message.id)} voice={message.kind === 'host'} rewind={actions.rewind && rewindable.has(message.id)}
+    regenerate={actions.rewind && message.kind === 'host' && lastReply.has(message.id)} voice={message.kind === 'host'} rewindCount={actions.rewind ? rewindPoints.get(message.id)?.count : undefined}
+    onConfirming={on => setRewindMarked(on ? rewindPoints.get(message.id)?.from ?? null : null)}
     busy={actionBusy} locked={Boolean(props.pending || props.chatHostText || props.aiSpeaking)} playing={playing === message.id} usage={voiceUsage} note={actionNote}
     onAction={kind => { void runAction(message, kind); }} /> : null;
   // A new message or a reply starting brings the log back to the newest, even if it had been scrolled up.
@@ -546,7 +552,7 @@ function RoomView(props: RoomViewProps) {
                 {!props.scenario && (props.status === 'lobby' || !conversationMessages.length) && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble">{props.status === 'lobby' ? solo ? props.chat ? '오늘은 둘이 편하게 이야기해요. 곧 먼저 인사할게요.' : '오늘은 둘이 편하게 이야기해요. 음성과 마이크를 준비하고 있어요.' : '친구에게 초대 링크를 보내 주세요. 두 명 이상 음성으로 연결되면 가볍게 인사부터 나눠요.' : host.greeting}</div></div>}
                 <div className="lounge-guidance">{props.topicBrief && <LoungeTopicDescription brief={props.topicBrief} />}{props.study && <LoungeStudyNotes study={props.study} />}
             {sessionProps && <LoungeSessionPanel {...sessionProps} mode="context" />}</div>
-                {timeline.map(({ message, photo }) => photo ? <div key={`photo-${photo.id}`} className="lounge-host-message lounge-photo-message"><strong>{hostTitle} <span>{hostRole}</span></strong><a className="lounge-photo" href={photo.url} target="_blank" rel="noopener noreferrer"><img src={photo.url} alt={`${koreanSubject(hostTitle)} 보낸 사진${photo.caption ? `: ${photo.caption}` : ''}`} loading="lazy" /></a>{photo.caption && <div className="lounge-host-bubble">{photo.caption}</div>}</div> : !message ? null : message.kind === 'host' ? <div key={message.id} className="lounge-host-message" data-message-id={message.id}><strong>{hostTitle} <span>{hostRole}</span></strong><div className={`lounge-host-bubble${tappable(message) ? ' lounge-tappable' : ''}`} {...(tappable(message) ? tapProps(message.id, true) : {})}>{props.chat && message.id === latestHost?.id ? <LoungeTypewriterText text={message.text} innerVoice={props.innerVoice !== false} /> : <LoungeMessageText text={message.text} host innerVoice={props.innerVoice !== false} />}</div>{actionMenu(message)}</div> : <article key={message.id} className={message.user_id === props.currentUserId ? 'self' : ''} data-message-id={message.id}><strong>{message.user_id === props.currentUserId ? '나' : message.nickname}</strong><p className={tappable(message) ? 'lounge-tappable' : undefined} {...(tappable(message) ? tapProps(message.id, false) : {})}><LoungeMessageText text={message.text} /></p>{actionMenu(message)}</article>)}
+                {timeline.map(({ message, photo }) => photo ? <div key={`photo-${photo.id}`} className="lounge-host-message lounge-photo-message"><strong>{hostTitle} <span>{hostRole}</span></strong><a className="lounge-photo" href={photo.url} target="_blank" rel="noopener noreferrer"><img src={photo.url} alt={`${koreanSubject(hostTitle)} 보낸 사진${photo.caption ? `: ${photo.caption}` : ''}`} loading="lazy" /></a>{photo.caption && <div className="lounge-host-bubble">{photo.caption}</div>}</div> : !message ? null : message.kind === 'host' ? <div key={message.id} className={`lounge-host-message${marked(message) ? ' lounge-rewind-marked' : ''}`} data-message-id={message.id}><strong>{hostTitle} <span>{hostRole}</span></strong><div className={`lounge-host-bubble${tappable(message) ? ' lounge-tappable' : ''}`} {...(tappable(message) ? tapProps(message.id, true) : {})}>{props.chat && message.id === latestHost?.id ? <LoungeTypewriterText text={message.text} innerVoice={props.innerVoice !== false} /> : <LoungeMessageText text={message.text} host innerVoice={props.innerVoice !== false} />}</div>{actionMenu(message)}</div> : <article key={message.id} className={`${message.user_id === props.currentUserId ? 'self' : ''}${marked(message) ? ' lounge-rewind-marked' : ''}`} data-message-id={message.id}><strong>{message.user_id === props.currentUserId ? '나' : message.nickname}</strong><p className={tappable(message) ? 'lounge-tappable' : undefined} {...(tappable(message) ? tapProps(message.id, false) : {})}><LoungeMessageText text={message.text} /></p>{actionMenu(message)}</article>)}
                 {props.aiSpeaking && props.liveHostText && props.liveHostText !== latestHost?.text && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeMessageText text={props.liveHostText} host innerVoice={props.innerVoice !== false} /></div></div>}
                 {props.chat && props.chatHostText && props.chatHostText !== latestHost?.text && <div className="lounge-host-message"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble"><LoungeTypewriterText text={props.chatHostText} fromStart /></div></div>}
                 {props.photoPending && !ended && <div className="lounge-host-message" role="status"><strong>{hostTitle} <span>{hostRole}</span></strong><div className="lounge-host-bubble lounge-photo-pending"><Camera size={15} /> 사진을 고르는 중…</div></div>}

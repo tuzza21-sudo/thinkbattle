@@ -4,10 +4,12 @@ import { loungeSpokenText, type LoungeMessage } from './lounge';
  * What a member can do with a message of their one-to-one chat (2026-11-20, by the owner), tapping it:
  *   다시 쓰기: the character's last reply is written again, from where it was before that reply;
  *   음성으로 듣기: a reply of the character read in its voice, kept with the message so it is heard again without being counted again;
- *   되감기: the chat goes back to before one of its last messages, and the character no longer knows what came after
- *   (rewind_voice_lounge_chat, migration 20270107000000).
+ *   되감기: takes back what the member said with the character's answer to it, in whole exchanges counted from the last reply
+ *   (2, 4, ... up to 10 messages of the two), and the character no longer knows what came after
+ *   (rewind_voice_lounge_chat, migrations 20270107000000 and 20270108000000).
  */
-export const loungeRewindWindow = 10;
+/** How many exchanges (the member's message and the reply to it) can be taken back: ten messages of the two at most. */
+export const loungeRewindExchanges = 5;
 
 /** Minutes of message voices a month (the month in Korea): without a plan, with Plus. The super admin has no limit. */
 export const loungeMessageVoiceMinutes = { free: 3, plan: 30 } as const;
@@ -32,9 +34,26 @@ export const loungeMessageVoiceEstimate = (text: string) => Math.max(1, text.rep
 export const loungeMp3Seconds = (bytes: number, kbps = 128) => Math.round(bytes * 8 / (kbps * 1000) * 100) / 100;
 
 const said = (message: Pick<LoungeMessage, 'kind'>) => message.kind === 'host' || message.kind === 'human';
-/** The messages a chat can go back to: the last ten of what the two said. */
-export function loungeRewindableIds(messages: ReadonlyArray<Pick<LoungeMessage, 'id' | 'kind'>>): Set<number> {
-  return new Set(messages.filter(said).slice(-loungeRewindWindow).map(message => message.id));
+/** Where going back from a message goes: to before the member's message that starts its exchange, taking back `count` messages. */
+export type LoungeRewindPoint = { from: number; count: number };
+/**
+ * The messages a chat can go back from, each with its point: every message of the member's last five exchanges. A reply split
+ * over several bubbles counts as one message, as the member sees it said; a reply with no message of the member before it (an
+ * opening) cannot be taken back.
+ */
+export function loungeRewindPoints(messages: ReadonlyArray<Pick<LoungeMessage, 'id' | 'kind'>>): Map<number, LoungeRewindPoint> {
+  const list = messages.filter(said), points = new Map<number, LoungeRewindPoint>();
+  const starts = list.flatMap((message, index) => message.kind === 'human' ? [index] : []).slice(-loungeRewindExchanges);
+  if (!starts.length) return points;
+  // How many messages of the two are said from each index to the end.
+  const left = new Array<number>(list.length + 1).fill(0);
+  for (let index = list.length - 1; index >= 0; index--) left[index] = left[index + 1] + (list[index].kind === 'human' || list[index + 1]?.kind !== 'host' ? 1 : 0);
+  let start = starts[0];
+  for (let index = starts[0]; index < list.length; index++) {
+    if (list[index].kind === 'human') start = index;
+    points.set(list[index].id, { from: list[start].id, count: left[start] });
+  }
+  return points;
 }
 /**
  * The last reply of the character, when the chat ends with one; otherwise undefined: there is no reply to write again. Going

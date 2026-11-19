@@ -796,8 +796,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       });
     }
 
-    // A message of the member's own one-to-one chat, tapped (2026-11-20, see loungeMessageActions.ts): gone back to (되감기, and 다시 쓰기,
-    // which goes back from the last reply and then asks for a new one), or read aloud in the character's voice (음성으로 듣기).
+    // A message of the member's own one-to-one chat, tapped (2026-11-20, see loungeMessageActions.ts): gone back to (되감기 takes back
+    // whole exchanges, the member's message with its reply; 다시 쓰기 takes back the last reply only and then asks for a new one), or
+    // read aloud in the character's voice (음성으로 듣기).
     if (body.action === 'rewind' || body.action === 'message-voice') {
       const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
       if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요. 잠시 뒤 다시 시도해 주세요.' }, 503);
@@ -816,7 +817,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (body.action === 'rewind') {
         if (!own || !mine?.companion_chat || messageId === undefined) return json({ error: '이 대화는 되돌릴 수 없어요.' }, 403);
         const consult = isLoungeConsultRoom(normalizeLoungeRoomScenario(mine.scenario)?.id, mine.host_persona);
-        const response = await fetchTimed(`${url}/rest/v1/rpc/rewind_voice_lounge_chat`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_room: roomId, p_message: messageId, p_consult: consult }) });
+        const response = await fetchTimed(`${url}/rest/v1/rpc/rewind_voice_lounge_chat`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_room: roomId, p_message: messageId, p_consult: consult, p_reply_only: body.regenerate === true }) });
         if (!response.ok) throw await loungeRpcFailure(response, 'rewind_voice_lounge_chat');
         const result = await readJson<{ state: string; from?: number; removed?: number; voices?: unknown }>(response, 'lounge');
         if (result.state === 'busy') throw new LoungeUpstreamError('방금 나눈 대화를 정리하고 있어요. 잠시 뒤 다시 해 주세요.', 409, 'lounge_rewind_busy', true, 5);
