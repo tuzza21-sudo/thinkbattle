@@ -1331,7 +1331,8 @@ ${photoRule}`;
     if (turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) Object.assign(turnConditions, { speech: loungeAdultSceneSpeech });
     // An adult scene in a chat is answered by DeepSeek's own model first, whatever model the room has, and by NanoGPT's when it fails; on a call
     // NanoGPT's comes first (2026-11-18, by the owner: DeepSeek's JSON mode answered empty on half of the call's turns). Each is the other's first fallback.
-    const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey));
+    // A room on 라쿤 (DeepSeek's own model, for calls too) keeps DeepSeek first on a call as well (2026-11-19, by the owner).
+    const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey || chosenChat.id === 'deepseek-raccoon'));
     const adultReply = Boolean((deepseekKey || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     Object.assign(turnNote, { character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode, adult_why: adultWhy, adult_routed: adultReply, chosen_model: chosenChat.id });

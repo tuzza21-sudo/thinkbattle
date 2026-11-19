@@ -24,11 +24,15 @@
  * 2026-11-16: GLM is gone (a room still stored with 'glm-flash' answers with the fast GPT), and members no longer see
  * the provider names: each model is shown under a code name (노바, 아리아, 오닉스). The ids and providers stay as they
  * are, since rooms store the id.
+ *
+ * 2026-11-19, by the owner: 라쿤 ('deepseek-raccoon') is DeepSeek's own model for a chat and for a call alike. Where 오닉스 hands a call to the fast GPT and an adult
+ * scene on a call goes to NanoGPT first, a room on 라쿤 keeps DeepSeek first on a call too (NanoGPT is its fallback), so the two can be compared on the same turns.
  */
 export const loungeChatModels = [
   { id: 'gpt', label: '노바', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gemini-flash', label: '아리아', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'deepseek-flash', label: '오닉스', description: '빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
+  { id: 'deepseek-raccoon', label: '라쿤', description: '빠르고 표현이 자유로운 대화 (채팅·음성)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
 ] as const;
 export type LoungeChatModelId = typeof loungeChatModels[number]['id'];
