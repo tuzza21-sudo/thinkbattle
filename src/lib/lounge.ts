@@ -811,11 +811,23 @@ export const formatLoungeNarration = (text: string) => splitLoungeActions(text, 
  */
 const innerVoiceMark = '\n\n[속마음]\n';
 /** Fit storage at a sentence or paragraph boundary when possible, preserving a complete short reply as is. */
+/**
+ * An action that was opened with * and never closed (2026-11-19, by the owner: a reply cut at its limit ended in the middle of an action, and the voice read the
+ * action aloud as if it were said): the unfinished action is dropped, so the text ends on the last whole sentence or whole action. A * that sits against a
+ * word ("3*4") is not an action.
+ */
+export function withoutOpenAction(text: string) {
+  const marks = [...text.matchAll(/\*/g)].map(match => match.index!);
+  if (marks.length % 2 === 0) return text;
+  const open = marks[marks.length - 1];
+  if (open > 0 && /[a-z0-9가-힣]$/i.test(text.slice(0, open))) return text;
+  return text.slice(0, open).trimEnd();
+}
 export function clipLoungeReply(reply: string, limit: number) {
-  if (reply.length <= limit) return reply.trimEnd();
+  if (reply.length <= limit) return withoutOpenAction(reply.trimEnd());
   const head = reply.slice(0, Math.max(0, limit)).replace(/[\uD800-\uDBFF]$/, '');
   const boundary = Math.max(head.lastIndexOf('\n\n'), ...[...head.matchAll(/[.!?。！？](?:["”’)]|\s|$)/g)].map(match => match.index! + match[0].trimEnd().length));
-  return (boundary >= limit * 0.6 ? head.slice(0, boundary) : head).trimEnd();
+  return withoutOpenAction((boundary >= limit * 0.6 ? head.slice(0, boundary) : head).trimEnd());
 }
 export function joinLoungeInnerVoice(reply: string, inner: string, limit?: number) {
   if (limit === undefined) return inner.trim() ? `${reply.trimEnd()}${innerVoiceMark}${inner.trim()}` : reply;
@@ -891,7 +903,8 @@ export const loungeVoiceEmotionRule = 'reply_medium=voice이면 감정을 말과
 export const loungeCallGreetingRule = `지금은 사용자가 건 전화를 방금 받은 순간이다. 이번 답은 사용자를 맞이하는 한두 마디다. recent의 마지막 대사는 전화를 걸기 전 채팅이니 읽거나 이어 말하지 않는다. relationship.mood와 room_memory의 감정, 지금까지의 분위기에 맞는 받는 말로 한다(밝게 '안녕~', 편하게 '응, 여보세요~', 무심하게 '응.', 서운하면 '…여보세요.'). 늘 같은 말('전화했네')로 받지 않고, 이름과 말투는 캐릭터대로 쓴다.`;
 /** The chat after a call: the call is over, and the chat carries on from what was said in it. */
 export const loungeAfterCallRule = `memory 첫 줄이 '지금 장면: 통화'로 시작하면 방금까지 전화 통화를 하다 끊은 것이다. 이제는 채팅이므로 통화에서 나눈 이야기에 이어서 장면을 자연스럽게 정해 이어 간다(통화에서 만나기로 했으면 만나는 장면, 아니면 통화를 끊은 뒤의 장면).`;
-export const loungeSpokenText = (text: string) => splitLoungeActions(splitLoungeInnerVoice(text).reply, { parens: true }).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+// An action left open (no closing *) is not read aloud either: `streaming` takes an open * as an action that runs to the end.
+export const loungeSpokenText = (text: string) => splitLoungeActions(splitLoungeInnerVoice(text).reply, { parens: true, streaming: true }).filter(part => !part.action).map(part => part.text).join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 
 /** Help a participant can ask for. `direct` is set by the server when someone addresses the AI by voice. */
 export type LoungeHelpKind = 'spark' | 'question' | 'opinion' | 'topic' | 'summary' | 'direct';
