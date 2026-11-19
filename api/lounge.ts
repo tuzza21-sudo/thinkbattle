@@ -11,6 +11,10 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
+import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
+
+/** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
+const loungeMessageVoiceBucket = 'lounge-message-voices';
 import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeCallTogether, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeVoiceEmotionRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
@@ -495,7 +499,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -790,6 +794,91 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
         items: (state.room_memory ?? []).filter(entry => entry.status === 'active').map(entry => ({ id: entry.id, kind: entry.kind, summary: entry.summary })),
         ...(state.lingering?.what ? { lingering: state.lingering.what } : {}), ...(state.next_intent?.what ? { next_intent: state.next_intent.what } : {}),
       });
+    }
+
+    // A message of the member's own one-to-one chat, tapped (2026-11-20, see loungeMessageActions.ts): gone back to (되감기, and 다시 쓰기,
+    // which goes back from the last reply and then asks for a new one), or read aloud in the character's voice (음성으로 듣기).
+    if (body.action === 'rewind' || body.action === 'message-voice') {
+      const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요. 잠시 뒤 다시 시도해 주세요.' }, 503);
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,space_id,companion_chat,scenario`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string; capacity: number; space_id?: string | null; companion_chat?: boolean; scenario?: unknown }>>(roomResponse, 'lounge') : [];
+      const own = Boolean(mine && mine.host_id === user.id && mine.capacity === 1 && !mine.space_id);
+      const messageId = body.messageId === undefined ? undefined : Number(body.messageId);
+      if (messageId !== undefined && (!Number.isSafeInteger(messageId) || messageId <= 0)) return json({ error: '올바르지 않은 요청이에요.' }, 400);
+      const removeVoices = async (paths: unknown) => {
+        const list = Array.isArray(paths) ? paths.filter((path): path is string => typeof path === 'string') : [];
+        if (!list.length) return;
+        const removed = await fetchTimed(`${url}/storage/v1/object/${loungeMessageVoiceBucket}`, { method: 'DELETE', headers: serviceHeaders, body: JSON.stringify({ prefixes: list }) }).catch(() => undefined);
+        if (!removed?.ok) console.warn('[Lounge message voice] not removed', removed?.status ?? 'error', list.length);
+      };
+
+      if (body.action === 'rewind') {
+        if (!own || !mine?.companion_chat || messageId === undefined) return json({ error: '이 대화는 되돌릴 수 없어요.' }, 403);
+        const consult = isLoungeConsultRoom(normalizeLoungeRoomScenario(mine.scenario)?.id, mine.host_persona);
+        const response = await fetchTimed(`${url}/rest/v1/rpc/rewind_voice_lounge_chat`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ p_user: user.id, p_room: roomId, p_message: messageId, p_consult: consult }) });
+        if (!response.ok) throw await loungeRpcFailure(response, 'rewind_voice_lounge_chat');
+        const result = await readJson<{ state: string; from?: number; removed?: number; voices?: unknown }>(response, 'lounge');
+        if (result.state === 'busy') throw new LoungeUpstreamError('방금 나눈 대화를 정리하고 있어요. 잠시 뒤 다시 해 주세요.', 409, 'lounge_rewind_busy', true, 5);
+        if (result.state !== 'done') return json({ error: '이 메시지로는 되돌릴 수 없어요.' }, 403);
+        await removeVoices(result.voices);
+        console.info('[Lounge rewind]', JSON.stringify({ host: mine.host_persona, from: result.from, removed: result.removed, regenerate: body.regenerate === true }));
+        return json({ from: Number(result.from), removed: Number(result.removed ?? 0) });
+      }
+
+      // 음성으로 듣기: a member's month of message voices; a voice already made is handed back without being counted again.
+      if (user.is_anonymous) return json({ error: '음성 변환은 로그인한 회원만 쓸 수 있어요.' }, 403);
+      const service = async <T,>(name: string, args: Record<string, unknown>) => {
+        const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify(args) });
+        if (!response.ok) throw await loungeRpcFailure(response, name);
+        return readJson<T>(response, 'lounge');
+      };
+      const status = await service<LoungeMessageVoiceStatus>('lounge_message_voice_status', { p_user: user.id });
+      const limitSeconds = loungeMessageVoiceLimitSeconds(status);
+      const usage = (used: unknown) => ({ usedSeconds: Number(used) || 0, limitSeconds });
+      if (messageId === undefined) return json({ usage: usage(status.seconds) });
+      if (!own || !mine) return json({ error: '이 메시지는 음성으로 바꿀 수 없어요.' }, 403);
+      const sign = async (path: string) => {
+        const response = await fetchTimed(`${url}/storage/v1/object/sign/${loungeMessageVoiceBucket}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify({ expiresIn: 3600 }) });
+        const signed = response.ok ? await readJson<{ signedURL?: string }>(response, 'lounge') : {};
+        if (!signed.signedURL) throw new LoungeUpstreamError('음성을 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_message_voice_failed', true, 5);
+        return `${url}/storage/v1${signed.signedURL}`;
+      };
+      const keptResponse = await fetchTimed(`${url}/rest/v1/lounge_message_voices?message_id=eq.${messageId}&room_id=eq.${encodeURIComponent(roomId)}&select=path,seconds`, { headers: serviceHeaders });
+      const [kept] = keptResponse.ok ? await readJson<Array<{ path: string; seconds: number }>>(keptResponse, 'lounge') : [];
+      if (kept) return json({ url: await sign(kept.path), seconds: Number(kept.seconds), usage: usage(status.seconds) });
+      const messageResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_messages?id=eq.${messageId}&room_id=eq.${encodeURIComponent(roomId)}&kind=eq.host&select=text`, { headers });
+      const [message] = messageResponse.ok ? await readJson<Array<{ text: string }>>(messageResponse, 'lounge') : [];
+      if (!message) return json({ error: '이 메시지는 음성으로 바꿀 수 없어요.' }, 404);
+      const text = loungeMessageVoiceText(message.text);
+      if (!text) return json({ error: '소리 내어 읽을 말이 없는 메시지예요.' }, 400);
+      if (limitSeconds !== null && Number(status.seconds) + loungeMessageVoiceEstimate(text) > limitSeconds + 5) {
+        const used = Number(status.seconds) >= limitSeconds;
+        throw new LoungeUpstreamError(used ? `이번 달 음성 변환 ${limitSeconds / 60}분을 모두 썼어요.${status.plan ? ' 다음 달에 다시 쓸 수 있어요.' : ` Plus 이용권으로 한 달 ${loungeMessageVoiceMinutes.plan}분까지 쓸 수 있어요.`}` : '이번 달 남은 음성 변환 시간보다 긴 메시지예요.', 403, 'lounge_message_voice_allowance', false);
+      }
+      await ensureCustomCharacter(mine.host_persona);
+      const key = process.env.ELEVENLABS_API_KEY, voice = loungeEngineVoice('eleven', mine.host_persona, process.env.LOUNGE_VOICE_IDS);
+      if (!key || !voice) throw new LoungeUpstreamError('지금은 음성 변환을 쓸 수 없어요.', 503, 'lounge_speech_not_configured', false, 60);
+      const speak = (id: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}?output_format=mp3_44100_128`, { method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' }, body: JSON.stringify(loungeElevenSpeechRequest(text)) }, 45_000);
+      let spoken = await speak(voice);
+      // As in a call: a library voice refused to an account without a paid plan speaks with the premade one; a full plan is asked once more.
+      const premade = loungeElevenPremadeVoice(mine.host_persona);
+      if (spoken.status === 402 && premade && premade !== voice) spoken = await speak(premade);
+      if (spoken.status === 429) { await spoken.body?.cancel().catch(() => {}); await new Promise(resolve => setTimeout(resolve, 1200)); spoken = await speak(voice); }
+      const audio = spoken.ok ? new Uint8Array(await spoken.arrayBuffer()) : new Uint8Array(0);
+      if (audio.length < 200) {
+        console.warn('[Lounge message voice] not made', spoken.status);
+        throw new LoungeUpstreamError('목소리를 만들지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_message_voice_failed', true, 10);
+      }
+      const seconds = loungeMp3Seconds(audio.length), path = `${user.id}/${roomId}/${messageId}.mp3`;
+      const uploaded = await fetchTimed(`${url}/storage/v1/object/${loungeMessageVoiceBucket}/${path}`, { method: 'POST', headers: { ...serviceHeaders, 'Content-Type': 'audio/mpeg', 'x-upsert': 'true' }, body: new Blob([audio], { type: 'audio/mpeg' }) });
+      if (!uploaded.ok) { console.warn('[Lounge message voice] not stored', uploaded.status); throw new LoungeUpstreamError('음성을 저장하지 못했어요. 잠시 뒤 다시 눌러 주세요.', 502, 'lounge_message_voice_failed', true, 10); }
+      const recorded = await service<{ path: string; seconds: number; fresh: boolean; used: number } | null>('record_lounge_message_voice', { p_user: user.id, p_room: roomId, p_message: messageId, p_path: path, p_text: text, p_seconds: seconds });
+      if (!recorded) { await removeVoices([path]); return json({ error: '이 메시지는 음성으로 바꿀 수 없어요.' }, 404); }
+      // The characters spoken are also the cost guard of ElevenLabs for everyone (loungePremiumSpeech).
+      if (recorded.fresh) void service('add_lounge_speech_usage', { p_user: user.id, p_engine: 'eleven-v4-turbo', p_chars: text.length }).catch(() => {});
+      console.info('[Lounge message voice]', JSON.stringify({ host: mine.host_persona, seconds, chars: text.length, fresh: recorded.fresh }));
+      return json({ url: await sign(recorded.path), seconds: Number(recorded.seconds), usage: usage(recorded.used) });
     }
 
     if (body.action === 'topics') {
