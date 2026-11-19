@@ -5662,3 +5662,19 @@ test('the record of a turn says why adult mode was on or off, so an app turn wit
     assert.equal(failure.adult_why, why); assert.equal(failure.adult_mode, adultOn, why); assert.equal(failure.client, userAgent.startsWith('Saseok') ? 'app' : 'web');
   }
 });
+
+test('a turn that claims the room leaves a trail and gives the claim back however it ends without a saved reply (2026-11-19)', () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  // the claim and the end of the stream's work each leave a line; a claim with no end line is a turn that died on the way
+  assert.match(api, /console\.info\('\[Lounge claim\]'/);
+  assert.match(api, /console\.info\('\[Lounge turn end\]', JSON\.stringify\(\{ host: host\.id, saved: replySaved, stage: turnStage/);
+  // the finally block gives the claim back when the reply was not saved (the ticket must match, so a late reply cannot be saved twice)
+  const finalBlock = api.slice(api.indexOf('if (stallTimer) clearTimeout(stallTimer);'));
+  assert.match(finalBlock.slice(0, 700), /if \(!replySaved\) await rpc<void>\('release_voice_lounge_host', \{ p_room: roomId, p_ticket: ticket \}, true\)/);
+  // what follows the saved reply says where it is if it passes 45 seconds
+  assert.match(api, /\[Lounge turn stalled\][\s\S]{0,200}stage: turnStage, after: afterStage/);
+  // a reply that is not valid JSON logs its shape, never its words, and a code fence round it is not held against it
+  assert.match(api, /shape = \(\(\) => \{ let parsed = false, text = 'none'/);
+  assert.doesNotMatch(api, /shape[^\n]*output\.slice\(/);
+  assert.ok(api.includes('(?:json)?'), 'a code fence round the JSON is stripped before it is parsed');
+});
