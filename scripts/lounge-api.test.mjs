@@ -5695,3 +5695,23 @@ test('a reply cut at its limit never ends inside an action, and an action left o
   assert.equal(lounge.loungeSpokenText(open), '좋아요, 자기야.');
   assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
 });
+
+test('a claimed turn is a lease of 15 seconds that the working request renews, and process-level errors are logged with what was in flight (2026-11-19)', () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../supabase/migrations/20270104000000_lounge_turn_lease.sql', import.meta.url), 'utf8');
+  // the database: a renewal that only the holder of the ticket can make, and a claim that lapses after 15 seconds
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.renew_voice_lounge_host\(p_room text, p_ticket uuid\)/);
+  assert.match(sql, /r\.ai_ticket IS DISTINCT FROM p_ticket[^\n]*RETURN false/);
+  assert.match(sql, /OR r\.ai_ticket_at>now\(\)-interval '15 seconds'/);
+  assert.doesNotMatch(sql, /ai_ticket_at>now\(\)-interval '60 seconds'/);
+  // the request renews every 5 seconds, for 75 seconds at most, and stops when the reply is saved, when the turn ends, or when the renewal fails
+  assert.match(api, /rpc<boolean>\('renew_voice_lounge_host', \{ p_room: roomId, p_ticket: ticket \}\)\.then\(kept => \{ if \(kept !== true\) stopLease\(\); \}, \(\) => stopLease\(\)\);\s*\}, 5_000\);/);
+  assert.match(api, /if \(Date\.now\(\) - leaseStarted > 75_000\) \{ stopLease\(\); return; \}/);
+  assert.match(api, /replySaved = savedOk;\s*\/\/[^\n]*\n\s*stopLease\(\);/);
+  assert.match(api, /\} finally \{\s*stopLease\(\); loungeInFlight\.delete\(flightId\);/);
+  assert.match(api, /\} finally \{\s*\/\/[^\n]*\n\s*if \(!streaming\) \{ stopLease\(\); loungeInFlight\.delete\(flightId\); \}/);
+  // process-level errors: logged with every request's action, phase and stage; an unhandled rejection no longer ends the process
+  assert.match(api, /process\.on\('uncaughtExceptionMonitor', \(error, origin\) => loungeProcessError\(origin, error\)\)/);
+  assert.match(api, /process\.on\('unhandledRejection', reason => loungeProcessError\('unhandledRejection', reason\)\)/);
+  assert.match(api, /inFlight: \[\.\.\.loungeInFlight\.values\(\)\]\.map\(flight => \(\{ action: flight\.action\(\), phase: flight\.phase\(\), stage: flight\.stage\?\.\(\)/);
+});
