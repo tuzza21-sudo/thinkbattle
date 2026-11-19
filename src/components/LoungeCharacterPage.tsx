@@ -40,11 +40,11 @@ function CustomActions({ row, user }: { row: LoungeCustomCharacterRow; user: App
   return <>
     <div className="lounge-character-actions">
       {user ? <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void run('chat', async () => navigate(`/lounge/${await startLoungeCustomChat(row.id, user.nickname)}`))}>{busy === 'chat' ? <LoaderCircle size={16} className="lounge-spin" /> : <MessageCircle size={16} />}{koreanWith(row.name)} 대화하기</button>
-        : <Link to="/lounge" className="lounge-character-cta"><MessageCircle size={16} />로그인하고 대화하기</Link>}
+        : <Link to="/" className="lounge-character-cta"><MessageCircle size={16} />로그인하고 대화하기</Link>}
       {mine && <Link to={`/lounge/create/${row.id}`} className="lounge-character-secondary"><Pencil size={15} />고치기</Link>}
       {mine && (status === 'private' || status === 'rejected') && <button type="button" className="lounge-character-secondary" disabled={Boolean(busy)} onClick={() => void run('submit', async () => setStatus(await setLoungeCustomStatus(row.id, 'submit') as LoungeCustomCharacterRow['status']))}><Send size={15} />공개 신청</button>}
       {mine && (status === 'public' || status === 'pending') && <button type="button" className="lounge-character-secondary" disabled={Boolean(busy)} onClick={() => void run('private', async () => setStatus(await setLoungeCustomStatus(row.id, 'private') as LoungeCustomCharacterRow['status']))}>나만 보기로 바꾸기</button>}
-      {mine && <button type="button" className="lounge-character-secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`${row.name}을(를) 지울까요? 대화 기록과 관계는 다시 되돌릴 수 없어요.`)) void run('delete', async () => { await setLoungeCustomStatus(row.id, 'delete'); navigate('/lounge'); }); }}><Trash2 size={15} />지우기</button>}
+      {mine && <button type="button" className="lounge-character-secondary" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`${row.name}을(를) 지울까요? 대화 기록과 관계는 다시 되돌릴 수 없어요.`)) void run('delete', async () => { await setLoungeCustomStatus(row.id, 'delete'); navigate('/'); }); }}><Trash2 size={15} />지우기</button>}
     </div>
     {mine && <p className="lounge-character-lead">{statusLabels[status]}{status === 'rejected' && row.review_note ? ` · ${row.review_note}` : ''}</p>}
     {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}
@@ -59,10 +59,10 @@ function CustomActions({ row, user }: { row: LoungeCustomCharacterRow; user: App
 export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | null }) {
   const custom = useLoungeCustomCharacter(id);
   const scenarios = useLoungeScenarios(id);
-  if (custom.missing) return <main className="lounge-join-gate"><Users size={40} /><h1>찾을 수 없는 인물이에요</h1><p>만든 사람이 지웠거나 공개되지 않은 캐릭터예요.</p><Link to="/lounge">라운지로 돌아가기</Link></main>;
+  if (custom.missing) return <main className="lounge-join-gate"><Users size={40} /><h1>찾을 수 없는 인물이에요</h1><p>만든 사람이 지웠거나 공개되지 않은 캐릭터예요.</p><Link to="/">라운지로 돌아가기</Link></main>;
   if (!custom.ready) return <main className="lounge-join-gate"><LoaderCircle size={32} className="lounge-spin" /><h1>인물을 불러오는 중…</h1></main>;
   const character = getLoungeCharacter(id);
-  if (!character) return <main className="lounge-join-gate"><Users size={40} /><h1>찾을 수 없는 인물이에요</h1><Link to="/lounge">라운지로 돌아가기</Link></main>;
+  if (!character) return <main className="lounge-join-gate"><Users size={40} /><h1>찾을 수 없는 인물이에요</h1><Link to="/">라운지로 돌아가기</Link></main>;
   const host = getLoungeHost(character.id);
   const night = character.id === 'velvet';
   const made = isLoungeCustomCharacterId(character.id);
@@ -76,7 +76,7 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
 
   return <main className={`lounge-character ${night ? 'night' : ''}`} style={{ '--character-accent': host.color } as CSSProperties}>
     <nav className="lounge-character-nav" aria-label="라운지의 인물들">
-      <Link to="/lounge" className="lounge-character-back"><ArrowLeft size={15} /> 사석</Link>
+      <Link to="/" className="lounge-character-back"><ArrowLeft size={15} /> 사석</Link>
       {!made && <div>{loungeHosts.map(item => <Link key={item.id} to={`/lounge/characters/${item.id}`} aria-current={item.id === character.id ? 'page' : undefined} aria-label={`${nameOf(item.id)} · ${item.name}`} title={`${nameOf(item.id)} · ${item.name}`}><LoungeHostPortrait hostId={item.id} /></Link>)}</div>}
     </nav>
 

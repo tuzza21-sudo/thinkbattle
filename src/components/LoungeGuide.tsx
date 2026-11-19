@@ -125,7 +125,7 @@ export function LoungeGuide() {
       <h2>자, 이제 한 명 골라 볼까요?</h2>
       <p>첫 인사는 어색해도 괜찮아요. 캐릭터는 그런 걸로 점수를 깎지 않습니다. (깎는 건 들이댈 때뿐이에요.)</p>
       <div>
-        <Link to="/lounge" className="lounge-guide-cta primary">캐릭터 만나러 가기 <ArrowRight size={16} aria-hidden="true" /></Link>
+        <Link to="/" className="lounge-guide-cta primary">캐릭터 만나러 가기 <ArrowRight size={16} aria-hidden="true" /></Link>
         <Link to="/lounge/pricing" className="lounge-guide-cta">통화 시간·요금제 보기</Link>
       </div>
     </footer>

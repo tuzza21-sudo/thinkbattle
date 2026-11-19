@@ -20,7 +20,7 @@ export function LoungeTabBar({ unread }: { unread: number }) {
   const item = (id: string, to: string, label: string, icon: ReactNode, badge?: number) =>
     <Link to={to} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined}><span>{icon}{badge ? <em aria-label={`안 읽은 쪽지 ${badge}개`}>{badge > 99 ? '99+' : badge}</em> : null}</span>{label}</Link>;
   return <nav className="lounge-tabbar" aria-label="라운지 메뉴">
-    {item('home', '/lounge', '홈', <House size={22} />)}
+    {item('home', '/', '홈', <House size={22} />)}
     {item('chats', '/lounge/chats', '사석', <MessageCircle size={22} />)}
     {item('settings', '/lounge/settings', '설정', <Settings size={22} />, unread)}
   </nav>;
@@ -90,7 +90,7 @@ function LoungeChatItems({ state, compact = false }: { state: ReturnType<typeof 
   return <>
     {error && <p className="lounge-error" role="alert">{error}</p>}
     {chats === null && !error && <p className="lounge-tab-loading" role="status">대화를 불러오는 중…</p>}
-    {chats?.length === 0 && <div className="lounge-tab-empty">{!compact && <MessageCircle size={34} />}{compact ? <h3>아직 나눈 사석이 없어요</h3> : <h2>아직 나눈 대화가 없어요</h2>}<p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p>{!compact && <Link to="/lounge" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link>}</div>}
+    {chats?.length === 0 && <div className="lounge-tab-empty">{!compact && <MessageCircle size={34} />}{compact ? <h3>아직 나눈 사석이 없어요</h3> : <h2>아직 나눈 대화가 없어요</h2>}<p>캐릭터를 골라 이야기를 시작하면 여기에서 이어갈 수 있어요.</p>{!compact && <Link to="/" className="lounge-primary"><Plus size={16} />캐릭터 고르기</Link>}</div>}
     {chats && chats.length > 0 && <ul className="lounge-chat-list">
       {chats.map(chat => {
         const custom = isLoungeCustomCharacterId(chat.character_id);

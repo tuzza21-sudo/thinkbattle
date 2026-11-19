@@ -126,7 +126,7 @@ export function LoungeCharacterCreator({ user, editId, onLoginRequest }: { user:
   const rules = loungeCustomRules;
 
   return <main className="lounge-character lounge-creator">
-    <nav className="lounge-character-nav"><Link to="/lounge" className="lounge-character-back"><ArrowLeft size={15} /> 사석</Link></nav>
+    <nav className="lounge-character-nav"><Link to="/" className="lounge-character-back"><ArrowLeft size={15} /> 사석</Link></nav>
     <header className="lounge-creator-head">
       <span className="lounge-character-eyebrow">나만의 캐릭터 · 한 사람당 {loungeCustomLimit}개</span>
       <h1>{editId ? `${row?.name ?? '캐릭터'} 고치기` : '캐릭터 만들기'}</h1>

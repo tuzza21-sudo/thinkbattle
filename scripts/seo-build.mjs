@@ -23,7 +23,7 @@ export function headFor(page) {
   const lines = [
     `<title>${escapeHtml(page.title)}</title>`,
     `<meta name="description" content="${attr(page.description)}" />`,
-    `<meta name="robots" content="${page.noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1'}" />`,
+    `<meta name="robots" content="${seo.seoRobots(page)}" />`,
     `<link rel="canonical" href="${url}" />`,
     `<meta property="og:site_name" content="${attr(content.SEO_BRAND)}" />`,
     `<meta property="og:title" content="${attr(page.title)}" />`,
@@ -47,7 +47,7 @@ const list = items => items?.length ? `<ul>${items.map(item => `<li>${escapeHtml
 const sectionHtml = section => `<section><h2>${escapeHtml(section.heading)}</h2>${section.paragraphs.map(text => `<p>${escapeHtml(text)}</p>`).join('')}${list(section.bullets)}</section>`;
 const faqHtml = faq => `<section><h2>자주 묻는 질문</h2><dl>${faq.map(item => `<dt>${escapeHtml(item.question)}</dt><dd>${escapeHtml(item.answer)}</dd>`).join('')}</dl></section>`;
 const castHtml = () => `<section><h2>사석의 캐릭터</h2><ul>${loungeCharacters.map(character => `<li><a href="/lounge/characters/${character.id}">${escapeHtml(character.name)}</a> — ${escapeHtml(character.job)}. ${escapeHtml(character.tagline)}</li>`).join('')}</ul></section>`;
-const guideLinks = () => `<nav aria-label="사석 안내"><ul>${seoGuides.map(guide => `<li><a href="${guide.path}">${escapeHtml(guide.label)}</a></li>`).join('')}<li><a href="/lounge">사석 홈</a></li></ul></nav>`;
+const guideLinks = () => `<nav aria-label="사석 안내"><ul>${seoGuides.map(guide => `<li><a href="${guide.path}">${escapeHtml(guide.label)}</a></li>`).join('')}<li><a href="/">사석 홈</a></li></ul></nav>`;
 const footerHtml = () => `<footer><p>${escapeHtml(seoVirtualNotice)}</p><p>상호 ${SEO_COMPANY} · 문의 <a href="mailto:${SEO_EMAIL}">${SEO_EMAIL}</a> · <a href="/terms">이용약관</a> · <a href="/privacy">개인정보 처리 안내</a></p></footer>`;
 const wrap = inner => `<div id="seo-static"><main>${inner}</main></div>`;
 
@@ -58,7 +58,7 @@ export function bodyFor(page) {
   }
   const guide = seoGuides.find(item => item.path === page.path);
   if (guide) {
-    const related = `<nav aria-label="함께 보면 좋은 안내"><ul>${guide.related.map(path => `<li><a href="${path}">${escapeHtml(seoGuides.find(item => item.path === path).label)}</a></li>`).join('')}<li><a href="/lounge">사석 홈</a></li></ul></nav>`;
+    const related = `<nav aria-label="함께 보면 좋은 안내"><ul>${guide.related.map(path => `<li><a href="${path}">${escapeHtml(seoGuides.find(item => item.path === path).label)}</a></li>`).join('')}<li><a href="/">사석 홈</a></li></ul></nav>`;
     return wrap(`<h1>${escapeHtml(guide.h1)}</h1><p>${escapeHtml(guide.lead)}</p>${guide.sections.map(sectionHtml).join('')}${guide.showCast ? castHtml() : ''}${faqHtml(guide.faq)}${related}${footerHtml()}`);
   }
   const character = loungeCharacters.find(item => page.path === `/lounge/characters/${item.id}`);
@@ -77,11 +77,14 @@ export function renderPage(template, page) {
     .replace('<!--seo:body-->', () => bodyFor(page));
 }
 
-/** Every public address that gets its own static page, with the tags it carries. */
+/** Every address that is offered to search, with the tags it carries. */
 export const pagesToWrite = () => seo.seoIndexablePaths().map(path => ({ path, ...seo.seoFor(path) }));
 
-/** The file a page is written to inside dist: /lounge → lounge/index.html. */
-export const fileFor = path => `${path.replace(/^\//, '')}/index.html`;
+/** The legal pages: written as static HTML (and kept open) but marked no-index and left out of the sitemap. */
+export const quietPagesToWrite = () => seo.seoQuietPaths().map(path => ({ path, ...seo.seoFor(path) }));
+
+/** The file a page is written to inside dist: / → index.html, /ai-call → ai-call/index.html. */
+export const fileFor = path => path === '/' ? 'index.html' : `${path.replace(/^\//, '')}/index.html`;
 
 export function buildSitemap(date) {
   const entries = pagesToWrite().map(page => {
@@ -106,7 +109,7 @@ export function buildLlmsTxt() {
     ...loungeCharacters.map(character => `- [${character.name} (${character.job})](${absolute(`/lounge/characters/${character.id}`)}): ${character.tagline}`),
     '',
     '## 기본 정보',
-    `- 서비스 주소: ${absolute('/lounge')}`,
+    `- 서비스 주소: ${absolute('/')}`,
     `- 운영: ${SEO_COMPANY} · 문의 ${SEO_EMAIL}`,
     `- 요금: ${[loungeFreePlan.name + ' 0원', ...loungePlans.map(priceLine)].join(', ')} (부가세 포함, 자동 재결제 없음)`,
     `- 이용약관: ${absolute('/terms')} · 개인정보 처리 안내: ${absolute('/privacy')}`,

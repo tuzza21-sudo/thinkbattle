@@ -15,7 +15,7 @@ export function LoungePersonaPage({ user, onLoginRequest }: { user: AppUser | nu
   const member = user && !user.isAnonymous ? user : null;
   return <main className="lounge-persona-page">
     <div className="lounge-persona-page-inner">
-      <Link to="/lounge" className="lounge-persona-page-back"><ArrowLeft size={15} /> 사석</Link>
+      <Link to="/" className="lounge-persona-page-back"><ArrowLeft size={15} /> 사석</Link>
       <header>
         <span className="lounge-persona-page-eyebrow">MY PERSONA</span>
         <h1><UserCog size={26} aria-hidden="true" /> 내 페르소나</h1>
@@ -33,7 +33,7 @@ export function LoungePersonaPage({ user, onLoginRequest }: { user: AppUser | nu
             <button type="button" className="btn btn-primary" onClick={onLoginRequest}>로그인하기</button>
           </div>}
       </section>
-      <Link to="/lounge" className="lounge-persona-page-go"><MessageCircle size={16} /> 대화하러 가기</Link>
+      <Link to="/" className="lounge-persona-page-go"><MessageCircle size={16} /> 대화하러 가기</Link>
     </div>
   </main>;
 }

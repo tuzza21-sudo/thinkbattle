@@ -156,7 +156,7 @@ export function LoungePaymentResult() {
         <p>{params.get('message') || '결제가 취소됐거나 처리되지 않았어요.'}</p>
       </>}
       {!checking && <div className="lounge-payment-actions">
-        <Link to="/lounge" className="lounge-pricing-cta solid">홈으로</Link>
+        <Link to="/" className="lounge-pricing-cta solid">홈으로</Link>
         {!success && <Link to="/lounge/pricing" className="lounge-pricing-cta">요금제 다시 보기</Link>}
       </div>}
       <p className="lounge-pricing-fine">결제 관련 문의: <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a></p>

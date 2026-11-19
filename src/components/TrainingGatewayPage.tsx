@@ -127,7 +127,7 @@ export const TrainingGatewayPage = ({ user, onLoginRequest, onGuestRequest, onLo
           })}
         </section>
 
-        <button type="button" className="home-lounge-entry" onClick={() => navigate('/lounge')}>
+        <button type="button" className="home-lounge-entry" onClick={() => navigate('/')}>
           <span className="home-lounge-icon"><Coffee size={28} /></span>
           <span className="home-lounge-copy"><small>NEW · 대화 라운지 테스트 오픈</small><strong>오늘은 그냥, 대화 나눌까요?</strong><span>AI 호스트와 친구 2~6명이 함께하는 가벼운 음성 대화. 점수 없이, 부담 없이.</span></span>
           <span className="home-lounge-link"><Headphones size={17} /> 라운지 둘러보기 <ArrowRight size={18} /></span>

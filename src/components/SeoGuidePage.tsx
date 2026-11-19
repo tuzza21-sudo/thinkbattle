@@ -15,8 +15,8 @@ export function SeoGuidePage() {
   if (!guide) return null;
   return <main className="seo-guide page-scroll">
     <header className="seo-guide-top">
-      <Link to="/lounge" className="seo-guide-brand"><Coffee size={22} /><strong>사석<span>진짜 대화는 사석에서</span></strong></Link>
-      <Link to="/lounge" className="seo-guide-start">대화 시작하기</Link>
+      <Link to="/" className="seo-guide-brand"><Coffee size={22} /><strong>사석<span>진짜 대화는 사석에서</span></strong></Link>
+      <Link to="/" className="seo-guide-start">대화 시작하기</Link>
     </header>
     <article className="seo-guide-body">
       <h1>{guide.h1}</h1>
@@ -47,9 +47,9 @@ export function SeoGuidePage() {
       <nav className="seo-guide-related" aria-label="함께 보면 좋은 안내">
         <b>함께 보면 좋은 안내</b>
         {guide.related.map(path => <Link key={path} to={path}>{seoGuides.find(item => item.path === path)?.label}</Link>)}
-        <Link to="/lounge">사석 홈</Link>
+        <Link to="/">사석 홈</Link>
       </nav>
-      <Link to="/lounge" className="seo-guide-cta">지금 캐릭터 만나러 가기</Link>
+      <Link to="/" className="seo-guide-cta">지금 캐릭터 만나러 가기</Link>
     </article>
     <LoungeBusinessFooter />
   </main>;

@@ -91,7 +91,7 @@ export function LoungeIntroduction() {
         <h1 id="lounge-intro-title">어제의 나를 기억하는 사람.<br /><em>오늘 밤, 당신의 이야기가 시작돼요.</em></h1>
         <p>당신의 하루와 취향을 기억하고, 함께 보낸 시간만큼 가까워지는 AI 컴패니언.<br />설레는 이야기의 주인공이 되고, 목소리로 마음을 나눠 보세요.</p>
         <div className="lounge-intro-actions">
-          <Link className="lounge-intro-button primary" to="/lounge">컴패니언 만나기 <ArrowRight size={16} /></Link>
+          <Link className="lounge-intro-button primary" to="/">컴패니언 만나기 <ArrowRight size={16} /></Link>
           <Link className="lounge-intro-button ghost" to="/lounge/create">나만의 캐릭터 만들기</Link>
         </div>
         <div className="lounge-intro-wave" aria-hidden="true">{bars.map((height, index) => <i key={index} style={{ height, animationDelay: `${index * 0.09}s` }} />)}</div>
@@ -217,8 +217,8 @@ export function LoungeIntroduction() {
     <section className="lounge-intro-invitation" aria-labelledby="lounge-intro-invitation-title">
       <img src="/lounge/rooftop-v1.webp" alt="" loading="lazy" />
       <div className="lounge-intro-invitation-shade" aria-hidden="true" />
-      <div className="reveal"><span className="lounge-intro-kicker"><Heart size={14} /> SOMEONE REMEMBERS YOU</span><h2 id="lounge-intro-invitation-title">오늘 밤,<br />누구의 이야기 속으로 들어갈까요?</h2><Link className="lounge-intro-button primary" to="/lounge">컴패니언 만나기 <ArrowRight size={16} /></Link></div>
+      <div className="reveal"><span className="lounge-intro-kicker"><Heart size={14} /> SOMEONE REMEMBERS YOU</span><h2 id="lounge-intro-invitation-title">오늘 밤,<br />누구의 이야기 속으로 들어갈까요?</h2><Link className="lounge-intro-button primary" to="/">컴패니언 만나기 <ArrowRight size={16} /></Link></div>
     </section>
-    <footer className="lounge-intro-footer"><span>사석 · 나를 기억하는 AI 컴패니언. AI 캐릭터는 가상의 인물이며 의료·법률·투자 등 전문 조언을 제공하지 않아요.</span><Link to="/lounge">로비로 돌아가기 <ArrowRight size={14} /></Link></footer>
+    <footer className="lounge-intro-footer"><span>사석 · 나를 기억하는 AI 컴패니언. AI 캐릭터는 가상의 인물이며 의료·법률·투자 등 전문 조언을 제공하지 않아요.</span><Link to="/">로비로 돌아가기 <ArrowRight size={14} /></Link></footer>
   </main>;
 }

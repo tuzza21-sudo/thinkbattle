@@ -4,18 +4,27 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadTs } from './lounge-ts-loader.mjs';
 
-const { seoFor, seoJsonLd } = loadTs(fileURLToPath(new URL('../src/lib/seo.ts', import.meta.url)));
+const { seoFor, seoJsonLd, seoRobots } = loadTs(fileURLToPath(new URL('../src/lib/seo.ts', import.meta.url)));
 const { seoGuides, seoCharacterPortrait } = loadTs(fileURLToPath(new URL('../src/lib/seoContent.ts', import.meta.url)));
-const { buildSitemap, buildLlmsTxt, buildLlmsFullTxt, renderPage, pagesToWrite, fileFor } = await import('./seo-build.mjs');
+const { buildSitemap, buildLlmsTxt, buildLlmsFullTxt, renderPage, pagesToWrite, quietPagesToWrite, fileFor } = await import('./seo-build.mjs');
 const { loungeCharacters } = loadTs(fileURLToPath(new URL('../src/lib/loungeCharacters.ts', import.meta.url)));
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('the sitemap lists the lounge home, the keyword pages, every character page and the legal pages', () => {
+test('the sitemap lists the home at the bare domain, the keyword pages and every character page; the legal pages are open but not offered to search', () => {
   const sitemap = buildSitemap('2026-11-14');
-  for (const path of ['/lounge', '/terms', '/privacy', '/account-deletion', ...seoGuides.map(guide => guide.path), ...loungeCharacters.map(character => `/lounge/characters/${character.id}`)]) {
+  for (const path of ['/', ...seoGuides.map(guide => guide.path), ...loungeCharacters.map(character => `/lounge/characters/${character.id}`)]) {
     assert.ok(sitemap.includes(`<loc>https://saseok.kr${path}</loc>`), `${path} is in the sitemap`);
     assert.equal(seoFor(path)?.noindex, false, `${path} can be indexed`);
   }
+  assert.ok(!sitemap.includes('/lounge</loc>'), '/lounge is not an address of its own');
+  for (const path of ['/terms', '/privacy', '/account-deletion']) {
+    assert.ok(!sitemap.includes(`<loc>https://saseok.kr${path}</loc>`), `${path} is not in the sitemap`);
+    const seo = seoFor(path);
+    assert.equal(seo.noindex, true, `${path} is no-index`);
+    assert.equal(seoRobots(seo), 'noindex, follow', `${path} still passes its links on`);
+  }
+  assert.deepEqual(quietPagesToWrite().map(page => page.path), ['/terms', '/privacy', '/account-deletion']);
+  assert.equal(seoRobots(seoFor('/lounge/lounge-abc')), 'noindex, nofollow', 'rooms pass nothing on');
 });
 
 test('every character has its own title and a description of search length', () => {
@@ -33,8 +42,9 @@ test('rooms, places and staff screens are kept out of search, and the home redir
   for (const path of ['/lounge/lounge-abc', '/lounge/spaces/hotel-lounge', '/lounge/characters/unknown', '/super-admin', '/admin', '/battle/new', '/history']) {
     assert.equal(seoFor(path)?.noindex, true, `${path} is noindex`);
   }
-  assert.equal(seoFor('/').path, '/lounge');
-  assert.equal(seoFor('/lounge/').path, '/lounge');
+  assert.equal(seoFor('/').path, '/');
+  assert.equal(seoFor('/lounge').path, '/', '/lounge names the bare domain as its address');
+  assert.equal(seoFor('/lounge/').path, '/');
   assert.equal(seoFor('/debate'), null, 'the other service keeps its own titles');
 });
 
@@ -75,14 +85,15 @@ test('the static page of an address carries its own head, text and structured da
     const html = renderPage(template, page);
     assert.ok(html.includes(`<title>${page.title.replace(/&/g, '&amp;')}</title>`), `${page.path} title`);
     assert.ok(html.includes(`<link rel="canonical" href="https://saseok.kr${page.path}" />`), `${page.path} canonical`);
+    assert.ok(html.includes('<meta name="robots" content="index, follow'), `${page.path} is open to search`);
     assert.ok(/<div id="root"><div id="seo-static"><main><h1>/.test(html), `${page.path} has text in the page for crawlers that run no script`);
-    assert.ok(html.includes('<a href="/lounge">') && /<a href="\/(ai-companion|ai-call|voice-chat|character-chat)">/.test(html), `${page.path} links to the other pages`);
+    assert.ok(html.includes('<a href="/">') && /<a href="\/(ai-companion|ai-call|voice-chat|character-chat)">/.test(html), `${page.path} links to the other pages`);
     const ld = html.match(/<script type="application\/ld\+json" id="seo-jsonld">(.*?)<\/script>/s);
     assert.ok(ld, `${page.path} has structured data`);
     const graph = JSON.parse(ld[1])['@graph'];
     assert.ok(graph.some(item => item['@type'] === 'Organization'));
     assert.ok(!html.includes('<!--seo:'), `${page.path} has no marker left`);
-    assert.ok(fileFor(page.path).endsWith('/index.html'));
+    assert.ok(fileFor(page.path).endsWith('index.html'));
   }
   const home = JSON.parse(renderPage(template, pagesToWrite()[0]).match(/id="seo-jsonld">(.*?)<\/script>/s)[1])['@graph'];
   assert.deepEqual(home.map(item => item['@type']).sort(), ['FAQPage', 'Organization', 'WebApplication', 'WebPage', 'WebSite']);
@@ -138,7 +149,7 @@ test('the site is named 사석에서 and has real icon files at the addresses se
   const html = read('index.html');
   assert.ok(html.includes('<meta property="og:site_name" content="사석에서" />'));
   const graph = JSON.parse(html.match(/<script type="application\/ld\+json" id="seo-jsonld">(.*?)<\/script>/s)[1])['@graph'];
-  assert.ok(seoJsonLd(seoFor('/lounge'))['@graph'].some(item => item['@type'] === 'WebSite' && item.name === '사석에서' && item.alternateName.includes('사석')));
+  assert.ok(seoJsonLd(seoFor('/'))['@graph'].some(item => item['@type'] === 'WebSite' && item.name === '사석에서' && item.alternateName.includes('사석')));
   assert.ok(graph.length >= 2);
   for (const link of ['/favicon.ico', '/favicon.svg', '/favicon-192.png', '/apple-touch-icon.png']) assert.ok(html.includes(`href="${link}"`), `${link} is linked`);
   const ico = readFileSync(new URL('../public/favicon.ico', import.meta.url));

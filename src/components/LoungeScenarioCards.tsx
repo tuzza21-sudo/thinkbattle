@@ -64,7 +64,7 @@ export function LoungeScenarioCards({ scenarios, user }: { scenarios: LoungeScen
         <h3>{scenario.title}</h3>
         <p>{personalizeLoungeStory(scenario.hook, user?.nickname)}</p>
         <small>{personalizeLoungeStory('당신의 역할', user?.nickname)} · {personalizeLoungeStory(scenario.user_role, user?.nickname)}</small>
-        {!user ? <Link to="/lounge" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>
+        {!user ? <Link to="/" className="lounge-character-cta"><Play size={15} />로그인하고 시작</Link>
           : begun.has(scenario.character_id) ? <div className="lounge-scenario-actions">
             <button type="button" className="lounge-character-cta" disabled={Boolean(busy)} onClick={() => void start(scenario.id)}>{spinner(scenario.id, Play)}기존 대화 이어하기</button>
             <small>새로 시작하려면 기존 채팅을 삭제해 주세요. 기억과 관계도 초기화돼요.</small>
