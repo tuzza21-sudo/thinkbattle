@@ -5678,3 +5678,19 @@ test('a turn that claims the room leaves a trail and gives the claim back howeve
   assert.doesNotMatch(api, /shape[^\n]*output\.slice\(/);
   assert.ok(api.includes('(?:json)?'), 'a code fence round the JSON is stripped before it is parsed');
 });
+
+test('a reply cut at its limit never ends inside an action, and an action left open is not read aloud (2026-11-19)', () => {
+  const open = '*숨을 들이쉰다.* 좋아요, 자기야. *몸이 활처럼 휘고, 목을 감은 팔에 힘이 들어갔다가 풀어진다. 떨리는 허';
+  assert.equal(lounge.withoutOpenAction(open), '*숨을 들이쉰다.* 좋아요, 자기야.');
+  assert.equal(lounge.withoutOpenAction('*웃는다.* 좋아요.'), '*웃는다.* 좋아요.', 'a closed action stays');
+  assert.equal(lounge.withoutOpenAction('3*4는 12예요'), '3*4는 12예요', 'a * against a word is not an action');
+  // the clip at the limit: the unfinished action is dropped with its words
+  const long = '*조리대를 짚는다.* 좋아. 계속해. *' + '가'.repeat(400) + ' 끝.* 마무리.';
+  assert.equal(lounge.clipLoungeReply(long, 120), '*조리대를 짚는다.* 좋아. 계속해.');
+  assert.equal(lounge.joinLoungeInnerVoice(long, '생각', 120), '*조리대를 짚는다.* 좋아. 계속해.');
+  // a reply that fits but was left open by the model is closed the same way
+  assert.equal(lounge.clipLoungeReply('좋아요. *손을 뻗는다', 360), '좋아요.');
+  // the voice: an open action is not said; closed actions behave as before
+  assert.equal(lounge.loungeSpokenText(open), '좋아요, 자기야.');
+  assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
+});
