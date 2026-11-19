@@ -824,7 +824,8 @@ export function withoutOpenAction(text: string) {
   return text.slice(0, open).trimEnd();
 }
 export function clipLoungeReply(reply: string, limit: number) {
-  if (reply.length <= limit) return withoutOpenAction(reply.trimEnd());
+  // A reply that fits is kept as it is, an open action included (the chat shows all of it; only the voice leaves it unread).
+  if (reply.length <= limit) return reply.trimEnd();
   const head = reply.slice(0, Math.max(0, limit)).replace(/[\uD800-\uDBFF]$/, '');
   const boundary = Math.max(head.lastIndexOf('\n\n'), ...[...head.matchAll(/[.!?。！？](?:["”’)]|\s|$)/g)].map(match => match.index! + match[0].trimEnd().length));
   return withoutOpenAction((boundary >= limit * 0.6 ? head.slice(0, boundary) : head).trimEnd());

@@ -5688,8 +5688,9 @@ test('a reply cut at its limit never ends inside an action, and an action left o
   const long = '*조리대를 짚는다.* 좋아. 계속해. *' + '가'.repeat(400) + ' 끝.* 마무리.';
   assert.equal(lounge.clipLoungeReply(long, 120), '*조리대를 짚는다.* 좋아. 계속해.');
   assert.equal(lounge.joinLoungeInnerVoice(long, '생각', 120), '*조리대를 짚는다.* 좋아. 계속해.');
-  // a reply that fits but was left open by the model is closed the same way
-  assert.equal(lounge.clipLoungeReply('좋아요. *손을 뻗는다', 360), '좋아요.');
+  // a reply that fits is kept whole, an open action included: the chat shows all of it, and only the voice leaves the open action unread
+  assert.equal(lounge.clipLoungeReply('좋아요. *손을 뻗는다', 360), '좋아요. *손을 뻗는다');
+  assert.equal(lounge.loungeSpokenText('좋아요. *손을 뻗는다'), '좋아요.');
   // the voice: an open action is not said; closed actions behave as before
   assert.equal(lounge.loungeSpokenText(open), '좋아요, 자기야.');
   assert.equal(lounge.loungeSpokenText('*웃으며* 좋아요. *고개를 끄덕인다* 그렇게 해요.'), '좋아요. 그렇게 해요.');
