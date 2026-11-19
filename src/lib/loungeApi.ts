@@ -410,7 +410,7 @@ export function prepareLoungeTopic(roomId: string) {
 }
 
 /** What a character remembers of the member, the relationship's important events and its timeline (migration 20261128). */
-export type LoungeMemoryItem = { id: string; kind: string; summary: string; follow_up: string | null; importance: number; created_at: string; updated_at: string };
+export type LoungeMemoryItem = { id: string; kind: string; summary: string; follow_up: string | null; importance: number; created_at: string; updated_at: string; /** Pinned: in every reply (migration 20270103). */ pinned?: boolean };
 export type LoungeRelationshipEvent = { type: string; summary: string; at: string; importance: number; turn: number };
 export type LoungeMemoryBook = {
   memories: LoungeMemoryItem[];
@@ -422,6 +422,9 @@ export type LoungeMemoryBook = {
 export const getMyLoungeMemory = (characterId: string) => loungeRpc<LoungeMemoryBook | null>('get_my_lounge_memory', { p_character: characterId });
 export const editMyLoungeMemory = (id: string, summary: string, followUp: string) => loungeRpc<boolean>('edit_my_lounge_memory', { p_id: id, p_summary: summary, p_follow_up: followUp });
 export const forgetMyLoungeMemory = (id: string) => loungeRpc<boolean>('forget_my_lounge_memory', { p_id: id });
+/** Pins a memory (up to five in a conversation) so the character keeps it in every reply, or unpins it. */
+export const pinMyLoungeMemory = (id: string, pinned: boolean) => loungeRpc<boolean>('pin_my_lounge_memory', { p_id: id, p_pinned: pinned });
+export const loungePinnedMemoryLimit = 5;
 export const addMyLoungeMemory = (characterId: string, kind: string, summary: string, followUp: string) => loungeRpc<string>('add_my_lounge_memory', { p_character: characterId, p_kind: kind, p_summary: summary, p_follow_up: followUp });
 /** What the character carries of this room (2026-11-18): the summary lines, the agreements and feelings, and what is on her mind. The member can forget any of it. */
 export type LoungeRoomMemory = { summary: Array<{ id: string; text: string }>; items: Array<{ id: string; kind: string; summary: string }>; lingering?: string; next_intent?: string };

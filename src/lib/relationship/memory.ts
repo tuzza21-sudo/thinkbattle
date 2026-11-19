@@ -7,8 +7,10 @@ export type MemoryKind = typeof memoryKinds[number];
 export type MemoryRow = {
   id: string; character_id: string; kind: MemoryKind; summary: string; follow_up: string | null; importance: number;
   status?: string; mention_count?: number; updated_at?: string; last_confirmed_at?: string; created_at?: string;
+  /** Pinned by the member (migration 20270103): a settled fact that goes into every reply and that the model does not change. */
+  pinned?: boolean;
 };
-export type PromptMemory = { ref: string; kind: MemoryKind; summary: string; follow_up?: string };
+export type PromptMemory = { ref: string; kind: MemoryKind; summary: string; follow_up?: string; pinned?: true };
 export type MemoryOp =
   | { op: 'add'; kind: MemoryKind; summary: string; importance: number; follow_up?: string }
   | { op: 'update'; id: string; summary?: string; importance?: number; follow_up?: string }
@@ -24,6 +26,8 @@ export const memorySettings = {
   relevanceWeight: 2,
   /** Open threads among them, so follow-ups never crowd out everything else. */
   openThreadLimit: 3,
+  /** Pinned memories, shown in every reply on top of the others (2026-11-19, by the owner, after Kindroid's Key Memories). */
+  pinnedLimit: 5,
   /** Proposed memories below this importance are dropped. */
   minImportance: 0.5,
   maxOpsPerTurn: 3,
@@ -52,7 +56,10 @@ export function similarity(a: string, b: string) {
  * conversation is shown even among many; a memory with no closeness yet (not embedded) counts as unrelated.
  */
 export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId: string, now: Date, relevance?: ReadonlyMap<string, number>, limits?: { prompt: number; relevant: number }) {
-  const active = rows.filter(row => row.character_id === characterId && (row.status ?? 'active') === 'active');
+  const all = rows.filter(row => row.character_id === characterId && (row.status ?? 'active') === 'active');
+  // Pinned memories are always shown, ahead of the rest and on top of its limit; the rest is chosen among the others as before.
+  const pinned = all.filter(row => row.pinned === true).slice(0, memorySettings.pinnedLimit);
+  const active = all.filter(row => row.pinned !== true);
   const threads = active.filter(row => row.kind === 'open_thread')
     .sort((a, b) => Date.parse(b.updated_at ?? '') - Date.parse(a.updated_at ?? ''))
     .slice(0, memorySettings.openThreadLimit);
@@ -60,11 +67,11 @@ export function selectMemoriesForPrompt(rows: readonly MemoryRow[], characterId:
   const score = (row: MemoryRow) => Number(row.importance) + 0.3 * Math.exp(-days(row.last_confirmed_at ?? row.updated_at, now) / 30) + 0.05 * Math.log(row.mention_count ?? 1)
     + memorySettings.relevanceWeight * Math.max(0, relevance?.get(row.id) ?? 0);
   const rest = active.filter(row => !threads.includes(row)).sort((a, b) => score(b) - score(a)).slice(0, limit - threads.length);
-  const chosen = [...threads, ...rest];
+  const chosen = [...pinned, ...threads, ...rest];
   const refs = new Map<string, string>();
   const forPrompt: PromptMemory[] = chosen.map((row, index) => {
     const ref = `m${index + 1}`; refs.set(ref, row.id);
-    return { ref, kind: row.kind, summary: row.summary, ...(row.follow_up ? { follow_up: row.follow_up } : {}) };
+    return { ref, kind: row.kind, summary: row.summary, ...(row.follow_up ? { follow_up: row.follow_up } : {}), ...(row.pinned === true ? { pinned: true as const } : {}) };
   });
   return { forPrompt, refs, chosen };
 }
@@ -75,7 +82,7 @@ export const memoryEmbeddingText = (row: Pick<MemoryRow, 'summary' | 'follow_up'
 /** Everything the user can see this character remembers: open threads first, then by importance. */
 export function memoriesForView(rows: readonly MemoryRow[], characterId: string) {
   return rows.filter(row => row.character_id === characterId && (row.status ?? 'active') === 'active')
-    .sort((a, b) => Number(b.kind === 'open_thread') - Number(a.kind === 'open_thread') || Number(b.importance) - Number(a.importance));
+    .sort((a, b) => Number(b.pinned === true) - Number(a.pinned === true) || Number(b.kind === 'open_thread') - Number(a.kind === 'open_thread') || Number(b.importance) - Number(a.importance));
 }
 
 const cleanText = (value: unknown, max: number) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '';
@@ -97,10 +104,13 @@ export function normalizeMemoryOps(raw: unknown, refs: ReadonlyMap<string, strin
     const importance = typeof value.importance === 'number' && Number.isFinite(value.importance) ? Math.min(1, Math.max(0, Math.round(value.importance * 100) / 100)) : undefined;
     if (isSensitiveMemory(`${summary} ${followUp}`)) continue;
     const id = typeof value.ref === 'string' ? refs.get(value.ref.trim()) : undefined;
+    // A pinned memory is the member's settled fact: the model neither changes nor closes it.
+    if (id && shown.some(row => row.id === id && row.pinned === true)) continue;
     if (op === 'add') {
       if (!kind || summary.length < 2 || importance === undefined || importance < memorySettings.minImportance) continue;
       if (kind === 'open_thread' && !followUp) continue;
       const duplicate = shown.find(row => row.kind === kind && similarity(row.summary, summary) >= 0.6);
+      if (duplicate?.pinned === true) continue;
       if (duplicate) { if (!touched.has(duplicate.id)) { touched.add(duplicate.id); ops.push({ op: 'update', id: duplicate.id, summary, importance, ...(followUp ? { follow_up: followUp } : {}) }); } continue; }
       if (ops.some(other => other.op === 'add' && similarity(other.summary, summary) >= 0.6)) continue;
       ops.push({ op: 'add', kind, summary, importance, ...(followUp ? { follow_up: followUp } : {}) });
@@ -153,6 +163,7 @@ export const memoryOpsSchema = {
 /** How to use and propose long-term memories; added to the instructions of one-to-one relationship rooms. */
 /** How to use the stored memories in a reply. */
 export const longMemoryUseInstructions = `user_memories는 이 사용자가 이 캐릭터와의 지난 대화에서 직접 말한 일이다. ref는 내부 표시라 말하지 않는다. 지금 대화와 관련될 때만 자연스럽게 녹여 쓰고, 날짜를 대거나 기억하고 있다고 과시하지 않는다. user_memories와 previous_session에 없는 과거는 지어내지 않으며, 확실하지 않으면 묻는 말로 확인한다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.
+pinned가 true인 기억은 사용자가 직접 고정한, 둘 사이의 확정된 사실이다. 매번 들어 있다고 매번 말하지 않고, 말과 행동이 늘 이 사실과 어긋나지 않게 하며 그와 다른 과거를 지어내지 않는다. 사용자가 지금 분명히 바꾸어 말하면 지금 말을 따른다.
 follow_up이 있는 기억은 아직 결과를 모르는 이야기다. opening_follow_up이 있으면 새 대화의 첫 인사(reason=opening)는 방 주제 질문 대신 그 일이 어떻게 됐는지 가볍게 묻는다. 이 규칙은 첫 인사에서 방 주제를 묻는 규칙보다 우선한다. 그 밖에는 자연스러울 때만 묻고 매번 묻지 않는다.
 previous_session은 이 캐릭터와 나눈 직전 대화의 요약이다. 이어 갈 거리가 있을 때만 쓴다.`;
 /** How to record new memories (memory_ops). Only solo play records them. */
@@ -169,7 +180,8 @@ summary는 사용자에 대한 3인칭 한 문장, 80자 이내로 쓴다. impor
  * entirely from 2026-10-22 (an opening asked about a real jazz concert); since every conversation became a story the
  * characters remembered nothing, so memories come back on these terms (2026-10-24).
  */
-export const longMemoryStoryUseInstructions = `user_memories는 이 사용자가 지난 대화들에서 실제 자기 자신에 대해 말한 것이다(이야기 속 역할이 아니다). ref는 내부 표시라 말하지 않는다. 지금은 이야기 속 장면이므로, 기억은 그 장면 안에서 캐릭터가 이 사람을 알아보는 방식으로만 녹인다: 좋아하는 것과 싫어하는 것, 불리고 싶은 호칭, 원하는 대화나 관계의 방식 같은 것(예: 좋아한다던 술을 건넨다). 이야기에서 빠져나와 현실의 일(일정, 시험, 회사, 약속의 결과)을 묻거나, 현실의 일을 이야기 속 사건으로 바꾸지 않는다. 날짜를 대거나 기억하고 있다고 과시하지 않고, user_memories에 없는 과거는 지어내지 않는다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.`;
+export const longMemoryStoryUseInstructions = `user_memories는 이 사용자가 지난 대화들에서 실제 자기 자신에 대해 말한 것이다(이야기 속 역할이 아니다). ref는 내부 표시라 말하지 않는다. 지금은 이야기 속 장면이므로, 기억은 그 장면 안에서 캐릭터가 이 사람을 알아보는 방식으로만 녹인다: 좋아하는 것과 싫어하는 것, 불리고 싶은 호칭, 원하는 대화나 관계의 방식 같은 것(예: 좋아한다던 술을 건넨다). 이야기에서 빠져나와 현실의 일(일정, 시험, 회사, 약속의 결과)을 묻거나, 현실의 일을 이야기 속 사건으로 바꾸지 않는다. 날짜를 대거나 기억하고 있다고 과시하지 않고, user_memories에 없는 과거는 지어내지 않는다. 지금 사용자의 말이 기억과 다르면 지금 말을 따른다. 기억을 쓰는 방식은 memory_style을 따른다.
+pinned가 true인 기억은 사용자가 직접 고정한 사실이라 이야기 안에서도 그대로 사실이다(예: 둘이 처음 만난 때와 곳, 서로를 부르는 이름). 이야기 속 말과 행동이 이와 어긋나지 않게 하고, 매번 꺼내어 말하지는 않는다.`;
 /** What a story may record about the member: only what they say about themselves outside the role. */
 export const longMemoryStoryWriteInstructions = `이야기 속 장면에서 memory_ops는 사용자가 역할이 아닌 실제 자기 자신에 대해 분명히 말한 것만 기록한다: 실제 취향, 불리고 싶은 호칭, 원하는 이야기나 관계의 방식(예: 천천히 가까워지는 로맨스를 좋아함), 이야기 밖에서 말한 실제 일정이나 계획. 사용자가 맡은 역할의 설정, 이야기 속 행동·사건·대사, 장면에 대한 반응은 기록하지 않는다(그것은 memory에 이야기 기록으로 남는다). 역할인지 실제인지 애매하면 기록하지 않는다. 그래서 이야기 속 대부분의 턴은 빈 배열이다.`;
 export const longMemoryInstructions = `${longMemoryUseInstructions}

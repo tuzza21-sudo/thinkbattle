@@ -1137,6 +1137,10 @@
 .lounge-memory-list small { font-size:12px; opacity:.7; }
 .lounge-memory-list time { font-size:11px; opacity:.5; }
 .lounge-memory-kind { justify-self:start; padding:1px 8px; border-radius:999px; background:#ffffff14; color:var(--lounge-accent,#ead0a3); font-size:11px; }
+/* A pinned memory (2026-11-19): a settled fact, in every reply. */
+.lounge-memory-list li.pinned { border-color:color-mix(in srgb, var(--lounge-accent,#ead0a3) 55%, transparent); background:#ead0a312; }
+.lounge-memory-list li.pinned .lounge-memory-kind { display:inline-flex; align-items:center; gap:4px; }
+.lounge-memory-actions button[aria-pressed="true"] { color:var(--lounge-accent,#ead0a3); }
 .lounge-memory-actions { display:flex; gap:4px; flex-shrink:0; align-self:flex-start; }
 .lounge-memory-actions button { display:grid; place-items:center; width:30px; height:30px; border:1px solid #ffffff24; border-radius:9px; background:transparent; color:#fff5e8; cursor:pointer; }
 .lounge-memory-actions button:disabled { opacity:.5; }
