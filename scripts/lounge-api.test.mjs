@@ -5169,8 +5169,16 @@ test('the beta account adult05 starts a new chat at the closest stage, every oth
 
 test('a voice conversation within a day of the last message is the same chat by voice, side by side; later than that it is a phone call (2026-11-18)', async () => {
   const hour = 3_600_000, now = Date.now();
-  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now), true, 'a call placed two hours after the last message');
-  assert.equal(lounge.loungeCallTogether([{ at: now - 25 * hour }], '', true, now), false, 'a day and an hour');
+  const wineBar = '지금 장면: 와인바 — 둘이 마주 앉아 있다';
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], wineBar, true, now), true, 'a call placed two hours after the last message, in a place the two were in');
+  // 2026-11-19, by the owner: without a place the two were in, a voice conversation is a call, however fresh the chat
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now), false, 'no place stated');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 5 * 60_000 }], '지금 장면: 통화 중 — 각자 집', true, now), false, 'a call after a call is a call');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 5 * 60_000 }], '지금 장면: 통화 중 — 각자 집', true, now, '하린의 집'), false, 'the summary says it was a call, whatever place the scene names');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now, '북한산 입구'), true, "the engine's scene is a place the two are in");
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], wineBar, true, now, '전화 통화 중'), false, "the engine's scene is a call");
+  assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '지금 장면: 각자 있는 곳', true, now), false, '"각자" is no place');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 25 * hour }], wineBar, true, now), false, 'a day and an hour');
   assert.equal(lounge.loungeCallTogether([], '', true, now), false, 'nothing to continue');
   assert.equal(lounge.loungeCallTogether([{ at: NaN }], '', true, now), false, 'unknown time');
   assert.equal(lounge.loungeCallTogether([{ at: now - 1000 }], '지금 장면: 와인바', false, now), true, 'later turns keep it');
@@ -5191,7 +5199,11 @@ test('a voice conversation within a day of the last message is the same chat by 
     }, async () => { await (await handler(request({ action: 'host', roomId, reason, stream: true, ...(callStart ? { callStart: true } : {}) }))).text(); });
     return { input: JSON.parse(reply.input), instructions: reply.instructions, after };
   };
-  const warm = await turn({ ago: 2 * hour, reason: 'opening', callStart: true });
+  const noPlace = await turn({ ago: 2 * hour, reason: 'opening', callStart: true });
+  assert.deepEqual(noPlace.input.phone_call, { just_connected: true }, 'a fresh chat with no place the two were in is still a phone call');
+  const afterCall = await turn({ ago: 5 * 60_000, reason: 'opening', callStart: true, memory: '지금 장면: 통화 중 — 각자 집' });
+  assert.deepEqual(afterCall.input.phone_call, { just_connected: true }, 'a call five minutes after a call is a call');
+  const warm = await turn({ ago: 2 * hour, reason: 'opening', callStart: true, memory: wineBar });
   assert.deepEqual(warm.input.phone_call, { just_connected: true, together: true });
   assert.match(warm.instructions, /phone_call\.together=true이면 전화가 아니다/);
   assert.match(warm.instructions, /같은 자리에서 곁에 앉아 이어서 말한다/);
