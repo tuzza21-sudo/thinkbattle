@@ -392,6 +392,33 @@ const isSaseokAppRequest = (req: Request) => (req.headers.get('user-agent') || '
 // minutes after that the read goes straight to the old form, so a database without the migration does not answer a failing request every turn.
 let pinnedColumnMissingAt = 0;
 
+/**
+ * Process-level errors (2026-11-19, by the owner): twice a turn died 0.6 seconds after it claimed the room with a "socket hang up" that none of
+ * the request's own handlers saw, and the turn before it stopped in the middle of its after-reply work at the same moment. What every request
+ * of this instance was doing then is logged with the error. A promise that fails with nobody waiting on it yet (a read started early, for
+ * instance) is logged and no longer ends the process, so it cannot take the other requests of the instance down with it; an uncaught
+ * exception is only logged and still ends it, as before.
+ */
+type LoungeFlight = { action: () => string; phase: () => string; stage?: () => string; startedAt: number };
+const loungeInFlight = new Map<number, LoungeFlight>();
+let loungeFlightCount = 0;
+const loungeProcessError = (kind: string, error: unknown) => {
+  const value = error as { name?: string; code?: string; message?: string; stack?: string; cause?: { code?: string; message?: string } } | undefined;
+  const now = performance.now();
+  console.error('[Lounge process error]', JSON.stringify({
+    kind, name: value?.name, code: value?.code, message: typeof value?.message === 'string' ? value.message.slice(0, 200) : String(error).slice(0, 200),
+    cause: value?.cause ? { code: value.cause.code, message: value.cause.message?.slice(0, 120) } : undefined,
+    stack: typeof value?.stack === 'string' ? value.stack.split('\n').slice(1, 9).map(line => line.trim()).join(' | ').slice(0, 900) : undefined,
+    inFlight: [...loungeInFlight.values()].map(flight => ({ action: flight.action(), phase: flight.phase(), stage: flight.stage?.(), ms: Math.round(now - flight.startedAt) })),
+  }));
+};
+const loungeProcessHooks = Symbol.for('lounge.processErrorHooks');
+if (typeof process !== 'undefined' && typeof process.on === 'function' && !(globalThis as Record<symbol, unknown>)[loungeProcessHooks]) {
+  (globalThis as Record<symbol, unknown>)[loungeProcessHooks] = true;
+  process.on('uncaughtExceptionMonitor', (error, origin) => loungeProcessError(origin, error));
+  process.on('unhandledRejection', reason => loungeProcessError('unhandledRejection', reason));
+}
+
 // Developers listed in LOUNGE_RELATIONSHIP_DEBUG_USERS (emails or user ids) can see raw relationship scores.
 function isRelationshipDeveloper(user: { id: string; email?: string }) {
   const allowed = (process.env.LOUNGE_RELATIONSHIP_DEBUG_USERS || '').split(',').map(value => value.trim().toLowerCase()).filter(Boolean);
@@ -451,6 +478,16 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
   const requestStartedAt = performance.now();
   const requestClient: 'app' | 'web' = isSaseokAppRequest(req) ? 'app' : 'web';
   let noteTurnFailure: ((outcome: 'skipped' | 'failed', detail: { phase: string; error?: unknown; attempts?: unknown[] }) => Promise<void>) | undefined;
+  // This request among the instance's, for a process-level error (see loungeProcessError). A reply stream takes it over and removes it when it ends.
+  const flightId = ++loungeFlightCount;
+  const flight: LoungeFlight = { action: () => requestAction, phase: () => requestPhase, startedAt: requestStartedAt };
+  loungeInFlight.set(flightId, flight);
+  let streaming = false;
+  // The claim is a lease of 15 seconds that this request renews every 5 until the reply is saved (migration 20270104). Stopped once the reply
+  // is saved or the turn ends; after 75 seconds it is no longer renewed whatever happens, so a request that forgot to stop holds the room no
+  // longer than a claim did before. Before the migration the renewal does not exist, it stops at once, and the claim holds for 60 seconds as before.
+  let leaseTimer: ReturnType<typeof setInterval> | undefined;
+  const stopLease = () => { if (leaseTimer) clearInterval(leaseTimer); leaseTimer = undefined; };
   try {
     const raw = await req.text();
     if (new TextEncoder().encode(raw).length > MAX_BYTES) return json({ error: '음성이 너무 길어요.' }, 413);
@@ -832,6 +869,11 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     turnNote.reason = typeof body.reason === 'string' ? body.reason : undefined;
     if (!ticket) { lookupGiveUp.abort(); if (body.reason !== 'silence') await noteTurnFailure?.('skipped', { phase: 'claim' }); return json({ skipped: true }); }
     claimedTicket = ticket; requestPhase = 'claimed';
+    const leaseStarted = Date.now();
+    leaseTimer = setInterval(() => {
+      if (Date.now() - leaseStarted > 75_000) { stopLease(); return; }
+      void rpc<boolean>('renew_voice_lounge_host', { p_room: roomId, p_ticket: ticket }).then(kept => { if (kept !== true) stopLease(); }, () => stopLease());
+    }, 5_000);
     // A turn that claims and then leaves no "[Lounge turn end]" line died on the way (2026-11-19: a claim at 10:16:05 left nothing, and the room waited out its 60 seconds).
     console.info('[Lounge claim]', JSON.stringify({ reason: turnNote.reason, afterMs: Math.round(performance.now() - requestStartedAt) }));
     const user = await readJson<{ id: string; email?: string; is_anonymous?: boolean }>(auth, 'lounge');
@@ -1895,6 +1937,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
       return ndjson(new ReadableStream<Uint8Array>({
         start(controller) {
+          streaming = true;
           const work = (async () => {
           // Once the reader is gone there is nobody to send to; the turn goes on.
           const send = (event: unknown) => { if (cancelled.signal.aborted) return; try { controller.enqueue(encoder.encode(JSON.stringify(event) + '\n')); } catch { cancelled.abort(); } };
@@ -2172,6 +2215,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           };
           let replySaved = false, turnStage = 'text', stallTimer: ReturnType<typeof setTimeout> | undefined;
           const workStarted = performance.now();
+          flight.stage = () => turnStage;
           try {
             const early = (await textReady)?.trim();
             const firstText = messenger && early ? await companionReply(early) : early?.slice(0, replyLimit);
@@ -2203,6 +2247,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const after = afterReply(firstText, saved);
             const savedOk = await saved;
             replySaved = savedOk;
+            // The save gave the room back (or failed): the lease is not renewed any more.
+            stopLease();
             turnStage = 'trace';
             // What follows the saved reply (the trace, the speech, the after-reply work) is not timed by anything that logs: if it passes 45 seconds, say where it is.
             stallTimer = setTimeout(() => console.warn('[Lounge turn stalled]', JSON.stringify({ host: host.id, stage: turnStage, after: afterStage, afterMs: Math.round(performance.now() - workStarted) })), 45_000);
@@ -2258,6 +2304,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               .catch(failure => { if (!(failure instanceof LoungeUpstreamError && failure.code === 'lounge_schema_not_ready')) console.warn('[Lounge API] turn not released', failure instanceof LoungeUpstreamError ? failure.code : 'error'); });
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
           } finally {
+            stopLease(); loungeInFlight.delete(flightId);
             if (stallTimer) clearTimeout(stallTimer);
             // However the turn ended, a reply that was not saved gives its claim back now (the catch above does it for a failure; a turn that left without one did not).
             if (!replySaved) await rpc<void>('release_voice_lounge_host', { p_room: roomId, p_ticket: ticket }, true).catch(() => {});
@@ -2343,5 +2390,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     // instead of a minute later.
     const shown = error instanceof Error && /[가-힣]/.test(error.message) ? error.message : '사회자 연결이 잠시 끊겼어요. 곧 다시 시도할게요.';
     return json({ error: shown, code: 'lounge_internal_error', retryable: true, retryAfterSeconds: 3 }, 502);
+  } finally {
+    // A reply stream goes on after the response is returned; it stops the lease and leaves the list itself.
+    if (!streaming) { stopLease(); loungeInFlight.delete(flightId); }
   }
 }
