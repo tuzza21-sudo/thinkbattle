@@ -198,3 +198,12 @@ test('numbered pages of twenty, and a shared list that does not repeat itself (2
   assert.equal(placeLib.isGenericPlaceName('저녁의 조용한 실내'), true);
   assert.equal(placeLib.isGenericPlaceName('호텔 로비 카페'), false);
 });
+
+test('a story that begins in a place the card cannot name opens on it: 윤지안 starts in her car', () => {
+  const lounge = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+  const room = { id: 'lounge-x', host_persona: 'diplomat', theme: 'river', scenario: { id: 'diplomat-old-friend-fling' } };
+  assert.equal(lounge.loungeRoomSceneTheme({ ...room, background: null }), 'car');
+  // a background the member chose still wins, and other stories keep their card's theme
+  assert.equal(lounge.loungeRoomSceneTheme({ ...room, background: { theme: 'cafe' } }), 'cafe');
+  assert.equal(lounge.loungeRoomSceneTheme({ ...room, scenario: { id: 'poker-after-the-final' }, theme: 'hotellobby', background: null }), 'hotellobby');
+});
