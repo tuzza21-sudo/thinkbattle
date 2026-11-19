@@ -55,10 +55,12 @@ export type SceneFollowInput = {
   sceneTurns: number;
   change?: SceneChangeNote;
   follow?: SceneFollow;
+  /** A chat that began from a story's prologue: its first background stays until the talk moves the two (2026-11-19, by the owner). */
+  story?: boolean;
   now: number;
 };
 export type SceneFollowDecision =
-  | { action: 'keep'; reason: 'manual' | 'no_place' | 'same' | 'too_soon' | 'on_the_way' }
+  | { action: 'keep'; reason: 'manual' | 'no_place' | 'same' | 'too_soon' | 'on_the_way' | 'story_stays' }
   | { action: 'apply'; reason: 'first' | 'explicit' | 'moved'; key: string; place: string };
 
 export function sceneFollowKey(scene: SceneForFollow | undefined, place: string) {
@@ -85,6 +87,9 @@ export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision 
   if (follow.key.split('|').at(-1) === key) return { action: 'keep', reason: 'same' };
   // An explicit move, made after the last decision, changes it at once, however recently the last change was.
   if (fromEngine && change?.explicit && change.at > follow.at) return { action: 'apply', reason: 'explicit', key, place };
+  // A story's place is told by its prologue and then worded again by the engine's own scene ("…늘 서던 자리에 선 지안의 낡은 흰색 SUV 안" became "집 앞에 세운 지안의 SUV 안"):
+  // that is the same place in other words, not a move, so without an explicit move the background it began with stays.
+  if (input.story) return { action: 'keep', reason: 'story_stays' };
   // Otherwise not often: the new place has held for a few turns, and the last change was a while ago.
   const stable = fromEngine ? input.sceneTurns >= sceneFollowRules.stableTurns : true;
   if (stable && now - follow.at >= sceneFollowRules.minIntervalMs) return { action: 'apply', reason: 'moved', key, place };

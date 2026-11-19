@@ -72,6 +72,18 @@ test('without an explicit move the background changes only after the scene has s
   assert.equal(decide({ scene: next, sceneTurns: 5, change: { turn: 3, at: now - 3 * minute, explicit: false }, follow: was(5) }).action, 'keep');
 });
 
+test('a chat that began from a story keeps its first background unless the talk moves the two (2026-11-19)', () => {
+  const first = { key: follow.sceneFollowKey(undefined, '금요일 밤 11시 40분, 당신의 집 앞 지안의 낡은 흰색 SUV 안'), at: now - 90 * minute, place: '지안의 SUV 안' };
+  // the engine words the same place its own way, and it has held for many turns and a long while: still not a move
+  const reworded = decide({ story: true, scene: scene('집 앞에 세운 지안의 SUV 안', '차'), sceneTurns: 30, change: { turn: 1, at: now - 80 * minute, explicit: false }, follow: first });
+  assert.deepEqual([reworded.action, reworded.reason], ['keep', 'story_stays']);
+  // the same wording of a chat that is not a story still follows, as before
+  assert.equal(decide({ scene: scene('집 앞에 세운 지안의 SUV 안', '차'), sceneTurns: 30, follow: first }).reason, 'moved');
+  // an explicit move in a story is followed at once, and the start is still set from the prologue's place
+  assert.equal(decide({ story: true, scene: scene('집 거실', '집'), sceneTurns: 0, change: { turn: 12, at: now - 1 * minute, explicit: true }, follow: first }).reason, 'explicit');
+  assert.equal(decide({ story: true, memoryLine: '금요일 밤, 한남동 작은 프렌치 레스토랑의 창가 테이블' }).reason, 'first');
+});
+
 test('a place on the way is never shown, and arriving from it is followed at once, other places still wait', () => {
   const pool = { key: follow.sceneFollowKey(scene('호텔 수영장', '수영장'), '호텔 수영장'), at: now - 2 * minute, place: '호텔 수영장' };
   const room = scene('호텔 객실', '집');
