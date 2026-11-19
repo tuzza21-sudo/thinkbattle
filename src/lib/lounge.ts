@@ -506,12 +506,20 @@ export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | n
 /** The empty space a member can pick, and the neutral scene while a story's own background is being found. */
 export const loungeBlankScene = { name: '빈 공간', image: 'radial-gradient(120% 90% at 50% 18%, #3a3530 0%, #1d1b1e 55%, #111113 100%)', accent: '#d9cfc2', surface: '#18171b' } as const;
 /**
+ * A story whose first scene is a place the story's own card cannot name (the card's theme list has no places such as a car, which
+ * are backgrounds only): its start screen and the room before a scene is decided show this one (2026-11-19, by the owner:
+ * 윤지안's prologue begins in her SUV, so it opens on the car, not on the river).
+ */
+export const loungeStoryStartThemes: Readonly<Record<string, LoungeThemeId>> = { 'diplomat-old-friend-fling': 'car' };
+/**
  * The scene a room shows: the background the member chose, else the story's own (a story room keeps the theme its
  * scenario names), else one of the character's.
  */
 export function loungeRoomSceneTheme(room: { id: string; host_persona: string; theme?: LoungeThemeId | null; space_id?: string | null; scenario?: unknown; background?: unknown }): LoungeThemeId {
   const chosen = readLoungeRoomBackground(room.background)?.theme;
   if (chosen) return chosen;
+  const story = (room.scenario as { id?: unknown } | null | undefined)?.id;
+  if (typeof story === 'string' && Object.hasOwn(loungeStoryStartThemes, story)) return loungeStoryStartThemes[story];
   if ((room.space_id || room.scenario) && room.theme && loungeThemes.some(item => item.id === room.theme)) return room.theme;
   return loungeRoomTheme(room.host_persona, room.id);
 }
