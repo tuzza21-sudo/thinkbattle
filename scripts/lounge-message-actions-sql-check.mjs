@@ -1,6 +1,6 @@
 // Isolated PostgreSQL; no production database or paid model requests. Every lounge migration in order, then the message
-// actions of 20270107000000: going back to before a message restores what the character knew then, and a message's voice is
-// kept and counted once.
+// actions of 20270107000000 and 20270108000000: going back takes back the member's message with its reply and restores what the
+// character knew then, 다시 쓰기 takes back the last reply only, and a message's voice is kept and counted once.
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { PGlite } from '../node_modules/.cache/lounge-validation/node_modules/@electric-sql/pglite/dist/index.js';
@@ -26,8 +26,8 @@ try {
     try { await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8')); }
     catch (error) { await db.exec('ROLLBACK').catch(() => {}); if (!storyData.test(file)) throw new Error(`${file}: ${error.message}`); }
   }
-  const actions = await readFile('supabase/migrations/20270107000000_lounge_message_actions.sql', 'utf8');
-  await db.exec(actions); // applies twice without harm
+  // Both apply twice without harm, in order.
+  for (const file of ['20270107000000_lounge_message_actions.sql', '20270108000000_lounge_rewind_exchanges.sql']) await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'));
   for (const id of users) {
     await db.query('insert into auth.users(id) values($1)', [id]);
     await db.query("insert into public.users(id,nickname,gender,age_group) values($1,'나','male','30s')", [id]);
@@ -74,18 +74,19 @@ try {
 
   // Busy while a reply is still being recorded.
   await db.query("update voice_lounge_turn_updates set status='ready',updated_at=now() where room_id=$1 and turn=3", [room]);
-  const rewind = (message, user = users[0], consult = false) => one('select rewind_voice_lounge_chat($1,$2,$3,$4) r', [user, room, message, consult]).then(row => row.r);
+  const rewind = (message, user = users[0], replyOnly = false) => one('select rewind_voice_lounge_chat($1,$2,$3,false,$4) r', [user, room, message, replyOnly]).then(row => row.r);
   assert.equal((await rewind(t2.host[1])).state, 'busy');
   await db.query("update voice_lounge_turn_updates set status='applied',updated_at=now()-interval '5 minutes' where room_id=$1 and turn=3", [room]);
   assert.equal((await rewind(t2.host[1], users[1])).state, 'denied', 'only the chat\'s own member');
+  assert.equal((await rewind(t2.host[1], users[0], true)).state, 'denied', '다시 쓰기 only for the last reply');
 
-  // Back to before the second part of turn 2's reply: the whole reply goes, and the character knows only turn 1.
+  // 되감기 from the second part of turn 2's reply: the member's message before it goes too, and the character knows only turn 1.
   const done = await rewind(t2.host[1]);
   assert.equal(done.state, 'done');
-  assert.equal(Number(done.from), t2.host[0], 'a split reply goes back from its first message');
-  assert.equal(done.removed, 4);
+  assert.equal(Number(done.from), t2.human, 'the exchange goes back from the member\'s message');
+  assert.equal(done.removed, 5);
   assert.deepEqual(done.voices, [`${users[0]}/${room}/${t3.host[0]}.mp3`], 'the voices of removed messages are handed back to be deleted');
-  assert.deepEqual((await db.query('select id from voice_lounge_messages where room_id=$1 order by id', [room])).rows.map(row => Number(row.id)), [t1.human, t1.host[0], t2.human]);
+  assert.deepEqual((await db.query('select id from voice_lounge_messages where room_id=$1 order by id', [room])).rows.map(row => Number(row.id)), [t1.human, t1.host[0]]);
   const after = await one('select memory,memory_turn,ai_turns,ai_mood from voice_lounge_rooms where id=$1', [room]);
   assert.equal(after.memory, '요약 1'); assert.equal(after.memory_turn, 1); assert.equal(after.ai_turns, 1);
   assert.deepEqual(after.ai_mood, { mood: 1 });
@@ -102,21 +103,39 @@ try {
   assert.equal((await one('select count(*)::int n from lounge_message_voices where room_id=$1', [room])).n, 0);
   assert.equal(Number((await one('select lounge_message_voice_status($1) s', [users[0]])).s.seconds), 4.5, 'a removed voice stays counted');
   assert.equal((await one('select commit_voice_lounge_turn($1,$2,$3,3,1,1,null,null,null,$4,null) status', [users[0], 'auditor', room, '늦은 턴'])).status, 'missing', 'a removed turn cannot come back');
+  assert.equal((await rewind(t1.host[0])).state, 'done', 'the first exchange can be taken back too');
+  assert.equal((await one('select count(*)::int n from voice_lounge_messages where room_id=$1', [room])).n, 0);
+  assert.equal((await one('select ai_turns from voice_lounge_rooms where id=$1', [room])).ai_turns, 0);
 
-  // The next reply takes the removed turn's number again.
+  // The member says it again; the next reply takes the removed turn's number again.
+  const again1 = await say('human', '다시 안녕하세요');
   const ticket = (await one("select claim_voice_lounge_host($1,'followup') t", [room])).t;
   assert.ok(ticket, 'the character can answer at once');
-  assert.equal((await one('select ai_turns from voice_lounge_rooms where id=$1', [room])).ai_turns, 2);
-  assert.equal((await one('select finish_voice_lounge_reply($1,$2,$3) ok', [room, ticket, '좋아해요, 커피.'])).ok, true);
-  assert.equal((await one('select turn from voice_lounge_turn_updates where room_id=$1 and reply=$2', [room, '좋아해요, 커피.'])).turn, 2);
-  assert.equal((await rewind(t2.human)).state, 'busy', 'not while the new reply is being recorded');
+  assert.equal((await one('select ai_turns from voice_lounge_rooms where id=$1', [room])).ai_turns, 1);
+  assert.equal((await one('select finish_voice_lounge_reply($1,$2,$3) ok', [room, ticket, '반가워요, 다시.'])).ok, true);
+  const reply = await one('select turn,message_id from voice_lounge_turn_updates where room_id=$1 and reply=$2', [room, '반가워요, 다시.']);
+  assert.equal(reply.turn, 1);
+  assert.equal((await rewind(Number(reply.message_id), users[0], true)).state, 'busy', 'not while the new reply is being recorded');
   await db.query("update voice_lounge_turn_updates set status='applied',updated_at=now()-interval '5 minutes' where room_id=$1", [room]);
 
-  // Only the last 10 messages can be gone back to.
-  for (let n = 0; n < 6; n++) { await say('human', `말 ${n}`); await say('host', `답 ${n}`); }
-  assert.equal((await rewind(t1.human)).state, 'denied');
-  assert.equal((await one("select has_function_privilege('authenticated','public.rewind_voice_lounge_chat(uuid,text,bigint,boolean)','EXECUTE') ok")).ok, false);
+  // 다시 쓰기: the reply goes, the member's message stays for the character to answer again.
+  assert.equal((await rewind(again1, users[0], true)).state, 'denied', 'the member\'s message is not a reply');
+  const rewritten = await rewind(Number(reply.message_id), users[0], true);
+  assert.equal(rewritten.state, 'done'); assert.equal(rewritten.removed, 1);
+  assert.deepEqual((await db.query('select id from voice_lounge_messages where room_id=$1 order by id', [room])).rows.map(row => Number(row.id)), [again1]);
+
+  // 되감기 reaches back five exchanges of the member, no further.
+  await say('host', '반가워요');
+  const exchanges = [];
+  for (let n = 0; n < 6; n++) exchanges.push({ human: await say('human', `말 ${n}`), host: await say('host', `답 ${n}`) });
+  await db.query("update voice_lounge_turn_updates set status='applied',updated_at=now()-interval '5 minutes' where room_id=$1", [room]);
+  assert.equal((await rewind(again1)).state, 'denied');
+  assert.equal((await rewind(exchanges[0].host)).state, 'denied', 'the sixth exchange back is too far');
+  const five = await rewind(exchanges[1].host);
+  assert.equal(five.state, 'done'); assert.equal(Number(five.from), exchanges[1].human); assert.equal(five.removed, 10, 'ten messages of the two');
+  assert.equal((await one("select has_function_privilege('authenticated','public.rewind_voice_lounge_chat(uuid,text,bigint,boolean,boolean)','EXECUTE') ok")).ok, false);
+  assert.equal((await one("select count(*)::int n from pg_proc where proname='rewind_voice_lounge_chat'")).n, 1, 'the old form is gone');
   assert.equal((await one("select has_function_privilege('authenticated','public.record_lounge_message_voice(uuid,text,bigint,text,text,numeric)','EXECUTE') ok")).ok, false);
-  console.log('PASS: going back restores what the character knew, split replies go whole, voices count once.');
+  console.log('PASS: going back takes back whole exchanges and restores what the character knew, 다시 쓰기 the reply only, voices count once.');
 } catch (error) { console.error(error.stack); process.exitCode = 1; }
 finally { await db.close(); }

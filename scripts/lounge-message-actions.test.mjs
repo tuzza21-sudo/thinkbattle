@@ -29,25 +29,37 @@ test('a voice reads what is said aloud, without the inner voice or the actions',
   assert.ok(actions.loungeMessageVoiceEstimate('가나다라마바사아자차') > 1);
 });
 
-test('only the last ten messages can be gone back to, and only a reply that ends the chat can be written again', () => {
+test('going back takes back the member\'s message with its reply, two by two up to ten, and only a reply that ends the chat can be written again', () => {
   const list = messages(['human', 'host', 'human', 'host', 'host', 'human', 'host', 'human', 'host', 'host', 'human', 'host', 'host']);
-  assert.deepEqual([...actions.loungeRewindableIds(list)], [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  const points = actions.loungeRewindPoints(list);
+  assert.deepEqual(points.get(13), { from: 11, count: 2 }, 'the last reply goes with what the member said before it');
+  assert.deepEqual(points.get(11), { from: 11, count: 2 });
+  assert.deepEqual(points.get(9), { from: 8, count: 4 }, 'a reply in two bubbles counts as one');
+  assert.deepEqual(points.get(1), { from: 1, count: 10 });
+  assert.equal(points.size, 13);
+  const long = messages(['host', ...Array.from({ length: 7 }, () => ['human', 'host']).flat()]);
+  const far = actions.loungeRewindPoints(long);
+  assert.deepEqual(far.get(6), { from: 6, count: 10 }, 'five exchanges back at most');
+  assert.equal(far.has(5), false); assert.equal(far.has(4), false);
+  assert.equal(actions.loungeRewindPoints(messages(['host'])).size, 0, 'an opening with nothing of the member before it is not taken back');
+  assert.deepEqual(actions.loungeRewindPoints(messages(['human', 'host', 'human'])).get(3), { from: 3, count: 1 }, 'a message still waiting for its reply goes alone');
   assert.deepEqual([...actions.loungeLastReplyIds(list)].sort((a, b) => a - b), [12, 13], 'every part of the last reply');
   assert.equal(actions.loungeLastReplyId(list), 13);
   const waiting = messages(['host', 'human']);
   assert.equal(actions.loungeLastReplyId(waiting), undefined, 'the member spoke last: nothing to write again');
   assert.equal(actions.loungeLastReplyIds(waiting).size, 0);
-  assert.deepEqual([...actions.loungeRewindableIds([{ id: 1, kind: 'system' }, ...messages(['human'])])], [1], 'only what the two said counts');
+  assert.deepEqual([...actions.loungeRewindPoints([{ id: 1, kind: 'system' }, { id: 2, kind: 'human' }]).keys()], [2], 'only what the two said counts');
 });
 
 test('the server takes the actions only for the member\'s own chat, and the voice is counted once by the database', () => {
   const api = read('api/lounge.ts');
   assert.match(api, /'rewind', 'message-voice'\]\.includes/);
   assert.match(api, /rpc\/rewind_voice_lounge_chat/);
+  assert.match(api, /p_reply_only: body\.regenerate === true/, '다시 쓰기 takes back the reply only; 되감기 the whole exchange');
   assert.match(api, /mine\.host_id === user\.id && mine\.capacity === 1 && !mine\.space_id/);
   assert.match(api, /'record_lounge_message_voice'/);
   assert.match(api, /output_format=mp3_44100_128/);
-  const sql = read('supabase/migrations/20270107000000_lounge_message_actions.sql');
+  const sql = read('supabase/migrations/20270107000000_lounge_message_actions.sql') + read('supabase/migrations/20270108000000_lounge_rewind_exchanges.sql');
   for (const name of ['rewind_voice_lounge_chat', 'record_lounge_message_voice', 'lounge_message_voice_status']) {
     assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${name}\\([^)]*\\) TO service_role`), `${name} is for the server only`);
     assert.doesNotMatch(sql, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${name}\\([^)]*\\) TO authenticated`));
