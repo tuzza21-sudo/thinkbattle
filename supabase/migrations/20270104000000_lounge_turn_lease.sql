@@ -28,7 +28,7 @@ BEGIN
   solo:=coalesce(public.voice_lounge_is_solo(r),false);
   chat:=r.capacity=1 AND r.space_id IS NULL AND NOT coalesce(r.voice_on,true);
   IF r.id IS NULL OR NOT public.voice_lounge_drives_ai(r,auth.uid()) OR NOT public.is_voice_lounge_member(p_room)
-    OR r.status<>'active' OR r.expires_at<=now() OR r.ai_turns>=120
+    OR r.status<>'active' OR r.expires_at<=now() OR (r.ai_turns>=120 AND NOT r.companion_chat)
     OR r.last_ai_at>now()-(CASE WHEN chat THEN interval '1 second' WHEN solo THEN interval '2 seconds' ELSE interval '10 seconds' END)
     OR r.ai_ticket_at>now()-interval '15 seconds'
     OR EXISTS(SELECT 1 FROM public.voice_lounge_members WHERE room_id=p_room AND user_id=auth.uid() AND speaking_restricted_until>now())
