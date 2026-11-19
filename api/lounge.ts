@@ -1151,7 +1151,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // One to one, the voice is a phone call (the call screen): the two are apart and the member called the character.
     const phoneCall = solo && !chat && !room.space_id;
     // A call placed while the chat is warm (under a day since the last message) is the same conversation by voice, the two side by side.
-    const callTogether = phoneCall && loungeCallTogether(recent.map(message => ({ at: Date.parse(message.created_at ?? '') })), String(room.memory ?? ''), body.callStart === true && body.reason === 'opening');
+    const callTogether = phoneCall && loungeCallTogether(recent.map(message => ({ at: Date.parse(message.created_at ?? '') })), String(room.memory ?? ''), body.callStart === true && body.reason === 'opening', Date.now(), companionState?.scene?.location);
     // What the provider can cache comes first (see the order below), and a one-to-one chat keeps its last 16 messages:
     // with the summary and the long-term memories that is enough, and each message after the cached part is written
     // to the cache again on every turn (cache writes were the largest cost of a chat on 2026-11-01).

@@ -876,10 +876,22 @@ export function loungeTimeAway(messages: Array<{ kind: string; at: number }>) {
  * turns after it keep that decision (a call that began apart wrote its scene as '지금 장면: 통화 중' into the summary).
  */
 export const loungeCallTogetherHours = 24;
-export function loungeCallTogether(messages: Array<{ at: number }>, memory: string, opening: boolean, now = Date.now()) {
+/**
+ * 2026-11-19, by the owner: a call is carried on beside the member only when the chat had a place the two were in. A promise to meet ("토요일에 북한산 앞에서 보자")
+ * is not a place they are in, and a call that follows a call is still a call: a second call five minutes after the first one was answered "일찍 나왔네" as if
+ * the two had met at the mountain. The place is the engine's scene when it has one, else the summary's first line; a call, "각자" or nothing stated is no place.
+ */
+const statedCallPlace = (value: string | undefined) => {
+  const place = (value ?? '').replace(/^\s*지금 장면:\s*/, '').split(/\s[—–-]\s/)[0].trim();
+  return place.length >= 2 && !/통화|전화|각자|어딘가|모르|알 수 없|기타/.test(place);
+};
+export function loungeCallTogether(messages: Array<{ at: number }>, memory: string, opening: boolean, now = Date.now(), scene?: string) {
   if (!opening) return !/^\s*지금 장면:\s*통화 중/.test(memory) && messages.some(message => Number.isFinite(message.at));
   const last = messages.length ? messages[messages.length - 1].at : NaN;
-  return Number.isFinite(last) && now - last < loungeCallTogetherHours * 3_600_000;
+  // The summary says the last talk was a call: it was apart, whatever place the scene names (the engine may name where each one is).
+  if (/^\s*지금 장면:\s*통화/.test(memory)) return false;
+  const place = scene?.trim() ? scene : /^\s*지금 장면:[^\n]*/.exec(memory)?.[0] ?? '';
+  return Number.isFinite(last) && now - last < loungeCallTogetherHours * 3_600_000 && statedCallPlace(place);
 }
 export const loungeTimeAwayInstruction = 'time_away는 사용자가 지난 대화 뒤 그만큼 지나 다시 말을 건 것이다. 하던 이야기와 장면은 그대로 이어 가되, 시간이 흐른 것을 캐릭터답게 자연스럽게 알아챈다(반가움, 기다렸던 마음 같은 것). 어디 있었는지 캐묻거나 서운함을 따지지 않는다. 입력에 time_away가 없으면 같은 자리에서 이어지는 대화로 본다.';
 /** scene_background in the JSON input; always kept in cached instructions so toggling a backdrop does not rewrite them. */
