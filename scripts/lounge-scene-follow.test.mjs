@@ -147,6 +147,10 @@ test('a motel or a hotel the two are in is one room, however the spot in it is w
   for (const wording of ['호텔 로비 카페', '호텔 수영장', '호텔 연회장 복도', '모텔 주차장', '모텔 앞']) assert.notEqual(placeLib.canonicalScenePlace(wording), '호텔 객실', wording);
   assert.equal(placeLib.canonicalScenePlace('호텔 로비 카페의 낮은 소파 자리'), '호텔 로비 카페');
   assert.equal(placeLib.canonicalScenePlace('와인바 창가 자리'), '와인바');
+  // 2026-11-19, by the owner: a cocktail bar in a hotel was read as the hotel's room and the scene moved. Only a room is the room.
+  for (const wording of ['호텔 지하 칵테일바', '호텔 와인바', '호텔 바', '호텔 클럽', '호텔 스파', '모텔 근처 포차']) assert.equal(placeLib.canonicalScenePlace(wording), wording, wording);
+  assert.equal(placeLib.canonicalScenePlace('밤의 모텔 객실'), '모텔 방');
+  assert.ok(!placeLib.sameScenePlace('호텔 지하 칵테일바', '호텔 객실'));
   assert.equal(placeLib.canonicalScenePlace('와인바 앞'), '와인바 앞', 'outside is not the bar');
   assert.ok(placeLib.sameScenePlace('모텔 침대 위', '모텔 방'));
   assert.ok(!placeLib.sameScenePlace('모텔 방', '집 거실'));
