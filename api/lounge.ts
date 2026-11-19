@@ -874,7 +874,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
     // Enable the larger private-chat limit only after its database migration. Older databases keep accepting replies.
-    const replyLimit = chat && room.capacity === 1 && !room.space_id && !room.guided_session && process.env.LOUNGE_EXTENDED_COMPANION_REPLIES === 'on' ? loungeCompanionReplyLimit : chat ? 1200 : room.capacity === 1 && !room.space_id ? 360 : 600;
+    const replyLimit = chat && room.capacity === 1 && !room.space_id && !room.guided_session && process.env.LOUNGE_EXTENDED_COMPANION_REPLIES === 'on' ? loungeCompanionReplyLimit : chat ? 1200 : room.capacity === 1 && !room.space_id ? 400 : 600; // a one-to-one voice reply is saved up to 400 characters (2026-11-19, by the owner; was 360)
     // A call (the voice of a one-to-one room) answers without the character's knowledge lookup, and its memories are
     // ranked by what was just said only when that ranking is already there; otherwise by importance, as before
     // embeddings. The long-term memories themselves are always used (2026-11-07: calls answered too slowly).
