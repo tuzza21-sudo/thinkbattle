@@ -397,6 +397,13 @@ export type LoungeCallUsage = { usedSeconds: number; limitMinutes: number | null
 export const loadLoungeSpeechUsage = (roomId: string) => apiRequest({ action: 'speech', roomId }) as Promise<{ engines: LoungeSpeechUsage; call?: LoungeCallUsage | null }>;
 /** One tick of a voice call, every 30 seconds while it is connected (`start` for the first of a call): the server adds the time. */
 export const tickLoungeCall = (roomId: string, start = false) => apiRequest({ action: 'call-tick', roomId, ...(start ? { start: true } : {}) }) as Promise<{ call?: LoungeCallUsage | null }>;
+/** The month's seconds of message voices (음성으로 듣기) and the limit; null when there is none. */
+export type LoungeMessageVoiceUsage = { usedSeconds: number; limitSeconds: number | null };
+/** A reply of the character read aloud: the voice made once and kept with the message (an address that lasts an hour). */
+export const loadLoungeMessageVoice = (roomId: string, messageId: number) => apiRequest({ action: 'message-voice', roomId, messageId }) as Promise<{ url: string; seconds: number; usage: LoungeMessageVoiceUsage }>;
+export const loadLoungeMessageVoiceUsage = (roomId: string) => apiRequest({ action: 'message-voice', roomId }) as Promise<{ usage: LoungeMessageVoiceUsage }>;
+/** Goes back to before a message (one of the last 10): it and what came after are gone, and the character no longer knows them. */
+export const rewindLoungeChat = (roomId: string, messageId: number, regenerate = false) => apiRequest({ action: 'rewind', roomId, messageId, ...(regenerate ? { regenerate: true } : {}) }) as Promise<{ from: number; removed: number }>;
 export const loadLoungeRelationship = (roomId: string) => apiRequest({ action: 'relationship', roomId }) as Promise<{ enabled: boolean; relationship?: RelationshipView }>;
 const topicPreparations = new Map<string, Promise<{ skipped?: boolean; study?: LoungeTopicStudy }>>();
 export function prepareLoungeTopic(roomId: string) {

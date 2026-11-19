@@ -1214,3 +1214,18 @@
 
 /* The send button with nothing typed asks for the next turn (2026-11-08): the same accent, a different mark. */
 .lounge-chat-composer button.is-next:not(:disabled) { box-shadow:0 0 0 2px color-mix(in srgb, var(--lounge-accent) 35%, transparent); }
+
+/* A message of the member's own chat can be tapped (LoungeMessageActions, 2026-11-20): the bubble shows it can be, and its menu opens
+   under it, on the bubble's side. The blur is written out (the production minifier drops backdrop-filter:var(...)). */
+.has-room .lounge-participant-log .lounge-tappable { cursor:pointer; transition:background-color .15s ease; -webkit-tap-highlight-color:transparent; }
+.has-room .lounge-participant-log .lounge-tappable:hover,.has-room .lounge-participant-log .lounge-tappable[aria-expanded="true"] { background:#00000038; }
+.has-room .lounge-participant-log .lounge-tappable:focus-visible { outline:2px solid #fff5e9aa; outline-offset:2px; }
+.lounge-message-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; max-width:100%; margin:6px 2px 0; }
+.lounge-message-actions.own { justify-content:flex-end; }
+.lounge-message-actions button { display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:6px 12px; border-radius:999px; border:1px solid #ffffff40; background:#0000005c; color:#fff5e9; font:inherit; font-size:12px; line-height:1; cursor:pointer; -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); text-shadow:none; }
+.lounge-message-actions button:hover:not(:disabled) { background:#00000085; }
+.lounge-message-actions button:disabled { opacity:.55; cursor:default; }
+.lounge-message-actions button.danger { border-color:#ffab9a8c; color:#ffe2da; }
+.lounge-message-actions-note { flex-basis:100%; margin:2px 4px 0; font-size:11px; line-height:1.5; color:#efe4d3; text-shadow:0 1px 3px #000d; }
+.lounge-message-actions.own .lounge-message-actions-note { text-align:right; }
+.lounge-message-actions-note[role="alert"] { color:#ffc9bd; }
