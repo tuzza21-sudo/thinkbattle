@@ -111,3 +111,32 @@ test('every character says how it uses memories, and the rules forbid inventing 
   assert.match(longMemoryInstructions, /reason=opening/);
   assert.deepEqual(memoryOpsSchema.items.required, ['op', 'ref', 'kind', 'summary', 'importance', 'follow_up']);
 });
+
+test('a pinned memory is in every reply, on top of the others, and the model cannot change it (2026-11-19)', () => {
+  const rows = [
+    row('pin', 'event', '둘은 3년 전에 을지로 국밥집에서 처음 만났다', { importance: 0.5, pinned: true, last_confirmed_at: daysAgo(300), updated_at: daysAgo(300) }),
+    row('t1', 'open_thread', '주말 산행을 고민 중이다', { follow_up: '산에 갔는지' }),
+    ...Array.from({ length: 12 }, (_, i) => row(`x${i}`, 'preference', `좋아하는 것 ${i}`, { importance: 0.9 })),
+  ];
+  const { forPrompt, chosen, refs } = selectMemoriesForPrompt(rows, 'velvet', now);
+  // the pinned one is shown first even though it is old and unimportant, and the others still get their usual number
+  assert.equal(chosen[0].id, 'pin');
+  assert.equal(forPrompt[0].pinned, true);
+  assert.equal(forPrompt.filter(item => item.pinned).length, 1);
+  assert.equal(chosen.length, memorySettings.promptLimit + 1);
+  assert.ok(chosen.some(item => item.id === 't1'), 'open threads still come');
+  // at most five pinned
+  const many = Array.from({ length: 7 }, (_, i) => row(`p${i}`, 'event', `정해진 사실 ${i}`, { pinned: true }));
+  assert.equal(selectMemoriesForPrompt(many, 'velvet', now).forPrompt.filter(item => item.pinned).length, memorySettings.pinnedLimit);
+  // the model cannot update, supersede or close a pinned memory, nor add a copy that becomes an update of it
+  const pinRef = [...refs].find(([, id]) => id === 'pin')[0];
+  const ops = normalizeMemoryOps([
+    { op: 'update', ref: pinRef, kind: '', summary: '둘은 작년에 만났다', importance: 0.8, follow_up: '' },
+    { op: 'close', ref: pinRef, kind: '', summary: '', importance: 0, follow_up: '' },
+    { op: 'add', ref: '', kind: 'event', summary: '둘은 3년 전에 을지로 국밥집에서 처음 만났다', importance: 0.8, follow_up: '' },
+  ], refs, chosen);
+  assert.deepEqual(ops, []);
+  // the member sees the pinned ones first
+  assert.equal(memoriesForView(rows, 'velvet')[0].id, 'pin');
+  assert.match(longMemoryInstructions, /pinned가 true인 기억은 사용자가 직접 고정한/);
+});

@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
-import { Check, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { addMyLoungeMemory, editMyLoungeMemory, forgetLoungeRoomMemory, forgetMyLoungeEvent, forgetMyLoungeMemory, getMyLoungeMemory, loadLoungeRoomMemory, type LoungeMemoryBook, type LoungeMemoryItem, type LoungeRoomMemory } from '../lib/loungeApi';
+import { Check, LoaderCircle, Pencil, Pin, PinOff, Plus, Trash2, X } from 'lucide-react';
+import { addMyLoungeMemory, editMyLoungeMemory, forgetLoungeRoomMemory, forgetMyLoungeEvent, forgetMyLoungeMemory, getMyLoungeMemory, loadLoungeRoomMemory, loungePinnedMemoryLimit, pinMyLoungeMemory, type LoungeMemoryBook, type LoungeMemoryItem, type LoungeRoomMemory } from '../lib/loungeApi';
 import { getRelationshipConfig, memoryKindLabels, relationshipEventLabels, type RelationshipEventType } from '../lib/relationship';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -44,6 +44,9 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample,
     if (done) setEditing(null);
   };
   const forget = (memory: LoungeMemoryItem) => { if (window.confirm('이 기억을 지울까요? 캐릭터가 더는 떠올리지 않아요.')) void run(memory.id, () => forgetMyLoungeMemory(memory.id)); };
+  // A pinned memory is a settled fact of the two, kept in every reply (2026-11-19, up to five).
+  const pinnedCount = book?.memories.filter(memory => memory.pinned).length ?? 0;
+  const pin = (memory: LoungeMemoryItem) => void run(`pin-${memory.id}`, () => pinMyLoungeMemory(memory.id, !memory.pinned));
   const forgetRoom = (target: 'summary' | 'item' | 'lingering' | 'next_intent', id?: string) => {
     if (!roomId || !window.confirm('이 기억을 지울까요? 캐릭터가 이 대화에서 더는 떠올리지 않아요.')) return;
     void run(`room-${target}-${id ?? ''}`, async () => { setRoomBook(await forgetLoungeRoomMemory(roomId, target, id)); });
@@ -71,10 +74,12 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample,
       {!book ? <p className="lounge-memory-empty"><LoaderCircle size={15} className="lounge-spin" /> 불러오는 중…</p> : <>
         {tab === 'memories' && <div className="lounge-memory-panel">
           <p className="lounge-memory-note">{subject(characterName)} 기억하는 나에 대한 이야기예요. 대화할 때 지금 이야기와 가까운 것을 6~8개쯤 떠올려 자연스럽게 꺼내요. 틀린 건 고치고, 잊었으면 하는 건 지울 수 있어요. ({book.memories.length}/{book.limit})</p>
-          {book.memories.length ? <ul className="lounge-memory-list">{book.memories.map(memory => <li key={memory.id}>
+          <p className="lounge-memory-note">핀으로 고정한 기억은 둘 사이의 정해진 사실로, 매번 대화에 빠짐없이 반영돼요. ({pinnedCount}/{loungePinnedMemoryLimit})</p>
+          {book.memories.length ? <ul className="lounge-memory-list">{book.memories.map(memory => <li key={memory.id} className={memory.pinned ? 'pinned' : undefined}>
             {editing?.id === memory.id ? editor : <>
-              <div><span className="lounge-memory-kind">{memoryKindLabels[memory.kind as keyof typeof memoryKindLabels] ?? memory.kind}</span><p>{memory.summary}</p>{memory.follow_up && <small>다음에 물어볼 것: {memory.follow_up}</small>}<time>{day(memory.updated_at)}</time></div>
+              <div><span className="lounge-memory-kind">{memory.pinned && <Pin size={11} aria-label="고정됨" />}{memoryKindLabels[memory.kind as keyof typeof memoryKindLabels] ?? memory.kind}</span><p>{memory.summary}</p>{memory.follow_up && <small>다음에 물어볼 것: {memory.follow_up}</small>}<time>{day(memory.updated_at)}</time></div>
               <div className="lounge-memory-actions">
+                <button type="button" title={memory.pinned ? '고정 풀기' : pinnedCount >= loungePinnedMemoryLimit ? `고정은 ${loungePinnedMemoryLimit}개까지예요` : '고정하기: 매번 대화에 반영'} aria-pressed={Boolean(memory.pinned)} disabled={Boolean(busy) || (!memory.pinned && pinnedCount >= loungePinnedMemoryLimit)} onClick={() => pin(memory)}>{busy === `pin-${memory.id}` ? <LoaderCircle size={14} className="lounge-spin" /> : memory.pinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
                 <button type="button" title="고치기" disabled={Boolean(busy)} onClick={() => setEditing({ id: memory.id, kind: memory.kind, summary: memory.summary, follow_up: memory.follow_up ?? '' })}><Pencil size={14} /></button>
                 <button type="button" title="지우기" disabled={Boolean(busy)} onClick={() => forget(memory)}>{busy === memory.id ? <LoaderCircle size={14} className="lounge-spin" /> : <Trash2 size={14} />}</button>
               </div>

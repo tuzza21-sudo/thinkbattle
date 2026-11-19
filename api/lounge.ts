@@ -644,7 +644,10 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     async function readMemoryRows(userId: string, characterId?: string) {
       if (!serviceHeaders || process.env.LOUNGE_LONG_MEMORY === 'off') return null;
       try {
-        const response = await fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&source_room=eq.${encodeURIComponent(roomId)}${characterId ? `&character_id=eq.${encodeURIComponent(characterId)}` : ''}&status=eq.active&order=importance.desc,updated_at.desc&limit=40&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at`, { headers: serviceHeaders });
+        // Pinned memories first, so the forty read always hold them (migration 20270103); a database without the column is read as before.
+        const read = (pinned: boolean) => fetchTimed(`${url}/rest/v1/voice_lounge_memories?user_id=eq.${encodeURIComponent(userId)}&source_room=eq.${encodeURIComponent(roomId)}${characterId ? `&character_id=eq.${encodeURIComponent(characterId)}` : ''}&status=eq.active&order=${pinned ? 'pinned.desc,' : ''}importance.desc,updated_at.desc&limit=40&select=id,character_id,kind,summary,follow_up,importance,status,mention_count,created_at,updated_at,last_confirmed_at${pinned ? ',pinned' : ''}`, { headers: serviceHeaders! });
+        let response = await read(true);
+        if (response.status === 400) response = await read(false);
         if (!response.ok) { console.warn('[Lounge memory] read failed', response.status); return null; }
         return await readJson<MemoryRow[]>(response, 'lounge');
       } catch { return null; }
