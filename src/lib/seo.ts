@@ -10,6 +10,8 @@ export const SEO_DEFAULT_IMAGE = { url: `${SEO_ORIGIN}/brand/saseok-banner.jpg`,
 
 export type PageSeo = {
   title: string; description: string; path: string; noindex: boolean;
+  /** A page kept out of search that still passes its links on ("noindex, follow"); other no-index pages do not. */
+  followLinks?: boolean;
   /** An absolute address and a description of the picture a shared link shows; the lounge's picture when absent. */
   image?: { url: string; alt: string };
   /** What kind of page this is, for the structured data. */
@@ -23,12 +25,13 @@ const short = (text: string, max: number) => text.length <= max ? text : `${text
 // Pages that should never show up in search: rooms, places, and everything behind a login or for staff.
 const privatePrefixes = ['/lounge/spaces', '/super-admin', '/admin', '/history', '/battle', '/simulation', '/report', '/institution', '/argument-library'];
 
-const homeCrumb = { name: SEO_BRAND, path: '/lounge' };
+const homeCrumb = { name: SEO_BRAND, path: '/' };
 
 /** The title, description and address a search engine or a shared link should see for a path; null for pages this site does not describe. */
 export function seoFor(pathname: string): PageSeo | null {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
-  if (path === '/' || path === '/lounge') return { title: seoHome.title, description: seoHome.description, path: '/lounge', noindex: false, kind: 'home', faq: seoHomeFaq };
+  // The home is the bare domain; /lounge still opens it (the app sends a visitor on to /), and its tags name / as the address.
+  if (path === '/' || path === '/lounge') return { title: seoHome.title, description: seoHome.description, path: '/', noindex: false, kind: 'home', faq: seoHomeFaq };
   const guide = seoGuideByPath(path);
   if (guide) return { title: guide.title, description: guide.description, path, noindex: false, kind: 'guide', faq: guide.faq, breadcrumb: [homeCrumb, { name: guide.label, path }] };
   const character = path.startsWith('/lounge/characters/') ? loungeCharacters.find(item => item.id === path.slice('/lounge/characters/'.length)) : undefined;
@@ -45,22 +48,28 @@ export function seoFor(pathname: string): PageSeo | null {
       breadcrumb: [homeCrumb, { name: character.name, path }],
     };
   }
-  if (path === '/terms') return { title: '이용약관 · 사석에서', description: '사석 이용약관. 대화방 이용 규칙, 안전 관리, 베타 기간 이용 시간 안내.', path, noindex: false, kind: 'legal' };
-  if (path === '/account-deletion') return { title: '계정·데이터 삭제 안내 · 사석에서', description: '사석 계정을 삭제하는 방법과 삭제되는 데이터, 보관되는 정보 안내.', path, noindex: false, kind: 'legal' };
-  if (path === '/privacy') return { title: '개인정보 처리 안내 · 사석에서', description: '사석이 처리하는 개인정보와 대화 데이터, 보관 기간, 이용자의 권리 안내.', path, noindex: false, kind: 'legal' };
+  // The legal pages stay open (sign-in review, store listings) but are not offered in search, so they never stand in for the home.
+  if (path === '/terms') return { title: '이용약관 · 사석에서', description: '사석 이용약관. 대화방 이용 규칙, 안전 관리, 베타 기간 이용 시간 안내.', path, noindex: true, followLinks: true, kind: 'legal' };
+  if (path === '/account-deletion') return { title: '계정·데이터 삭제 안내 · 사석에서', description: '사석 계정을 삭제하는 방법과 삭제되는 데이터, 보관되는 정보 안내.', path, noindex: true, followLinks: true, kind: 'legal' };
+  if (path === '/privacy') return { title: '개인정보 처리 안내 · 사석에서', description: '사석이 처리하는 개인정보와 대화 데이터, 보관 기간, 이용자의 권리 안내.', path, noindex: true, followLinks: true, kind: 'legal' };
   // Rooms and places keep the lounge title; the staff and login-only screens of the other service keep their own, so only the no-index tag is set.
   if (path === '/lounge/spaces' || path.startsWith('/lounge/')) return { title: seoHome.title, description: seoHome.description, path, noindex: true };
   if (privatePrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`))) return { title: '', description: '', path, noindex: true };
   return null;
 }
 
-/** Every address that belongs in the sitemap: the lounge home, the keyword pages, the characters and the legal pages. */
+/** The robots tag of a page: open to search, or kept out of it (with or without following its links). */
+export const seoRobots = (seo: Pick<PageSeo, 'noindex' | 'followLinks'>) => !seo.noindex ? 'index, follow, max-image-preview:large, max-snippet:-1' : seo.followLinks ? 'noindex, follow' : 'noindex, nofollow';
+
+/** Every address that belongs in the sitemap: the home, the keyword pages and the characters. */
 export const seoIndexablePaths = (): string[] => [
-  '/lounge',
+  '/',
   ...seoGuides.map(guide => guide.path),
   ...loungeCharacters.map(character => `/lounge/characters/${character.id}`),
-  '/terms', '/privacy', '/account-deletion',
 ];
+
+/** Pages the build writes as static HTML but keeps out of the sitemap and out of search: the legal pages. */
+export const seoQuietPaths = (): string[] => ['/terms', '/privacy', '/account-deletion'];
 
 const organization = {
   '@type': 'Organization', '@id': `${SEO_ORIGIN}/#org`, name: SEO_COMPANY, url: `${SEO_ORIGIN}/`, email: SEO_EMAIL,
@@ -138,9 +147,9 @@ export function applySeo(seo: PageSeo) {
   let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical); }
   canonical.href = url;
-  setMeta('meta[name="robots"]', 'name', 'robots', seo.noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1');
+  setMeta('meta[name="robots"]', 'name', 'robots', seoRobots(seo));
   // The structured data follows the page; a page with none (a room, a place) keeps the site's own.
   let script = document.head.querySelector<HTMLScriptElement>('script#seo-jsonld');
   if (!script) { script = document.createElement('script'); script.type = 'application/ld+json'; script.id = 'seo-jsonld'; document.head.appendChild(script); }
-  script.textContent = seoJsonLdText(seo.kind ? seo : { ...seo, kind: 'home', path: '/lounge', breadcrumb: undefined, faq: undefined, image: undefined });
+  script.textContent = seoJsonLdText(seo.kind ? seo : { ...seo, kind: 'home', path: '/', breadcrumb: undefined, faq: undefined, image: undefined });
 }

@@ -215,7 +215,7 @@ export const seoHomeFaq: readonly SeoFaq[] = [
 ];
 
 export const seoHome = {
-  path: '/lounge',
+  path: '/',
   title: '사석에서 — 목소리로 대화하는 AI 컴패니언 · AI 전화 · 캐릭터 채팅',
   description: '나를 기억하고 가까워지는 AI 컴패니언 사석. 캐릭터와 채팅하고, 전화를 걸어 목소리로 대화해 보세요.',
   h1: '사석 — 나를 기억하는 AI 컴패니언',

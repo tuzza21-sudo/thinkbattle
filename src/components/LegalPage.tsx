@@ -96,7 +96,7 @@ export const LegalPage = ({ kind }: LegalPageProps) => {
     <main className="lounge-legal page-scroll">
       <header className="lounge-legal-top">
         <button type="button" className="lounge-legal-back" onClick={() => navigate(-1)} aria-label={isEnglish ? 'Go back' : '뒤로 가기'}><ChevronLeft size={20} /></button>
-        <Link to="/lounge" className="lounge-legal-brand"><Coffee size={22} /><strong>사석<span>{isEnglish ? 'Real talk, off the record' : '진짜 대화는 사석에서 · Off the record'}</span></strong></Link>
+        <Link to="/" className="lounge-legal-brand"><Coffee size={22} /><strong>사석<span>{isEnglish ? 'Real talk, off the record' : '진짜 대화는 사석에서 · Off the record'}</span></strong></Link>
       </header>
       <div className="lounge-legal-body">
         <section className="lounge-legal-hero">

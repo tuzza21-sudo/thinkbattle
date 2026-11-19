@@ -20,7 +20,7 @@ export function LoungeAccountDeletion() {
     try {
       await deleteLoungeAccount(acceptPaid);
       await supabase.auth.signOut().catch(() => undefined);
-      window.location.assign('/lounge');
+      window.location.assign('/');
     } catch (failure) {
       if (failure instanceof LoungeApiError && failure.code === 'paid_plan_running') setPaidRunning(true);
       else setError(failure instanceof Error ? failure.message : '계정을 삭제하지 못했어요.');

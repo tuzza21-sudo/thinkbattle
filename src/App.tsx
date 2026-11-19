@@ -57,6 +57,12 @@ const LoungePage = lazy(async () => ({ default: (await import('./components/Loun
 const SeoGuidePage = lazy(async () => ({ default: (await import('./components/SeoGuidePage')).SeoGuidePage }));
 const LoungePersonaPage = lazy(async () => ({ default: (await import('./components/LoungePersonaPage')).LoungePersonaPage }));
 
+/** /lounge was the lounge home's old address (push links, bookmarks): it opens the home at the bare domain, keeping the query and any state. */
+function LoungeHomeRedirect() {
+  const { search, hash, state } = useLocation();
+  return <Navigate to={{ pathname: '/', search, hash }} state={state} replace />;
+}
+
 function App() {
   const { pathname } = useLocation();
   const normalizedPath = pathname.replace(/\/$/, '') || '/';
@@ -71,7 +77,7 @@ function App() {
 
   useEffect(() => {
     const pageTitles: Record<string, string> = {
-      '/lounge': '사석에서',
+      '/': '사석에서',
       '/lounge/personas': '내 페르소나 · 사석에서',
       '/lounge/guide': '플레이 가이드 · 사석에서',
       '/debate': '토론 훈련',
@@ -198,10 +204,7 @@ function App() {
     <div className={isHomeRoute ? 'thinkfit-home home-route' : undefined} style={isHomeRoute ? undefined : { display: 'contents' }}>
       <Suspense fallback={loungeRoute ? loungeWaiting : <div className="app-container live-login-gate">화면을 준비하고 있습니다...</div>}>
       <Routes>
-        <Route
-          path="/"
-          element={<Navigate to="/lounge" replace />}
-        />
+        <Route path="/" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route
           path="/debate"
           element={requireAuth(<LandingPage user={user} onLoginRequest={requestLogin} onLogout={handleLogout} onUserUpdate={setUser} />)}
@@ -216,7 +219,7 @@ function App() {
           element={requireAuth(<LiveDebateRoom user={user} onLoginRequest={requestLogin} />)}
         />
         <Route path="/history" element={requireAuth(<HistoryPage user={user} onLoginRequest={requestLogin} />)} />
-        <Route path="/lounge" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
+        <Route path="/lounge" element={<LoungeHomeRedirect />} />
         <Route path="/lounge/spaces/:spaceId/:entry" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/spaces/:spaceId" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
         <Route path="/lounge/create" element={<LoungePage user={user} onGuestRequest={requestGuest} onLoginRequest={requestLogin} onSignupRequest={requestSignup} onUserUpdate={setUser} onLogout={handleLogout} />} />
@@ -250,7 +253,7 @@ function App() {
 
       {/* The beta tester call: on the lounge's front pages only, never over a sign-in or a conversation. */}
       <AppPushBanner />
-      <BetaRecruitPopup blocked={showAuthModal || !['/', '/lounge', '/lounge/about', '/lounge/guide', '/lounge/pricing'].includes(normalizedPath) || Boolean(user && !user.isAnonymous && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user))} />
+      <BetaRecruitPopup blocked={showAuthModal || !['/', '/lounge/about', '/lounge/guide', '/lounge/pricing'].includes(normalizedPath) || Boolean(user && !user.isAnonymous && (normalizedPath === '/' || normalizedPath.startsWith('/lounge')) && !isLoungeProfileComplete(user))} />
 
       {showAuthModal && (
         <AuthModal

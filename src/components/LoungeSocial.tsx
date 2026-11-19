@@ -219,7 +219,7 @@ export function LoungeFriendsPage({ user, onLoginRequest, onNotesRead, onProfile
     {error && <p className="lounge-social-error" role="alert">{error}</p>}
     {notice && <p className="lounge-social-notice" role="status">{notice}</p>}
     {tab === 'friends' && (!friends ? <p className="lounge-social-muted"><LoaderCircle size={15} className="lounge-spin" /> 친구를 불러오고 있어요.</p>
-      : !friends.length ? <div className="lounge-friends-empty"><Heart size={26} /><strong>아직 친구가 없어요</strong><p>대화방에서 함께한 분의 프로필 사진을 눌러 보세요. 대화가 끝나면 다음에 또 이야기하고 싶은 분을 고를 수도 있어요.</p><Link to="/lounge">대화방 둘러보기 <ArrowRight size={14} /></Link></div>
+      : !friends.length ? <div className="lounge-friends-empty"><Heart size={26} /><strong>아직 친구가 없어요</strong><p>대화방에서 함께한 분의 프로필 사진을 눌러 보세요. 대화가 끝나면 다음에 또 이야기하고 싶은 분을 고를 수도 있어요.</p><Link to="/">대화방 둘러보기 <ArrowRight size={14} /></Link></div>
         : <>
           <ul className="lounge-friend-list">{friends.map(friend => <FriendRow key={friend.userId} friend={friend} onProfile={() => setProfileId(friend.userId)}
             onNote={() => { setNotice(''); setWriteTo({ id: friend.userId, name: friend.nickname }); }} onRemove={() => void remove(friend)} />)}</ul>

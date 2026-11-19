@@ -212,7 +212,7 @@ try {
   assert.doesNotMatch(await evaluate("document.querySelector('.lounge-chat-log article:last-child p').textContent"), /다른 분들/);
   await screenshot('solo-room-320');
   await send('Page.navigate', { url: `${base}/` });
-  await waitFor("location.pathname==='/lounge' && document.querySelector('.lounge-account')!==null");
+  await waitFor("location.pathname==='/' && document.querySelector('.lounge-account')!==null");
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true, 'home overflow');
   await screenshot('lounge-home-320');
   await evaluate("document.querySelector('.lounge-account-signup').click()");

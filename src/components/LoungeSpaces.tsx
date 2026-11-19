@@ -432,7 +432,7 @@ export function LoungeSpacePage(props: { spaceId: string; user: AppUser | null; 
 /** Where a link to a group room ends while they are closed (see `loungeGroupRoomsEnabled`). */
 function LoungeGroupRoomsClosed() {
   return <main className="lounge-join-gate"><BookOpen size={40} /><h1>지금은 1:1 대화만 열려 있어요</h1><p>여러 사람이 함께하는 대화방은 잠시 쉬어요. 캐릭터를 골라 둘만의 이야기를 시작해 보세요.</p>
-    <Link className="lounge-primary" to="/lounge">캐릭터 고르러 가기 <ArrowRight size={17} /></Link></main>;
+    <Link className="lounge-primary" to="/">캐릭터 고르러 가기 <ArrowRight size={17} /></Link></main>;
 }
 
 function LoungeOpenSpacePage({ spaceId, user, onGuestRequest }: { spaceId: string; user: AppUser | null; onGuestRequest: () => Promise<void> }) {
@@ -462,13 +462,13 @@ function LoungeOpenSpacePage({ spaceId, user, onGuestRequest }: { spaceId: strin
   const cancelWaiting = () => { stopLoungeWait(); void leaveLoungeWait(spaceId).catch(() => {}); };
   const space = spaces?.find(item => item.id === spaceId);
   if (!spaces) return <main className="lounge-lobby lounge-home"><SpacesStatus failed={failed} retry={retry} /></main>;
-  if (!space) return <main className="lounge-join-gate"><Coffee size={40} /><h1>지금은 열려 있지 않은 장소예요</h1><Link to="/lounge">사석으로 돌아가기</Link></main>;
+  if (!space) return <main className="lounge-join-gate"><Coffee size={40} /><h1>지금은 열려 있지 않은 장소예요</h1><Link to="/">사석으로 돌아가기</Link></main>;
   const theme = getLoungeTheme(space.theme), soloCharacter = getLoungeCharacter(space.host_persona);
   const soloName = soloCharacter?.name ?? getLoungeHost(space.host_persona).name;
   const open = tables?.filter(table => table.mine || table.present_count < table.capacity) ?? [];
   const allFull = Boolean(tables?.length) && !open.length;
   return <main className="lounge-lobby lounge-space-page">
-    <Link to="/lounge" className="lounge-space-back"><ArrowLeft size={15} /> 사석</Link>
+    <Link to="/" className="lounge-space-back"><ArrowLeft size={15} /> 사석</Link>
     <section className="lounge-space-hero">
       <img src={theme.image} alt="" />
       <div>
@@ -559,7 +559,7 @@ export function LoungeSpaceEntry({ spaceId, entry, user, onGuestRequest, onLogin
   }, [spaceId, entry, solo, valid, table, topic, host, agesKey, seatCount, nickname, navigate]);
   if (!solo && !loungeGroupRoomsEnabled) return <LoungeGroupRoomsClosed />;
   if (storiesOnly) return <main className="lounge-join-gate"><BookOpen size={40} /><h1>1:1 대화는 이야기로 시작해요</h1><p>캐릭터의 이야기 하나를 고르면 짧은 프롤로그 뒤에 장면 속에서 대화가 시작돼요.</p>
-    <Link className="lounge-primary" to={host ? loungeStoriesPath(host) : '/lounge'}>{host ? '이야기 고르러 가기' : '캐릭터 고르러 가기'} <ArrowRight size={17} /></Link></main>;
+    <Link className="lounge-primary" to={host ? loungeStoriesPath(host) : '/'}>{host ? '이야기 고르러 가기' : '캐릭터 고르러 가기'} <ArrowRight size={17} /></Link></main>;
   if (!valid) return <main className="lounge-join-gate"><Coffee size={40} /><h1>{entry === 'open' ? '대화 주제와 캐릭터를 먼저 정해 주세요' : '어느 대화방에 앉을지 골라 주세요'}</h1><Link className="lounge-primary" to={`/lounge/spaces/${spaceId}`}>장소 둘러보기 <ArrowRight size={17} /></Link></main>;
   if (!user) return <main className="lounge-join-gate"><DoorOpen size={40} /><h1>{solo ? '둘이서 이야기하기 전에' : '들어가기 전에'} 불릴 이름이 필요해요.</h1><p>게스트로 바로 들어가거나, 로그인하면 캐릭터와의 관계가 계정에 이어져요.</p>
     <button className="lounge-primary" type="button" onClick={() => { void onGuestRequest().catch(err => setError(errorText(err))); }}>게스트로 들어가기 <ArrowRight size={17} /></button>
