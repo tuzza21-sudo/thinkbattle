@@ -209,12 +209,16 @@ function parseHostAnswer(output: string | undefined, result?: ModelResult, withM
     throw new LoungeUpstreamError('사회자 답변이 비어 있었어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_empty_response', true, 5);
   }
   try {
-    const answer = JSON.parse(output);
+    // A code fence round the JSON (```json … ```) is not part of it.
+    let answer: { text: string; memory: string; events?: unknown };
+    try { answer = JSON.parse(output); } catch (first) { const bare = output.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''); if (bare === output.trim()) throw first; answer = JSON.parse(bare); }
     if (typeof answer?.text === 'string') answer.text = withoutRunawayTail(answer.text);
     if (typeof answer?.text !== 'string' || !answer.text.trim() || (withMemory && typeof answer.memory !== 'string')) throw new Error();
     return answer;
   } catch {
-    console.error('[Lounge API] host reply was not valid JSON', JSON.stringify({ status: result?.status, incomplete: result?.incomplete_details?.reason, outputTokens: result?.usage?.output_tokens }));
+    // Only the shape of the answer is logged, never what it said (2026-11-19: DeepSeek's turn 202 failed this twice with 539 and 510 tokens and nothing said why).
+    const shape = (() => { let parsed = false, text = 'none'; try { const found = JSON.parse(output); parsed = true; text = typeof found?.text; } catch { /* not JSON */ } return { length: output.length, first: output.trimStart().slice(0, 1), last: output.trimEnd().slice(-1), parsed, text, fenced: /^\s*```/.test(output) }; })();
+    console.error('[Lounge API] host reply was not valid JSON', JSON.stringify({ status: result?.status, incomplete: result?.incomplete_details?.reason, outputTokens: result?.usage?.output_tokens, shape }));
     throw new LoungeUpstreamError('사회자 답변이 불완전하게 도착했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 60);
   }
 }
@@ -821,6 +825,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     turnNote.reason = typeof body.reason === 'string' ? body.reason : undefined;
     if (!ticket) { lookupGiveUp.abort(); if (body.reason !== 'silence') await noteTurnFailure?.('skipped', { phase: 'claim' }); return json({ skipped: true }); }
     claimedTicket = ticket; requestPhase = 'claimed';
+    // A turn that claims and then leaves no "[Lounge turn end]" line died on the way (2026-11-19: a claim at 10:16:05 left nothing, and the room waited out its 60 seconds).
+    console.info('[Lounge claim]', JSON.stringify({ reason: turnNote.reason, afterMs: Math.round(performance.now() - requestStartedAt) }));
     const user = await readJson<{ id: string; email?: string; is_anonymous?: boolean }>(auth, 'lounge');
     turnNote.user_id = user.id;
     // Read in parallel with the room so a relationship adds no round trip; a failure only disables it.
@@ -1534,14 +1540,18 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     // Runs once the reply is written, alongside its speech. What it writes is saved only if the reply was (`saved`). A
     // failure loses this turn's summary and events, never the reply. It is not cancelled with the request: the member
     // leaving right after a reply should not lose what the reply changed.
+    let afterStage = 'idle';
     const afterReply = async (reply: string, saved: Promise<boolean>): Promise<{ answer?: AfterReply; relationship?: { relationship: RelationshipView; change: RelationshipChange }; story?: LoungeStoryState }> => {
       const started = performance.now();
       let answer: AfterReply | undefined;
       const request = afterReplyRequest(reply);
+      afterStage = 'saved';
       if (durableCompanion && await saved) {
+        afterStage = 'prepare';
         try { await prepareTurn(companionTurn, turnPayload(request), false); }
         catch (error) { console.warn('[Lounge turn prepare]', error instanceof Error ? error.name : 'error'); }
       }
+      afterStage = 'model';
       try {
         const result = await readJson<ModelResult>(await openai('responses', JSON.stringify(request), undefined, 40_000), 'openai');
         const usage = modelUsageLog(result, { host: host.id, mode: 'after-reply' }); if (usage) console.info('[Lounge model]', JSON.stringify(usage));
@@ -1553,10 +1563,14 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       if (!await saved) return {};
       if (durableCompanion) {
         let relationshipSaved;
+        afterStage = 'commit';
         try { relationshipSaved = await persistTurn(answer, request); }
         catch (error) { console.warn('[Lounge turn commit]', error instanceof Error ? error.name : 'error'); }
+        afterStage = 'story';
         const storySaved = await saveStory(answer?.story_checkpoints, answer?.story_facts, answer?.story_choice, answer?.memory);
+        afterStage = 'embeddings';
         await fillMemoryEmbeddings();
+        afterStage = 'done';
         console.info('[Lounge after reply]', JSON.stringify({ host: host.id, ms: Math.round(performance.now() - started), written: Boolean(answer), durable: true }));
         return { answer, relationship: relationshipSaved, story: storySaved };
       }
@@ -2149,7 +2163,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             if (notes.length) console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes }));
             return joinLoungeInnerVoice(said.text, thought.inner, replyLimit);
           };
-          let replySaved = false;
+          let replySaved = false, turnStage = 'text', stallTimer: ReturnType<typeof setTimeout> | undefined;
+          const workStarted = performance.now();
           try {
             const early = (await textReady)?.trim();
             const firstText = messenger && early ? await companionReply(early) : early?.slice(0, replyLimit);
@@ -2177,9 +2192,13 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 throw error;
               })
               .catch(error => { console.error('[Lounge API] reply not saved', error instanceof LoungeUpstreamError ? error.code : 'error'); return false; });
+            turnStage = 'saving';
             const after = afterReply(firstText, saved);
             const savedOk = await saved;
             replySaved = savedOk;
+            turnStage = 'trace';
+            // What follows the saved reply (the trace, the speech, the after-reply work) is not timed by anything that logs: if it passes 45 seconds, say where it is.
+            stallTimer = setTimeout(() => console.warn('[Lounge turn stalled]', JSON.stringify({ host: host.id, stage: turnStage, after: afterStage, afterMs: Math.round(performance.now() - workStarted) })), 45_000);
             // Where a turn's wait went, from the request: the context (claim, reads, lookups), the first words of a chat,
             // the whole reply, and the save that lets the next turn start.
             console.info('[Lounge turn]', JSON.stringify({ host: host.id, model: chatModel.id, medium: chat ? 'chat' : 'voice', contextMs: Math.round(modelStarted - contextStarted), ...(firstPartialAt ? { firstTextMs: Math.round(firstPartialAt - contextStarted) } : {}), textMs: Math.round(textAt - contextStarted), savedMs: Math.round(performance.now() - contextStarted), chars: firstText.length }));
@@ -2197,9 +2216,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const traceWrite = serviceHeaders ? writeTurnModel(turnModelRow)
               .then(response => response.status === 400 ? writeTurnModel(turnModel) : response)
               .then(response => { if (!response.ok && response.status !== 404) console.warn('[Lounge turn model] not saved', response.status); }).catch(() => {}) : Promise.resolve();
+            turnStage = 'speech';
             await speech;
             await traceWrite;
+            turnStage = 'after';
             const { answer, relationship: relationshipSaved, story: storySaved } = await after;
+            turnStage = 'sent';
             // The chat's status card: the new stage and scores, and what the member's message changed.
             if (relationshipSaved) send({ type: 'relationship', ...relationshipSaved });
             // Where the story is now, so the choices the reply put to the member show without waiting for the room's reload.
@@ -2229,6 +2251,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               .catch(failure => { if (!(failure instanceof LoungeUpstreamError && failure.code === 'lounge_schema_not_ready')) console.warn('[Lounge API] turn not released', failure instanceof LoungeUpstreamError ? failure.code : 'error'); });
             send(streamFailure(error, '사회자가 답변을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.'));
           } finally {
+            if (stallTimer) clearTimeout(stallTimer);
+            // However the turn ended, a reply that was not saved gives its claim back now (the catch above does it for a failure; a turn that left without one did not).
+            if (!replySaved) await rpc<void>('release_voice_lounge_host', { p_room: roomId, p_ticket: ticket }, true).catch(() => {});
+            console.info('[Lounge turn end]', JSON.stringify({ host: host.id, saved: replySaved, stage: turnStage, ms: Math.round(performance.now() - workStarted) }));
             await reader?.cancel().catch(() => {}); reader?.releaseLock();
             await recordSpeech();
             if (!cancelled.signal.aborted) try { controller.close(); } catch { /* the reader is gone */ }
