@@ -5715,3 +5715,11 @@ test('a claimed turn is a lease of 15 seconds that the working request renews, a
   assert.match(api, /process\.on\('unhandledRejection', reason => loungeProcessError\('unhandledRejection', reason\)\)/);
   assert.match(api, /inFlight: \[\.\.\.loungeInFlight\.values\(\)\]\.map\(flight => \(\{ action: flight\.action\(\), phase: flight\.phase\(\), stage: flight\.stage\?\.\(\)/);
 });
+
+test('the lease migration keeps a one-to-one chat free of the 120-turn limit (2026-11-19 hotfix)', () => {
+  const lease = readFileSync(new URL('../supabase/migrations/20270104000000_lounge_turn_lease.sql', import.meta.url), 'utf8');
+  assert.match(lease, /OR \(r\.ai_turns>=120 AND NOT r\.companion_chat\)/);
+  assert.doesNotMatch(lease, /OR r\.ai_turns>=120/);
+  const hotfix = readFileSync(new URL('../supabase/migrations/20270104000100_lounge_claim_companion_limit.sql', import.meta.url), 'utf8');
+  assert.match(hotfix, /replace\(definition,'OR r\.ai_turns>=120','OR \(r\.ai_turns>=120 AND NOT r\.companion_chat\)'\)/);
+});
