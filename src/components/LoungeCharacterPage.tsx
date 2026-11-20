@@ -11,7 +11,7 @@ import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { LoungeHostPortrait } from './LoungeHostPortrait';
 import { LoungeCharacterGallery } from './LoungeCharacterGallery';
 import { LoungePersonaPicker } from './LoungePersonaPicker';
-import { LoungeScenarioCards } from './LoungeScenarioCards';
+import { LoungeStoryStart } from './LoungeStoryStart';
 import { useLoungeScenarios } from '../lib/useLoungeScenarios';
 import './LoungeCharacter.css';
 
@@ -53,8 +53,9 @@ function CustomActions({ row, user }: { row: LoungeCustomCharacterRow; user: App
 
 /**
  * A character's page, opened straight from the home (2026-10-29: the summary sheet in between is gone): their photo at
- * work with the name over it and the card's line under it, then the way into a conversation, a story from their life,
- * their temperament, the stories to start and the gallery. What moves the relationship is folded away at the end.
+ * work with the name over it and the card's line under it, then the way into a conversation (the stories to start, as small cards under the
+ * button, and the persona to be), a story from their life,
+ * their temperament and the gallery. What moves the relationship is folded away at the end.
  */
 export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | null }) {
   const custom = useLoungeCustomCharacter(id);
@@ -70,8 +71,6 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
   const chips = (event: RelationshipEventType, direction: 1 | -1) => <span className={`lounge-character-effects ${direction > 0 ? 'up' : 'down'}`}>{effectChips(config, event, direction).map(chip => <i key={chip.name} className={chip.strong ? 'strong' : ''}>{chip.name} {direction > 0 ? chip.strong ? '▲▲' : '▲' : chip.strong ? '▼▼' : '▼'}</i>)}</span>;
   const nameOf = (hostId: string) => loungeCharacters.find(item => item.id === hostId)?.name ?? getLoungeHost(hostId).name;
   const profile = made ? undefined : loungeCharacterProfiles[character.id];
-  // A conversation with a house character starts from one of its stories, listed further down.
-  const toStories = () => document.getElementById('stories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const moves = config && (character.wins?.length > 0 || character.losses?.length > 0);
 
   return <main className={`lounge-character ${night ? 'night' : ''}`} style={{ '--character-accent': host.color } as CSSProperties}>
@@ -97,11 +96,7 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
           <div><dt>하는 일</dt><dd>{character.role}</dd></div>
           {made && <div><dt>관계</dt><dd>{host.tag}</dd></div>}
         </dl>
-        {made ? custom.row && <CustomActions row={custom.row} user={user} />
-          : scenarios?.length !== 0 && <div className="lounge-character-actions lounge-character-start">
-            <button type="button" className="lounge-character-cta" onClick={toStories}><MessageCircle size={17} />대화 시작하기</button>
-            <span className="lounge-character-cta-note">{scenarios ? `함께할 이야기 ${scenarios.length}개 중에서 골라요` : '이야기를 불러오는 중…'}</span>
-          </div>}
+        {made ? custom.row && <CustomActions row={custom.row} user={user} /> : <LoungeStoryStart scenarios={scenarios} user={user} />}
         {user && !user.isAnonymous && <div className="lounge-character-actions"><LoungePersonaPicker characterId={character.id} characterName={character.name} /></div>}
       </div>
     </section>
@@ -120,8 +115,6 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
       <h2>취향</h2>
       <div className="lounge-character-traits">{character.tastes.split('\n').map(line => line.trim()).filter(Boolean).map((line, index) => { const [label, ...rest] = line.split(/[:：]/); return rest.length ? <article key={index}><h3>{label.trim()}</h3><p>{rest.join(':').trim()}</p></article> : <article key={index}><p>{line}</p></article>; })}</div>
     </section>}
-
-    {!made && scenarios && <LoungeScenarioCards scenarios={scenarios} user={user} />}
 
     <LoungeCharacterGallery characterId={character.id} name={character.name} />
 

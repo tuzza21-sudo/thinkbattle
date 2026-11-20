@@ -1,10 +1,10 @@
-import { useEffect, useId, useState } from 'react';
-import { Check, LoaderCircle, UserCog, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useId, useState } from 'react';
+import { UserCog, X } from 'lucide-react';
 import { listLoungeChats, listMyLoungePersonas, setLoungeRoomPersona } from '../lib/loungeApi';
 import type { LoungeMemberPersonaRow } from '../lib/loungePersonas';
 import { loadLoungePersonaPreference, saveLoungePersonaPreference } from '../lib/loungePersonaPreference';
 import { supabase } from '../lib/supabase';
+import { LoungePersonaManager } from './LoungePersonaManager';
 import './LoungePersonaPicker.css';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -17,6 +17,8 @@ const chosenOf = (value: unknown) => {
 /**
  * On a character's page (2026-11-18, by the owner): who the member is in the conversations with this character. The pick goes to the conversation they
  * already have with the character, if there is one, and is kept for the ones they open next. The default persona (the star) is used until one is picked.
+ * Since 2026-11-20 the same sheet makes, edits and deletes personas (the manager of the profile, with a way to tap one to use it), so there is no
+ * second page to go to.
  */
 export function LoungePersonaPicker({ characterId, characterName }: { characterId: string; characterName: string }) {
   const [open, setOpen] = useState(false);
@@ -27,7 +29,6 @@ export function LoungePersonaPicker({ characterId, characterName }: { characterI
   const [error, setError] = useState('');
   const titleId = useId();
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     void Promise.all([listMyLoungePersonas().catch(() => [] as LoungeMemberPersonaRow[]), listLoungeChats().catch(() => [])]).then(async ([list, chats]) => {
       const chat = chats.find(item => item.character_id === characterId);
@@ -40,7 +41,7 @@ export function LoungePersonaPicker({ characterId, characterName }: { characterI
       setPersonas(list); setRoomId(chat?.room_id ?? null); setValue(chosen);
     });
     return () => { cancelled = true; };
-  }, [open, characterId]);
+  }, [characterId]);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) setOpen(false); };
@@ -56,30 +57,19 @@ export function LoungePersonaPicker({ characterId, characterName }: { characterI
       setValue(next);
     } catch (err) { setError(errorText(err)); } finally { setBusy(false); }
   };
-  const fallback = personas?.find(persona => persona.is_default);
-  const options = [
-    { id: '', label: fallback ? `기본 페르소나 · ${fallback.title}` : '기본 페르소나', hint: fallback ? '새 대화마다 자동으로 쓰는 페르소나예요' : '기본으로 정한 페르소나가 없어서 쓰지 않아요' },
-    ...(personas ?? []).map(persona => ({ id: persona.id, label: persona.title, hint: [persona.call_name && `"${persona.call_name}"`, persona.job, persona.personality].filter(Boolean).join(' · ') || '설정 없음' })),
-    { id: 'none', label: '페르소나 쓰지 않기', hint: '닉네임으로 부르고 내 설정 없이 대화해요' },
-  ];
-  const current = options.find(option => option.id === value) ?? options[0];
+  const onList = useCallback((list: LoungeMemberPersonaRow[]) => setPersonas(list), []);
+  const label = value === 'none' ? '쓰지 않음' : (personas?.find(persona => persona.id === value) ?? (value === '' ? personas?.find(persona => persona.is_default) : undefined))?.title ?? '기본';
   return <>
     <button type="button" className="lounge-persona-pick-button" onClick={() => setOpen(true)} title={`${characterName}과(와) 대화할 때의 나(페르소나)를 골라요`}>
-      <UserCog size={16} aria-hidden="true" /><span>페르소나</span><small>{value ? current.label : '기본'}</small>
+      <UserCog size={16} aria-hidden="true" /><span>페르소나</span><small>{label}</small>
     </button>
     {open && <>
       <div className="lounge-persona-pick-backdrop" onClick={() => { if (!busy) setOpen(false); }} />
-      <section className="lounge-persona-pick-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <section className="lounge-persona-pick-sheet lounge-account-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header><b id={titleId}>{characterName}과(와) 대화할 때의 나</b><button type="button" onClick={() => setOpen(false)} disabled={busy} aria-label="닫기"><X size={18} /></button></header>
         <p className="lounge-persona-pick-note">{roomId ? `지금 ${characterName}과(와) 하는 대화에 바로 쓰고, 새로 여는 대화에도 써요.` : `${characterName}과(와) 새로 여는 대화부터 써요.`}</p>
-        {!personas ? <p className="lounge-persona-pick-note"><LoaderCircle size={14} className="lounge-spin" /> 불러오는 중…</p>
-          : <ul className="lounge-persona-pick-list">{options.map(option => <li key={option.id || 'default'}>
-            <button type="button" disabled={busy} aria-pressed={option.id === (value || '')} onClick={() => void choose(option.id)}>
-              <span><b>{option.label}</b><small>{option.hint}</small></span>{option.id === (value || '') ? <Check size={16} aria-hidden="true" /> : null}
-            </button>
-          </li>)}</ul>}
+        <LoungePersonaManager choice={{ value, busy, onChoose: next => void choose(next) }} onList={onList} />
         {error && <p className="lounge-persona-pick-error" role="alert">{error}</p>}
-        <Link to="/lounge/personas" className="lounge-persona-pick-manage">페르소나 만들고 고치기</Link>
       </section>
     </>}
   </>;

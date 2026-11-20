@@ -1,12 +1,22 @@
 /**
- * The tone heard while a call is being put through (2026-11-07): the ringback of a phone, 440 Hz and 480 Hz together for
- * one second, then two seconds of quiet, until the character picks up (its first word) or a failsafe ends it. Made with
- * the Web Audio API, so there is no sound file to ship. It starts from the member's click (the call button), where the
- * browser lets a page make sound.
+ * The tone heard while a call is being put through (2026-11-07): the ringback of a phone, 440 Hz and 480 Hz together,
+ * until the character picks up (its first word) or a failsafe ends it. Made with the Web Audio API, so there is no sound
+ * file to ship. It starts from the member's click (the call button), where the browser lets a page make sound.
+ *
+ * 2026-11-20 (the tone cut out in the middle while the call was connecting): every ring of the failsafe's length is now
+ * scheduled on the audio clock at the start, so a page busy with the connection can no longer make a ring late, early or
+ * clipped (they were started from a timer, which the connecting work held up). Each ring swells in and fades out
+ * slowly instead of starting and stopping at once, and a context the browser pauses is resumed.
  */
 
-// The level was 0.07, which a phone speaker barely showed; 0.2 is clearly heard at a normal volume (2026-11-09).
-const ringSeconds = 1, quietSeconds = 2, failsafeMs = 20_000, level = 0.2, fadeSeconds = 0.25;
+const ringSeconds = 1.3, quietSeconds = 1.7, failsafeMs = 20_000, level = 0.2, attackSeconds = 0.14, releaseSeconds = 0.4, fadeSeconds = 0.3;
+
+/** When each ring starts and ends (seconds from the start), enough of them to cover the failsafe. */
+export function ringbackSchedule(totalSeconds = failsafeMs / 1000): Array<{ start: number; end: number }> {
+  const rings: Array<{ start: number; end: number }> = [];
+  for (let start = 0; start < totalSeconds; start += ringSeconds + quietSeconds) rings.push({ start, end: start + ringSeconds });
+  return rings;
+}
 
 export function startCallRingback(onEnd?: () => void): () => void {
   let audio: AudioContext;
@@ -17,6 +27,10 @@ export function startCallRingback(onEnd?: () => void): () => void {
   } catch { return () => {}; }
   // `onEnd` tells the page the ringing is over, however it ended (the first word, an error, the failsafe).
   void audio.resume().catch(() => {});
+  let stopped = false;
+  // The browser may pause the context while the call connects (the microphone opens, another sound starts): the clock stops with it, so the
+  // rings already scheduled wait and go on from where they were once it runs again.
+  audio.onstatechange = () => { if (!stopped && audio.state !== 'running' && audio.state !== 'closed') void audio.resume().catch(() => {}); };
   const gain = audio.createGain();
   gain.gain.value = 0;
   gain.connect(audio.destination);
@@ -26,25 +40,23 @@ export function startCallRingback(onEnd?: () => void): () => void {
     oscillator.connect(gain); oscillator.start();
     return oscillator;
   });
-  const ring = () => {
-    const at = audio.currentTime;
-    gain.gain.cancelScheduledValues(at);
-    gain.gain.setValueAtTime(0, at);
-    gain.gain.linearRampToValueAtTime(level, at + 0.03);
-    gain.gain.setValueAtTime(level, at + ringSeconds - 0.05);
-    gain.gain.linearRampToValueAtTime(0, at + ringSeconds);
-  };
-  ring();
-  const repeat = window.setInterval(ring, (ringSeconds + quietSeconds) * 1000);
-  let stopped = false;
+  const begin = audio.currentTime + 0.03;
+  gain.gain.setValueAtTime(0, begin);
+  for (const { start, end } of ringbackSchedule()) {
+    gain.gain.setValueAtTime(0, begin + start);
+    gain.gain.linearRampToValueAtTime(level, begin + start + attackSeconds);
+    gain.gain.setValueAtTime(level, begin + end - releaseSeconds);
+    gain.gain.linearRampToValueAtTime(0, begin + end);
+  }
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    window.clearInterval(repeat); window.clearTimeout(failsafe); onEnd?.();
+    window.clearTimeout(failsafe); onEnd?.();
     try {
       const at = audio.currentTime;
+      const held = gain.gain.value;
       gain.gain.cancelScheduledValues(at);
-      gain.gain.setValueAtTime(gain.gain.value, at);
+      gain.gain.setValueAtTime(held, at);
       gain.gain.linearRampToValueAtTime(0, at + fadeSeconds);
     } catch { /* the tone is stopped below either way */ }
     window.setTimeout(() => {
