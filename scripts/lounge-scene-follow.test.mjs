@@ -207,3 +207,21 @@ test('a story that begins in a place the card cannot name opens on it: 윤지안
   assert.equal(lounge.loungeRoomSceneTheme({ ...room, background: { theme: 'cafe' } }), 'cafe');
   assert.equal(lounge.loungeRoomSceneTheme({ ...room, scenario: { id: 'poker-after-the-final' }, theme: 'hotellobby', background: null }), 'hotellobby');
 });
+
+test('a background picked by hand is not written over by a follow that began before it (2026-11-20, back to the first background)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const api = readFileSync(new URL('../api/lounge-images.ts', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8');
+  // Both writes of the automatic follow read the room again first, and write nothing when the member has chosen since.
+  const held = api.slice(api.indexOf('const heldBackground'), api.indexOf('const saveOnRoom'));
+  assert.match(held, /if \(!automatic\) return/);
+  assert.match(held, /select=background/);
+  assert.match(held, /auto_off === true \|\| background\.auto !== true\) \? undefined/);
+  assert.match(api, /const saveOnRoom[\s\S]{0,200}const held = await heldBackground\(\);\s*if \(!held\) return json\(\{ background: null \}\)/);
+  assert.match(api, /const recordFollow[\s\S]{0,200}const held = await heldBackground\(\);\s*if \(!held\) return;\s*const kept = held\.background \?\? \{\}/);
+  assert.doesNotMatch(api, /const kept = room\.background/, 'the old read at the start is not written back');
+  // The page shows an answer of the follow only while the follow is still on, and a pick that could not be saved says so.
+  assert.match(page, /mounted\.current && followingPlace\.current\) keepBackground\(picked\)/);
+  assert.doesNotMatch(page, /not saved on the room/);
+  assert.match(page, /catch \(err\) \{\s*if \(!\('scene' in picked\)\) keepBackground\(before\);\s*throw err;/);
+});

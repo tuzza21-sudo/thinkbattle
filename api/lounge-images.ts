@@ -330,9 +330,22 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   }
   if (!scene) return json({ background: null });
   const key = scenario && episode ? loungeSceneKey(scenario.id, episode.number, state?.adapted ? episode.scene : undefined) : undefined;
+  // The follow is slow (the model, sometimes a picture), and the member can pick a background by hand meanwhile. What it writes is
+  // therefore written over what the room has at that moment, not over what it read when it began (2026-11-20, by the owner: a
+  // background picked by hand went back to the first one). `held` is undefined when the room cannot be read: nothing is written.
+  const heldBackground = async (): Promise<{ background: Record<string, unknown> | null } | undefined> => {
+    if (!automatic) return { background: room.background ?? null };
+    const response = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}&select=background`, { headers: serviceHeaders(context) }).catch(() => null);
+    const [now] = response?.ok ? await response.json().catch(() => []) as Array<{ background?: Record<string, unknown> | null }> : [];
+    if (!now) return undefined;
+    const background = now.background && typeof now.background === 'object' ? now.background : null;
+    return background && (background.auto_off === true || background.auto !== true) ? undefined : { background };
+  };
   const saveOnRoom = async (background: Record<string, unknown>) => {
+    const held = await heldBackground();
+    if (!held) return json({ background: null });
     // A one-off "fit it to the scene" while the follow is off keeps it off.
-    const value = { ...background, auto: true, ...(room.background?.auto_off === true ? { auto_off: true } : {}), ...(episode ? { episode: episode.number } : {}), ...(followNote ? { follow: followNote } : {}) };
+    const value = { ...background, auto: true, ...(held.background?.auto_off === true ? { auto_off: true } : {}), ...(episode ? { episode: episode.number } : {}), ...(followNote ? { follow: followNote } : {}) };
     const saved = await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: value }) }).catch(() => null);
     console.info('[Lounge scene]', JSON.stringify({ key, chosen: background.theme ?? (background.scene ? 'shared' : 'blank'), saved: Boolean(saved?.ok) }));
     return json({ background: value });
@@ -340,7 +353,9 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   // The background stays as it is, but what it was decided for is kept, so the same scene is not asked about again.
   const recordFollow = async () => {
     if (!followNote) return;
-    const kept = room.background && typeof room.background === 'object' ? room.background : {};
+    const held = await heldBackground();
+    if (!held) return;
+    const kept = held.background ?? {};
     await timed(`${context.base}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&host_id=eq.${userId}`, { method: 'PATCH', headers: serviceHeaders(context, { 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ background: { ...kept, auto: true, follow: followNote } }) }).catch(() => undefined);
   };
   const unchanged = async () => { await recordFollow(); return json({ background: null }); };
