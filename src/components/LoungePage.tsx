@@ -879,6 +879,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
   const latestHostId = messages.filter(message => message.kind === 'host').at(-1)?.id;
   const placeFollowed = useRef<{ room: string; at: number } | null>(null);
   const followsPlace = Boolean(room && user && !user.isAnonymous && room.capacity === 1 && !room.space_id && room.host_id === user.id && !storyState && loungeSceneAutoOn(room.background));
+  // An answer that comes after the member picked a background by hand (the follow turns itself off then) is not shown.
+  const followingPlace = useRef(followsPlace);
+  useEffect(() => { followingPlace.current = followsPlace; }, [followsPlace]);
   useEffect(() => {
     if (!followsPlace) return;
     const ask = () => {
@@ -886,7 +889,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       const last = placeFollowed.current;
       if (last && last.room === roomId && Date.now() - last.at < 2000) return;
       placeFollowed.current = { room: roomId, at: Date.now() };
-      void matchLoungeSceneBackground(roomId, true).then(result => { const picked = readLoungeRoomBackground(result.background); if (picked && mounted.current) keepBackground(picked); })
+      void matchLoungeSceneBackground(roomId, true).then(result => { const picked = readLoungeRoomBackground(result.background); if (picked && mounted.current && followingPlace.current) keepBackground(picked); })
         .catch(err => console.warn('[Lounge scene] not followed', err instanceof Error ? err.message.slice(0, 80) : 'error'));
     };
     const timers = [window.setTimeout(ask, 2500), window.setTimeout(ask, 9000)];
@@ -1669,9 +1672,17 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       // The conversation's own place is saved as a pick too, so a story does not change it again in the same episode.
       const picked = choice ?? { theme: storyTheme.id };
       const episodeNumber = storyState ? storyState.episode + 1 : undefined;
+      // The pick shows at once. One that could not be saved goes back and says so: left on screen alone, the room reloaded with the
+      // old background a moment later and the pick seemed to undo itself.
+      const before = background;
       if (!('scene' in picked)) keepBackground({ ...picked, ...(episodeNumber ? { episode: episodeNumber } : {}) });
-      const saved = await chooseLoungeRoomBackground(roomId, picked, episodeNumber).catch(err => { if ('scene' in picked) throw err; console.warn('[Lounge background] not saved on the room', err instanceof Error ? err.message.slice(0, 80) : 'error'); });
-      if ('scene' in picked) keepBackground(readLoungeRoomBackground(saved));
+      try {
+        const saved = await chooseLoungeRoomBackground(roomId, picked, episodeNumber);
+        if ('scene' in picked) keepBackground(readLoungeRoomBackground(saved));
+      } catch (err) {
+        if (!('scene' in picked)) keepBackground(before);
+        throw err;
+      }
     }}
     onMatch={async () => { keepBackground(readLoungeRoomBackground((await matchLoungeSceneBackground(roomId)).background) ?? background); }}
     onMake={async prompt => { const made = await makeLoungeRoomBackground(roomId, prompt); keepBackground({ image: made.image, ...(made.scene ? { scene: made.scene } : {}), prompt: made.prompt, ...(storyState ? { episode: storyState.episode + 1 } : {}) }); }} /> : undefined;
