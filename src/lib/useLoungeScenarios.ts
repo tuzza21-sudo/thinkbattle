@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { listLoungeScenarios } from './loungeApi';
 import type { LoungeScenarioRow } from './loungeScenarios';
 
-/** The stories of a character, loaded once for the page (its "대화 시작하기" and the list below); null while loading. */
+/** The stories of a character, loaded once for the page (the stories under its "대화 시작하기"); null while loading. */
 export function useLoungeScenarios(characterId: string) {
   const [scenarios, setScenarios] = useState<{ id: string; rows: LoungeScenarioRow[] } | null>(null);
   useEffect(() => {

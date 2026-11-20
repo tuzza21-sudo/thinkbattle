@@ -6,14 +6,22 @@ import { loungePersonaLimits, type LoungeMemberPersonaRow } from '../lib/loungeP
 
 type Draft = Omit<LoungeMemberPersonaRow, 'id'> & { id?: string };
 const empty: Draft = { title: '', call_name: '', job: '', personality: '', details: '', story_character: '', story: '', is_default: false };
+/**
+ * Choosing as well as making (2026-11-20, by the owner: on a character's page the persona is set and picked in one place): with this, each persona
+ * of the list can be tapped to be the one used. The default one is picked with the empty value (it goes on following the default), and 'none' is
+ * no persona. A persona saved as a new one is picked at once.
+ */
+export type PersonaChoice = { value: string; busy: boolean; onChoose: (value: string) => void };
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 
 /**
  * The member's personas in the profile: who they are in a one-to-one conversation (a name to be called by, a job, a
  * personality, anything else). Up to five; the default one is used in every conversation unless another is chosen there.
  */
-export function LoungePersonaManager() {
+export function LoungePersonaManager({ choice, onList }: { choice?: PersonaChoice; onList?: (list: LoungeMemberPersonaRow[]) => void } = {}) {
   const [personas, setPersonas] = useState<LoungeMemberPersonaRow[] | null>(null);
+  // The list is also told to the page that chooses (2026-11-20), so its button can name the persona that is picked.
+  useEffect(() => { if (personas) onList?.(personas); }, [personas, onList]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -29,12 +37,16 @@ export function LoungePersonaManager() {
         return others.some(item => item.id === saved.id) ? others.map(item => item.id === saved.id ? saved : item) : [...others, saved];
       });
       setDraft(null);
+      if (choice && !draft.id) choice.onChoose(saved.is_default ? '' : saved.id);
     } catch (err) { setError(errorText(err)); } finally { setBusy(''); }
   };
   const remove = async (persona: LoungeMemberPersonaRow) => {
     if (busy || !window.confirm(`'${persona.title}' 페르소나를 지울까요?`)) return;
     setBusy(persona.id); setError('');
-    try { await deleteMyLoungePersona(persona.id); setPersonas(list => (list ?? []).filter(item => item.id !== persona.id)); }
+    try {
+      await deleteMyLoungePersona(persona.id); setPersonas(list => (list ?? []).filter(item => item.id !== persona.id));
+      if (choice && (choice.value === persona.id || (choice.value === '' && persona.is_default))) choice.onChoose('');
+    }
     catch (err) { setError(errorText(err)); } finally { setBusy(''); }
   };
   const makeDefault = async (persona: LoungeMemberPersonaRow) => {
@@ -50,17 +62,25 @@ export function LoungePersonaManager() {
     {rows ? <textarea rows={rows} value={draft?.[key] ?? ''} maxLength={loungePersonaLimits[key]} placeholder={placeholder} disabled={busy === 'save'} onChange={event => setDraft(current => current && { ...current, [key]: event.target.value })} />
       : <input value={draft?.[key] ?? ''} maxLength={loungePersonaLimits[key]} placeholder={placeholder} disabled={busy === 'save'} onChange={event => setDraft(current => current && { ...current, [key]: event.target.value })} />}
   </label>;
+  const hasDefault = personas?.some(persona => persona.is_default) ?? false;
+  const chosen = (persona: LoungeMemberPersonaRow) => choice ? choice.value === persona.id || (choice.value === '' && persona.is_default) : false;
+  const noneChosen = choice ? choice.value === 'none' || (choice.value === '' && !hasDefault) : false;
   if (personas === null) return <p className="lounge-persona-note"><LoaderCircle size={14} className="lounge-spin" /> 페르소나를 불러오는 중…</p>;
   return <div className="lounge-persona-manager">
-    <p className="lounge-persona-note">캐릭터와 1:1로 대화할 때의 나예요. 직업과 성격을 적어 두면 캐릭터가 그런 사람으로 대하고, 어울릴 때 먼저 이야기해요. 한 캐릭터와의 서사를 써 두면 그 캐릭터와는 그 서사로 이야기가 시작돼요. 기본 페르소나는 모든 대화에 쓰이고, 대화 중 설정에서 다른 것으로 바꿀 수 있어요.</p>
-    {personas.length > 0 && <ul className="lounge-persona-list">{personas.map(persona => <li key={persona.id} className={persona.is_default ? 'default' : ''}>
-      <div><b>{persona.title}{persona.is_default && <small>기본</small>}</b><span>{[persona.call_name && `"${persona.call_name}"`, persona.job, persona.personality].filter(Boolean).join(' · ') || '설정 없음'}</span>{persona.story?.trim() && persona.story_character && <small className="lounge-persona-story-tag">{loungeCharacters.find(character => character.id === persona.story_character)?.name ?? '캐릭터'}와의 서사</small>}</div>
+    {!choice && <p className="lounge-persona-note">캐릭터와 1:1로 대화할 때의 나예요. 직업과 성격을 적어 두면 캐릭터가 그런 사람으로 대하고, 어울릴 때 먼저 이야기해요. 한 캐릭터와의 서사를 써 두면 그 캐릭터와는 그 서사로 이야기가 시작돼요. 기본 페르소나는 모든 대화에 쓰이고, 대화 중 설정에서 다른 것으로 바꿀 수 있어요.</p>}
+    {(personas.length > 0 || choice) && <ul className="lounge-persona-list">{personas.map(persona => {
+      const body = <><b>{persona.title}{persona.is_default && <small>기본</small>}</b><span>{[persona.call_name && `"${persona.call_name}"`, persona.job, persona.personality].filter(Boolean).join(' · ') || '설정 없음'}</span>{persona.story?.trim() && persona.story_character && <small className="lounge-persona-story-tag">{loungeCharacters.find(character => character.id === persona.story_character)?.name ?? '캐릭터'}와의 서사</small>}</>;
+      return <li key={persona.id} className={`${persona.is_default ? 'default' : ''} ${chosen(persona) ? 'chosen' : ''}`}>
+      {choice ? <button type="button" className="lounge-persona-choose" disabled={choice.busy || Boolean(busy)} aria-pressed={chosen(persona)} onClick={() => choice.onChoose(persona.is_default ? '' : persona.id)}>{body}{chosen(persona) && <Check size={16} aria-hidden="true" />}</button>
+        : <div>{body}</div>}
       <div className="lounge-persona-actions">
         <button type="button" onClick={() => void makeDefault(persona)} disabled={Boolean(busy)} aria-pressed={persona.is_default} title={persona.is_default ? '기본에서 빼기' : '기본으로 쓰기'}><Star size={15} fill={persona.is_default ? 'currentColor' : 'none'} /></button>
         <button type="button" onClick={() => { setDraft({ ...persona }); setError(''); }} disabled={Boolean(busy)} title="고치기"><Pencil size={15} /></button>
         <button type="button" onClick={() => void remove(persona)} disabled={Boolean(busy)} title="지우기">{busy === persona.id ? <LoaderCircle size={15} className="lounge-spin" /> : <Trash2 size={15} />}</button>
       </div>
-    </li>)}</ul>}
+    </li>; })}
+      {choice && <li className={noneChosen ? 'chosen' : ''}><button type="button" className="lounge-persona-choose" disabled={choice.busy || Boolean(busy)} aria-pressed={noneChosen} onClick={() => choice.onChoose('none')}><b>페르소나 쓰지 않기</b><span>닉네임으로 부르고 내 설정 없이 대화해요</span>{noneChosen && <Check size={16} aria-hidden="true" />}</button></li>}
+    </ul>}
     {draft ? <form className="lounge-account-form lounge-persona-form" onSubmit={event => { event.preventDefault(); void save(); }}>
       {field('title', '페르소나 이름', '예: 회사원 지수, 여행 작가 모드')}
       {field('call_name', '캐릭터가 부를 이름', '비우면 닉네임으로 불러요')}
