@@ -671,6 +671,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
     poker: 'RU7aSi6lT4uQBXMLgDxK', // Kyle - deep, attractive, confident young Korean male (2026-11-16; it was the shared male default)
     teacher: 'Kndx0DUJ5HQE1HQgiMY8', // Jin - calm, low-pitched Korean woman in her 30s (정하린, 2026-11-16; picked by me, alternatives in docs/voice-samples/teacher-2026-11-16)
+    interpreter: 'pJtMZEFAxLgFoi6crgwM', // Minseong - Calm & Gentle: warm, calm mid-low tone of a man in his 30s (문정우, 2026-11-20; picked by me by its description, not heard by the owner; three alternatives in docs/voice-samples/interpreter-2026-11-20)
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
