@@ -34,8 +34,25 @@ test('at the start the stated place is applied, from the engine or, without one,
   assert.equal(decide({ scene: scene('각자 있는 곳에서 전화 통화', '기타') }).action, 'keep', 'no stated place: nothing to follow');
 });
 
-test('a background the member chose is never touched', () => {
+test('a background the member chose before its pick was stamped is never touched', () => {
   assert.deepEqual(decide({ manual: true, scene: scene('집 거실', '집') }), { action: 'keep', reason: 'manual' });
+  assert.deepEqual(decide({ manual: true, scene: scene('가까운 공원', '기타'), change: { turn: 3, at: now, explicit: true } }), { action: 'keep', reason: 'manual' });
+});
+
+test('a background the member picked holds for its place, and follows an explicit move made after the pick (2026-11-20, 공원)', () => {
+  const picked = now - 20 * minute;
+  const park = scene('가까운 공원', '기타');
+  // the talk is still where it was, or drifts: the pick stays, however long and however many turns
+  assert.deepEqual(decide({ manual: true, pickedAt: picked, scene: scene('와인바', '바'), sceneTurns: 40, now: now + 600 * minute }), { action: 'keep', reason: 'manual' });
+  assert.deepEqual(decide({ manual: true, pickedAt: picked, scene: park, sceneTurns: 40, now: now + 600 * minute, change: { turn: 6, at: now - 30 * minute, explicit: false } }), { action: 'keep', reason: 'manual' }, 'a drift is not a move');
+  // an explicit move made before the pick was the pick's own place
+  assert.deepEqual(decide({ manual: true, pickedAt: picked, scene: park, change: { turn: 6, at: picked - minute, explicit: true } }), { action: 'keep', reason: 'manual' });
+  // an explicit move after it goes, at once
+  const moved = decide({ manual: true, pickedAt: picked, scene: park, change: { turn: 11, at: picked + minute, explicit: true } });
+  assert.equal(moved.action, 'apply'); assert.equal(moved.reason, 'explicit'); assert.equal(moved.place, '가까운 공원');
+  // but not while on the way, or when the engine does not know the place
+  assert.deepEqual(decide({ manual: true, pickedAt: picked, scene: scene('엘리베이터', '기타'), change: { turn: 11, at: picked + minute, explicit: true } }), { action: 'keep', reason: 'on_the_way' });
+  assert.deepEqual(decide({ manual: true, pickedAt: picked, scene: scene('각자 있는 곳', '기타'), change: { turn: 11, at: picked + minute, explicit: true } }), { action: 'keep', reason: 'manual' });
 });
 
 test('the same place changes nothing, however many replies ask', () => {
@@ -129,7 +146,11 @@ test('the switch for the follow is on until the member turns it off, and off for
   assert.equal(loungeSceneAutoOn({ theme: 'cafe', auto: true }), true);
   assert.equal(loungeSceneAutoOn({ theme: 'cafe', auto: true, auto_off: true }), false);
   assert.equal(loungeSceneAutoOn({ auto: true, auto_off: true }), false);
-  assert.equal(loungeSceneAutoOn({ theme: 'river' }), false, 'a background the member chose');
+  assert.equal(loungeSceneAutoOn({ theme: 'river' }), false, 'a background the member chose before its pick was stamped');
+  assert.equal(loungeSceneAutoOn({ theme: 'river', picked_at: 1795000000000 }), true, 'a stamped pick follows an explicit move');
+  assert.equal(loungeSceneAutoOn({ theme: 'river', picked_at: 1795000000000, auto_off: true }), false, 'unless the member turned the follow off');
+  const { readLoungeRoomBackground } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
+  assert.deepEqual(readLoungeRoomBackground({ theme: 'river', picked_at: 1795000000000 }), { theme: 'river', picked_at: 1795000000000 });
 });
 
 test('the five new places are backgrounds with images, and the scene text for the model carries the activity', () => {
@@ -216,7 +237,8 @@ test('a background picked by hand is not written over by a follow that began bef
   const held = api.slice(api.indexOf('const heldBackground'), api.indexOf('const saveOnRoom'));
   assert.match(held, /if \(!automatic\) return/);
   assert.match(held, /select=background/);
-  assert.match(held, /auto_off === true \|\| background\.auto !== true\) \? undefined/);
+  assert.match(held, /background\.auto_off === true \|\| \(background\.auto !== true && typeof background\.picked_at !== 'number'\)/);
+  assert.match(held, /picked_at : undefined\) === pickedAt \? \{ background \} : undefined/, 'a pick made again meanwhile is not written over');
   assert.match(api, /const saveOnRoom[\s\S]{0,200}const held = await heldBackground\(\);\s*if \(!held\) return json\(\{ background: null \}\)/);
   assert.match(api, /const recordFollow[\s\S]{0,200}const held = await heldBackground\(\);\s*if \(!held\) return;\s*const kept = held\.background \?\? \{\}/);
   assert.doesNotMatch(api, /const kept = room\.background/, 'the old read at the start is not written back');

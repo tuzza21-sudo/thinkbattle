@@ -479,14 +479,15 @@ export function loungeRoomTheme(hostId: string, roomId: string): LoungeThemeId {
  * (lounge_scene_backgrounds, public under scenes/); or an empty, neutral space. `episode` is the story episode it was
  * chosen in, and `auto` marks one chosen for the scene rather than by the member.
  */
-export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string; scene?: string; blank?: true; episode?: number; auto?: true };
+export type LoungeRoomBackground = { theme?: LoungeThemeId; image?: string; prompt?: string; scene?: string; blank?: true; episode?: number; auto?: true; /** when the member chose it (ms, stamped by the database) */ picked_at?: number };
 /**
- * Whether a chat's background follows the scene by itself (2026-11-09): on unless the member turned it off, and not while the
- * background is one they chose. Read from the room's raw background, which can hold only the switch (no picture yet).
+ * Whether a chat's background follows the scene by itself (2026-11-09): on unless the member turned it off. A background they
+ * chose holds for its place and follows an explicit move after it (2026-11-20), when its pick is stamped (`picked_at`); one chosen
+ * before the stamp existed is still never touched. Read from the room's raw background, which can hold only the switch.
  */
 export function loungeSceneAutoOn(raw: unknown) {
   const value = raw && typeof raw === 'object' ? raw as Record<string, unknown> : undefined;
-  return !value || (value.auto === true && value.auto_off !== true);
+  return !value || (value.auto_off !== true && (value.auto === true || typeof value.picked_at === 'number'));
 }
 export const isLoungeSceneImage = (path?: string | null) => /^scenes\/[\w.-]{1,120}\.(webp|jpg)$/.test(path ?? '');
 export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | null {
@@ -497,7 +498,8 @@ export function readLoungeRoomBackground(raw: unknown): LoungeRoomBackground | n
   const scene = typeof value.scene === 'string' && /^[0-9a-f-]{36}$/.test(value.scene) && typeof value.image === 'string' && isLoungeSceneImage(value.image) ? value.scene : undefined;
   const prompt = typeof value.prompt === 'string' ? value.prompt.replace(/\s+/g, ' ').trim().slice(0, 300) : undefined;
   const episode = typeof value.episode === 'number' && Number.isInteger(value.episode) && value.episode >= 1 && value.episode <= 12 ? value.episode : undefined;
-  const extra = { ...(episode ? { episode } : {}), ...(value.auto === true ? { auto: true as const } : {}) };
+  const pickedAt = typeof value.picked_at === 'number' && Number.isFinite(value.picked_at) ? value.picked_at : undefined;
+  const extra = { ...(episode ? { episode } : {}), ...(value.auto === true ? { auto: true as const } : {}), ...(pickedAt !== undefined ? { picked_at: pickedAt } : {}) };
   if (image) return { image, ...(prompt ? { prompt } : {}), ...extra };
   if (scene) return { scene, image: value.image as string, ...(prompt ? { prompt } : {}), ...extra };
   if (value.blank === true) return { blank: true, ...extra };

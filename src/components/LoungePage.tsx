@@ -1678,7 +1678,9 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       if (!('scene' in picked)) keepBackground({ ...picked, ...(episodeNumber ? { episode: episodeNumber } : {}) });
       try {
         const saved = await chooseLoungeRoomBackground(roomId, picked, episodeNumber);
-        if ('scene' in picked) keepBackground(readLoungeRoomBackground(saved));
+        // What the database kept, with the time it was picked (the follow lets an explicit move after it through).
+        const kept = readLoungeRoomBackground(saved);
+        if (kept || 'scene' in picked) keepBackground(kept);
       } catch (err) {
         if (!('scene' in picked)) keepBackground(before);
         throw err;
@@ -1703,7 +1705,7 @@ function LoungeRoomPage({ roomId, user, onGuestRequest, onLoginRequest }: Props 
       catch (err) { setError(errorText(err)); }
       finally { setSceneAutoBusy(false); }
     }}
-    options={[{ value: 'on', label: '켜기', hint: '대화 속 장소가 바뀌면 배경도 따라 바뀌어요' }, { value: 'off', label: '끄기', hint: '배경을 지금 그대로 두어요. 직접 배경을 고르면 꺼져요' }]} /> : null;
+    options={[{ value: 'on', label: '켜기', hint: '대화 속 장소가 바뀌면 배경도 따라 바뀌어요. 직접 고른 배경은 다른 곳으로 옮겨 갈 때까지 유지돼요' }, { value: 'off', label: '끄기', hint: '배경을 지금 그대로 두어요' }]} /> : null;
   // Who the member is in this conversation (2026-11-18): the default persona, another of theirs, or none.
   const chosenPersona = (() => { const value = room.member_persona as { none?: boolean; id?: string } | null | undefined; return value?.none === true ? 'none' : typeof value?.id === 'string' && personas?.some(persona => persona.id === value.id) ? value.id : ''; })();
   const defaultPersona = personas?.find(persona => persona.is_default);
