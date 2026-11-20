@@ -71,6 +71,8 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
   const chips = (event: RelationshipEventType, direction: 1 | -1) => <span className={`lounge-character-effects ${direction > 0 ? 'up' : 'down'}`}>{effectChips(config, event, direction).map(chip => <i key={chip.name} className={chip.strong ? 'strong' : ''}>{chip.name} {direction > 0 ? chip.strong ? '▲▲' : '▲' : chip.strong ? '▼▼' : '▼'}</i>)}</span>;
   const nameOf = (hostId: string) => loungeCharacters.find(item => item.id === hostId)?.name ?? getLoungeHost(hostId).name;
   const profile = made ? undefined : loungeCharacterProfiles[character.id];
+  // Who the member is in the conversation: at the right of the start button (2026-11-20).
+  const picker = user && !user.isAnonymous ? <LoungePersonaPicker characterId={character.id} characterName={character.name} /> : null;
   const moves = config && (character.wins?.length > 0 || character.losses?.length > 0);
 
   return <main className={`lounge-character ${night ? 'night' : ''}`} style={{ '--character-accent': host.color } as CSSProperties}>
@@ -96,8 +98,10 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
           <div><dt>하는 일</dt><dd>{character.role}</dd></div>
           {made && <div><dt>관계</dt><dd>{host.tag}</dd></div>}
         </dl>
-        {made ? custom.row && <CustomActions row={custom.row} user={user} /> : <LoungeStoryStart scenarios={scenarios} user={user} />}
-        {user && !user.isAnonymous && <div className="lounge-character-actions"><LoungePersonaPicker characterId={character.id} characterName={character.name} /></div>}
+        {made ? <>
+          {custom.row && <CustomActions row={custom.row} user={user} />}
+          {picker && <div className="lounge-character-actions">{picker}</div>}
+        </> : <LoungeStoryStart scenarios={scenarios} user={user} extra={picker} />}
       </div>
     </section>
 
