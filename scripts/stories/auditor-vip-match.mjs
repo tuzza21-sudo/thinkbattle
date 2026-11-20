@@ -214,7 +214,7 @@ const episodes = [
 const story = {
   // The card's role, starting point and first scene as they are in lounge_scenarios; the hook now says it is six episodes.
   id: 'auditor-vip-match', character_id: 'auditor', title: 'VIP 매칭, 첫 만남', sort: 0, theme: 'hotellobby',
-  hook: '결혼정보회사가 1등 신랑감으로 꼽는 남자가 처음으로 먼저 만나자고 한 사람이 당신이다. 말을 아끼는 그가 처음 무너지는 새벽까지, 6부작.',
+  hook: '직업 좋고, 돈 많고, 여자한테 익숙하다는 소문의 맞선남. 늦게 온 당신에게 그가 먼저 말한다. “저 순진한 남자는 아닙니다.” 진심일까, 수작일까?',
   prologue,
   user_role: '결혼정보회사 VIP 회원. 조건 좋은 남자들에게 늘 한발 물러서 있던, 자기 안목을 믿는 사람',
   relationship: '오늘 처음 만나는 사이. 여유 있고 배려 깊은 그는 서두르지 않고 당신을 편하게 해 준다. 조건이 아니라 당신이라는 사람이 궁금해서 이 자리에 나왔다.',

@@ -397,7 +397,7 @@ const story = {
   // The card's title and starting point as they are in lounge_scenarios. The first scene moves to the next evening, where
   // the first episode begins; the member's role says they are a 상무, as the family calls them.
   id: 'closer-contract-love', character_id: 'closer', title: '6개월의 연인', sort: 0, theme: 'boardroom',
-  hook: '결혼 압박을 피하려 그를 6개월짜리 연인으로 고용했다. 그는 합의서부터 내밀고, 손을 잡을 때도 돌이킬 수 없다고 선언한다. 1부 5화.',
+  hook: '결혼 압박을 피하려 그를 6개월짜리 연인으로 고용했다. 그는 합의서부터 내밀고, 손을 잡을 때도 돌이킬 수 없다고 선언한다. 가족과의 첫 저녁은 내일이다.',
   prologue,
   user_role: '유력 건설·부동산 그룹의 오너 2세이자 대형 복합개발 사업을 이끄는 상무. 결혼 압박을 피하려 그와 6개월짜리 연인 계약을 맺었다.',
   relationship: '막 서명한 6개월짜리 계약 연인. 그는 마음 대신 조항을 말하고 손을 잡을 때는 “돌이킬 수 없다”고 못 박지만, 당신 앞에서는 즉답이 늦어진다. 그가 이 계약에 응한 진짜 이유는 아직 모른다.',
