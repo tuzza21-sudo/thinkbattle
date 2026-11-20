@@ -4652,8 +4652,16 @@ test('a story in episodes: the character leads the current episode, the checkpoi
 });
 
 test('the picker offers 아리아, 오닉스 and 라쿤 under code names (no 노바, no GLM), and 오닉스 is the default', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['gemini-flash', 'deepseek-flash', 'deepseek-raccoon']);
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['아리아', '오닉스', '라쿤']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['오닉스', '아리아', '라쿤'], '오닉스 first');
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.description), ['빠르고 자유로운 대화', '표현이 풍부한 대화', '균형잡힌 대화']);
+  for (const model of modelsLib.loungeChatModels) assert.doesNotMatch(model.description, /채팅|음성/, 'no word about chat or voice after a model');
+  // On a phone the chat's bottom bar has the model button (2026-11-20), with 사진 and 추천 as the short labels; the voice-engine picker stays hidden there.
+  const css = readFileSync(new URL('../src/components/LoungeRoom.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /@media \(max-width:760px\) \{\s*\.lounge-model-picker \{ display:none !important; \}/, 'the model picker is shown on a phone');
+  assert.match(css, /\.lounge-model-picker:not\(\.lounge-chat-model-picker\) \{ display:none !important; \}/, 'only the voice-engine picker stays hidden on a phone');
+  assert.match(readFileSync(new URL('../src/components/LoungePage.tsx', import.meta.url), 'utf8'), /lounge-label-short">사진<\/span>/, 'the photo button reads 사진 on a phone');
+  assert.match(readFileSync(new URL('../src/components/LoungeReplySuggestions.tsx', import.meta.url), 'utf8'), /lounge-label-short">추천<\/span>/, 'the reply button reads 추천 on a phone');
   assert.equal(modelsLib.loungeDefaultChatModelId, 'deepseek-flash');
   assert.equal(modelsLib.getLoungeChatModel(null).id, 'deepseek-flash', 'a room with no model');
   assert.equal(modelsLib.getLoungeChatModel('gpt').label, '노바', '노바 stays as the id a call and a failed reply fall back to');

@@ -28,17 +28,18 @@
  * 2026-11-19, by the owner: 라쿤 ('deepseek-raccoon') is DeepSeek's own model for a chat and for a call alike. Where 오닉스 hands a call to the fast GPT and an adult
  * scene on a call goes to NanoGPT first, a room on 라쿤 keeps DeepSeek first on a call too (NanoGPT is its fallback), so the two can be compared on the same turns.
  *
- * 2026-11-20, by the owner: 노바 is no longer offered and 오닉스 is the default (a room with no model, and one stored with an id that
+ * 2026-11-20, by the owner: the picker lists 오닉스 ('빠르고 자유로운 대화'), 아리아 ('표현이 풍부한 대화') and 라쿤 ('균형잡힌 대화') in that
+ * order, with no word about chat or voice after a name. 노바 is no longer offered and 오닉스 is the default (a room with no model, and one stored with an id that
  * is gone, answers with it). 노바 stays as the id 'gpt' that a call and a failed reply fall back to. 라쿤 moves to OpenRouter's
  * Qwen 3.8 Flash (OPENROUTER_API_KEY), for every turn of a room on it: general talk, chat, calls and adult scenes alike; DeepSeek's
  * own model answers when it fails.
  */
 export const loungeChatModels = [
+  { id: 'deepseek-flash', label: '오닉스', description: '빠르고 자유로운 대화', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
+  { id: 'gemini-flash', label: '아리아', description: '표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
+  { id: 'deepseek-raccoon', label: '라쿤', description: '균형잡힌 대화', provider: 'openrouter', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gpt', label: '노바', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: false, voiceFallback: null },
-  { id: 'gemini-flash', label: '아리아', description: '빠르고 표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
-  { id: 'deepseek-flash', label: '오닉스', description: '빠르고 표현이 자유로운 대화 (채팅 전용)', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
-  { id: 'deepseek-raccoon', label: '라쿤', description: '빠르고 표현이 자유로운 대화 (채팅·음성)', provider: 'openrouter', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
-  { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화 (채팅 전용)', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
+  { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
 ] as const;
 export type LoungeChatModelId = typeof loungeChatModels[number]['id'];
 /** The model of a room that has none, and of one stored with an id that is gone. */
