@@ -45,3 +45,12 @@ test('the chat sidebar says nothing about logging in, and 서도현\'s card no l
   assert.doesNotMatch(hook, /부작|화\b/);
   assert.ok(hook.length <= 120, 'the hook fits loungeScenarioLimits.hook');
 });
+
+test('no story card summary counts episodes (2026-11-20)', () => {
+  for (const file of ['velvet-black-rose', 'closer-contract-love', 'auditor-vip-match']) {
+    const hook = read(`docs/stories/${file}.json`).match(/"hook": "([^"]+)"/)?.[1];
+    assert.ok(hook && !/부작|\d화/.test(hook), `${file}: ${hook}`);
+  }
+  const migration = read('supabase/migrations/20270112000000_lounge_card_hooks_no_episodes.sql');
+  for (const [, hook] of migration.matchAll(/hook='([^']+)'/g)) assert.ok(hook.length <= 120 && !/부작|\d화/.test(hook));
+});
