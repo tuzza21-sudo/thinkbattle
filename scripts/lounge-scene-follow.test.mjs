@@ -225,3 +225,13 @@ test('a background picked by hand is not written over by a follow that began bef
   assert.doesNotMatch(page, /not saved on the room/);
   assert.match(page, /catch \(err\) \{\s*if \(!\('scene' in picked\)\) keepBackground\(before\);\s*throw err;/);
 });
+
+test('every place the background picker shows can be picked: the last definition of choose_lounge_room_background lists them all (2026-11-20, 와인바)', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const dir = new URL('../supabase/migrations/', import.meta.url);
+  const last = readdirSync(dir).sort().filter(name => /FUNCTION public\.choose_lounge_room_background\(/.test(readFileSync(new URL(name, dir), 'utf8'))).at(-1);
+  const sql = readFileSync(new URL(last, dir), 'utf8');
+  const list = /NOT IN \(([^)]*)\)/.exec(sql)?.[1] ?? '';
+  const missing = loungeThemes.filter(theme => !list.includes(`'${theme.id}'`)).map(theme => theme.id);
+  assert.deepEqual(missing, [], `${last} does not list: ${missing.join(', ')}`);
+});
