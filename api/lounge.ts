@@ -3,7 +3,7 @@ import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScen
 import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
-import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels } from '../src/lib/loungeModels';
+import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeRaccoonModel, loungeRaccoonUrl } from '../src/lib/loungeModels';
 import { loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
@@ -1411,6 +1411,9 @@ ${photoRule}`;
     // Flash still uses DeepSeek's own API (DEEPSEEK_API_KEY).
     const deepseekKey = process.env.DEEPSEEK_API_KEY;
     const nanoKey = process.env.NANOGPT_API_KEY;
+    // 라쿤 (2026-11-20, by the owner): OpenRouter's Qwen answers every turn of a room on it, an adult scene and a call included.
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const raccoonViaOpenrouter = Boolean(openrouterKey && chosenChat.provider === 'openrouter');
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
     const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultDepth} 통화에서도 높임말 없이 반말로 말한다(말투 합의가 존댓말이어도 이 장면 안에서는 반말). ${loungeAdultVoiceNote}` : undefined;
     // 2026-11-18: at the closest step the adult model answers only a sexual scene (the analyzer reads it from the recent talk and
@@ -1423,7 +1426,7 @@ ${photoRule}`;
     // NanoGPT's comes first (2026-11-18, by the owner: DeepSeek's JSON mode answered empty on half of the call's turns). Each is the other's first fallback.
     // A room on 라쿤 (DeepSeek's own model, for calls too) keeps DeepSeek first on a call as well (2026-11-19, by the owner).
     const adultViaDeepseek = Boolean(deepseekKey && (chat || !nanoKey || chosenChat.id === 'deepseek-raccoon'));
-    const adultReply = Boolean((deepseekKey || nanoKey) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
+    const adultReply = Boolean((deepseekKey || nanoKey || raccoonViaOpenrouter) && ((turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || adultCallText));
     // Which model answered this turn, and whether OpenAI stepped in for the adult model (its reply is a brake, not the room's own: see afterReply).
     Object.assign(turnNote, { character_id: host.id, turn: companionTurn, medium: chat ? 'chat' : 'voice', stage: stageNumber ?? null, adult_mode: adultMode, adult_why: adultWhy, adult_routed: adultReply, chosen_model: chosenChat.id });
     const turnApplied: { current?: { provider: string; model: string } } = {};
@@ -2100,16 +2103,18 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // JSON shape. A picked DeepSeek Flash still uses DeepSeek's API. JSON mode takes no schema, so the instructions
           // carry it; a failed or blank answer falls back to OpenAI.
           // `quiet` is a rewrite that shows nothing while it is written (a reply that came back in another language).
-          const deepseekReply = async (note = '', quiet = false, backend?: 'nano' | 'deepseek') => {
+          // `backend` 'openrouter' is 라쿤's own model (Qwen on OpenRouter, reasoning off), the same request shape.
+          const deepseekReply = async (note = '', quiet = false, backend?: 'nano' | 'deepseek' | 'openrouter') => {
             if (!quiet) partialLength = 0;
-            const adult = backend ? backend === 'nano' : adultReply && !adultViaDeepseek;
-            const model = adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
-            const key = adult ? nanoKey : deepseekKey;
-            const response = await fetchTimed(adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
+            const router = backend === 'openrouter';
+            const adult = !router && (backend ? backend === 'nano' : adultReply && !adultViaDeepseek);
+            const model = router ? process.env.LOUNGE_RACCOON_MODEL || loungeRaccoonModel : adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
+            const key = router ? openrouterKey : adult ? nanoKey : deepseekKey;
+            const response = await fetchTimed(router ? loungeRaccoonUrl : adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
               method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: replyStop,
               body: JSON.stringify({
                 model, stream: true, stream_options: { include_usage: true },
-                ...(adult ? { reasoning: { exclude: true } } : { thinking: { type: 'disabled' } }),
+                ...(router ? { reasoning: { enabled: false } } : adult ? { reasoning: { exclude: true } } : { thinking: { type: 'disabled' } }),
                 response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
@@ -2118,7 +2123,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               }),
             }, 30_000);
             if (!response.ok || !response.body) {
-              console.warn('[Lounge model] deepseek failed', JSON.stringify({ model, status: response.status }));
+              // OpenRouter says in its error what it did not accept (a parameter, the key, a limit): kept in the log, never shown.
+              const why = router ? (await response.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 240) : undefined;
+              console.warn('[Lounge model] deepseek failed', JSON.stringify({ backend: router ? 'openrouter' : adult ? 'nanogpt' : 'deepseek', model, status: response.status, ...(why ? { why } : {}) }));
               throw new LoungeUpstreamError(response.status === 429 ? 'AI 요청이 잠시 몰렸어요. 잠시 뒤 다시 시도해 주세요.' : 'AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, response.status === 429 ? 'deepseek_rate_limit' : 'deepseek_request_failed', true, 5);
             }
             type DeepSeekChunk = { choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_cache_hit_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } };
@@ -2138,17 +2145,18 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               usage: { input_tokens: usage?.prompt_tokens, output_tokens: usage?.completion_tokens, input_tokens_details: { cached_tokens: Math.max(usage?.prompt_cache_hit_tokens ?? 0, usage?.prompt_tokens_details?.cached_tokens ?? 0) } } }; // NanoGPT reports its cache in prompt_tokens_details (2026-11-18: it showed 0 though 98% was cached)
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
             // A reply its JSON mode could not read comes back as spaces (DeepSeek's documentation says it may sometimes return empty content); the log says how it ended.
-            if (!output.trim()) console.warn('[Lounge model] empty answer', JSON.stringify({ backend: adult ? 'nanogpt' : 'deepseek', model, finish: finish || null, outputTokens: usage?.completion_tokens ?? null, inputTokens: usage?.prompt_tokens ?? null, medium: chat ? 'chat' : 'voice' }));
+            if (!output.trim()) console.warn('[Lounge model] empty answer', JSON.stringify({ backend: router ? 'openrouter' : adult ? 'nanogpt' : 'deepseek', model, finish: finish || null, outputTokens: usage?.completion_tokens ?? null, inputTokens: usage?.prompt_tokens ?? null, medium: chat ? 'chat' : 'voice' }));
             return parseHostAnswer(output.trim() || undefined, final, false);
           };
           // A reply that has not begun writing after loungeReplyStallMs() is given up and asked again without reasoning
           // (`fast`); once it has begun it may take its time. On 2026-10-21 a "deep" reply thought for 29 s and the 30 s
           // limit on the whole request cut it off as it began, so the conversation stood still and then failed.
-          const attemptReplyRaw = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReplyRaw = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' | 'openrouter' = 'openai', fast = false, inCharacter = false) => {
             if (provider === 'gemini') return geminiReply();
             if (provider === 'deepseek') return deepseekReply();
             if (provider === 'deepseek-plain') return deepseekReply('', false, 'deepseek');
             if (provider === 'nanogpt') return deepseekReply('', false, 'nano');
+            if (provider === 'openrouter') return deepseekReply('', false, 'openrouter');
             partialLength = 0;
             const base = fast && replyReasoning !== 'none' ? { ...modelRequest, model: chatModel.stallModel ?? modelRequest.model, reasoning: { effort: 'none' }, max_output_tokens: modelRequest.max_output_tokens - 2500 } : modelRequest;
             // After an empty or refused answer the same request is refused again; this one asks for the reply in character.
@@ -2186,12 +2194,13 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // Every attempt at this turn's reply is kept (2026-11-18, by the owner: to see whether the adult model is unstable): which
           // model, whether it answered, how long it took, and why not. The last one that answered is the one that was applied.
           const trace: { attempts: Array<{ provider: string; model: string; ok: boolean; ms: number; status?: string }>; applied?: { provider: string; model: string } } = { attempts: [] };
-          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' = 'openai', fast = false, inCharacter = false) => {
+          const attemptReply = async (provider: 'openai' | 'gemini' | 'deepseek' | 'deepseek-plain' | 'nanogpt' | 'openrouter' = 'openai', fast = false, inCharacter = false) => {
             const adultBackend = provider === 'nanogpt' || (provider === 'deepseek' && adultReply && !adultViaDeepseek);
             const label = {
               provider: adultBackend ? 'nanogpt' : provider === 'deepseek-plain' ? 'deepseek' : provider,
               model: provider === 'gemini' ? String(chatModel.id === 'gemini-pro' ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'])
-                : adultBackend ? String(process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel) : provider === 'openai' ? String(modelRequest.model ?? 'openai') : 'deepseek-flash',
+                : provider === 'openrouter' ? String(process.env.LOUNGE_RACCOON_MODEL || loungeRaccoonModel)
+                  : adultBackend ? String(process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel) : provider === 'openai' ? String(modelRequest.model ?? 'openai') : 'deepseek-flash',
             };
             const started = performance.now();
             try {
@@ -2206,7 +2215,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // A model request that fails quickly (a dropped connection, an abort or timeout seen about a second in on
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
-          const provider = adultReply || (deepseekKey && chatModel.provider === 'deepseek') ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
+          // 라쿤 first answers with OpenRouter's model, for every turn; without its key it is DeepSeek's own model as before.
+          const provider = openrouterKey && chatModel.provider === 'openrouter' ? 'openrouter'
+            : adultReply || (deepseekKey && (chatModel.provider === 'deepseek' || chatModel.provider === 'openrouter')) ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
             try {
@@ -2216,7 +2227,20 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 if (found || earlySpeech || replyStop.aborted) throw error;
                 // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: GPT answers this turn, so
                 // the conversation goes on.
-                if (provider === 'gemini' || provider === 'deepseek') {
+                if (provider === 'gemini' || provider === 'deepseek' || provider === 'openrouter') {
+                  // 라쿤's model failed before any text: once more, then DeepSeek's own model (or NanoGPT's), with the adult fallbacks below.
+                  if (provider === 'openrouter') {
+                    console.warn('[Lounge API] openrouter reply failed, asking again', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                    try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                    if (deepseekKey || nanoKey) {
+                      console.warn(`[Lounge API] openrouter failed twice, answering with ${deepseekKey ? 'DeepSeek' : 'NanoGPT'}`);
+                      try { return await attemptReply(deepseekKey ? 'deepseek-plain' : 'nanogpt'); } catch (other) { if (found || earlySpeech || replyStop.aborted) throw other; }
+                    }
+                    if (adultReply && geminiKey) {
+                      console.warn('[Lounge API] adult model and its fallback failed, answering with Gemini');
+                      try { return await attemptReply('gemini'); } catch (gemini) { if (found || earlySpeech || replyStop.aborted) throw gemini; }
+                    }
+                  }
                   // JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
                   if (provider === 'deepseek') {
                     console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
@@ -2266,6 +2290,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const rewrite = async (note: string, characterRepair = false) => {
               // Live comparisons kept returning the same novice role on DeepSeek. Its failed non-explicit Dohyun
               // replies use the existing GPT fallback for this one repair; a healthy chosen-model reply stays as is.
+              if (provider === 'openrouter' && (!characterRepair || adultReply)) return await deepseekReply(note, true, 'openrouter') as { text?: string; inner_voice?: unknown; character_life?: unknown };
               if (provider === 'deepseek' && (!characterRepair || adultReply)) return await deepseekReply(note, true) as { text?: string; inner_voice?: unknown; character_life?: unknown };
               const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({ ...modelRequest, ...(chatModel.provider === 'openai' ? {} : { model: 'gpt-6-luna', reasoning: { effort: 'none' } }), instructions: `${modelRequest.instructions}\n${note}` }), replyStop, 30_000), 'openai');
               return parseHostAnswer(modelOutputText(result), result, false) as { text?: string; inner_voice?: unknown; character_life?: unknown };
@@ -2293,7 +2318,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               // One bounded rewrite only; healthy replies and other characters do not pay for another model call.
               const again = await rewrite(repair.instruction, true).catch(() => undefined);
               const fixed = Boolean(again?.text && !loungeNotKorean(again.text) && !review(again));
-              console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes: repair.notes, rewritten: fixed, provider: provider === 'deepseek' && !adultReply ? 'openai' : provider }));
+              console.info('[Lounge reply check]', JSON.stringify({ host: host.id, notes: repair.notes, rewritten: fixed, provider: (provider === 'deepseek' || provider === 'openrouter') && !adultReply ? 'openai' : provider }));
               if (fixed) full = again;
             }
             authoredLife = normalizeLoungeCharacterLife(full?.character_life, companionTurn, now);

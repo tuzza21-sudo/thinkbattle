@@ -20,7 +20,7 @@ import { loadLoungePersonaPreference, loungePersonaToApply } from '../lib/lounge
 import { listMyLoungePersonas, setLoungeRoomPersona, loadEarlierLoungeMessages, loungeHistoryPage, loadLoungeInnerVoice, saveLoungeInnerVoice, loadLoungeMessageVoice, loadLoungeMessageVoiceUsage, rewindLoungeChat, type LoungeMemoryBook, type LoungeMessageVoiceUsage } from '../lib/loungeApi';
 import { loungePersonaStoryScenario, loungeRoomPersonaRow, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../lib/loungePersonas';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
-import { getLoungeChatModel } from '../lib/loungeModels';
+import { getLoungeChatModel, loungeDefaultChatModelId } from '../lib/loungeModels';
 import { LoungeModelPicker } from './LoungeModelPicker';
 import { LoungeSpeechPicker } from './LoungeSpeechPicker';
 import { LoungeCall } from './LoungeCall';
@@ -484,7 +484,7 @@ function RoomView(props: RoomViewProps) {
   // written on the screen (it is kept, and shows in the chat).
   if (solo && !space && !props.chat && !ended && !sessionProps) {
     const options = <>
-      {props.onModelChange && <LoungeModelPicker value={props.chatModel ?? 'gpt'} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
+      {props.onModelChange && <LoungeModelPicker value={props.chatModel ?? loungeDefaultChatModelId} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
       {props.onSpeechEngineChange && <LoungeSpeechPicker value={props.speechEngine ?? 'openai'} usage={props.speechUsage} disabled={Boolean(props.pending || props.aiSpeaking)} onChange={props.onSpeechEngineChange} />}
     </>;
     return <main className="lounge-room-main lounge-one-to-one lounge-call" data-theme={theme.id} style={roomStyle} ref={roomElement}>
@@ -572,7 +572,7 @@ function RoomView(props: RoomViewProps) {
             {!sessionProps && !ended && props.topicPicker && <LoungeTopicPicker {...props.topicPicker} disabled={props.topicPicker.disabled || restricted} />}
             {!sessionProps && ((solo && !props.chat) || ended || space) && microphoneControl}
             {!sessionProps && voiceToggle}
-            {!sessionProps && solo && !ended && props.onModelChange && <LoungeModelPicker value={props.chatModel ?? 'gpt'} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
+            {!sessionProps && solo && !ended && props.onModelChange && <LoungeModelPicker value={props.chatModel ?? loungeDefaultChatModelId} disabled={Boolean(props.modelBusy || props.pending)} onChange={props.onModelChange} />}
             {!sessionProps && solo && !ended && !props.chat && props.onSpeechEngineChange && <LoungeSpeechPicker value={props.speechEngine ?? 'openai'} usage={props.speechUsage} disabled={Boolean(props.pending || props.aiSpeaking)} onChange={props.onSpeechEngineChange} />}
             {!sessionProps && solo && props.chat && !ended && props.onPhotoRequest && <button type="button" className="lounge-ask-button lounge-photo-button" onClick={props.onPhotoRequest} disabled={props.photoPending || props.pending || restricted || props.photosLeft === 0} title={props.photosLeft === 0 ? '오늘 받을 수 있는 사진을 모두 받았어요' : undefined}>{props.photoPending ? <LoaderCircle size={17} className="lounge-spin" /> : <Camera size={17} />}<span className="lounge-label-full">지금 모습 보여줘</span><span className="lounge-label-short">사진 받기</span>{typeof props.photosLeft === 'number' && <small><span className="lounge-label-full">오늘 </span>{props.photosLeft}장</small>}</button>}
         {!sessionProps && assistanceControl}
@@ -631,7 +631,7 @@ function LoungePreview() {
   // The speaking demo would keep a one-to-one chat busy, so it starts paused there.
   const [demoPlaying, setDemoPlaying] = useState(capacity !== 1);
   const [previewVoice, setPreviewVoice] = useState(false);
-  const [previewModel, setPreviewModel] = useState('gpt');
+  const [previewModel, setPreviewModel] = useState<string>(loungeDefaultChatModelId);
   const previewSpeech = loungeDefaultSpeechEngine(host.id);
   const [demoTurn, setDemoTurn] = useState(0);
   // One to one, the status card runs on the character's real relationship rules with example events: each example reply
