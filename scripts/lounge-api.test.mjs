@@ -5091,7 +5091,7 @@ test('the sidebar opens as the full list (with delete, in its own column) and fo
   const sidebar = tabs.slice(tabs.indexOf('export function LoungeChatSidebar'), tabs.indexOf('/** Settings:'));
   const folded = sidebar.slice(sidebar.indexOf('if (collapsed)'), sidebar.indexOf('return <aside className="lounge-chat-sidebar" '));
   assert.match(sidebar, /<h2>대화중인 사석<\/h2>/, 'unfolded: the title and the full list');
-  assert.match(sidebar, /user \? <LoungeChatItems state=\{state\} compact \/> : /);
+  assert.match(sidebar, /\{user && <LoungeChatItems state=\{state\} compact \/>\}/, 'the full list, and nothing about logging in without an account (2026-11-20)');
   assert.match(folded, /className="lounge-chat-rail"[^]*onClick=\{onToggle\}/, 'folded: pressing a portrait unfolds');
   assert.doesNotMatch(folded, /<h2>|새로고침/);
   assert.match(tabs, /className="lounge-chat-delete"/, 'delete stays in the list');

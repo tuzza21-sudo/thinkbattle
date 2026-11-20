@@ -35,3 +35,13 @@ test('a character\'s page starts a conversation from small story cards under the
   const manager = read('src/components/LoungePersonaManager.tsx');
   assert.match(manager, /choice\.onChoose\(saved\.is_default \? '' : saved\.id\)/, 'a persona just made is the one picked');
 });
+
+test('the chat sidebar says nothing about logging in, and 서도현\'s card no longer reads as six episodes (2026-11-20)', () => {
+  const tabs = read('src/components/LoungeTabs.tsx');
+  const sidebar = tabs.slice(tabs.indexOf('export function LoungeChatSidebar'), tabs.indexOf('export function LoungeSettingsPage'));
+  assert.doesNotMatch(sidebar, /로그인/);
+  const card = read('supabase/migrations/20270111000000_lounge_dohyun_card_copy.sql');
+  const hook = card.match(/hook='([^']+)'/)[1];
+  assert.doesNotMatch(hook, /부작|화\b/);
+  assert.ok(hook.length <= 120, 'the hook fits loungeScenarioLimits.hook');
+});
