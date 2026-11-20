@@ -47,6 +47,13 @@ export const loungeDefaultChatModelId = 'deepseek-flash';
 export const getLoungeChatModel = (id?: string | null) => loungeChatModels.find(model => model.id === id) ?? loungeChatModels.find(model => model.id === loungeDefaultChatModelId)!;
 /** The models shown in the room's picker. */
 export const loungeOfferedChatModels = loungeChatModels.filter(model => model.listed);
+/**
+ * 2026-11-20, by the owner: 라쿤 (OpenRouter) is being tried, so the picker shows it only on a computer's own address (localhost, 127.0.0.1); on the
+ * site's domain it is not offered. A room already on it keeps answering with it and shows its name; the menu there lists the others.
+ */
+export const loungeLocalOnlyChatModelIds: readonly string[] = ['deepseek-raccoon'];
+export const isLoungeLocalHost = (hostname: string) => /^(localhost|127\.0\.0\.1|\[?::1\]?)$/i.test(hostname);
+export const loungeChatModelsFor = (hostname: string) => isLoungeLocalHost(hostname) ? loungeOfferedChatModels : loungeOfferedChatModels.filter(model => !loungeLocalOnlyChatModelIds.includes(model.id));
 
 /** Gemini model names; LOUNGE_GEMINI_FLASH_MODEL and LOUNGE_GEMINI_PRO_MODEL change them. */
 export const loungeGeminiChatModels = { 'gemini-flash': 'gemini-3.8-flash', 'gemini-pro': 'gemini-3.1-pro-preview' } as const;
