@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { UserCog, X } from 'lucide-react';
 import { listLoungeChats, listMyLoungePersonas, setLoungeRoomPersona } from '../lib/loungeApi';
 import type { LoungeMemberPersonaRow } from '../lib/loungePersonas';
@@ -61,9 +62,9 @@ export function LoungePersonaPicker({ characterId, characterName }: { characterI
   const label = value === 'none' ? '쓰지 않음' : (personas?.find(persona => persona.id === value) ?? (value === '' ? personas?.find(persona => persona.is_default) : undefined))?.title ?? '기본';
   return <>
     <button type="button" className="lounge-persona-pick-button" onClick={() => setOpen(true)} title={`${characterName}과(와) 대화할 때의 나(페르소나)를 골라요`}>
-      <UserCog size={16} aria-hidden="true" /><span>페르소나</span><small>{label}</small>
+      <UserCog size={18} aria-hidden="true" /><span><i>페르소나</i><b>{label}</b></span>
     </button>
-    {open && <>
+    {open && createPortal(<>
       <div className="lounge-persona-pick-backdrop" onClick={() => { if (!busy) setOpen(false); }} />
       <section className="lounge-persona-pick-sheet lounge-account-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header><b id={titleId}>{characterName}과(와) 대화할 때의 나</b><button type="button" onClick={() => setOpen(false)} disabled={busy} aria-label="닫기"><X size={18} /></button></header>
@@ -71,6 +72,6 @@ export function LoungePersonaPicker({ characterId, characterName }: { characterI
         <LoungePersonaManager choice={{ value, busy, onChoose: next => void choose(next) }} onList={onList} />
         {error && <p className="lounge-persona-pick-error" role="alert">{error}</p>}
       </section>
-    </>}
+    </>, document.body)}
   </>;
 }

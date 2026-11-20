@@ -19,14 +19,18 @@ test('the ringback is scheduled whole on the audio clock, with soft rings that n
 
 test('a character\'s page starts a conversation from small story cards under the button, and the persona is made and picked in one sheet (2026-11-20)', () => {
   const page = read('src/components/LoungeCharacterPage.tsx');
-  assert.match(page, /<LoungeStoryStart scenarios=\{scenarios\} user=\{user\} \/>/);
+  assert.match(page, /<LoungeStoryStart scenarios=\{scenarios\} user=\{user\} extra=\{picker\} \/>/, 'the persona button is beside the start button');
   assert.doesNotMatch(page, /LoungeScenarioCards|toStories|scrollIntoView/, 'the button no longer scrolls down to a section');
   assert.doesNotMatch(page, /대화 시작하기/, 'the section below is gone');
   const start = read('src/components/LoungeStoryStart.tsx');
   assert.match(start, /\{scenario\.title\}/, 'a card shows its title');
-  assert.doesNotMatch(start, /scenario\.(hook|user_role)/, 'and nothing else of the story');
+  assert.match(start, /current\.hook/, 'the picked card shows its summary');
+  assert.doesNotMatch(start, /하던 대화가 이어져요/, 'no hint line under the cards');
+  assert.match(start, /onClick=\{\(\) => void start\(\)\}/, 'the button starts the picked story at once');
+  assert.match(start, /onClick=\{\(\) => setPicked\(scenario\.id\)\}/, 'a card only picks');
   const picker = read('src/components/LoungePersonaPicker.tsx');
   assert.match(picker, /<LoungePersonaManager choice=/, 'the sheet makes, edits and picks');
+  assert.match(picker, /createPortal/, 'the sheet is not held inside the sticky start bar');
   assert.doesNotMatch(picker, /lounge\/personas/, 'no second page to make one on');
   const manager = read('src/components/LoungePersonaManager.tsx');
   assert.match(manager, /choice\.onChoose\(saved\.is_default \? '' : saved\.id\)/, 'a persona just made is the one picked');
