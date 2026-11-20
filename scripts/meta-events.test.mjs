@@ -14,7 +14,7 @@ const run = async (mock, task, env = {}) => {
   Object.assign(process.env, { META_CAPI_TOKEN: 'secret-capi', SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'anon', APP_ORIGIN: 'https://app.test', ...env });
   for (const [name, value] of Object.entries(env)) if (value === undefined) delete process.env[name];
   globalThis.fetch = mock;
-  try { await task(); } finally { globalThis.fetch = previousFetch; for (const name of ['META_CAPI_TOKEN', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'APP_ORIGIN', 'META_TEST_EVENT_CODE']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
+  try { await task(); } finally { globalThis.fetch = previousFetch; for (const name of ['META_CAPI_TOKEN', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_ORIGIN', 'META_TEST_EVENT_CODE']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
 };
 const ok = body => new Response(JSON.stringify(body), { status: 200 });
 
@@ -69,4 +69,50 @@ test('a guest is not counted as a registration, and a failure at Meta is reporte
     const response = await handler(request({ ...event, eventId: 'CompleteRegistration-user-2' }));
     assert.equal(response.status, 502); assert.doesNotMatch(JSON.stringify(await response.json()), /private|secret-capi/);
   });
+});
+
+// 2026-11-20: each action counts once per member (meta_event_log), whatever browser it comes from.
+const logged = (state, onMeta) => async (url, init) => {
+  if (url.includes('/auth/')) return ok({ id: '11111111-1111-4111-8111-111111111111', email: 'a@b.test', is_anonymous: false });
+  if (url.includes('/rest/v1/meta_event_log') && init?.method === 'POST') { state.claims++; return new Response(JSON.stringify(state.taken ? [] : [JSON.parse(init.body)]), { status: 201 }); }
+  if (url.includes('/rest/v1/meta_event_log') && init?.method === 'DELETE') { state.released.push(url); return new Response(null, { status: 204 }); }
+  return onMeta(url, init);
+};
+
+test('the first action of a member is relayed and a repeat from another browser is answered as a duplicate without reaching Meta', async () => {
+  const state = { claims: 0, taken: false, released: [] }; let relayed = 0;
+  await run(logged(state, () => (relayed++, ok({ events_received: 1 }))), async () => {
+    const first = await handler(request(event));
+    assert.equal(first.status, 200); assert.equal((await first.json()).duplicate, undefined); assert.equal(relayed, 1);
+    state.taken = true;
+    const again = await handler(request(event));
+    assert.equal(again.status, 200); assert.equal((await again.json()).duplicate, true, 'told to the page, which then does not fire its pixel');
+    assert.equal(relayed, 1, 'the repeat is not sent to Meta');
+  }, { SUPABASE_SERVICE_ROLE_KEY: 'service' });
+});
+
+test('a failure at Meta gives the claim back so the next visit can send the action again', async () => {
+  const state = { claims: 0, taken: false, released: [] };
+  await run(logged(state, () => new Response('{}', { status: 400 })), async () => {
+    assert.equal((await handler(request(event))).status, 502);
+    assert.equal(state.released.length, 1); assert.match(state.released[0], /user_id=eq\.11111111-1111-4111-8111-111111111111&event_name=eq\.CompleteRegistration/);
+  }, { SUPABASE_SERVICE_ROLE_KEY: 'service' });
+});
+
+test('with no service key, or while the table is missing, the action is relayed as before', async () => {
+  let relayed = 0;
+  await run(async (url, init) => url.includes('/auth/') ? ok({ id: 'user-3', email: 'a@b.test' }) : url.includes('meta_event_log') ? new Response('{}', { status: 404 }) : (relayed++, ok({})), async () => {
+    assert.equal((await handler(request(event))).status, 200);
+  }, { SUPABASE_SERVICE_ROLE_KEY: 'service' });
+  await run(async url => url.includes('/auth/') ? ok({ id: 'user-3', email: 'a@b.test' }) : url.includes('meta_event_log') ? (() => { throw new Error('no claim without the key'); })() : (relayed++, ok({})), async () => {
+    assert.equal((await handler(request(event))).status, 200);
+  });
+  assert.equal(relayed, 2);
+});
+
+test('the page asks the server first and does not fire its pixel for a member the server has already counted', () => {
+  const source = readFileSync(new URL('../src/lib/metaPixel.ts', import.meta.url), 'utf8');
+  assert.match(source, /if \(answer\.duplicate\) return true;/);
+  assert.ok(source.indexOf("fetch('/api/meta-events'") < source.indexOf('fire();', source.indexOf('answer.duplicate')), 'the pixel fires after the server answered');
+  assert.match(readFileSync(new URL('../supabase/migrations/20270114000000_meta_event_log.sql', import.meta.url), 'utf8'), /PRIMARY KEY \(user_id, event_name\)/);
 });

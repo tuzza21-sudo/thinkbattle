@@ -53,25 +53,32 @@ export function captureMetaClickId() {
 }
 
 /**
- * Reports one action to the browser pixel and, for a signed-in member, to the server, which relays it to Meta's
- * conversions API. Both carry the same event id so Meta counts the action once. Nothing the member said is sent.
+ * Reports one action to the server, which relays it to Meta's conversions API, and to the browser pixel. Both carry the
+ * same event id so Meta counts the action once. Nothing the member said is sent.
+ *
+ * 2026-11-20: the server decides first. It keeps a record per member (meta_event_log), so a member who comes back from
+ * another browser or device is not counted again; when it answers "duplicate" the pixel is not fired either. A visitor
+ * with no session, or a server that cannot answer, falls back to the pixel alone, as before.
  */
 export async function trackMetaEvent(name: MetaEventName, eventId: string) {
   if (!metaTrackingAllowed()) return false;
   initMetaPixel();
-  window.fbq?.(name === 'CompleteRegistration' ? 'track' : 'trackCustom', name, {}, { eventID: eventId });
+  const fire = () => window.fbq?.(name === 'CompleteRegistration' ? 'track' : 'trackCustom', name, {}, { eventID: eventId });
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
-    if (!token) return false;
+    if (!token) { fire(); return false; }
     const response = await fetch('/api/meta-events', {
       method: 'POST', keepalive: true,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ eventName: name, eventId, eventSourceUrl: window.location.href, fbp: cookie('_fbp'), fbc: cookie('_fbc') }),
     });
+    const answer = response.status === 200 ? await response.json().catch(() => ({})) as { duplicate?: boolean } : {};
+    if (answer.duplicate) return true; // already counted for this member: nothing more is sent, by the server or the pixel
+    fire();
     // Our own server answered (it relayed the action, or had nothing to relay to), so it need not be tried again.
     return response.status === 200 || response.status === 202;
-  } catch { return false; /* Measuring must never get in the way of the app. */ }
+  } catch { fire(); return false; /* Measuring must never get in the way of the app. */ }
 }
 
 const inFlight = new Set<string>();
