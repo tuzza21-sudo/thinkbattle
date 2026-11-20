@@ -292,7 +292,7 @@ async function setSceneAuto(context: Context, userId: string, roomId: string, en
   let next: Record<string, unknown> | null;
   if (enabled) {
     const kept = { ...(current ?? {}) };
-    delete kept.auto_off; delete kept.follow; delete kept.auto;
+    delete kept.auto_off; delete kept.follow; delete kept.auto; delete kept.picked_at;
     next = Object.keys(kept).length ? { ...kept, auto: true } : null;
   } else {
     next = current && current.auto !== true ? { ...current, auto_off: true } : { ...(current ?? {}), auto: true, auto_off: true };
@@ -308,7 +308,11 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
   if (!room) return json({ error: '내 1:1 대화에서만 배경을 바꿀 수 있어요.', code: 'lounge_background_denied', retryable: false }, 403);
   const autoMode = process.env.LOUNGE_AUTO_SCENE === 'off' ? 'off' : process.env.LOUNGE_AUTO_SCENE === 'make' ? 'make' : 'reuse';
   // The member can turn the automatic follow off for this chat (auto_off, set by the scene_auto action): then no automatic ask changes anything.
-  if (automatic && (autoMode === 'off' || room.background?.auto_off === true || (room.background && room.background.auto !== true))) return json({ background: null });
+  // A background the member chose holds, and follows an explicit move after the pick (picked_at, stamped by the database): one
+  // chosen before the stamp existed is not touched.
+  const hand = room.background && room.background.auto !== true ? room.background : null;
+  const pickedAt = typeof hand?.picked_at === 'number' ? hand.picked_at : undefined;
+  if (automatic && (autoMode === 'off' || room.background?.auto_off === true || (hand && pickedAt === undefined))) return json({ background: null });
   const scenario = normalizeLoungeRoomScenario(room.scenario);
   const episodes = loungeStoryEpisodesOn ? scenario?.episodes ?? [] : [];
   const state = episodes.length ? normalizeLoungeStoryState(room.story_state, episodes) : undefined;
@@ -322,7 +326,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     const [stateRow] = stateRows?.ok ? await stateRows.json() as Array<{ state: unknown }> : [];
     const engine = readEngineScene(stateRow?.state);
     const now = Date.now();
-    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory) || scenario?.place, sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), story: Boolean(scenario), now });
+    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory) || scenario?.place, sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), story: Boolean(scenario), manual: Boolean(hand), pickedAt, now });
     if (decision.action === 'keep') return json({ background: null });
     followNote = { key: decision.key, at: now, place: decision.place };
     scene = sceneForMatch(engine.scene, decision.place);
@@ -339,7 +343,9 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     const [now] = response?.ok ? await response.json().catch(() => []) as Array<{ background?: Record<string, unknown> | null }> : [];
     if (!now) return undefined;
     const background = now.background && typeof now.background === 'object' ? now.background : null;
-    return background && (background.auto_off === true || background.auto !== true) ? undefined : { background };
+    // Still the member's switch as it was, and not picked again meanwhile.
+    if (background && (background.auto_off === true || (background.auto !== true && typeof background.picked_at !== 'number'))) return undefined;
+    return (typeof background?.picked_at === 'number' ? background.picked_at : undefined) === pickedAt ? { background } : undefined;
   };
   const saveOnRoom = async (background: Record<string, unknown>) => {
     const held = await heldBackground();

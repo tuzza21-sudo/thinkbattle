@@ -5,7 +5,8 @@
  *  - otherwise it does not change often: only when the engine's scene has stayed in the new place for a few turns and the
  *    last change was a while ago.
  * The server (api/lounge-images.ts, action "scene" with auto) decides with this and remembers what it did in the room's
- * background (`follow`); a background the member chose is never touched.
+ * background (`follow`). A background the member chose holds for the place it was chosen in (2026-11-20, by the owner): only an
+ * explicit move made after the pick takes it, never the slow drift; one chosen before the pick was stamped (`pickedAt`) is not touched.
  */
 import { canonicalScenePlace, isGenericPlaceName } from './loungeScenePlace.js';
 
@@ -47,8 +48,10 @@ export function placeFromSceneLine(line: string | undefined) {
 }
 
 export type SceneFollowInput = {
-  /** A background the member chose: not touched. */
+  /** A background the member chose: held, see `pickedAt`. */
   manual?: boolean;
+  /** When the member chose it (ms, set by the database at the pick). Without it a chosen background is not touched at all. */
+  pickedAt?: number;
   scene?: SceneForFollow;
   /** The chat's summary scene line, used when the engine has no scene. */
   memoryLine?: string;
@@ -74,14 +77,16 @@ const wayPlace = /복도|엘리베이터|계단|통로|에스컬레이터|이동
 export const isTransitPlace = (place: string | undefined) => wayPlace.test(place ?? '');
 
 export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision {
-  if (input.manual) return { action: 'keep', reason: 'manual' };
+  if (input.manual && input.pickedAt === undefined) return { action: 'keep', reason: 'manual' };
   const fromEngine = stateScenePlace(input.scene);
   const place = fromEngine ?? placeFromSceneLine(input.memoryLine);
-  if (!place) return { action: 'keep', reason: 'no_place' };
+  if (!place) return { action: 'keep', reason: input.manual ? 'manual' : 'no_place' };
   // The way from one place to another is not shown (the owner, 2026-11-09): the background waits for where the two arrive.
   if (isTransitPlace(place)) return { action: 'keep', reason: 'on_the_way' };
   const key = sceneFollowKey(fromEngine ? input.scene : undefined, place);
   const { follow, change, now } = input;
+  // A background the member chose stays while the talk is where it was; an explicit move made after the pick follows it.
+  if (input.manual) return fromEngine && change?.explicit && change.at > input.pickedAt! ? { action: 'apply', reason: 'explicit', key, place } : { action: 'keep', reason: 'manual' };
   // The start: the place is stated and nothing was decided for this chat yet.
   if (!follow) return { action: 'apply', reason: 'first', key, place };
   if (follow.key.split('|').at(-1) === key) return { action: 'keep', reason: 'same' };
