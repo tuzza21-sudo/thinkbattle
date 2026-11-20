@@ -54,3 +54,17 @@ test('no story card summary counts episodes (2026-11-20)', () => {
   const migration = read('supabase/migrations/20270112000000_lounge_card_hooks_no_episodes.sql');
   for (const [, hook] of migration.matchAll(/hook='([^']+)'/g)) assert.ok(hook.length <= 120 && !/부작|\d화/.test(hook));
 });
+
+test('라쿤 is offered by the picker only on a computer\'s own address, not on the site\'s domain (2026-11-20)', () => {
+  const models = loadTs(fileURLToPath(new URL('../src/lib/loungeModels.ts', import.meta.url)));
+  for (const host of ['localhost', '127.0.0.1', '::1']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon'], host);
+  for (const host of ['saseok.kr', 'www.saseok.kr', 'localhost.evil.com', 'xlocalhost', '192.168.0.4']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash'], host);
+  assert.match(read('src/components/LoungeModelPicker.tsx'), /loungeChatModelsFor\(window\.location\.hostname\)/, 'the menu follows the address');
+});
+
+test('on a computer the photo and the column beside it end on the same line (2026-11-20)', () => {
+  const css = read('src/components/LoungeCharacter.css');
+  const block = css.slice(css.lastIndexOf('@media(min-width:901px)'));
+  assert.match(block, /\.lounge-character-hero \{ align-items:stretch; \}/, 'the photo takes the column\'s height');
+  assert.match(block, /\.lounge-character-intro>\.lounge-character-actions \{ margin-top:auto;/, 'the stories sit at the column\'s foot');
+});

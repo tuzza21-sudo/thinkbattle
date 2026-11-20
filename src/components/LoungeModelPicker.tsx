@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Flame, PawPrint, Sparkles, Zap } from 'lucide-react';
-import { getLoungeChatModel, loungeOfferedChatModels } from '../lib/loungeModels';
+import { getLoungeChatModel, loungeChatModelsFor } from '../lib/loungeModels';
 
 const modelIcons: Record<string, typeof Zap> = { gpt: Zap, 'gemini-flash': Sparkles, 'deepseek-flash': Flame, 'deepseek-raccoon': PawPrint };
 
@@ -31,7 +31,7 @@ export function LoungeModelPicker({ value, disabled, onChange }: { value: string
     </button>
     {open && <div className="lounge-model-menu" id={menuId} role="menu" aria-label="대화 모델">
       <p>대화 모델</p>
-      {loungeOfferedChatModels.map(model => {
+      {loungeChatModelsFor(window.location.hostname).map(model => {
         const ModelIcon = modelIcons[model.id] ?? Sparkles, selected = model.id === current.id;
         return <button key={model.id} type="button" role="menuitemradio" aria-checked={selected} className={selected ? 'selected' : ''} onClick={() => choose(model.id)}>
           <i><ModelIcon size={17} /></i><span><strong>{model.label}</strong><small>{model.description}</small></span>{selected && <Check size={16} className="lounge-model-check" />}

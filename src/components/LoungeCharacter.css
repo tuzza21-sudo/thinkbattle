@@ -271,3 +271,30 @@
 .lounge-character-start .lounge-persona-pick-button svg { flex-shrink:0; color:var(--c-accent); }
 .lounge-story-hint { margin:0; font-size:12px; line-height:1.6; color:var(--c-muted); word-break:keep-all; }
 .lounge-creator-step>h2 small { font-size:12px; font-weight:500; letter-spacing:0; color:var(--c-muted,#8a8f84); }
+
+/* On a computer the photo and what is beside it end on the same line (2026-11-20, by the owner): the text is set a little tighter, the photo
+   takes the height the column ends up with (cropped at the sides, not the top), and the stories sit at the column's foot, level with the photo's. */
+@media(min-width:901px) {
+  .lounge-character-hero { align-items:stretch; }
+  .lounge-character-photo,.lounge-character-photo.portrait { aspect-ratio:auto; min-height:560px; }
+  .lounge-character-photo img { position:absolute; inset:0; object-position:50% 12%; }
+  .lounge-character-head { padding-top:0; }
+  .lounge-character-head h1 { gap:6px; margin-top:10px; font-size:clamp(34px,3.8vw,46px); letter-spacing:-1.5px; }
+  .lounge-character-head h1 small { font-size:15px; }
+  .lounge-character-intro { display:flex; flex-direction:column; padding-top:14px; }
+  .lounge-character-tagline { padding:12px 18px; font-size:16px; line-height:1.6; }
+  .lounge-character-chips { margin-top:12px; }
+  .lounge-character-chips li { padding:5px 11px; font-size:12px; }
+  .lounge-character-summary { margin-top:10px; font-size:13.5px; line-height:1.7; }
+  .lounge-character-facts { margin-top:8px; }
+  .lounge-character-facts>div { padding:7px 0; }
+  .lounge-character-facts dd { margin-top:2px; font-size:12.5px; line-height:1.5; }
+  .lounge-character-intro>.lounge-character-actions { margin-top:auto; padding-top:14px; }
+  .lounge-character-actions>button.lounge-character-cta,.lounge-character-start>.lounge-character-cta { padding:12px 24px; font-size:15px; box-shadow:0 8px 20px color-mix(in srgb,var(--c-accent) 30%,transparent); }
+  .lounge-story-start { gap:7px; margin-top:10px; }
+  .lounge-story-chips { gap:6px; }
+  .lounge-story-chips button { padding:6px 12px; font-size:13px; }
+  .lounge-story-summary { gap:3px; padding:9px 12px; }
+  .lounge-story-summary p { font-size:13px; line-height:1.55; }
+  .lounge-story-summary small { font-size:11.5px; }
+}
