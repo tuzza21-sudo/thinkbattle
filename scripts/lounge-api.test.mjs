@@ -5835,3 +5835,23 @@ test('a call of 오닉스 is answered by DeepSeek, and a blank answer on a call 
   assert.ok(api.slice(guard, guard + 500).includes('attemptReply(provider)'));
   assert.ok(api.indexOf("attemptReply('openai')", guard) > guard, 'GPT is still the last fallback');
 });
+
+test('a one-to-one reply asks a check once and keeps its own word, on a chat and a call (정하린, 2026-11-24)', () => {
+  const rule = messengerLib.loungeOwnWordsRule;
+  for (const part of ['한 번 묻는다', '같은 확인을 다시 묻거나 증거를 보여 달라고 하지 않고', '점수·합격·자격을 매기지 않으며', '가볍게 거두지 않는다', '짧게 인정한 뒤', '안전 규칙을 따른다']) assert.ok(rule.includes(part), part);
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  assert.ok(api.includes('...(solo ? [loungeContinuityRule, loungeOwnWordsRule] : []),'), 'every one-to-one reply instruction carries it, before the chat and call branches');
+  const harin = charactersLib.getLoungeCharacter('teacher');
+  assert.ok(!harin.bible.hidden.includes('평가를 방패로'));
+  assert.ok(harin.bible.humorExamples.bad.some(line => line.includes('되묻거나 증거')));
+  assert.ok(harin.bible.fewShot.some(shot => shot.stage === 1 && shot.reply.includes('제가 말을 바꿨어요')));
+});
+
+test('a Gemini reply that writes nothing in time is given up, so the next model answers', () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  assert.ok(api.includes("const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 12_000;"));
+  const reply = api.slice(api.indexOf('const geminiReply = async () => {'), api.indexOf('const deepseekReply = async'));
+  assert.ok(reply.includes('signal: AbortSignal.any([replyStop, stall.signal])'));
+  assert.ok(reply.includes("if (output.trim()) begun = true;"));
+  assert.ok(reply.includes("'gemini_stalled'") && reply.includes('finally { clearTimeout(stallTimer); }'));
+});
