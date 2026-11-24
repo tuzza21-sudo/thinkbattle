@@ -4677,7 +4677,7 @@ test('the picker offers 아리아, 오닉스 and 라쿤 under code names (no 노
   assert.equal(modelsLib.loungeGeminiChatModels['gemini-flash'], 'gemini-3.8-flash');
   assert.equal(modelsLib.getLoungeChatModel('glm-flash').id, 'deepseek-flash', 'a room still set to GLM answers with the default');
   const deepseek = modelsLib.getLoungeChatModel('deepseek-flash');
-  assert.equal(deepseek.provider, 'deepseek'); assert.equal(modelsLib.getLoungeChatModel(deepseek.voiceFallback).provider, 'openai', 'a voice reply is OpenAI\'s');
+  assert.equal(deepseek.provider, 'deepseek'); assert.equal(deepseek.voiceFallback, null, 'a call of 오닉스 is DeepSeek\'s too (2026-11-24)');
   assert.equal(modelsLib.loungeAdultChatModel, 'deepseek/deepseek-v4.1-flash-1017-uncensored');
   assert.equal(modelsLib.loungeAdultChatUrl, 'https://nano-gpt.com/api/v1/chat/completions');
   assert.equal(modelsLib.getLoungeChatModel('gpt-sol').id, 'deepseek-flash', 'a room still set to Sol answers with the default');
@@ -5826,4 +5826,12 @@ test('a failed 아리아 (Gemini) reply is answered by DeepSeek before GPT', () 
   const openai = api.indexOf('reply failed, answering with openai`', deepseek);
   assert.ok(deepseek > 0 && openai > deepseek);
   assert.ok(api.slice(deepseek, openai).includes("attemptReply('deepseek-plain')"));
+});
+
+test('a call of 오닉스 is answered by DeepSeek, and a blank answer on a call that is not an adult scene goes to GPT without asking DeepSeek again', () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  const guard = api.search(/if \(chat \|\| adultReply\) \{\s*console\.warn\(`\[Lounge API\] \$\{provider\} reply failed, asking again`/);
+  assert.ok(guard > 0, 'the second DeepSeek try is only for a chat or an adult scene');
+  assert.ok(api.slice(guard, guard + 500).includes('attemptReply(provider)'));
+  assert.ok(api.indexOf("attemptReply('openai')", guard) > guard, 'GPT is still the last fallback');
 });

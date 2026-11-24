@@ -33,9 +33,13 @@
  * is gone, answers with it). 노바 stays as the id 'gpt' that a call and a failed reply fall back to. 라쿤 moves to OpenRouter's
  * Qwen 3.8 Flash (OPENROUTER_API_KEY), for every turn of a room on it: general talk, chat, calls and adult scenes alike; DeepSeek's
  * own model answers when it fails.
+ *
+ * 2026-11-24, by the owner: 오닉스 answers a call with DeepSeek too (its voiceFallback is gone), where the fast GPT had answered every call since
+ * 2026-11-20. DeepSeek's blank answers (8 of 18 tries on 2026-11-19/20, all adult-scene calls; none in 122 chat tries) are not asked again on a call that is
+ * not an adult scene: the fast GPT answers at once (see the retry in api/lounge.ts).
  */
 export const loungeChatModels = [
-  { id: 'deepseek-flash', label: '오닉스', description: '빠르고 자유로운 대화', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
+  { id: 'deepseek-flash', label: '오닉스', description: '빠르고 자유로운 대화', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gemini-flash', label: '아리아', description: '표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'deepseek-raccoon', label: '라쿤', description: '균형잡힌 대화', provider: 'openrouter', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gpt', label: '노바', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: false, voiceFallback: null },
