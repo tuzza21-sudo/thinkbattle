@@ -5819,3 +5819,11 @@ test('a room with no model answers with 오닉스 (DeepSeek), and 라쿤 answers
     }
   }
 });
+
+test('a failed 아리아 (Gemini) reply is answered by DeepSeek before GPT', () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  const deepseek = api.indexOf("if (provider === 'gemini' && deepseekKey) {");
+  const openai = api.indexOf('reply failed, answering with openai`', deepseek);
+  assert.ok(deepseek > 0 && openai > deepseek);
+  assert.ok(api.slice(deepseek, openai).includes("attemptReply('deepseek-plain')"));
+});
