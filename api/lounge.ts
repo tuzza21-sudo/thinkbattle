@@ -2243,8 +2243,13 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                   }
                   // JSON mode sometimes answers with blanks: once more before OpenAI, which would decline an adult scene.
                   if (provider === 'deepseek') {
-                    console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
-                    try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                    // A call that is not an adult scene does not ask DeepSeek again (2026-11-24, by the owner, when 오닉스's calls went to
+                    // DeepSeek: on 2026-11-19/20 its blank answers and the second try made a call wait up to 9-15 s and drop): a blank
+                    // or failed answer goes straight to the fast GPT, so the call waits one failed try, not two.
+                    if (chat || adultReply) {
+                      console.warn(`[Lounge API] ${provider} reply failed, asking again`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                      try { return await attemptReply(provider); } catch (again) { if (found || earlySpeech || replyStop.aborted) throw again; }
+                    }
                     // The adult model (NanoGPT) is down: DeepSeek's own model, then Gemini, before OpenAI, which steps back from an adult scene (2026-11-18: GPT's "I went too far" turns became the room's agreement).
                     // The other adult backend: DeepSeek's own model for NanoGPT's turn, NanoGPT's for a room on 오닉스.
                     if (adultReply && (adultViaDeepseek ? nanoKey : deepseekKey)) {
