@@ -2225,8 +2225,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               catch (error) {
                 // Once the first sentence is being spoken a new attempt would say something else after it.
                 if (found || earlySpeech || replyStop.aborted) throw error;
-                // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: GPT answers this turn, so
-                // the conversation goes on.
+                // A chosen Gemini model (or DeepSeek in adult mode) that fails before any text: another model answers this
+                // turn (DeepSeek, then GPT, for Gemini), so the conversation goes on.
                 if (provider === 'gemini' || provider === 'deepseek' || provider === 'openrouter') {
                   // 라쿤's model failed before any text: once more, then DeepSeek's own model (or NanoGPT's), with the adult fallbacks below.
                   if (provider === 'openrouter') {
@@ -2255,6 +2255,12 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                       console.warn('[Lounge API] adult model and DeepSeek failed, answering with Gemini');
                       try { return await attemptReply('gemini'); } catch (gemini) { if (found || earlySpeech || replyStop.aborted) throw gemini; }
                     }
+                  }
+                  // 아리아 (Gemini) failed before any text: DeepSeek's own model answers first, GPT only after it (2026-11-24, by the
+                  // owner, when Gemini 3.8 Flash answered 503 "high demand" on every turn and GPT wrote 아리아's replies).
+                  if (provider === 'gemini' && deepseekKey) {
+                    console.warn('[Lounge API] gemini reply failed, answering with DeepSeek', JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
+                    try { return await attemptReply('deepseek-plain'); } catch (other) { if (found || earlySpeech || replyStop.aborted) throw other; }
                   }
                   console.warn(`[Lounge API] ${provider} reply failed, answering with openai`, JSON.stringify(error instanceof LoungeUpstreamError ? { code: error.code } : { name: error instanceof Error ? error.name : 'error' }));
                   return await attemptReply('openai');
