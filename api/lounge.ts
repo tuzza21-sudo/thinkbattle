@@ -4,7 +4,7 @@ import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdu
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeRaccoonModel, loungeRaccoonUrl } from '../src/lib/loungeModels';
-import { loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeOwnWordsRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
@@ -40,6 +40,12 @@ const loungeCallLookupWaitMs = 150;
  * LOUNGE_REPLY_STALL_MS changes it.
  */
 const loungeReplyStallMs = () => Number(process.env.LOUNGE_REPLY_STALL_MS) || 15_000;
+/**
+ * How long a Gemini reply may go without any reply text before it is given up and the next model answers (2026-11-24): a
+ * finished Flash reply took at most 18 s in chat and 9 s on a call, its first text sooner. Pro thinks first, so it waits longer.
+ * LOUNGE_GEMINI_FIRST_TEXT_MS changes Flash's.
+ */
+const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 12_000;
 /** Added to a reply asked again after an empty or refused one. */
 const loungeInCharacterRetryRule = '직전 시도에서 답을 쓰지 못했다. 이번에는 반드시 text에 캐릭터의 답을 쓴다. 상대의 말이 노골적이었다면 그 단어를 되풀이하거나 묘사하지 않고, 지금 관계 단계에 맞는 은근한 반응(설렘, 도발, 장난스럽게 혼내기, 다가가기, 장면 전환)으로 같은 장면 안에서 대화를 이어 간다. 대화를 끝내거나 침묵하지 않는다.';
 /**
@@ -1495,7 +1501,7 @@ ${photoRule}`;
       instructions: [
         // Stable cache prefix: identical every turn for the same character, inner-voice setting, room mode and adult flag.
         `${persona ? `${persona}\n${solo ? loungeOneToOneCharacterRules : loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${solo ? '사람의 가치나 인격은 평가하지 않는다.' : relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,
-        ...(solo ? [loungeContinuityRule] : []),
+        ...(solo ? [loungeContinuityRule, loungeOwnWordsRule] : []),
         ...(story || messenger ? [] : solo ? topicRoom ? [topicRules] : [] : [reactionRules, topicRules]), closingRules,
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
@@ -2068,8 +2074,14 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             partialLength = 0;
             const pro = chatModel.id === 'gemini-pro';
             const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
+            // No reply text yet after loungeGeminiFirstTextMs: given up, so DeepSeek answers (2026-11-24, by the owner: Gemini held
+            // a 정하린 turn for 68 s before failing, and three turns were lost while the member waited up to 2m41s).
+            const stall = new AbortController();
+            let begun = false;
+            const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('gemini stalled', 'TimeoutError')); }, loungeGeminiFirstTextMs(pro));
+            try {
             const response = await fetchTimed(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
-              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: replyStop,
+              method: 'POST', headers: { 'x-goog-api-key': geminiKey!, 'Content-Type': 'application/json' }, signal: AbortSignal.any([replyStop, stall.signal]),
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: modelRequest.instructions }] },
                 contents: [{ role: 'user', parts: [{ text: modelRequest.input }] }],
@@ -2087,6 +2099,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               const event = raw as unknown as GeminiEvent, candidate = event.candidates?.[0];
               if (event.promptFeedback?.blockReason) blocked = true;
               output += (candidate?.content?.parts ?? []).filter(part => !part.thought).map(part => part.text ?? '').join('');
+              if (output.trim()) begun = true;
               sendPartial(output);
               if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
               if (candidate?.finishReason) finish = candidate.finishReason;
@@ -2097,6 +2110,13 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               usage: { input_tokens: usage?.promptTokenCount, output_tokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0), input_tokens_details: { cached_tokens: usage?.cachedContentTokenCount ?? 0 } } };
             const logged = modelUsageLog(final, { host: host.id, mode: 'solo-stream', model }); if (logged) console.info('[Lounge model]', JSON.stringify(logged));
             return parseHostAnswer(output, final, false);
+            } catch (error) {
+              if (stall.signal.aborted && !begun && !replyStop.aborted) {
+                console.warn('[Lounge model] gemini wrote nothing in time', JSON.stringify({ model, afterMs: loungeGeminiFirstTextMs(pro) }));
+                throw new LoungeUpstreamError('AI 서버 연결이 잠시 어려워요. 조금 뒤에 다시 시도해 주세요.', 502, 'gemini_stalled', true, 5);
+              }
+              throw error;
+            } finally { clearTimeout(stallTimer); }
           };
           // Adult mode at the closest step (test accounts, 2026-11-03): OpenAI's models stop short of an explicit scene, so
           // that turn's reply goes to NanoGPT (NANOGPT_API_KEY, LOUNGE_ADULT_MODEL) with the same instructions, input and
