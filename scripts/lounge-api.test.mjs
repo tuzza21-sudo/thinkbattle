@@ -52,6 +52,20 @@ const run = async (mock, task) => {
   try { await task(); } finally { globalThis.fetch = originalFetch; for (const name of ['OPENAI_API_KEY','SUPABASE_URL','SUPABASE_ANON_KEY','APP_ORIGIN']) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; } }
 };
 
+test('the uptime watch asks GET ?health and gets an answer at once, with no login, database or model (2026-11-25)', async () => {
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (...args) => { calls.push(args[0]); throw new Error('no network in the health check'); };
+  try {
+    const response = await handler(new Request('https://saseok.kr/api/lounge?health=1'));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal((await handler(new Request('https://saseok.kr/api/lounge'))).status, 405, 'any other GET is still refused');
+    assert.deepEqual(calls, []);
+  } finally { globalThis.fetch = realFetch; }
+});
+
 test('canonical companion replies persist agreements atomically and reuse them on the next turn', async () => {
   let turn = 1, stateRow, relationRow, mood = {}, summary = '';
   const ownStoryQuote = '이번 주말엔 친구들을 불러서 저녁을 해 주기로 했어.';
