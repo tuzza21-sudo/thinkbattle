@@ -11,6 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
+import { loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
@@ -506,7 +507,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -728,6 +729,47 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
 
     // One tick of a voice call (every 30 seconds while it is connected): the database adds the time since the last one.
     // Only the room's owner, in their own one-to-one voice call, is timed.
+    // 영어 수업: expressions written for a situation the member told (in the 단어장, or in the lesson itself), saved as
+    // theirs (source 'situation') so that the lesson takes them first. Returns the rows saved.
+    const makeLessonExpressions = async (userId: string, situation: string, level: LoungeLessonLevel, items: readonly LoungeLessonItem[], fast: boolean) => {
+      if (!serviceHeaders) return { title: '', rows: [] as LoungeLessonItem[] };
+      const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+        model: 'gpt-6-luna', reasoning: { effort: fast ? 'none' : 'low' }, max_output_tokens: fast ? 1200 : 2500, store: false, prompt_cache_key: 'lounge-lesson-situation',
+        instructions: loungeLessonSituationInstructions,
+        input: JSON.stringify(loungeLessonSituationInput({ level, situation, items })),
+        text: { format: { type: 'json_schema', name: 'lounge_lesson_situation', strict: true, schema: loungeLessonSituationSchema } },
+      }), undefined, fast ? 12_000 : 30_000), 'openai');
+      const made = readLoungeLessonSituation(JSON.parse(modelOutputText(result) ?? ''), items);
+      if (!made.expressions.length) return { title: made.title, rows: [] as LoungeLessonItem[] };
+      const response = await fetchTimed(`${url}/rest/v1/lounge_english_items?on_conflict=user_id,expression_key`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=ignore-duplicates,return=representation' },
+        body: JSON.stringify(made.expressions.map(entry => ({ user_id: userId, ...entry, level: loungeLessonLevel(level).target, source: 'situation' }))) });
+      if (!response.ok) console.warn('[Lounge lesson] situation not saved', response.status);
+      return { title: made.title, rows: response.ok ? await readJson<LoungeLessonItem[]>(response, 'lounge') : [] };
+    };
+
+    if (body.action === 'lesson-situation') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
+      const situation = typeof body.situation === 'string' ? body.situation.replace(/\s+/g, ' ').trim().slice(0, 800) : '';
+      if (situation.length < 6) return json({ error: '어떤 상황인지 조금 더 적어 주세요.' }, 400);
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id || !isLoungeTutor(mine.host_persona)) return json({ error: '영어 수업에서만 쓸 수 있어요.' }, 403);
+      const [itemsResponse, profileResponse] = await Promise.all([
+        fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&select=*&order=created_at.asc&limit=400`, { headers: serviceHeaders }),
+        fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=level`, { headers: serviceHeaders }),
+      ]);
+      if (!itemsResponse.ok) return json({ error: '단어장을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, 502);
+      const items = await readJson<LoungeLessonItem[]>(itemsResponse, 'lounge');
+      // Forty a day (eight situations of five) while the lesson is free.
+      if (items.filter(item => item.source === 'situation' && Date.parse(item.created_at ?? '') > Date.now() - 86_400_000).length >= 40) return json({ error: '오늘은 상황 표현을 충분히 만들었어요. 수업에서 먼저 연습해 보고 내일 다시 만들어 주세요.' }, 429);
+      const level = readLoungeLessonLevel(profileResponse.ok ? (await readJson<Array<{ level?: string }>>(profileResponse, 'lounge'))[0]?.level : undefined);
+      const made = await makeLessonExpressions(user.id, situation, level, items, false);
+      if (!made.rows.length) return json({ error: '이 상황에 맞는 표현을 만들지 못했어요. 영어로 말해야 하는 장면을 조금 더 구체적으로 적어 주세요.' }, 422);
+      console.info('[Lounge lesson]', JSON.stringify({ situation: true, made: made.rows.length }));
+      return json({ title: made.title, items: made.rows });
+    }
+
     if (body.action === 'call-tick') {
       const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
       if (user.is_anonymous) return json({ call: null });
@@ -1468,6 +1510,11 @@ ${photoRule}`;
           return loungeLessonCleanGrade(readLoungeLessonGrade(JSON.parse(modelOutputText(result) ?? '')), lastHuman);
         } catch (error) { console.warn('[Lounge lesson] not graded', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
       })() : undefined;
+      // The member told a situation of their own: its expressions are made now and taken first (this turn waits for them).
+      if (grade?.intent === 'situation') {
+        try { items.push(...(await makeLessonExpressions(user.id, lastHuman, level, items, !chat)).rows); }
+        catch (error) { console.warn('[Lounge lesson] situation not made', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
+      }
       const turn = advanceLoungeLesson({ state: prior, items, plan, now, said: lastHuman, grade, opening });
       const keep = loungeLessonKeep(turn.state, grade, items);
       if (keep) turn.state.kept++;

@@ -1256,3 +1256,9 @@
 .lounge-lesson-said { text-decoration:line-through; text-decoration-color:#ff8a8a99; }
 .lounge-lesson-why { white-space:pre-line; }
 .lounge-lesson-add textarea { font-family:inherit; }
+.lounge-lesson-add > div { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.lounge-lesson-preview { display:grid; gap:8px; padding:12px; border:1px solid #ffffff24; border-radius:12px; background:#ffffff0a; }
+.lounge-lesson-preview p { margin:0; font-size:14px; }
+.lounge-lesson-preview > ul:not(.lounge-memory-list) { display:grid; gap:3px; margin:0; padding-left:18px; font-size:13px; }
+.lounge-lesson-preview > div { display:flex; gap:8px; justify-content:flex-end; }
+.lounge-lesson-preview small, .lounge-lesson-where { font-size:12px; opacity:.75; line-height:1.5; }

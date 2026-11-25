@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { parseLoungeLessonWords, readLoungeLessonLevel, type LoungeLessonItem, type LoungeLessonLevel } from './loungeLesson';
+import { requestLoungeLessonSituation } from './loungeApi';
 
 /** A correction from a lesson (lounge_english_attempts): what the member said and how it reads better. */
 export type LoungeLessonNote = { id: number; said: string; better: string; polished: string; why: string; verdict: string; created_at: string; item_id: string | null };
@@ -48,4 +49,29 @@ export async function setLoungeLessonLevel(level: LoungeLessonLevel) {
   if (!user.user) throw new Error('로그인이 필요해요.');
   const { error } = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level, updated_at: new Date().toISOString() });
   failed(error);
+}
+
+/**
+ * Expressions read from the member's file (loungeLessonFile.ts), added as theirs in batches; one they have is left as it
+ * is. A third column (where it is used) is kept when the database has the column (migration 20270117000000).
+ */
+export async function importLoungeLessonWords(words: ReadonlyArray<{ expression: string; meaning: string; situation: string }>, level: LoungeLessonLevel) {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) throw new Error('로그인이 필요해요.');
+  const target = level === 'B2' ? 'C1' : 'B2';
+  const withSituation = words.some(word => word.situation);
+  let added = 0;
+  for (let at = 0; at < words.length; at += 100) {
+    const { data, error } = await supabase.from('lounge_english_items')
+      .upsert(words.slice(at, at + 100).map(word => ({ user_id: user.user!.id, expression: word.expression, meaning: word.meaning, level: target, source: 'mine', ...(withSituation ? { situation: word.situation || null } : {}) })), { onConflict: 'user_id,expression_key', ignoreDuplicates: true })
+      .select('id');
+    failed(error);
+    added += data?.length ?? 0;
+  }
+  return added;
+}
+
+/** Expressions written for a situation the member told; they come first in the next lesson turn. */
+export async function makeLoungeLessonSituation(roomId: string, situation: string) {
+  return requestLoungeLessonSituation(roomId, situation);
 }
