@@ -49,34 +49,34 @@
   },
   "teacher": {
     "portrait": {
-      "file": "host-teacher-v1.webp",
-      "prompt": "Drawn on 2026-11-16 with the image edit API from the owner's chalkboard photo (host-teacher-work-v1.webp), not from this text: the same woman, same face and chin-length black bob, framed from just above the head to the upper chest, the same cream silk blouse buttoned modestly and a thin gold necklace, poised half-smile with one eyebrow barely raised, a softly blurred upscale hotel lounge at night with warm amber bokeh. Elegant magazine-portrait quality, tasteful and not provocative."
+      "file": "host-teacher-v2.webp",
+      "prompt": "Drawn on 2026-11-25 with scratchpad gen-portraits.mjs (gpt-image-2 low; the owner asked for a younger, more attractive tutor). A strikingly beautiful, glamorous fictional Korean woman aged about thirty-one with a confident, charismatic and alluring presence: refined balanced features, luminous skin, large dark almond-shaped eyes with a self-assured direct gaze, full lips in a poised, knowing half-smile. A glossy sleek black bob just below the jaw tucked behind one ear, small gold drop earrings, a thin gold necklace, a fitted cream silk blouse with the top button open. A softly blurred upscale hotel lounge at early evening with warm amber bokeh. Elegant beauty-magazine portrait, tasteful and not provocative. (v1 was drawn from the owner's chalkboard photo, which showed a CSAT board.)"
     },
     "full": {
-      "portrait": "host-teacher-v1.webp",
-      "file": "host-teacher-full-v1.webp",
-      "prompt": "{{common}} She is a 33-year-old star English lecturer off duty: the same chin-length black bob, a fitted dark knit dress with a thin gold necklace and small gold earrings, a light trench coat over one arm, standing in a quiet hotel lounge at night with warm amber light, poised and confident with a faint knowing smile."
+      "portrait": "host-teacher-v2.webp",
+      "file": "host-teacher-full-v2.webp",
+      "prompt": "{{common}} Full-length: she stands in an upscale hotel lounge in the evening, slim and curvy, a fitted black knee-length dress with a structured cream jacket over her shoulders, black heels, a small handbag, one hand lightly on a bar stool, a poised knowing smile. Warm amber light. Nothing readable. Tasteful and not provocative."
     },
     "work": {
-      "portrait": "host-teacher-v1.webp",
-      "file": "host-teacher-work-v1.webp",
-      "prompt": "Not generated: the owner's own photo of her at a chalkboard (2026-11-16) is used as it is."
+      "portrait": "host-teacher-v2.webp",
+      "file": "host-teacher-work-v2.webp",
+      "prompt": "{{common}} She is an adult English tutor giving a private one-to-one lesson in a stylish study room with large windows in the early evening: beside a clean glass whiteboard with only abstract marker strokes, holding a marker, one hand on her hip, a confident charismatic half-smile. A fitted cream silk blouse and a high-waisted black pencil skirt, framed from the head to the knees. Nothing readable on any surface. Gallery photos teacher-v2-1 (gym) and teacher-v2-2 (wine bar) were drawn from the same portrait."
     }
   },
   "interpreter": {
     "portrait": {
-      "file": "host-interpreter-v1.webp",
-      "prompt": "{{common}} A strikingly handsome fictional Korean man, 36, 181cm, a straight relaxed posture, calm composed eyes, lightly tousled black hair, the corner of his mouth just beginning to lift as if an answer came to mind. A dark navy jacket over a white open-collar shirt, one plain watch. A softly blurred upscale hotel lobby at night with warm amber light. Elegant magazine-portrait quality, tasteful and not provocative."
+      "file": "host-interpreter-v2.webp",
+      "prompt": "Drawn on 2026-11-25 with scratchpad gen-portraits.mjs (gpt-image-2 low; the owner asked for a younger, more attractive tutor). A strikingly handsome fictional Korean man who looks about thirty, youthful and fresh, the kind of warm, gentle and refined man young women would love to have as their private English tutor: clean-shaven clear complexion, a soft defined jawline, kind bright dark eyes that smile a little, a warm friendly half-smile. Soft natural black hair with a light comma-style fringe. A soft ivory knit over a crisp white shirt collar, a thin silver watch. A bright, softly blurred modern hotel lounge cafe in the late afternoon with warm window light and green plants. Approachable and attractive, tasteful and not provocative."
     },
     "full": {
-      "portrait": "host-interpreter-v1.webp",
-      "file": "host-interpreter-full-v1.webp",
-      "prompt": "{{common}} The same Korean man stands in a quiet hotel lobby at night after work: the same dark navy jacket, the tie pulled loose and tucked into a pocket, a lanyard-free collar open, well-worn clean sneakers, a slim bag with an earphone case over one shoulder, a relaxed posture and a small, patient smile."
+      "portrait": "host-interpreter-v2.webp",
+      "file": "host-interpreter-full-v2.webp",
+      "prompt": "{{common}} Full-length: he stands in a quiet modern hotel lobby in the evening after work, about 181 cm, slim, a dark navy jacket over a soft ivory knit, slim charcoal trousers and clean white sneakers, a slim leather bag over one shoulder, one hand in his pocket, a relaxed warm smile. Warm amber lobby light. Nothing readable."
     },
     "work": {
-      "portrait": "host-interpreter-v1.webp",
-      "file": "host-interpreter-work-v1.webp",
-      "prompt": "{{common}} The same Korean man works as a conference interpreter: in a glass interpreter's booth at an international forum, wearing a headset, the dark navy jacket and a watch, one hand resting beside a small notepad with no readable writing, eyes on the speaker beyond the glass, composed and attentive. Nothing readable on any sign, screen or paper."
+      "portrait": "host-interpreter-v2.webp",
+      "file": "host-interpreter-work-v2.webp",
+      "prompt": "{{common}} He gives a one-to-one English lesson at a bright modern hotel lounge cafe in the afternoon: seated at a small marble table, a laptop half open and a notebook with no readable writing, a cup of coffee, leaning forward slightly with a warm encouraging smile. Soft ivory knit over a white shirt collar, a thin silver watch. Nothing readable on any screen, page or sign."
     }
   }
 }

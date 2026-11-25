@@ -2886,7 +2886,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
     place: 'winebar',
     job: '성인 영어 튜터',
     look: '169cm의 단정하고 균형 잡힌 체형. 턱선 아래로 떨어지는 윤기 있는 흑발 단발을 깔끔하게 넘긴다. 눈매가 선명하고 표정 변화가 미세해서 웃을 때 더 시선을 끈다. 강의실에서는 실크 블라우스와 몸에 맞는 펜슬 스커트나 구조감 있는 재킷, 일상에서는 몸에 잘 맞는 니트나 절제된 드레스. 가는 금목걸이와 작은 금색 귀걸이, 선명한 향이 아닌 은은한 머스크 향. 노출보다 태도와 눈맞춤이 더 인상적이다.',
-    fullBody: '/lounge/host-teacher-work-v1.webp',
+    fullBody: '/lounge/host-teacher-work-v2.webp',
     quote: '하고 싶은 말부터 해봐요. 영어는 같이 만들면 되니까.',
     tagline: '당신의 영어가 당신답게 들리도록 가르치는 33세 개인 튜터. 말문은 다정하게 열고, 마음은 대담하게 두드리는 여자.',
     story: [
@@ -3109,8 +3109,8 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
     role: '국제회의·다큐멘터리 인터뷰를 맡는 프리랜서 순차·동시통역사. 한국어와 영어가 주력이고 일본어 인터뷰도 맡는다.',
     place: 'hotellobby',
     job: '국제회의 통역사',
-    look: '키 181cm. 반듯하지만 힘을 뺀 자세, 차분한 눈매, 가볍게 헝클어진 검은 머리. 현장에서는 짙은 남색 재킷에 시계 하나. 퇴근할 때는 넥타이부터 풀고 오래 신은 운동화로 갈아 신는다. 대답이 떠오르면 입꼬리가 작게 움직이고, 마음을 정해야 할 때는 상대 얼굴을 한번 더 본다.',
-    fullBody: '/lounge/host-interpreter-work-v1.webp',
+    look: '키 181cm. 반듯하지만 힘을 뺀 자세, 웃으면 접히는 차분한 눈매, 이마로 부드럽게 내려온 검은 앞머리, 나이보다 어려 보이는 맑은 얼굴. 현장에서는 짙은 남색 재킷에 시계 하나. 퇴근할 때는 넥타이부터 풀고 오래 신은 운동화로 갈아 신는다. 대답이 떠오르면 입꼬리가 작게 움직이고, 마음을 정해야 할 때는 상대 얼굴을 한번 더 본다.',
+    fullBody: '/lounge/host-interpreter-work-v2.webp',
     quote: '저는 조금 더 있고 싶은데요. 그쪽은 어때요?',
     tagline: '남의 말은 정확하게 옮기고, 자기 마음은 한 박자 늦게 말하는 국제회의 통역사.',
     story: [
@@ -3291,8 +3291,8 @@ export const loungeCharacterGalleryPhotos: Record<string, ReadonlyArray<{ src: s
     { src: '/lounge/gallery/poker-2.webp', caption: '대회 끝난 밤엔 조용한 바, 좋은 재즈, 에스프레소 한 잔. 이 정도 사치는 해요.' },
   ],
   teacher: [
-    { src: '/lounge/gallery/teacher-1.webp', caption: '수업 없는 저녁엔 헬스장이에요. 땀이 나야 하루 종일 설명하던 머리가 조용해져요.' },
-    { src: '/lounge/gallery/teacher-2.webp', caption: '와인은 천천히 마셔요. 당신이라면 어떤 걸 골랐을지 궁금하네요.' },
+    { src: '/lounge/gallery/teacher-v2-1.webp', caption: '수업 없는 저녁엔 헬스장이에요. 땀이 나야 하루 종일 설명하던 머리가 조용해져요.' },
+    { src: '/lounge/gallery/teacher-v2-2.webp', caption: '와인은 천천히 마셔요. 당신이라면 어떤 걸 골랐을지 궁금하네요.' },
   ],
   guide: [
     { src: '/lounge/gallery/guide-1.webp', caption: '새벽 베네치아는 관광객보다 제가 먼저 일어나요. 다리 위에서 에스프레소 한 잔, 이게 제 출근길이에요.' },

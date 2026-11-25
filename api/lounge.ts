@@ -11,6 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
+import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
 /** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
@@ -588,7 +589,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       }
       const form = new FormData();
       form.append('file', new Blob([Uint8Array.from(binary, character => character.charCodeAt(0))], { type: mime }), `speech.${extensions[mime]}`);
-      form.append('model', 'gpt-4o-mini-transcribe'); form.append('language', 'ko');
+      // An English lesson (loungeLesson.ts) is heard in whatever language is spoken: with Korean set, a learner's
+      // "I am interesting in" came back corrected once in twelve tries (2026-11-25), and with no language none did.
+      form.append('model', 'gpt-4o-mini-transcribe'); if (body.language !== 'auto') form.append('language', 'ko');
       // A second request starts if the first is slow; longer recordings get a little longer before that.
       const sttStarted = performance.now(); let sttHedged = false;
       const result = await hedged(async attemptSignal => readJson<{ text: string }>(await openai('audio/transcriptions', form, AbortSignal.any([req.signal, attemptSignal]), 20_000), 'openai'),
@@ -728,10 +731,12 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     if (body.action === 'call-tick') {
       const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
       if (user.is_anonymous) return json({ call: null });
-      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,capacity,space_id,status,voice_on`, { headers });
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,space_id,status,voice_on`, { headers });
       if (!roomResponse.ok) throw new Error('대화방을 확인하지 못했어요.');
-      const [room] = await readJson<Array<{ host_id: string; capacity: number; space_id?: string | null; status: string; voice_on?: boolean | null }>>(roomResponse, 'lounge');
+      const [room] = await readJson<Array<{ host_id: string; host_persona?: string; capacity: number; space_id?: string | null; status: string; voice_on?: boolean | null }>>(roomResponse, 'lounge');
       if (!room || room.host_id !== user.id || room.capacity !== 1 || room.space_id || room.status !== 'active' || room.voice_on === false) return json({ call: null });
+      // English lessons are free while they are tried out (2026-11-25, by the owner): their calls are not counted.
+      if (isLoungeTutor(room.host_persona)) return json({ call: null });
       return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }).catch(() => null) });
     }
 
@@ -868,7 +873,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       await ensureCustomCharacter(mine.host_persona);
       const key = process.env.ELEVENLABS_API_KEY, voice = loungeEngineVoice('eleven', mine.host_persona, process.env.LOUNGE_VOICE_IDS);
       if (!key || !voice) throw new LoungeUpstreamError('지금은 음성 변환을 쓸 수 없어요.', 503, 'lounge_speech_not_configured', false, 60);
-      const speak = (id: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}?output_format=mp3_44100_128`, { method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' }, body: JSON.stringify(loungeElevenSpeechRequest(text)) }, 45_000);
+      const speak = (id: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}?output_format=mp3_44100_128`, { method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' }, body: JSON.stringify(loungeElevenSpeechRequest(text, undefined, mine.host_persona)) }, 45_000);
       let spoken = await speak(voice);
       // As in a call: a library voice refused to an account without a paid plan speaks with the premade one; a full plan is asked once more.
       const premade = loungeElevenPremadeVoice(mine.host_persona);
@@ -1018,6 +1023,13 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     if (room.study_required && !room.topic_study) throw new LoungeUpstreamError('사회자가 주제 자료를 먼저 준비하고 있어요. 잠시 뒤 다시 시도해 주세요.', 503, 'lounge_study_pending', true, 60);
     const custom = await ensureCustomCharacter(room.host_persona);
     const host = getLoungeHost(room.host_persona);
+    // 영어 수업 (loungeLesson.ts): a tutor's room reads the member's expressions and level alongside the rest of the context.
+    const lessonRead = isLoungeTutor(room.host_persona) && serviceHeaders && !room.space_id ? Promise.all([
+      fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&select=*&order=created_at.asc&limit=400`, { headers: serviceHeaders })
+        .then(async response => response.ok ? await readJson<LoungeLessonItem[]>(response, 'lounge') : null),
+      fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=level`, { headers: serviceHeaders })
+        .then(async response => readLoungeLessonLevel(response.ok ? (await readJson<Array<{ level?: string }>>(response, 'lounge'))[0]?.level : undefined)),
+    ]).catch(() => undefined) : undefined;
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
     // Enable the larger private-chat limit only after its database migration. Older databases keep accepting replies.
@@ -1096,6 +1108,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // Who the member is in this conversation: the persona chosen for the room (read fresh, so an edit shows at once), or their default.
     const memberPersona = solo && !room.space_id ? loungeRoomPersona(room.member_persona, personaRows) : undefined;
     const scenario = personaStory ? loungePersonaStoryScenario(personaStory, memberPersona) : roomScenario;
+    // An English tutor's room is a lesson, not a scene: no analyzer, no scene moves, no inner voice and no photos.
+    const lessonRoom = Boolean(lessonRead) && solo;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
@@ -1138,7 +1152,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const pendingContext = pendingTurns.map(item => ({ turn: item.turn, user: item.user_text, character: splitLoungeInnerVoice(item.reply).reply }));
 
     // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
-    const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' ? 'off' : 'on';
+    const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' || lessonRoom ? 'off' : 'on';
     // Every character with adult flirtation has it, a character a member made included (2026-11-18, by the owner): its sheet is an adult of 20 to 80 and the AI review at creation turns away anyone who reads as a minor; the member chose flirtation for it.
     // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
     const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && await adultUnlocked);
@@ -1186,7 +1200,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance, memoryLimits) : undefined;
     const analyzerStarted = performance.now();
     const skipAnalyzer = loungeSkipsAnalyzer(companionState, adultMode && stageNumber === 4, messages[0]?.kind === 'human' ? String(messages[0].text ?? '') : '', companionTurn);
-    const analyzerRead = !skipAnalyzer && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
+    const analyzerRead = !skipAnalyzer && !lessonRoom && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
       const state = currentRelationshipContext();
       const characterReading = companionCharacter ? { name: companionCharacter.name, role: companionCharacter.role,
         personality: companionCharacter.personality, lens: companionCharacter.bible?.interpretationLens,
@@ -1413,7 +1427,68 @@ ${photoRule}`;
       ? advanceLoungeConsult(readLoungeConsultState(room.story_state), { opening: body.reason === 'opening' && !lastHuman, said: lastHuman }) : undefined;
     // While a reading is under way (asking, picking, reading) nothing happens around them; plain talk is the usual chat.
     const consulting = Boolean(consult && consult.turn.do !== 'chat');
-    const sceneFound = companionChat && companionState ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
+    // 영어 수업: the member's words are graded (did the expression come out, what to correct) while the rest loads; code
+    // takes the lesson's next step and moves each expression's stage, and the reply says it (see loungeLesson.ts).
+    const lessonWork = lessonRoom && lessonRead ? (async () => {
+      const read = await lessonRead;
+      if (!read?.[0] || !serviceHeaders) return undefined;
+      const [stored, level] = read;
+      const items = [...stored];
+      const now = new Date(), today = loungeLessonDay(now);
+      const prior = readLoungeLessonState(room.story_state);
+      const plan: string[] = [];
+      if (!prior || prior.day !== today) {
+        // A new day: reviews due and the member's new expressions first, then the tutor's own ones of the member's level.
+        const planned = planLoungeLesson(items, now);
+        plan.push(...planned.queue);
+        const added = loungeLessonPackFor(level, items, planned.pack);
+        if (added.length) {
+          const response = await fetchTimed(`${url}/rest/v1/lounge_english_items?on_conflict=user_id,expression_key`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=ignore-duplicates,return=representation' },
+            body: JSON.stringify(added.map(entry => ({ user_id: user.id, expression: entry.expression, meaning: entry.meaning, level: entry.level, source: 'tutor', pack_id: entry.id }))) }).catch(() => undefined);
+          const rows = response?.ok ? await readJson<LoungeLessonItem[]>(response, 'lounge') : [];
+          items.push(...rows); plan.push(...rows.map(row => row.id));
+        }
+      }
+      const opening = body.reason === 'opening' && !lastHuman;
+      const current = prior?.day === today ? prior.current : undefined;
+      const target = current && !current.retell ? items.find(item => item.id === current.id) : undefined;
+      const lastHumanAt = recent.map(message => message.kind).lastIndexOf('human');
+      const askedMessage = lastHumanAt > 0 ? recent.slice(0, lastHumanAt).reverse().find(message => message.kind === 'host') : undefined;
+      const today_ = new Set([...(prior?.day === today ? [...prior.queue, ...prior.done.map(done => done.id)] : []), ...plan]);
+      const others = items.filter(item => today_.has(item.id) || item.stage >= 3);
+      const graded = performance.now();
+      const grade = !opening && lastHuman ? await (async () => {
+        try {
+          const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+            model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 2000 : 800, store: false, prompt_cache_key: 'lounge-lesson-grade',
+            instructions: loungeLessonGradeInstructions,
+            input: JSON.stringify(loungeLessonGradeInput({ level, target, others, asked: askedMessage ? splitLoungeInnerVoice(String(askedMessage.text ?? '')).reply : '', said: lastHuman })),
+            text: { format: { type: 'json_schema', name: 'lounge_lesson_grade', strict: true, schema: loungeLessonGradeSchema } },
+          }), undefined, chat ? 20_000 : 8_000), 'openai');
+          return loungeLessonCleanGrade(readLoungeLessonGrade(JSON.parse(modelOutputText(result) ?? '')), lastHuman);
+        } catch (error) { console.warn('[Lounge lesson] not graded', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
+      })() : undefined;
+      const turn = advanceLoungeLesson({ state: prior, items, plan, now, said: lastHuman, grade, opening });
+      const keep = loungeLessonKeep(turn.state, grade, items);
+      if (keep) turn.state.kept++;
+      const write = (path: string, init: RequestInit) => fetchTimed(`${url}/rest/v1/${path}`, { ...init, headers: { ...serviceHeaders, Prefer: 'return=minimal', ...(init.headers as Record<string, string> | undefined) } })
+        .then(response => { if (!response.ok) console.warn('[Lounge lesson] not saved', path.split('?')[0], response.status); }).catch(() => console.warn('[Lounge lesson] not saved', path.split('?')[0]));
+      const notes = grade && (grade.better || grade.errors.length) ? { said: lastHuman.slice(0, 600), better: grade.better, polished: grade.polished, why: grade.errors.map(error => `${error.wrong} → ${error.right}: ${error.why}`).join('\n').slice(0, 400) } : undefined;
+      const attempts: Array<Record<string, unknown>> = turn.verdicts.map(({ item, verdict }) => ({ user_id: user.id, item_id: item.id, room_id: roomId, character_id: host.id, verdict, said: lastHuman.slice(0, 600), ...(notes && item.id === turn.finished?.item.id ? { better: notes.better, polished: notes.polished, why: notes.why } : { better: '', polished: '', why: '' }) }));
+      // Every row has the same keys (PostgREST inserts an array only so); a correction with no expression finished is a note of its own.
+      if (notes && !attempts.some(attempt => attempt.better)) attempts.push({ user_id: user.id, item_id: null, room_id: roomId, character_id: host.id, verdict: 'note', ...notes });
+      await Promise.all([
+        write(`voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', body: JSON.stringify({ story_state: turn.state }) }),
+        ...turn.verdicts.map(({ item, verdict }) => write(`lounge_english_items?id=eq.${encodeURIComponent(item.id)}&user_id=eq.${encodeURIComponent(user.id)}`, { method: 'PATCH',
+          body: JSON.stringify({ ...applyLoungeLessonVerdict(item, verdict, now), last_said: lastHuman.slice(0, 300), updated_at: now.toISOString() }) })),
+        ...(attempts.length ? [write('lounge_english_attempts', { method: 'POST', body: JSON.stringify(attempts) })] : []),
+        ...(keep ? [write('lounge_english_items?on_conflict=user_id,expression_key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify({ user_id: user.id, expression: keep.expression, meaning: keep.meaning, level: loungeLessonLevel(level).target, source: 'upgrade' }) })] : []),
+      ]);
+      console.info('[Lounge lesson]', JSON.stringify({ host: host.id, step: turn.step, phase: turn.state.phase, graded: grade ? { target: grade.target, intent: grade.intent, free: grade.free_used.length, errors: grade.errors.length } : null, gradeMs: grade ? Math.round(performance.now() - graded) : 0, verdicts: turn.verdicts.map(entry => entry.verdict), kept: Boolean(keep), done: turn.state.done.length, queue: turn.state.queue.length }));
+      return loungeLessonForPrompt(turn, level, grade);
+    })().catch(error => { console.warn('[Lounge lesson] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
+    const sceneFound = companionChat && companionState && !lessonRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, userText: lastHuman, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
     const agreedSpeech = companionState ? loungeRoomSpeechLevel(companionState) : undefined;
@@ -1490,6 +1565,7 @@ ${photoRule}`;
     }
     // The model the member chose for a one-to-one room (the fast GPT unless they picked another). A slow model (GPT with
     // reasoning, Gemini Pro) answers chats only; a voice reply uses its faster fallback instead of a long silence.
+    const lessonPrompt = lessonWork ? await lessonWork : undefined;
     const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
     const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
     // How hard the reasoning model thinks: medium by default, LOUNGE_REPLY_REASONING (low, medium, high) changes it.
@@ -1497,7 +1573,7 @@ ${photoRule}`;
     // In a chat the character may send a photo with the reply: the call after it writes the scene the reply shows being
     // sent. Photos are kept per member, so a guest's character does not offer them; a member's character sends photos
     // only when its portrait was made by the AI (an uploaded portrait is never used to make photos).
-    const chatPhotos = split && chat && !user.is_anonymous && (!custom || custom.portrait_source === 'ai');
+    const chatPhotos = split && chat && !user.is_anonymous && !lessonRoom && (!custom || custom.portrait_source === 'ai');
     const modelRequest = {
       // Without the split, the reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
@@ -1518,6 +1594,7 @@ ${photoRule}`;
         messenger ? messengerInstruction : story ? [storyInstruction, soloInputFieldRules, loungeStoryEpisodeInstructions].join('\n')
           : [roleInstruction, ...(solo && !room.space_id ? [soloInputFieldRules] : [])].filter(Boolean).join('\n'),
         consultRoom ? loungeConsultRules : '',
+        lessonRoom ? loungeLessonRules : '',
         // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
         relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
         // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.
@@ -1525,7 +1602,7 @@ ${photoRule}`;
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       // Finish a companion's context with what was actually said, rather than an older intention or a retrieved card.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
         ? loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
@@ -1851,7 +1928,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
     // Past the month's minutes of calls (unless LOUNGE_CALL_LIMITS=off) the call's replies stay text, the same way a used premium voice does.
-    const callGate: Promise<void> | undefined = phoneCall && loungeCallLimitsOn(process.env) && !user.is_anonymous
+    const callGate: Promise<void> | undefined = phoneCall && !lessonRoom && loungeCallLimitsOn(process.env) && !user.is_anonymous
       ? callService('lounge_call_status', { p_user: user.id }).then(state => {
         if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.tester ? '이번 달 베타테스터 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.legacy ? '이번 달 통화 시간을 다 썼어요. 다음 달에 다시 쓸 수 있어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
       }).catch(() => { console.warn('[Lounge call] allowance not read, speaking anyway'); })
@@ -1917,7 +1994,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       }
       if (!plan.key || !plan.voice) throw new LoungeUpstreamError('목소리 설정을 확인해 주세요. 대화는 글로 이어 갈게요.', 503, 'lounge_speech_not_configured', false, 60);
       const premade = loungeElevenPremadeVoice(host.id);
-      const once = (voice: string, model: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text, model)), signal }, timeout);
+      const once = (voice: string, model: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/stream?output_format=pcm_24000`, { method: 'POST', headers: { 'xi-api-key': plan.key!, 'Content-Type': 'application/json' }, body: JSON.stringify(loungeElevenSpeechRequest(text, model, host.id)), signal }, timeout);
       // The plan allows a few requests at once and refuses the next with 429 at once, without a queue (2026-10-26).
       // A refused line goes at once to the same voice in the backup model, which has its own places; only when both are
       // full does it wait a moment and ask again (a line takes about half a second, so a place opens soon). A reply

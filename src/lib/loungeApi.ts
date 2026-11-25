@@ -261,9 +261,10 @@ async function replyAfterTranscript(stream: ReadableStream<Uint8Array>) {
  * starts the character's reply in the same request, and `stream` is that reply; without a stream the page asks for the
  * reply itself, as it always did.
  */
-export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?: AbortSignal, turnId?: string, reply = false) {
+/** `anyLanguage`: an English lesson, heard in whatever language is spoken (Korean is set otherwise). */
+export async function transcribeLoungeAudio(roomId: string, audio: Blob, signal?: AbortSignal, turnId?: string, reply = false, anyLanguage = false) {
   const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(audio); });
-  const result = await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(turnId ? { turnId } : {}), ...(reply ? { reply: { ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) } } : {}) }, signal, reply) as { posted?: boolean; stream?: ReadableStream<Uint8Array> };
+  const result = await apiRequest({ action: 'transcribe', roomId, audio: encoded, mimeType: audio.type, ...(anyLanguage ? { language: 'auto' } : {}), ...(turnId ? { turnId } : {}), ...(reply ? { reply: { ...(loadLoungeInnerVoice() === 'off' ? { innerVoice: 'off' } : {}) } } : {}) }, signal, reply) as { posted?: boolean; stream?: ReadableStream<Uint8Array> };
   if (!result.stream) return { posted: result.posted } as { posted?: boolean; stream?: ReadableStream<Uint8Array> };
   const rest = await replyAfterTranscript(result.stream);
   return rest ? { posted: true, stream: rest } : { posted: true };

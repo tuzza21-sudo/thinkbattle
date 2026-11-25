@@ -298,3 +298,12 @@
   .lounge-story-summary p { font-size:13px; line-height:1.55; }
   .lounge-story-summary small { font-size:11.5px; }
 }
+
+/* 영어 수업 (2026-11-25): the lesson's way in, under the stories on a tutor's page. */
+.lounge-lesson-start { display:grid; gap:10px; margin-top:16px; padding:16px; border-radius:14px; background:var(--c-soft); border:1px solid var(--c-line); }
+.lounge-lesson-start-head { display:flex; align-items:center; gap:8px; font-size:15px; }
+.lounge-lesson-start-head span { margin-left:auto; padding:2px 9px; border-radius:999px; background:var(--c-accent); color:#fff; font-size:11px; font-weight:700; }
+.lounge-character.night .lounge-lesson-start-head span { color:#1c121c; }
+.lounge-lesson-start ul { display:grid; gap:5px; margin:0; padding-left:18px; font-size:14px; line-height:1.6; word-break:keep-all; }
+.lounge-lesson-start .lounge-character-cta { justify-self:start; }
+.lounge-lesson-start small { font-size:12px; opacity:.7; word-break:keep-all; }

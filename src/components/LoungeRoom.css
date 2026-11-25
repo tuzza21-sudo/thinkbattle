@@ -1240,3 +1240,19 @@
 .lounge-message-actions-note { flex-basis:100%; margin:2px 4px 0; font-size:11px; line-height:1.5; color:#efe4d3; text-shadow:0 1px 3px #000d; }
 .lounge-message-actions.own .lounge-message-actions-note { text-align:right; }
 .lounge-message-actions-note[role="alert"] { color:#ffc9bd; }
+
+/* 영어 수업 (2026-11-25): the 단어장 button above the composer and its sheet. */
+.lounge-lesson-bar { display:flex; justify-content:flex-start; margin-bottom:8px; }
+.lounge-lesson-button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:0 14px; border-radius:999px; border:1px solid #ffffff40; background:#1f3b5a; color:#f3f7ff; font:inherit; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px #0006; }
+.lounge-lesson-levels { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.lounge-lesson-levels button { display:grid; gap:2px; padding:10px 12px; border:1px solid #ffffff24; border-radius:12px; background:transparent; color:#fff5e8; text-align:left; font:inherit; cursor:pointer; }
+.lounge-lesson-levels button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; }
+.lounge-lesson-levels b { font-size:14px; }
+.lounge-lesson-levels small { font-size:11px; opacity:.7; line-height:1.4; word-break:keep-all; }
+.lounge-lesson-stage { font-weight:700; }
+.lounge-lesson-stage.stage-3, .lounge-lesson-stage.stage-4 { color:#9fd8a8; }
+.lounge-lesson-stage.stage-5 { color:#ffd27a; }
+.lounge-lesson-sheet .lounge-memory-list small, .lounge-lesson-sheet .lounge-memory-list time { font-size:12px; opacity:.72; line-height:1.5; }
+.lounge-lesson-said { text-decoration:line-through; text-decoration-color:#ff8a8a99; }
+.lounge-lesson-why { white-space:pre-line; }
+.lounge-lesson-add textarea { font-family:inherit; }

@@ -268,7 +268,7 @@ export const loungeHosts = [
   {
     // 정하린 (2026-11-16; retold 2026-11-17): an adult English tutor, not a CSAT lecturer; her full-body picture is the photo the owner made.
     id: 'teacher', name: '성인 영어 튜터', tag: '당신의 영어를 당신답게 만드는', emoji: '📚', color: '#e9dccb',
-    portrait: '/lounge/host-teacher-v1.webp', voiceSample: '/lounge/host-teacher-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 여유 있는 도발',
+    portrait: '/lounge/host-teacher-v2.webp', voiceSample: '/lounge/host-teacher-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 여유 있는 도발',
     description: '당신의 영어가 당신답게 들리도록 가르치는 33세 개인 튜터. 수업 밖에서는 반론하는 사람에게 먼저 끌린다',
     greeting: '하고 싶은 말부터 해봐요. 영어는 같이 만들면 되니까.',
     instruction: `성인 영어 튜터: 성인 영어 커뮤니케이션 강사인 33세 진행자다. 낮고 또렷한 해요체로 핵심만 짧게 말하고, 허세에는 침착하게 모순을 짚는다.
@@ -289,7 +289,7 @@ export const loungeHosts = [
   {
     // 문정우 (2026-11-20, the owner's bible): a freelance conference interpreter who renders other people's words exactly and says his own heart a beat late.
     id: 'interpreter', name: '국제회의 통역사', tag: '남의 말은 정확하게, 제 마음은 한 박자 늦게', emoji: '🎧', color: '#d3dbe6',
-    portrait: '/lounge/host-interpreter-v1.webp', voiceSample: '/lounge/host-interpreter-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 차분한 해요체',
+    portrait: '/lounge/host-interpreter-v2.webp', voiceSample: '/lounge/host-interpreter-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 차분한 해요체',
     description: '남의 말은 정확하게 옮기고 자기 마음은 한 박자 늦게 말하는 36세 국제회의 통역사. 퇴근하면 넥타이부터 푼다',
     greeting: '회의는 예정대로 끝났어요. 저녁만 예정에서 빠졌고요. 커피 한 잔 하실래요?',
     instruction: `국제회의 통역사: 한국어와 영어가 주력인 36세 프리랜서 통역사 진행자다. 낮고 또렷한 해요체로 짧게 말하고, 질문이 어떤 뜻인지 한 지점만 정확히 확인한다.
@@ -552,6 +552,8 @@ export function loungeRoomSceneTheme(room: { id: string; host_persona: string; t
 export type LoungeHost = {
   id: LoungeHostId; name: string; tag: string; emoji: string; color: string; portrait: string; voiceSample: string; voiceLabel: string;
   description: string; greeting: string; instruction: string; companion: string; voice: string; speechSpeed: number; speechInstruction: string; sampleText: string;
+  /** An English tutor (loungeLesson.ts) speaks Korean and English, so the voice engines are not told the text is Korean. */
+  bilingual?: boolean;
 };
 // Characters that members create (ids "c_..."), registered once their data has been read (see loungeCustomCharacters.ts).
 const customLoungeHosts = new Map<string, LoungeHost>();
@@ -580,7 +582,7 @@ export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
   const host = getLoungeHost(hostId);
   return {
-    contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following Korean dialogue exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
+    contents: [{ parts: [{ text: `${host.speechInstruction} ${loungeSpeechExpression}\nRead only the following ${host.bilingual ? 'dialogue (Korean, with the English sentences read in natural, clear North American English)' : 'Korean dialogue'} exactly as written. Do not add an introduction, an explanation or stage directions, and do not imitate a real person's voice.\n\n${input}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } } },
   };
 }
@@ -708,8 +710,9 @@ const loungeHostGender = (hostId: string) => houseVoiceGender[hostId] ?? (openAi
 /** The ElevenLabs premade voice of a character, for when its library voice is refused (an account without a paid plan). */
 export const loungeElevenPremadeVoice = (hostId: string) => loungeElevenPremadeVoices[hostId] ?? loungeElevenPremadeVoices[loungeHostGender(hostId)];
 /** ElevenLabs in Korean (v4 Turbo, or Flash v2.5 as its backup). It takes the stability settings; a "speed" setting is accepted but changes nothing (measured 2026-10-23), so none is sent. */
-export function loungeElevenSpeechRequest(input: string, model: string = loungeElevenModel) {
-  return { text: input, model_id: model, language_code: 'ko', voice_settings: { stability: 0.45, similarity_boost: 0.8 } };
+export function loungeElevenSpeechRequest(input: string, model: string = loungeElevenModel, hostId?: string) {
+  // A tutor's lines mix English and Korean: with no language set, the model reads each in its own (2026-11-25).
+  return { text: input, model_id: model, ...(hostId && getLoungeHost(hostId).bilingual ? {} : { language_code: 'ko' }), voice_settings: { stability: 0.45, similarity_boost: 0.8 } };
 }
 /** Typecast reads the feeling from the sentence itself ("smart" emotion) at the character's pace. */
 export function loungeTypecastSpeechRequest(hostId: string, voiceId: string, input: string) {
