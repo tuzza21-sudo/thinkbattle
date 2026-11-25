@@ -1,0 +1,56 @@
+# Uptime watch (2026-11-25, by the owner): one instance of the lounge function stopped and every request was refused
+# (ECONNREFUSED 127.0.0.1:<port>) until a redeploy, three times so far (10-26, 11-19, 11-25). Every five minutes this
+# asks the lounge function itself whether it answers; after three misses in a minute it starts a redeploy through the
+# Vercel deploy hook (secret VERCEL_DEPLOY_HOOK) and fails, so GitHub mails the owner. The repository is public, so
+# the runs cost nothing. GitHub may start a scheduled run a few minutes late.
+name: Uptime watch
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+
+concurrency:
+  group: uptime-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the lounge function
+        id: check
+        run: |
+          for try in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 'https://saseok.kr/api/lounge?health=1' || true)
+            echo "try $try: HTTP $code"
+            # Any answer from the function below 500 means it is running (a dead instance gives a bare 500 or nothing).
+            if [ "$code" -ge 200 ] 2>/dev/null && [ "$code" -lt 500 ]; then echo "down=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ "$try" -lt 3 ]; then sleep 20; fi
+          done
+          echo "down=true" >> "$GITHUB_OUTPUT"
+
+      - name: Redeploy
+        if: steps.check.outputs.down == 'true'
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A failed run in the last 20 minutes already started a redeploy: wait for it instead of starting another.
+          since=$(date -u -d '-20 min' +%Y-%m-%dT%H:%M:%SZ)
+          recent=$(gh run list -R "$GITHUB_REPOSITORY" --workflow uptime.yml --status failure --limit 5 --json createdAt --jq "[.[] | select(.createdAt > \"$since\")] | length" || echo 0)
+          if [ "${recent:-0}" -gt 0 ]; then
+            echo "::error::saseok.kr/api/lounge is still not answering; a redeploy was started less than 20 minutes ago."
+            exit 1
+          fi
+          if [ -z "$HOOK" ]; then
+            echo "::error::saseok.kr/api/lounge did not answer, and VERCEL_DEPLOY_HOOK is not set: redeploy by hand."
+            exit 1
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "::error::saseok.kr/api/lounge did not answer three times in a minute; a redeploy was started."
+          exit 1

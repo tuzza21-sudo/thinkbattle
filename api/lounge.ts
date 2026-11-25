@@ -453,6 +453,9 @@ function loungeKeepAlive(context?: { waitUntil?: LoungeWaitUntil }): LoungeWaitU
 
 export default async function handler(req: Request, context?: { waitUntil?: LoungeWaitUntil }): Promise<Response> {
   const keepAlive = loungeKeepAlive(context);
+  // Health check for the uptime watch (.github/workflows/uptime.yml, 2026-11-25): it must reach this function, the one that
+  // stopped (every request refused for minutes until a redeploy), and costs nothing: no database, no model, no login.
+  if (req.method === 'GET' && new URL(req.url).searchParams.has('health')) return json({ ok: true });
   if (req.method !== 'POST') return json({ error: 'POST 요청만 허용됩니다.' }, 405);
   const origin = req.headers.get('origin');
   const allowed = (process.env.APP_ORIGIN || '').split(',').map(value => value.trim());
