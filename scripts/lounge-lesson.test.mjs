@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { deflateRawSync } from 'node:zlib';
 import { loadTs } from './lounge-ts-loader.mjs';
 const load = path => loadTs(fileURLToPath(new URL(path, import.meta.url)));
 const lesson = load('../src/lib/loungeLesson.ts');
+const file = load('../src/lib/loungeLessonFile.ts');
 const lounge = load('../src/lib/lounge.ts');
 const characters = load('../src/lib/loungeCharacters.ts');
 const relationship = load('../src/lib/relationship/index.ts');
@@ -158,6 +160,7 @@ test('the grader\'s answer is read defensively, a kept correction is new and thr
   assert.equal(lesson.readLoungeLessonGrade(null), undefined);
   assert.equal(lesson.loungeLessonCleanGrade(grade({ better: 'I see what you mean, but I still think so.', polished: 'x', keep: 'y z' }), 'I see what you mean but I still think so').better, '', 'a correction that only repeats is none');
   assert.equal(lesson.loungeLessonCleanGrade(grade({ better: 'I went home.' }), 'I go home').better, 'I went home.');
+  assert.equal(lesson.loungeLessonCleanGrade(grade({ intent: 'situation', better: 'I have a call next week.' }), '다음 주에 통화가 있어요').better, '');
   const state = { kind: 'lesson', day: '2026-11-25', phase: 'drill', queue: [], done: [], kept: 0, turns: 1 };
   assert.deepEqual(lesson.loungeLessonKeep(state, grade({ keep: "I'm not entirely sure", keep_meaning: '확실하진 않지만' }), []), { expression: "I'm not entirely sure", meaning: '확실하진 않지만' });
   assert.equal(lesson.loungeLessonKeep(state, grade({ keep: "I'm  not entirely SURE" }), [item('x', { expression: "i'm not entirely sure" })]), undefined);
@@ -174,4 +177,72 @@ test('the grader\'s answer is read defensively, a kept correction is new and thr
   assert.deepEqual(lesson.loungeLessonForPrompt(asking, 'B1', giveaway).feedback, { errors: [{ wrong: 'more time', right: 'a bit more time', why: '' }], better: '' });
   assert.equal(lesson.loungeLessonForPrompt({ ...asking, step: 'give' }, 'B1', giveaway).feedback.better, giveaway.better, 'given, it may be said');
   assert.match(lesson.loungeLessonRules, /플러팅/); assert.match(lesson.loungeLessonRules, /별표/); assert.match(lesson.loungeLessonRules, /give에서 처음으로 전부 말한다/);
+});
+
+// A small .xlsx built here (a zip of XML files) the way Excel writes one: shared strings, an inline string, a number.
+const crc32 = bytes => { let crc = -1; for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ -1) >>> 0; };
+function zip(files) {
+  const locals = [], centrals = []; let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const raw = Buffer.from(text, 'utf8'), data = deflateRawSync(raw), nameBytes = Buffer.from(name);
+    const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(8, 8); local.writeUInt32LE(crc32(raw), 14); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(raw.length, 22); local.writeUInt16LE(nameBytes.length, 26);
+    const central = Buffer.alloc(46); central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(8, 10); central.writeUInt32LE(crc32(raw), 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(raw.length, 24); central.writeUInt16LE(nameBytes.length, 28); central.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, data); centrals.push(central, nameBytes); offset += 30 + nameBytes.length + data.length;
+  }
+  const directory = Buffer.concat(centrals), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(Object.keys(files).length, 8); end.writeUInt16LE(Object.keys(files).length, 10); end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
+  const all = Buffer.concat([...locals, directory, end]);
+  return all.buffer.slice(all.byteOffset, all.byteOffset + all.length);
+}
+
+test('a member\'s word file: an Excel sheet, a CSV in either encoding, or a text file becomes expressions with meaning and situation (2026-11-25)', async () => {
+  const shared = '<sst><si><t>영어 표현</t></si><si><t>뜻</t></si><si><t>come up with</t></si><si><r><t>생각해 </t></r><r><t>내다</t></r></si><si><t>Tom &amp; Jerry fight</t></si><si><t>회의에서 아이디어 낼 때</t></si></sst>';
+  const sheet = '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+    + '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2" t="s"><v>3</v></c><c r="C2" t="s"><v>5</v></c></row>'
+    + '<row r="3"><c r="B3" t="inlineStr"><is><t>put off</t></is></c><c r="C3" t="inlineStr"><is><t>미루다</t></is></c></row>'
+    + '<row r="4"><c r="A4" t="s"><v>4</v></c><c r="B4"><v>42</v></c></row><row r="5"/></sheetData></worksheet>';
+  const rows = await file.readLoungeXlsxRows(zip({ '[Content_Types].xml': '<Types/>', 'xl/sharedStrings.xml': shared, 'xl/worksheets/sheet1.xml': sheet }));
+  assert.deepEqual(rows[1], ['come up with', '생각해 내다', '회의에서 아이디어 낼 때']);
+  assert.deepEqual(rows[2], ['', 'put off', '미루다'], 'cells keep their column');
+  assert.deepEqual(lesson.parseLoungeLessonRows(rows), [
+    { expression: 'come up with', meaning: '생각해 내다', situation: '회의에서 아이디어 낼 때' },
+    { expression: 'put off', meaning: '미루다', situation: '' },
+    { expression: 'Tom & Jerry fight', meaning: '42', situation: '' },
+  ]);
+  assert.deepEqual(lesson.parseLoungeLessonRows([['뜻', 'Expression'], ['알아내다', 'figure out'], ['1. take into account', '고려하다'], ['figure out', '중복']]), [
+    { expression: 'figure out', meaning: '알아내다', situation: '' }, { expression: 'take into account', meaning: '고려하다', situation: '' }], 'the English column wins, numbering goes, once each');
+  assert.deepEqual(lesson.parseLoungeLessonCsv('expression,meaning\r\n"I see, but …",무슨 말인지는 알지만\r\n"say ""no""",거절\n'), [['expression', 'meaning'], ['I see, but …', '무슨 말인지는 알지만'], ['say "no"', '거절']]);
+  assert.deepEqual(lesson.parseLoungeLessonText('﻿come up with - 생각해 내다\nput off: 미루다\n그냥 한국어\n'), [
+    { expression: 'come up with', meaning: '생각해 내다', situation: '' }, { expression: 'put off', meaning: '미루다', situation: '' }]);
+  assert.deepEqual(lesson.parseLoungeLessonText('figure out\t알아내다\t문제 원인 찾을 때'), [{ expression: 'figure out', meaning: '알아내다', situation: '문제 원인 찾을 때' }]);
+  await assert.rejects(file.readLoungeLessonFile({ name: 'old.xls', size: 10, arrayBuffer: async () => new ArrayBuffer(10) }), /\.xls/);
+  await assert.rejects(file.readLoungeLessonFile({ name: 'big.xlsx', size: 3 * 1024 * 1024, arrayBuffer: async () => new ArrayBuffer(1) }), /2MB/);
+  const read = await file.readLoungeLessonFile({ name: 'words.csv', size: 40, arrayBuffer: async () => new TextEncoder().encode('look into,알아보다\n').buffer });
+  assert.deepEqual(read, [{ expression: 'look into', meaning: '알아보다', situation: '' }]);
+});
+
+test('the member\'s own situation: its expressions are read defensively and taken first, with the situation and example for the tutor', () => {
+  const have = [item('h', { expression: 'push back the deadline' })];
+  const made = lesson.readLoungeLessonSituation({ title: '납기 연기 요청', expressions: [
+    { expression: "I was wondering if we could …", meaning: '…할 수 있을까 해서요', situation: '회의 시작하고 본론을 꺼낼 때', example: 'I was wondering if we could move the delivery date.' },
+    { expression: 'Push back the deadline', meaning: '마감을 미루다', situation: '', example: '' },
+    { expression: '납기', meaning: '', situation: '', example: '' },
+    { expression: 'I appreciate your flexibility', meaning: '유연하게 해 주셔서 감사해요', situation: '마무리할 때', example: 'I really appreciate your flexibility.' },
+  ] }, have);
+  assert.equal(made.title, '납기 연기 요청');
+  assert.deepEqual(made.expressions.map(entry => entry.expression), ["I was wondering if we could …", 'I appreciate your flexibility'], 'none the member has, English only');
+  const items = [item('a'), item('b'), item('s1', { source: 'situation', situation: '회의 시작하고 본론을 꺼낼 때', example: 'I was wondering if we could move the delivery date.' })];
+  let turn = lesson.advanceLoungeLesson({ items: items.slice(0, 2), plan: ['a', 'b'], now, said: 'hi', grade: grade() });
+  assert.equal(turn.target.id, 'a');
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: '다음 주 거래처 회의에서 납기를 미뤄 달라고 해야 해요', grade: grade({ intent: 'situation' }) });
+  assert.equal(turn.step, 'ask'); assert.equal(turn.target.id, 's1', 'the member\'s situation first');
+  assert.deepEqual(turn.state.queue, ['a', 'b'], 'what was asked waits after it');
+  const prompt = lesson.loungeLessonForPrompt(turn, 'B1');
+  assert.equal(prompt.target.yours, true); assert.equal(prompt.target.situation, '회의 시작하고 본론을 꺼낼 때');
+  assert.equal(prompt.target.example, undefined, 'the example says the expression: only when it is given');
+  assert.equal(lesson.loungeLessonForPrompt({ ...turn, step: 'give' }, 'B1').target.example, 'I was wondering if we could move the delivery date.');
+  const none = lesson.advanceLoungeLesson({ state: lesson.advanceLoungeLesson({ items: items.slice(0, 2), plan: ['a', 'b'], now, said: 'hi', grade: grade() }).state, items: items.slice(0, 2), plan: [], now, said: '내 상황', grade: grade({ intent: 'situation' }) });
+  assert.equal(none.step, 'answer', 'no expressions were made: the situation is answered and the task waits');
+  assert.equal(lesson.planLoungeLesson([item('m'), item('s', { source: 'situation' }), item('t', { source: 'tutor' })], now).queue[0], 's');
+  assert.match(lesson.loungeLessonSituationInstructions, /known/); assert.match(lesson.loungeLessonRules, /target\.yours/);
 });

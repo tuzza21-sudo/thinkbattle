@@ -280,6 +280,8 @@ export function loadLoungeInnerVoice(): 'on' | 'off' {
 }
 export function saveLoungeInnerVoice(value: 'on' | 'off') { try { localStorage.setItem(innerVoiceKey, value); } catch { /* the choice lasts for this page */ } }
 /** Three replies the member could say next in a one-to-one conversation. */
+/** 영어 수업: the expressions for a situation the member told, saved in their 단어장 (see loungeLesson.ts). */
+export const requestLoungeLessonSituation = (roomId: string, situation: string) => apiRequest({ action: 'lesson-situation', roomId, situation }) as Promise<{ title: string; items: import('./loungeLesson').LoungeLessonItem[] }>;
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**
  * A photo from the character in the member's one-to-one room: `request` when the member asked, `character` when the
