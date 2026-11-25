@@ -3,12 +3,20 @@
 # asks the lounge function itself whether it answers; after three misses in a minute it starts a redeploy through the
 # Vercel deploy hook (secret VERCEL_DEPLOY_HOOK) and fails, so GitHub mails the owner. The repository is public, so
 # the runs cost nothing. GitHub may start a scheduled run a few minutes late.
+#
+# The owner's phone hears of it through ntfy (the ntfy app subscribed to the topic in secret NTFY_TOPIC): an urgent
+# alert when the site stops, one when it answers again, and a test from a manual run with "test" ticked.
 name: Uptime watch
 
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      test:
+        description: Send a test alert to the phone
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -21,7 +29,16 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
     steps:
+      - name: Test alert
+        if: inputs.test
+        run: |
+          if [ -z "$NTFY_TOPIC" ]; then echo "::error::NTFY_TOPIC is not set"; exit 1; fi
+          jq -n --arg topic "$NTFY_TOPIC" '{topic: $topic, title: "사석 서버 알림 시험", message: "이 알림이 보이면 서버가 멈출 때 휴대폰으로 알려 드려요.", priority: 3, tags: ["white_check_mark"]}' \
+            | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- https://ntfy.sh/ > /dev/null
+
       - name: Ask the lounge function
         id: check
         run: |
@@ -34,23 +51,44 @@ jobs:
           done
           echo "down=true" >> "$GITHUB_OUTPUT"
 
+      - name: Tell the phone it is back
+        if: steps.check.outputs.down == 'false' && env.NTFY_TOPIC != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The run before this one failed: the site was down then and answers now.
+          last=$(gh run list -R "$GITHUB_REPOSITORY" --workflow uptime.yml --status completed --limit 1 --json conclusion --jq '.[0].conclusion' || true)
+          if [ "$last" = failure ]; then
+            jq -n --arg topic "$NTFY_TOPIC" '{topic: $topic, title: "사석 서버 복구됨", message: "saseok.kr이 다시 응답해요.", priority: 3, tags: ["white_check_mark"], click: "https://saseok.kr"}' \
+              | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- https://ntfy.sh/ > /dev/null || true
+          fi
+
       - name: Redeploy
         if: steps.check.outputs.down == 'true'
         env:
           HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          alert() {
+            [ -n "$NTFY_TOPIC" ] || return 0
+            jq -n --arg topic "$NTFY_TOPIC" --arg message "$1" --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              '{topic: $topic, title: "사석 서버 멈춤", message: $message, priority: 5, tags: ["rotating_light"], click: $run}' \
+              | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- https://ntfy.sh/ > /dev/null || true
+          }
           # A failed run in the last 20 minutes already started a redeploy: wait for it instead of starting another.
           since=$(date -u -d '-20 min' +%Y-%m-%dT%H:%M:%SZ)
           recent=$(gh run list -R "$GITHUB_REPOSITORY" --workflow uptime.yml --status failure --limit 5 --json createdAt --jq "[.[] | select(.createdAt > \"$since\")] | length" || echo 0)
           if [ "${recent:-0}" -gt 0 ]; then
+            alert "아직 응답이 없어요. 20분 안에 다시 배포를 시작했어요. 계속되면 직접 확인해 주세요."
             echo "::error::saseok.kr/api/lounge is still not answering; a redeploy was started less than 20 minutes ago."
             exit 1
           fi
           if [ -z "$HOOK" ]; then
+            alert "대화 서버가 1분 동안 응답하지 않아요. 자동 배포가 설정되지 않아 직접 다시 배포해야 해요."
             echo "::error::saseok.kr/api/lounge did not answer, and VERCEL_DEPLOY_HOOK is not set: redeploy by hand."
             exit 1
           fi
           curl -fsS -X POST "$HOOK" > /dev/null
+          alert "대화 서버가 1분 동안 응답하지 않아 자동으로 다시 배포하고 있어요. 1~2분 뒤 복구 알림이 와요."
           echo "::error::saseok.kr/api/lounge did not answer three times in a minute; a redeploy was started."
           exit 1
