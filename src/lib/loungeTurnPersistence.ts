@@ -1,4 +1,4 @@
-import { alignLoungeProposalEvents, nextLoungeCompanionState, normalizeLoungeCompanionState, type LoungeAnalysis, type LoungeCompanionState, type LoungeCompanionUpdate, type LoungeSceneDecision, type LoungeTurnMessage } from './loungeMessenger';
+import { alignLoungeProposalEvents, loungeMemoryText, nextLoungeCompanionState, normalizeLoungeCompanionState, type LoungeAnalysis, type LoungeCompanionState, type LoungeCompanionUpdate, type LoungeSceneDecision, type LoungeTurnMessage } from './loungeMessenger';
 import { splitLoungeInnerVoice } from './lounge';
 import { applyDecay, describeRelationship, describeTurnChange, moodFromRoom, normalizeMemoryOps, processTurn, relationshipFromRow, relationshipState, type MemoryOp, type MemoryRow, type RelationshipConfig, type RelationshipRow, type RelationshipView, type RelationshipChange } from './relationship';
 
@@ -18,6 +18,8 @@ export type LoungeTurnPayload = {
   adultClosest?: boolean;
   /** State authored by the reply model, kept in the durable job even if recording must be recovered. */
   character_life?: unknown;
+  /** The room's record is kept as lists (2026-11-25): seed is the summary the recorder read when the room had no lists yet. */
+  ledger?: { seed?: string };
 };
 export type LoungePendingTurn = {
   room_id: string; turn: number; user_text: string; reply: string;
@@ -46,7 +48,7 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   const state = normalizeLoungeCompanionState(snapshot.state, roomId);
   const nextState = nextLoungeCompanionState({ state, update: payload.character_life ? { ...answer, character_life: payload.character_life } : answer, decision: payload.decision ?? { progress: 'stay' },
     turn: job.turn, reply, inner, userText: job.user_text, recent: payload.recent,
-    boldMove: payload.boldMove, braked: payload.braked, sexual: payload.analysis?.sexual_scene, analyzerSkipped: payload.analyzerSkipped, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined });
+    boldMove: payload.boldMove, braked: payload.braked, sexual: payload.analysis?.sexual_scene, analyzerSkipped: payload.analyzerSkipped, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined, ...(payload.ledger ? { ledger: payload.ledger } : {}) });
   let relationship: LoungeTurnCommit['relationship'] = null;
   let mood = snapshot.mood;
   let change: { relationship: RelationshipView; change: RelationshipChange } | undefined;
@@ -66,7 +68,9 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
   }
   const commit: LoungeTurnCommit = {
     turn: job.turn, relationshipVersion: snapshot.relationship?.version ?? 0, stateVersion: snapshot.stateVersion,
-    relationship, mood, state: nextState, memory: payload.braked ? null : answer?.memory?.trim() || null,
+    relationship, mood, state: nextState,
+    // A room kept as lists writes its summary from them; the others take the summary the recorder wrote.
+    memory: payload.braked ? null : payload.ledger && nextState.memory_ledger ? loungeMemoryText(nextState.memory_ledger) || null : answer?.memory?.trim() || null,
     memoryOps: job.user_text.trim() ? normalizeMemoryOps(answer?.memory_ops, new Map(payload.memoryRefs ?? []), payload.memories ?? []) : [],
   };
   return { commit, change };

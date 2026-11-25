@@ -5840,7 +5840,7 @@ test('a one-to-one reply asks a check once and keeps its own word, on a chat and
   const rule = messengerLib.loungeOwnWordsRule;
   for (const part of ['한 번 묻는다', '같은 확인을 다시 묻거나 증거를 보여 달라고 하지 않고', '점수·합격·자격을 매기지 않으며', '가볍게 거두지 않는다', '짧게 인정한 뒤', '안전 규칙을 따른다']) assert.ok(rule.includes(part), part);
   const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
-  assert.ok(api.includes('...(solo ? [loungeContinuityRule, loungeOwnWordsRule] : []),'), 'every one-to-one reply instruction carries it, before the chat and call branches');
+  assert.ok(api.includes('...(solo ? [loungeContinuityRule, loungeOwnWordsRule, loungeClockRule] : []),'), 'every one-to-one reply instruction carries it, before the chat and call branches');
   const harin = charactersLib.getLoungeCharacter('teacher');
   assert.ok(!harin.bible.hidden.includes('평가를 방패로'));
   assert.ok(harin.bible.humorExamples.bad.some(line => line.includes('되묻거나 증거')));
@@ -5854,4 +5854,92 @@ test('a Gemini reply that writes nothing in time is given up, so the next model 
   assert.ok(reply.includes('signal: AbortSignal.any([replyStop, stall.signal])'));
   assert.ok(reply.includes("if (output.trim()) begun = true;"));
   assert.ok(reply.includes("'gemini_stalled'") && reply.includes('finally { clearTimeout(stallTimer); }'));
+});
+
+test('a story chat keeps its record as lists: the recorder writes only what changed, the member\'s own news stays, and each turn has the date (2026-11-25)', async () => {
+  const scenario = { id: 'teacher-after-the-lecture', title: '강의 끝난 밤', prologue: '강의가 끝난 밤 와인바.', user_role: '옆자리 손님', relationship: '처음 만난 사이', place: '와인바' };
+  const seed = '지금 장면: 와인바, 밤\n둘 사이: 처음 만난 성인 사이로 해요체를 쓴다.\n있었던 일: 사용자는 10억 원을 벌었다고 주장하고 출금 내역을 보여줬다. 하린은 멈춘 행동이 중요하다고 했다.\n남은 것: 다음 주 화요일 저녁 약속.';
+  let turn = 1, stateRow, summary = seed;
+  const humans = ['저 오늘 코인으로 10억 벌었어요. 출금도 했어요.', '화요일 약속은 취소할게요. 대신 내일 봐요.'];
+  const jobs = [], commits = [], writerInputs = [], recorders = [];
+  const companion = { scene: { location: '와인바', scene_type: '바', activity: '이야기', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], self_story_updates: [], shared_experience: '', lingering: '', next_intent: '', room_memory_ops: [] };
+  await withServiceKey(() => run(async (url, init) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('voice_lounge_turn_updates?')) return result(jobs.filter(item => item.status !== 'applied'));
+    if (url.includes('voice_lounge_companion_state?')) return result(stateRow ? [stateRow] : []);
+    if (url.includes('voice_lounge_relationships?')) return result([]);
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'teacher', capacity: 1, companion_chat: true, topic: scenario.title, memory: summary, ai_mood: {}, ai_turns: turn, voice_on: false, space_id: null, scenario }]);
+    if (url.includes('voice_lounge_messages?')) return result([
+      { id: turn * 2, user_id: 'user-1', nickname: '나', kind: 'human', text: humans[turn - 1], created_at: '2026-11-24T11:48:46Z' },
+      { id: turn * 2 - 1, nickname: '정하린', kind: 'host', text: '잘 가요. 들어가서 연락 주세요.', created_at: '2026-11-24T11:18:33Z' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
+    if (url.endsWith('/embeddings')) return result({ data: [] });
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      if (isAfterReply(init)) {
+        recorders.push(body);
+        const record_ops = turn === 1 ? [
+          { op: 'add', section: 'member', ref: '', text: '코인으로 10억 원을 벌어 출금했다', major: false, quote: '코인으로 10억 벌었어요' },
+          { op: 'add', section: 'events', ref: '', text: '사용자가 코인으로 10억 원을 벌어 출금했다', major: true, quote: '' },
+          { op: 'update', section: 'events', ref: 'es0', text: '사용자가 돈 자랑을 했다', major: false, quote: '' },
+          { op: 'add', section: 'member', ref: '', text: '사용자는 의사다', major: false, quote: '저는 의사예요' },
+        ] : [{ op: 'remove', section: 'pending', ref: 'ps0', text: '', major: false, quote: '' }, { op: 'add', section: 'pending', ref: '', text: '11월 25일(수) 다시 만나기로 함', major: false, quote: '' }];
+        return modelAnswer({ memory: '지금 장면: 와인바, 밤 — 둘이 이야기하는 중', events: [], record_ops, history_merge: { refs: [], text: '' }, ...companion });
+      }
+      writerInputs.push(JSON.parse(body.input));
+      return modelAnswer({ text: '와, 진짜요? 축하해요.', inner_voice: '', character_life: { feeling: '놀람', body: '', attention: '상대의 소식', want: '', cause: '큰 소식을 들음' } });
+    }
+    if (url.includes('finish_voice_lounge_reply')) {
+      jobs.push({ room_id: roomId, turn, user_text: humans[turn - 1], reply: '와, 진짜요? 축하해요.', status: 'pending', payload: {}, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      return result(true);
+    }
+    if (url.includes('prepare_voice_lounge_turn')) {
+      const args = JSON.parse(init.body), job = jobs.find(item => item.turn === args.p_turn);
+      if (!job || job.status !== 'pending') return result(false);
+      job.payload = args.p_payload; job.status = args.p_ready ? 'ready' : 'pending';
+      return result(true);
+    }
+    if (url.includes('commit_voice_lounge_turn')) {
+      const args = JSON.parse(init.body); commits.push(args);
+      stateRow = { room_id: roomId, character_id: 'teacher', state: args.p_state, version: (stateRow?.version ?? 0) + 1 };
+      summary = args.p_memory;
+      jobs.find(item => item.turn === args.p_turn).status = 'applied';
+      return result('saved');
+    }
+    if (url.includes('save_voice_lounge_relationship') || url.includes('apply_voice_lounge_memory_ops')) return result(true);
+    throw new Error(`Unexpected request: ${url}`);
+  }, async () => {
+    for (turn = 1; turn <= 2; turn++) {
+      const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+      assert.equal(response.status, 200);
+      assert.doesNotMatch(await response.text(), /"type":"error"/);
+    }
+  }));
+  assert.equal(commits.length, 2);
+  const [first] = recorders, input = JSON.parse(first.input);
+  assert.equal(input.memory, undefined, 'the recorder reads the lists, not a summary to write again');
+  assert.deepEqual(input.record.events.map(item => item.ref), ['es0', 'es1']);
+  assert.equal(input.record.scene, '지금 장면: 와인바, 밤');
+  assert.match(input.now, /^\d{4}년 \d{1,2}월 \d{1,2}일 .요일 \d{1,2}시 \d{1,2}분$/);
+  assert.ok(first.text.format.schema.required.includes('record_ops') && first.text.format.schema.required.includes('history_merge'));
+  assert.match(first.instructions, /'주장'이나 '자랑'이 아니라 이야기 속 사실로 적는다/);
+  assert.doesNotMatch(first.instructions, /600자 이내로 적는다/, 'no summary to write whole');
+  assert.equal(jobs[0].payload.ledger.seed, seed, 'the room without lists starts them from the summary the recorder read');
+  assert.deepEqual(jobs[1].payload.ledger, {}, 'after that the lists are the record');
+  const written = commits[0].p_memory;
+  assert.ok(written.startsWith('지금 장면: 와인바, 밤 — 둘이 이야기하는 중'));
+  assert.match(written, /^사용자에 대해: 코인으로 10억 원을 벌어 출금했다$/m);
+  assert.match(written, /^있었던 일: 사용자는 10억 원을 벌었다고 주장하고 출금 내역을 보여줬다\.$/m, 'what happened is not written over');
+  assert.match(written, /^있었던 일: 사용자가 코인으로 10억 원을 벌어 출금했다$/m);
+  assert.doesNotMatch(written, /의사/, 'a member fact needs the member\'s own words');
+  assert.equal(commits[0].p_state.memory_ledger.events.at(-1).major, true);
+  assert.match(writerInputs[1].memory, /사용자에 대해: 코인으로 10억 원을 벌어 출금했다/, 'the next reply reads it');
+  assert.equal(writerInputs[0].clock.since_last_message, '30분');
+  assert.match(writerInputs[0].clock.now, /요일/);
+  const second = commits[1].p_memory;
+  assert.doesNotMatch(second, /다음 주 화요일/);
+  assert.match(second, /^남은 것: 11월 25일\(수\) 다시 만나기로 함$/m);
+  assert.match(second, /사용자에 대해: 코인으로 10억/, 'kept on the turns after');
 });

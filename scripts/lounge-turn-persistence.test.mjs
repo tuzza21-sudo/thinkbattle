@@ -192,3 +192,76 @@ test('a chat turn answered by the fallback model for the adult model writes no s
   assert.equal(braked.commit.state.lingering, undefined); assert.equal(braked.commit.state.next_intent, undefined);
   assert.equal(braked.commit.state.fallback_replies.length, 1, 'its start is kept to leave it out of what the next replies read');
 });
+
+test('the room\'s record as lists: taken apart once, added to, merged only where ordinary, and written back as one item a line (2026-11-25)', () => {
+  const ledger = m.loungeMemoryLedgerFromSummary('지금 장면: 와인바, 밤\n둘 사이: 해요체를 쓴다. 서로 농담을 주고받는다.\n있었던 일: 사용자는 10억 원을 벌었다. 하린이 축하했다.\n남은 것: 저녁 약속.\n줄거리 없는 한 줄');
+  assert.equal(ledger.scene, '지금 장면: 와인바, 밤');
+  assert.deepEqual(ledger.between.map(item => item.id), ['bs0', 'bs1']);
+  assert.deepEqual(ledger.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '하린이 축하했다.']);
+  assert.deepEqual(ledger.pending.map(item => item.text), ['저녁 약속.', '줄거리 없는 한 줄'], 'an unlabelled line follows the part before it');
+  const text = m.loungeMemoryText(ledger);
+  assert.deepEqual(text.split('\n').slice(0, 2), ['지금 장면: 와인바, 밤', '둘 사이: 해요체를 쓴다.']);
+  assert.deepEqual(m.loungeMemoryLedgerFromSummary(text), ledger, 'the written text reads back to the same lists');
+
+  const ops = (record_ops, history_merge = { refs: [], text: '' }) => ({ memory: '지금 장면: 와인바, 밤', record_ops, history_merge });
+  const third = m.applyLoungeMemoryLedger(ledger, ops([
+    { op: 'add', section: 'events', ref: '', text: '하나', major: false, quote: '' }, { op: 'add', section: 'events', ref: '', text: '둘', major: false, quote: '' },
+    { op: 'add', section: 'events', ref: '', text: '셋', major: false, quote: '' }, { op: 'remove', section: 'events', ref: 'es0', text: '', major: false, quote: '' },
+    { op: 'add', section: 'events', ref: '', text: '하린이 축하했다.', major: false, quote: '' },
+  ]), 7);
+  assert.deepEqual(third.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '하린이 축하했다.', '하나', '둘'], 'two new lines a turn at most, none removed, none twice');
+  assert.equal(ledger.events.length, 2, 'the lists before are not changed');
+
+  const facts = m.applyLoungeMemoryLedger(ledger, ops([
+    { op: 'add', section: 'member', ref: '', text: '10억 원을 벌었다', major: false, quote: '10억 벌었어요' },
+    { op: 'add', section: 'member', ref: '', text: '빚이 있다', major: false, quote: '빚이 있어요' },
+  ]), 8, ['저 오늘 10억 벌었어요!']);
+  assert.deepEqual(facts.member.map(item => item.text), ['10억 원을 벌었다']);
+  const changed = m.applyLoungeMemoryLedger(facts, ops([{ op: 'update', section: 'member', ref: facts.member[0].id, text: '번 10억을 다 잃었다', major: false, quote: '' }]), 9, ['다 잃었어요']);
+  assert.equal(changed.member[0].text, '10억 원을 벌었다', 'a member fact changes only on the member\'s words');
+  assert.equal(m.applyLoungeMemoryLedger(facts, ops([{ op: 'update', section: 'member', ref: facts.member[0].id, text: '번 10억을 다 잃었다', major: false, quote: '다 잃었어요' }]), 9, ['그 10억 다 잃었어요']).member[0].text, '번 10억을 다 잃었다');
+
+  let long = { ...ledger, events: Array.from({ length: 30 }, (_, index) => ({ id: `e${index}`, text: `일 ${index}`, turn: index, ...(index === 1 ? { major: true } : {}) })) };
+  assert.equal(m.loungeMemoryLedgerForRecorder(long).merge_due, true);
+  assert.equal(m.applyLoungeMemoryLedger(long, ops([], { refs: ['e0', 'e1', 'e2'], text: '합침' }), 31).events.length, 30, 'a major line is never merged');
+  const merged = m.applyLoungeMemoryLedger(long, ops([], { refs: ['e0', 'e2', 'e3'], text: '처음 세 가지 일' }), 31).events;
+  assert.deepEqual(merged.slice(0, 3).map(item => item.text), ['처음 세 가지 일', '일 1', '일 4']);
+  long = { ...ledger, events: Array.from({ length: 60 }, (_, index) => ({ id: `e${index}`, text: `${'긴 일'.repeat(20)} ${index}`, turn: index, ...(index === 0 ? { major: true } : {}) })) };
+  const capped = m.applyLoungeMemoryLedger(long, ops([]), 61);
+  assert.equal(capped.events.length, 40);
+  assert.equal(capped.events[0].major, true, 'the oldest ordinary lines go first');
+  const shown = m.loungeMemoryText(capped);
+  assert.ok(shown.length <= 1800);
+  assert.match(shown, / 0$/m, 'over the length the major line is still shown');
+  assert.match(shown, / 59$/m);
+
+  const forgetting = structuredClone(facts);
+  assert.equal(m.forgetLoungeMemoryLine(forgetting, '사용자에 대해: 10억 원을 벌었다'), true);
+  assert.equal(forgetting.member.length, 0);
+  assert.equal(m.forgetLoungeMemoryLine(forgetting, '없는 줄'), false);
+});
+
+test('a durable turn in a room kept as lists writes its summary from them and leaves them alone for a reply the adult model did not write', () => {
+  const job = (turn, answer, extra = {}) => ({ room_id: 'room', turn, user_text: '저 10억 벌었어요', reply: '와, 축하해요.', status: 'ready', payload: { companion: true, ledger: turn === 1 ? { seed: '지금 장면: 카페\n있었던 일: 커피를 마셨다.' } : {}, answer, ...extra }, created_at: '2026-11-24T00:00:00Z', updated_at: '2026-11-24T00:00:00Z' });
+  const answer = { memory: '지금 장면: 카페 — 축하하는 중', record_ops: [{ op: 'add', section: 'member', ref: '', text: '10억 원을 벌었다', major: false, quote: '10억 벌었어요' }], history_merge: { refs: [], text: '' } };
+  const { commit } = turns.reduceLoungeTurn('room', undefined, { relationship: null, state: null, stateVersion: 0, mood: {} }, job(1, answer));
+  assert.equal(commit.memory, '지금 장면: 카페 — 축하하는 중\n사용자에 대해: 10억 원을 벌었다\n있었던 일: 커피를 마셨다.');
+  const later = turns.reduceLoungeTurn('room', undefined, { relationship: null, state: commit.state, stateVersion: 1, mood: {} }, job(2, { ...answer, memory: '지금 장면: 카페', record_ops: [] }));
+  assert.match(later.commit.memory, /사용자에 대해: 10억 원을 벌었다/);
+  const braked = turns.reduceLoungeTurn('room', undefined, { relationship: null, state: commit.state, stateVersion: 1, mood: {} }, job(2, { ...answer, memory: '지금 장면: 모텔', record_ops: [{ op: 'add', section: 'events', ref: '', text: '잤다', major: true, quote: '' }] }, { braked: true }));
+  assert.equal(braked.commit.memory, null);
+  assert.deepEqual(braked.commit.state.memory_ledger, commit.state.memory_ledger);
+  const plain = turns.reduceLoungeTurn('room', undefined, { relationship: null, state: null, stateVersion: 0, mood: {} }, { ...job(1, { memory: '요약 그대로' }), payload: { companion: true, answer: { memory: '요약 그대로' } } });
+  assert.equal(plain.commit.memory, '요약 그대로', 'a room without lists keeps the summary the recorder wrote');
+});
+
+test('the clock: Korean date, weekday and time, and the gap before the member\'s last message (2026-11-25)', () => {
+  assert.equal(m.loungeClockNow(new Date('2026-11-24T11:48:46Z')), '2026년 11월 24일 화요일 20시 48분');
+  assert.equal(m.loungeClockNow(new Date('2026-11-24T15:05:00Z')), '2026년 11월 25일 수요일 0시 5분');
+  const at = Date.parse('2026-11-24T11:48:46Z');
+  assert.deepEqual(m.loungeClock([{ kind: 'host', at: at - 30 * 60_000 }, { kind: 'human', at }], at), { now: '2026년 11월 24일 화요일 20시 48분', since_last_message: '30분' });
+  assert.equal(m.loungeClock([{ kind: 'host', at: at - 26 * 3_600_000 }, { kind: 'human', at }, { kind: 'host', at: at + 1000 }], at).since_last_message, '1일');
+  assert.equal(m.loungeElapsed(95 * 60_000), '1시간 35분');
+  assert.deepEqual(m.loungeClock([{ kind: 'human', at }], at), { now: '2026년 11월 24일 화요일 20시 48분' });
+  assert.match(m.loungeClockRule, /날짜를 지어내지 않는다/);
+});
