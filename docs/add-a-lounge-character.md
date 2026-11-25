@@ -22,7 +22,7 @@ node scripts/new-lounge-character.mjs seoyeon --name 윤서연 --job "출판 편
 | 로비 카드, 배경, 묶음, 목소리 성별 | `src/lib/lounge.ts` (`loungeCharacterProfiles`, `loungeHostThemes`, `loungeHostGroups`, `houseVoiceGender`) |
 | 캐릭터 소개 페이지 (살아온 이야기, 성격, 습관, 호감을 얻는·잃는 대화, 선, 다른 캐릭터와의 관계) | `src/lib/loungeCharacters.ts` |
 | 관계 설정 (단계 4개, 점수 2개, 반응, 연애 수위, 털어놓는 이야기) | `src/lib/relationship/configs/<id>.ts` + `index.ts` |
-| 검색용 사이트맵 줄 | `public/sitemap.xml` |
+| (사이트맵은 빌드할 때 캐릭터 목록에서 저절로 만들어져요) | `scripts/seo-build.mjs` |
 | 이미지 프롬프트 (대표 사진, 전신, 일하는 모습) | `scripts/lounge-character-prompts.json` |
 
 만들어진 문구는 모두 `TODO(새 캐릭터)`예요. 숫자(점수, 단계 속도)는 이미 테스트를 통과하는 값이라서, 문구부터 쓰고 숫자는 필요할 때만 바꿔요.

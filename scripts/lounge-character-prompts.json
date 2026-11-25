@@ -62,5 +62,21 @@
       "file": "host-teacher-work-v1.webp",
       "prompt": "Not generated: the owner's own photo of her at a chalkboard (2026-11-16) is used as it is."
     }
+  },
+  "interpreter": {
+    "portrait": {
+      "file": "host-interpreter-v1.webp",
+      "prompt": "{{common}} A strikingly handsome fictional Korean man, 36, 181cm, a straight relaxed posture, calm composed eyes, lightly tousled black hair, the corner of his mouth just beginning to lift as if an answer came to mind. A dark navy jacket over a white open-collar shirt, one plain watch. A softly blurred upscale hotel lobby at night with warm amber light. Elegant magazine-portrait quality, tasteful and not provocative."
+    },
+    "full": {
+      "portrait": "host-interpreter-v1.webp",
+      "file": "host-interpreter-full-v1.webp",
+      "prompt": "{{common}} The same Korean man stands in a quiet hotel lobby at night after work: the same dark navy jacket, the tie pulled loose and tucked into a pocket, a lanyard-free collar open, well-worn clean sneakers, a slim bag with an earphone case over one shoulder, a relaxed posture and a small, patient smile."
+    },
+    "work": {
+      "portrait": "host-interpreter-v1.webp",
+      "file": "host-interpreter-work-v1.webp",
+      "prompt": "{{common}} The same Korean man works as a conference interpreter: in a glass interpreter's booth at an international forum, wearing a headset, the dark navy jacket and a watch, one hand resting beside a small notepad with no readable writing, eyes on the speaker beyond the glass, composed and attentive. Nothing readable on any sign, screen or paper."
+    }
   }
 }
