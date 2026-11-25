@@ -286,6 +286,198 @@ export function applyLoungeRoomMemory(raw: unknown, previous: readonly LoungeRoo
   const keep = (item: LoungeRoomMemory) => item.status === 'resolved' || !roomMemoryOpKinds.some(kind => kind === item.kind) ? 0 : item.kind === 'agreement' ? 2 : 1;
   return result.sort((a, b) => keep(a) - keep(b) || a.turn - b.turn).slice(-loungeRoomMemoryLimit);
 }
+// ── The room's record, kept as lists (2026-11-25, by the owner) ──
+/**
+ * Until 2026-11-25 the call after each reply wrote the room's 600-character summary again from the one before. A
+ * rewrite of a rewrite loses a little each time: in 정하린's room "사용자는 10억 원을 벌었다" was written at turn 36 as a
+ * claim ("주장"), lost its amount at turn 37 and was gone at turn 56, and from turn 63 the summary said the member had lost
+ * 280만 원, the opposite. Now each part is kept as it should be: the scene line is written again each turn; what happened
+ * is only added to (merged a few old lines at a time when it grows long, never the major ones); 둘 사이 and 남은 것 change
+ * one item at a time; what the member told of their own life is kept apart and changed only on their own words. Code
+ * writes the summary text from the lists (loungeMemoryText), one item a line, so everything that reads the summary (the
+ * reply, the analyzer, the scene, the memory sheet) reads it as before.
+ */
+export type LoungeMemoryItem = { id: string; text: string; turn: number; major?: boolean };
+export type LoungeMemoryLedger = { scene: string; member: LoungeMemoryItem[]; between: LoungeMemoryItem[]; events: LoungeMemoryItem[]; pending: LoungeMemoryItem[] };
+const ledgerSections = ['member', 'between', 'events', 'pending'] as const;
+type LedgerSection = typeof ledgerSections[number];
+const ledgerLabels: Record<LedgerSection, string> = { member: '사용자에 대해', between: '둘 사이', events: '있었던 일', pending: '남은 것' };
+const ledgerPrefix: Record<LedgerSection, string> = { member: 'u', between: 'b', events: 'e', pending: 'p' };
+const ledgerLimits: Record<LedgerSection, number> = { member: 20, between: 8, events: 40, pending: 6 };
+const ledgerTextLimit: Record<LedgerSection, number> = { member: 80, between: 120, events: 120, pending: 120 };
+/** From this many lines of what happened, the recorder is asked to merge a few of the oldest ordinary ones. */
+export const loungeHistoryMergeAt = 24;
+/** The room's summary column holds 1,800 characters (commit_voice_lounge_turn), and the reply reads as much. */
+const ledgerTextBudget = 1800;
+const ledgerNorm = (text: string) => text.normalize('NFKC').replace(/[\s.,!?~…'"“”‘’·]+/g, '').toLowerCase();
+const sceneLine = (value: unknown) => {
+  const line = clip(String(value ?? '').split('\n').find(part => part.trim()) ?? '', 200);
+  return !line ? '' : line.startsWith('지금 장면:') ? line : `지금 장면: ${line}`;
+};
+export function normalizeLoungeMemoryLedger(raw: unknown): LoungeMemoryLedger | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const value = raw as Record<string, unknown>;
+  const items = (section: LedgerSection) => (Array.isArray(value[section]) ? value[section] as unknown[] : []).flatMap((item): LoungeMemoryItem[] => {
+    if (!item || typeof item !== 'object') return [];
+    const entry = item as Record<string, unknown>;
+    const id = clip(entry.id, 32), text = clip(entry.text, ledgerTextLimit[section]);
+    if (!id || !text) return [];
+    return [{ id, text, turn: turnNumber(entry.turn) ?? 0, ...(entry.major === true ? { major: true } : {}) }];
+  }).slice(-ledgerLimits[section]);
+  return { scene: sceneLine(value.scene), member: items('member'), between: items('between'), events: items('events'), pending: items('pending') };
+}
+/**
+ * A summary written before the lists (or by hand), taken apart once: each labelled part, then each sentence of it, becomes an
+ * item. The ids follow the order, so the recorder that read this split and the turn that applies its answer agree.
+ */
+export function loungeMemoryLedgerFromSummary(summary: string, turn = 0): LoungeMemoryLedger {
+  const ledger: LoungeMemoryLedger = { scene: '', member: [], between: [], events: [], pending: [] };
+  const sectionOf: Record<string, LedgerSection> = { '사용자에 대해': 'member', '둘 사이': 'between', '있었던 일': 'events', '줄거리': 'events', '남은 것': 'pending', '다음': 'pending' };
+  let current: LedgerSection = 'events';
+  for (const raw of summary.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('지금 장면:')) { ledger.scene = sceneLine(line); continue; }
+    const label = /^([^:]{2,8}):\s*(.*)$/.exec(line);
+    if (label && sectionOf[label[1].trim()]) current = sectionOf[label[1].trim()];
+    const body = label && sectionOf[label[1].trim()] ? label[2] : line.replace(/^[-•]\s*/, '');
+    for (const sentence of body.split(/(?<=[.!?。])\s+/).map(part => part.trim()).filter(Boolean)) {
+      const list = ledger[current];
+      list.push({ id: `${ledgerPrefix[current]}s${list.length}`, text: sentence.slice(0, ledgerTextLimit[current]), turn });
+    }
+  }
+  for (const section of ledgerSections) ledger[section] = ledger[section].slice(-ledgerLimits[section]);
+  return ledger;
+}
+/**
+ * The summary's lines from the lists: the scene, what the member told of themselves, 둘 사이, what happened (oldest first)
+ * and 남은 것, one item a line. Over the column's length the oldest ordinary lines of what happened are left out of the
+ * text (they stay in the list), then the oldest major ones.
+ */
+export function loungeMemoryLines(ledger: LoungeMemoryLedger): Array<{ section: LedgerSection | 'scene'; id: string; text: string }> {
+  const line = (section: LedgerSection) => (item: LoungeMemoryItem) => ({ section, id: item.id, text: `${ledgerLabels[section]}: ${item.text}` });
+  const head = [...(ledger.scene ? [{ section: 'scene' as const, id: 'scene', text: ledger.scene }] : []), ...ledger.member.map(line('member')), ...ledger.between.map(line('between'))];
+  const tail = ledger.pending.map(line('pending'));
+  let events = ledger.events;
+  const size = (list: readonly LoungeMemoryItem[]) => [...head, ...list.map(line('events')), ...tail].reduce((sum, item) => sum + item.text.length + 1, 0);
+  while (events.length && size(events) > ledgerTextBudget) {
+    const drop = events.findIndex(item => !item.major);
+    events = events.filter((_, index) => index !== (drop >= 0 ? drop : 0));
+  }
+  return [...head, ...events.map(line('events')), ...tail];
+}
+export const loungeMemoryText = (ledger: LoungeMemoryLedger) => loungeMemoryLines(ledger).map(item => item.text).join('\n').slice(0, ledgerTextBudget);
+/** What the recorder reads of the lists: each item with its ref, and whether the lines of what happened should be merged. */
+export function loungeMemoryLedgerForRecorder(ledger: LoungeMemoryLedger) {
+  const refs = (list: readonly LoungeMemoryItem[]) => list.map(item => ({ ref: item.id, text: item.text, ...(item.major ? { major: true } : {}) }));
+  return { scene: ledger.scene, member: refs(ledger.member), between: refs(ledger.between), events: refs(ledger.events), pending: refs(ledger.pending), merge_due: ledger.events.length >= loungeHistoryMergeAt };
+}
+const recordOpSections = ledgerSections;
+export const loungeRecordOpsSchema = {
+  type: 'array', items: { type: 'object', additionalProperties: false, required: ['op', 'section', 'ref', 'text', 'major', 'quote'],
+    properties: { op: { type: 'string', enum: ['add', 'update', 'remove'] }, section: { type: 'string', enum: [...recordOpSections] }, ref: { type: 'string' }, text: { type: 'string' }, major: { type: 'boolean' }, quote: { type: 'string' } } },
+} as const;
+export const loungeHistoryMergeSchema = { type: 'object', additionalProperties: false, required: ['refs', 'text'], properties: { refs: { type: 'array', items: { type: 'string' } }, text: { type: 'string' } } } as const;
+export const loungeMemoryLedgerSchema = { record_ops: loungeRecordOpsSchema, history_merge: loungeHistoryMergeSchema } as const;
+export const loungeMemoryLedgerFields = Object.keys(loungeMemoryLedgerSchema);
+export const loungeMemoryLedgerInstructions = `record는 이 방의 지금까지 기록이다. scene은 지금 장면 줄, member는 사용자가 자기 삶에 대해 말한 사실, between은 둘 사이, events는 있었던 일(오래된 것부터), pending은 남은 것이고 각 항목은 ref로 가리킨다. 기록은 코드가 보관하므로 너는 이번 턴에 바뀐 것만 쓴다. 이미 있는 항목을 다시 쓰거나 요약해 옮겨 적지 않는다.
+memory: 방금 답까지 반영한 '지금 장면: 장소·시간·하고 있는 일' 한 줄만 쓴다. 둘이 실제로 도착하기 전에는 가기로 한 곳이 아니라 지금 있는 곳을 쓴다. 함께하는 장면이 끝났으면 빈 문자열이다.
+record_ops: 이번 턴에 기록이 바뀐 것 0~4개이고 대부분 0~1개다. op은 add, update, remove이고, update와 remove의 ref는 record에 있는 그 칸의 항목이며 add의 ref는 빈 문자열이다. 쓰지 않는 칸은 빈 문자열과 false다.
+- events: 이번 턴에 새로 생긴 일을 add만 한다(한 줄 80자 이내, 누가 무엇을 했고 어떻게 됐는지). 둘 사이를 움직인 일은 남긴다: 제안과 그 대답(받아들임·거절·미룸), 약속과 그 변경, 다툼·사과·화해, 처음 함께 한 일, 장소 이동, 사용자가 알린 소식. 평범한 잡담과 농담, 같은 이야기의 되풀이, 이미 events에 있는 일은 쓰지 않는다. major는 사용자나 둘의 관계에 오래 남을 큰 일이면 true다(돈을 크게 벌거나 잃음, 일·건강·가족·이사 같은 삶의 변화, 고백, 첫 약속, 큰 다툼과 화해).
+- member: 사용자가 자기 삶에 대해 직접 말한 사실(직업, 돈, 건강, 가족, 사는 곳, 큰 성취와 손실, 앞으로의 큰 계획, 분명히 밝힌 취향) 60자 이내. quote는 recent의 사용자 말에서 그 사실이 나온 원문(40자 이내)이다. 캐릭터의 말이나 추측은 쓰지 않는다. 있던 사실이 바뀌었다고 사용자가 직접 말했을 때만 그 ref를 update하거나 remove하고, 그때도 quote를 쓴다. 큰 일이면 events에도 add한다.
+- between: 마음의 거리, 서로에게 느끼는 것, 둘만의 농담, 털어놓은 이야기.
+- pending: 아직 꺼내지 않은 중요한 마음, 둘이 실제로 한 다음 약속(언제·어디서·무엇을). 약속이 새로 생기면 add하고, 날짜·장소·메뉴가 정해지거나 바뀌면 그 ref를 update하며, 이루어졌거나 취소됐거나 더는 맞지 않으면 remove한다. between도 바뀌면 update하고 더는 맞지 않으면 remove한다.
+사용자가 이 이야기 속에서 자기 일로 말한 것(벌었다, 잃었다, 했다)은 캐릭터가 의심하거나 반응이 작아도 '주장'이나 '자랑'이 아니라 이야기 속 사실로 적는다('10억 원을 벌었다고 말했다'가 아니라 '10억 원을 벌었다'). 사용자가 농담이나 거짓이라고 밝힌 것만 사실로 적지 않는다. 무엇이 중요한지는 캐릭터가 얼마나 반응했는지가 아니라 사용자에게 얼마나 큰 일인지로 정한다. 사용자가 스스로 말한 돈·건강·가족 이야기는 기록하되, 계좌번호·주소·전화번호 같은 식별 정보는 쓰지 않는다.
+now는 지금 실제 날짜와 시각이다. 날짜가 걸린 약속과 일은 '다음 주 화요일', '내일'이 아니라 now로 계산한 실제 날짜로 적는다(예: '12월 1일(화) 저녁 소고기와 와인 약속'). 확인하지 않은 날짜는 만들지 않는다.
+history_merge: record.merge_due가 true일 때만 가장 오래된 major가 아닌 events 3~6개의 ref를 refs에 넣고 한 줄(100자 이내)로 합친 text를 쓴다. 그 밖에는 refs는 빈 배열, text는 빈 문자열이다.`;
+/**
+ * The lists after a turn: the scene line as the recorder wrote it, its item changes (at most six), and its merge. A member
+ * fact needs the member's own words for it in the recent talk; what happened is only added to.
+ */
+export function applyLoungeMemoryLedger(ledger: LoungeMemoryLedger, update: { memory?: unknown; record_ops?: unknown; history_merge?: unknown } | undefined, turn: number, humanTexts: readonly string[] = []): LoungeMemoryLedger {
+  if (!update) return ledger;
+  const next: LoungeMemoryLedger = { scene: typeof update.memory === 'string' ? sceneLine(update.memory) : ledger.scene, member: [...ledger.member], between: [...ledger.between], events: [...ledger.events], pending: [...ledger.pending] };
+  const spoken = humanTexts.map(ledgerNorm).join('\n');
+  let added = 0;
+  for (const raw of Array.isArray(update.record_ops) ? update.record_ops.slice(0, 6) : []) {
+    if (!raw || typeof raw !== 'object') continue;
+    const value = raw as Record<string, unknown>;
+    const section = ledgerSections.find(item => item === value.section), op = value.op;
+    if (!section) continue;
+    const list = next[section], text = clip(value.text, ledgerTextLimit[section]);
+    const quote = ledgerNorm(clip(value.quote, 80));
+    if (section === 'member' && (quote.length < 2 || !spoken.includes(quote))) continue;
+    if (op === 'add') {
+      if (!text || list.some(item => ledgerNorm(item.text) === ledgerNorm(text))) continue;
+      if (section === 'events' && added >= 2) continue;
+      if (section === 'events') added++;
+      list.push({ id: `${ledgerPrefix[section]}${turn}-${list.length}`, text, turn, ...(value.major === true && section === 'events' ? { major: true } : {}) });
+      continue;
+    }
+    // What happened stays as it was written; only a merge folds it.
+    if (section === 'events') continue;
+    const at = list.findIndex(item => item.id === value.ref);
+    if (at < 0) continue;
+    if (op === 'remove') list.splice(at, 1);
+    else if (op === 'update' && text) list[at] = { ...list[at], text, turn };
+  }
+  const merge = update.history_merge && typeof update.history_merge === 'object' ? update.history_merge as Record<string, unknown> : undefined;
+  const refs = Array.isArray(merge?.refs) ? [...new Set(merge!.refs.filter((ref): ref is string => typeof ref === 'string'))] : [];
+  const mergedText = clip(merge?.text, ledgerTextLimit.events);
+  const folded = refs.map(ref => next.events.findIndex(item => item.id === ref));
+  if (refs.length >= 2 && mergedText && folded.every(index => index >= 0 && !next.events[index].major)) {
+    const first = Math.min(...folded);
+    const keep = next.events[first];
+    next.events = next.events.flatMap((item, index) => index === first ? [{ id: keep.id, text: mergedText, turn: keep.turn }] : folded.includes(index) ? [] : [item]);
+  }
+  for (const section of ledgerSections) {
+    const limit = ledgerLimits[section];
+    while (next[section].length > limit) {
+      const drop = section === 'events' ? next.events.findIndex(item => !item.major) : 0;
+      next[section].splice(drop >= 0 ? drop : 0, 1);
+    }
+  }
+  return next;
+}
+/** Takes one line of the summary away from the lists (the memory sheet), by its text; false when no item has it. */
+export function forgetLoungeMemoryLine(ledger: LoungeMemoryLedger, text: string): boolean {
+  const found = loungeMemoryLines(ledger).find(item => item.text.trim() === text.trim());
+  if (!found) return false;
+  if (found.section === 'scene') ledger.scene = '';
+  else ledger[found.section] = ledger[found.section].filter(item => item.id !== found.id);
+  return true;
+}
+
+// ── The clock (2026-11-25, by the owner) ──
+/**
+ * The models were never told the date: 정하린 promised "다음 주 화요일" and, half an hour later on a call, said "오늘이
+ * 화요일이네요, 약속이 바로 오늘이네" (she had guessed), and a gap under three hours was not told at all. Now each turn
+ * carries the Korean date and time and how long ago the message before the member's last one was.
+ */
+export function loungeClockNow(date = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'long', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })
+    .formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}년 ${parts.month}월 ${parts.day}일 ${parts.weekday} ${Number(parts.hour)}시 ${Number(parts.minute)}분`;
+}
+export function loungeElapsed(ms: number) {
+  if (!Number.isFinite(ms) || ms < 0) return undefined;
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return '1분이 안 됨';
+  if (minutes < 60) return `${minutes}분`;
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  if (hours < 24) return rest ? `${hours}시간 ${rest}분` : `${hours}시간`;
+  return `${Math.round(hours / 24)}일`;
+}
+/** The clock for a turn: now, and how long before the member's latest message the one before it came (messages oldest first). */
+export function loungeClock(messages: ReadonlyArray<{ kind: string; at: number }>, now = Date.now()) {
+  let latest = -1;
+  for (let index = messages.length - 1; index >= 0; index--) if (messages[index].kind === 'human') { latest = index; break; }
+  const gap = latest >= 1 ? messages[latest].at - messages[latest - 1].at : NaN;
+  const since = Number.isFinite(gap) ? loungeElapsed(gap) : undefined;
+  return { now: loungeClockNow(new Date(now)), ...(since ? { since_last_message: since } : {}) };
+}
+export const loungeClockRule = 'clock.now는 지금 실제 한국 날짜·요일·시각이고, clock.since_last_message는 사용자의 이번 말 바로 앞 메시지 뒤로 실제로 지난 시간이다. 오늘·내일·요일·며칠 뒤를 말할 때와 대화에서 정한 날짜(예: 다음 주 화요일)가 언제인지 따질 때는 clock.now로 계산하고, 날짜를 지어내지 않는다. 장면 속 때(scene의 time_of_day, memory의 지금 장면)는 이야기의 시간이므로 clock 때문에 바꾸지 않는다. 사용자가 오늘 날짜나 요일, 지금 시각을 물으면 clock.now로 답한다.';
+
 export type LoungeSelfStory = {
   id: string; summary: string; meaning: string; status: 'ongoing' | 'past' | 'resolved'; evidence: string; turn: number;
 };
@@ -391,6 +583,8 @@ export type LoungeCompanionState = {
   forgotten?: string[];
   /** The turn the analyzer last read as a sexual scene (2026-11-18): the six turns after it are not read again (2.5 to 4.5 s each), the seventh is. */
   sexual_turn?: number;
+  /** The room's record as lists (2026-11-25): the summary text is written from it (loungeMemoryText). */
+  memory_ledger?: LoungeMemoryLedger;
 };
 /** What makes a turn matter for the inner voice: read by the analyzer and the scene engine before the reply is written. */
 export const loungeInnerVoiceMatters = (analysis: LoungeAnalysis | undefined, decision?: Pick<LoungeSceneDecision, 'event'>) =>
@@ -433,6 +627,7 @@ export function normalizeLoungeCompanionState(raw: unknown, roomId: string): Lou
     ...(strings(value.fallback_replies, 8, 80).length ? { fallback_replies: strings(value.fallback_replies, 8, 80) } : {}),
     ...(strings(value.forgotten, 8, 120).length ? { forgotten: strings(value.forgotten, 8, 120) } : {}),
     ...(turnNumber(value.sexual_turn) !== undefined ? { sexual_turn: turnNumber(value.sexual_turn) } : {}),
+    ...(normalizeLoungeMemoryLedger(value.memory_ledger) ? { memory_ledger: normalizeLoungeMemoryLedger(value.memory_ledger) } : {}),
   };
 }
 function readSceneChange(value: unknown) {
@@ -623,7 +818,7 @@ self_story_updates: 방금 캐릭터가 실제 대사로 이야기한 자기 경
 shared_experience: 이번 턴에 둘이 함께 처음 해 본 일이나 오래 기억할 만한 순간이 있었으면 한 줄(40자 이내), 없으면 빈 문자열.
 lingering: 방금 답까지 반영해 캐릭터의 마음에 아직 남아 있는 감정과 그 까닭 한 줄(40자 이내, 예: '선수 소리를 세 번 들어 살짝 오기가 생김'). 입력의 lingering이 직전 것이다. 남아 있으면 그대로 두거나 방금 일로 조금 바꾸고, 풀렸거나 남은 게 없으면 빈 문자열이다. 매 턴 새 감정을 지어내지 않는다. 사용자가 진심으로 거절했거나 선을 그었으면 서운함이나 탓을 남기지 않는다.
 next_intent: 캐릭터가 자기 마음으로 다음에 하고 싶은 행동이나 들려주고 싶은 이야기 한 줄(40자 이내). 자기 경험을 나누거나 실제 함께할 일을 준비하려는 뜻을 적는다. 취향·장소·방법 등을 더 묻거나 답을 듣고 싶다는 일상 질문은 다음 턴의 과제로 저장하지 않는다. 입력에 그런 질문이 남아 있거나 상대가 화제를 바꿨으면 지우고, 자연스러운 자기 의도가 없으면 빈 문자열이다. 중요한 감정과 실제 함께 정할 일은 남길 수 있다. 캐릭터가 접촉을 멈추게 하거나 자기가 정한 범위를 지키려는 뜻은, 사용자가 실제로 거절하거나 멈추자고 한 일이 아니면 쓰지 않는다. forgotten에 있는 내용은 쓰지 않는다. 이미 했거나 원하지 않게 됐으면 빈 문자열이며 사용자의 선택이나 동의는 미리 정하지 않는다.`;
-export type LoungeCompanionUpdate = { scene?: unknown; reaction_type?: unknown; used_phrases?: unknown; exception_formula_used?: unknown; self_facts?: unknown; self_story_updates?: unknown; character_life?: unknown; shared_experience?: unknown; lingering?: unknown; next_intent?: unknown; room_memory_ops?: unknown };
+export type LoungeCompanionUpdate = { scene?: unknown; reaction_type?: unknown; used_phrases?: unknown; exception_formula_used?: unknown; self_facts?: unknown; self_story_updates?: unknown; character_life?: unknown; shared_experience?: unknown; lingering?: unknown; next_intent?: unknown; room_memory_ops?: unknown; memory?: unknown; record_ops?: unknown; history_merge?: unknown };
 
 /** Bounded repair for concrete failures observed in Dohyun's live replies, not a shared style or question quota. */
 export function loungeCompanionReplyReview(input: { characterId: string; userText: string; text: string; inner?: string }): { notes: string[]; instruction: string } | undefined {
@@ -656,10 +851,14 @@ const uniqueTail = (items: readonly string[], max: number) => [...new Set([...it
 export const loungeEndsOnQuestion = (reply: string) => /[?？]\s*$/.test(splitLoungeActions(reply, { parens: true }).filter(part => !part.action).map(part => part.text).join('').trim());
 const carried = (value: unknown, turn: number) => { const what = clip(value, 60); return what ? { what, turn } : undefined; };
 /** The state after a turn: the scene the call after the reply wrote, the event that came, what was used. */
-export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number; braked?: boolean; sexual?: boolean; analyzerSkipped?: boolean }): LoungeCompanionState {
+/**
+ * `ledger` is given in a room whose record is kept as lists (the durable story chat and its calls): its `seed` is the
+ * summary the recorder read, taken apart when the room has no lists yet.
+ */
+export function nextLoungeCompanionState(input: { state: LoungeCompanionState; update?: LoungeCompanionUpdate; decision: LoungeSceneDecision; turn: number; reply: string; inner: string; boldMove?: { stage: number }; emotional?: boolean; userText?: string; recent?: readonly LoungeTurnMessage[]; now?: number; braked?: boolean; sexual?: boolean; analyzerSkipped?: boolean; ledger?: { seed?: string } }): LoungeCompanionState {
   const { state, decision, turn } = input;
   // A reply that stepped in when the adult model was down wrote the character's own brake (a limit, a range, a stop): it is not written into the room (2026-11-18).
-  const update = input.braked && input.update ? Object.fromEntries(Object.entries(input.update).filter(([key]) => !['lingering', 'next_intent', 'room_memory_ops'].includes(key))) as LoungeCompanionUpdate : input.update;
+  const update = input.braked && input.update ? Object.fromEntries(Object.entries(input.update).filter(([key]) => !['lingering', 'next_intent', 'room_memory_ops', 'memory', 'record_ops', 'history_merge'].includes(key))) as LoungeCompanionUpdate : input.update;
   if (state.source_turn !== undefined && turn <= state.source_turn) return state;
   const read = readScene(update?.scene);
   // The same place named another way (모텔 방, then 모텔 침대 위) keeps the wording it had, and a motel or a hotel the two are in is named by its room:
@@ -714,6 +913,8 @@ export function nextLoungeCompanionState(input: { state: LoungeCompanionState; u
     // A sexual scene goes on (read so, or the analyzer skipped for it); a reading that says it is over ends it; no reading keeps it as it was.
     ...(input.analyzerSkipped ? {} : input.sexual === true ? { sexual_turn: turn } : input.sexual === false ? { sexual_turn: undefined } : {}),
     ...(input.braked ? { fallback_replies: uniqueTail([...(state.fallback_replies ?? []), input.reply.replace(/\s+/g, ' ').trim().slice(0, 60)].filter(item => item.length >= 8), 8) } : {}),
+    ...(input.ledger ? { memory_ledger: input.braked ? state.memory_ledger ?? loungeMemoryLedgerFromSummary(input.ledger.seed ?? '') : applyLoungeMemoryLedger(state.memory_ledger ?? loungeMemoryLedgerFromSummary(input.ledger.seed ?? ''), update, turn,
+      [input.userText ?? '', ...(input.recent ?? []).filter(item => item.kind === 'human').slice(-4).map(item => item.text)]) } : {}),
   };
 }
 
