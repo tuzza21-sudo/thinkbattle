@@ -4,7 +4,7 @@
 // It writes, in the places a character lives in (see docs/add-a-lounge-character.md), a working entry whose text is
 // marked TODO(새 캐릭터): the host (lounge.ts), its lobby card, background, group and voice gender, its page
 // (loungeCharacters.ts), its relationship (configs/<id>.ts, cut from scripts/templates/relationship-config.template.ts), its
-// sitemap entry and its image prompts
+// image prompts
 // (scripts/lounge-character-prompts.json). The tests refuse to pass while a TODO(새 캐릭터) is left, so nothing is shipped
 // half written. With --register the id is also added to lounge_house_characters (and a space for it, with --space) in the
 // database with the service key: no SQL to run by hand (needs migration 20261120000000 once).
@@ -122,13 +122,7 @@ index = insertBefore(index, "import { witRelationship } from './configs/wit.js';
 index = insertBefore(index, '].map(config => [config.characterId', `, ${id}Relationship`, 'relationship');
 write('src/lib/relationship/index.ts', index);
 
-// ---- the sitemap lists every character page
-let sitemap = read('public/sitemap.xml');
-const lastEntry = sitemap.lastIndexOf('/lounge/characters/');
-const entryEnd = sitemap.indexOf('\n', lastEntry);
-if (lastEntry < 0) fail('Cannot find the character pages in public/sitemap.xml.');
-sitemap = sitemap.slice(0, entryEnd) + `\n  <url><loc>https://saseok.kr/lounge/characters/${id}</loc></url>` + sitemap.slice(entryEnd);
-write('public/sitemap.xml', sitemap);
+// (the sitemap needs no entry: it is written at build from the characters, scripts/seo-build.mjs)
 
 // ---- the page: the moves follow what the template really changes (the tests keep the two in step)
 const config = Object.values(loadTs(path(templateFile))).find(value => value?.characterId);

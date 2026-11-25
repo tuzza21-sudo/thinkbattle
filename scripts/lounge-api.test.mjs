@@ -34,11 +34,12 @@ process.env.LOUNGE_ANALYZER ??= 'off';
 process.env.LOUNGE_DIRECTOR ??= 'off';
 process.env.LOUNGE_EXTENDED_COMPANION_REPLIES ??= 'on';
 const consultLib = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', import.meta.url)));
+const lessonLib = loadTs(fileURLToPath(new URL('../src/lib/loungeLesson.ts', import.meta.url)));
 const sajuLib = loadTs(fileURLToPath(new URL('../src/lib/loungeSaju.ts', import.meta.url)));
 const turnsLib = loadTs(fileURLToPath(new URL('../src/lib/loungeTurnPersistence.ts', import.meta.url)));
 const plansLib = compile('../src/lib/loungePlans.ts');
 const adminLib = compile('../src/lib/loungeAdmin.ts');
-const handler = compile('../api/lounge.ts', path => path.endsWith('loungeAdmin') ? adminLib : path.endsWith('loungePlans') ? plansLib : path.endsWith('loungeTurnPersistence') ? turnsLib : path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
+const handler = compile('../api/lounge.ts', path => path.endsWith('loungeLesson') ? lessonLib : path.endsWith('loungeAdmin') ? adminLib : path.endsWith('loungePlans') ? plansLib : path.endsWith('loungeTurnPersistence') ? turnsLib : path.endsWith('loungeSaju') ? sajuLib : path.endsWith('loungeConsult') ? consultLib : path.endsWith('loungeMessenger') ? messengerLib : path.endsWith('loungePersonas') ? personasLib : path.endsWith('loungeStory') ? storyLib : path.endsWith('loungeScenarios') ? scenariosLib : path.endsWith('loungeModels') ? modelsLib : path.endsWith('loungeCustomCharacters') ? customLib : path.endsWith('loungeReplies') ? repliesLib : path.endsWith('loungeStudy') ? study : path.endsWith('loungeFilmStudy') ? filmStudy : path.endsWith('loungeSession') ? sessionLib : path.endsWith('/relationship') ? relationshipLib : path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('loungeKnowledge') ? knowledgeLib : lounge).default;
 const roomId = 'lounge-00000000-0000-4000-8000-000000000001';
 const topicBrief = { category: 'media', subcategory: 'film', work_title: 'Nocturnal Animals', creator: 'Tom Ford', reason: '서로 다르게 읽힌 선택이 마음에 남았다.', discussion: '인물의 책임을 어떻게 보는지 다른 해석을 듣고 싶다.' };
 const request = (body, authorization = 'Bearer example', origin) => new Request('https://app.test/api/lounge', { method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) });
@@ -5942,4 +5943,75 @@ test('a story chat keeps its record as lists: the recorder writes only what chan
   assert.doesNotMatch(second, /다음 주 화요일/);
   assert.match(second, /^남은 것: 11월 25일\(수\) 다시 만나기로 함$/m);
   assert.match(second, /사용자에 대해: 코인으로 10억/, 'kept on the turns after');
+});
+
+test('an English lesson: the member\'s words are graded first, code moves the expression\'s stage and the tutor is told the step, with no analyzer, inner voice or relationship (2026-11-25)', async () => {
+  const scenario = { id: 'teachertutor-lesson', title: '영어 수업', prologue: '창가 카페에서 수업을 시작한다.', user_role: '수강생', relationship: '튜터와 수강생', place: '창가 카페' };
+  const items = [
+    { id: 'i-1', user_id: 'user-1', expression: "I see where you're coming from, but …", meaning: '정중하게 반대', level: 'B2', source: 'tutor', pack_id: 'b2-see-where', stage: 0, days: [], free_used: false, next_review_at: null, attempts: 0, created_at: '2026-11-24T00:00:00Z' },
+    { id: 'i-2', user_id: 'user-1', expression: 'come up with', meaning: '생각해 내다', level: 'B2', source: 'mine', stage: 0, days: [], free_used: false, next_review_at: null, attempts: 0, created_at: '2026-11-24T00:00:00Z' },
+  ];
+  const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+  const storyState = { kind: 'lesson', day, phase: 'drill', queue: ['i-2'], done: [], current: { id: 'i-1', hints: 0, tries: 0 }, kept: 0, turns: 1 };
+  const writes = [], graders = [], writers = [];
+  let analyzerCalls = 0;
+  await withServiceKey(() => run(async (url, init = {}) => {
+    if (url.includes('/auth/')) return result({ id: 'user-1' });
+    if (url.includes('claim_voice_lounge_host')) return result('ticket');
+    if (url.includes('lounge_english_items?user_id=')) return result(items);
+    if (url.includes('lounge_english_profiles?')) return result([{ level: 'B1' }]);
+    if (url.includes('voice_lounge_rooms?') && init.method === 'PATCH') { writes.push(['room', JSON.parse(init.body)]); return result(null, 200); }
+    if (url.includes('lounge_english_items?id=eq.')) { writes.push(['item', url.split('id=eq.')[1].split('&')[0], JSON.parse(init.body)]); return result(null, 200); }
+    if (url.includes('lounge_english_attempts')) { writes.push(['attempts', JSON.parse(init.body)]); return result(null, 201); }
+    if (url.includes('lounge_english_items?on_conflict')) { writes.push(['keep', JSON.parse(init.body)]); return result(null, 201); }
+    if (url.includes('voice_lounge_turn_updates?')) return result([]);
+    if (url.includes('voice_lounge_companion_state?')) return result([]);
+    if (url.includes('voice_lounge_relationships?')) throw new Error('a lesson reads no relationship');
+    if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'teachertutor', capacity: 1, companion_chat: true, topic: '영어 수업', memory: '', ai_mood: {}, ai_turns: 3, voice_on: false, space_id: null, scenario, story_state: storyState }]);
+    if (url.includes('voice_lounge_messages?')) return result([
+      { id: 4, user_id: 'user-1', nickname: '나', kind: 'human', text: 'I see where you are coming from, but I think we need more time.', created_at: '2026-11-25T03:00:00Z' },
+      { id: 3, nickname: '정하린', kind: 'host', text: '팀장이 마감 연장을 반대해요. 이유는 이해하지만 연장이 필요하다고, 영어로 정중하게 말해 볼래요?', created_at: '2026-11-25T02:59:00Z' }]);
+    if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
+    if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
+    if (url.endsWith('/embeddings')) return result({ data: [] });
+    if (url.endsWith('/responses')) {
+      const body = JSON.parse(init.body);
+      if (body.text?.format?.name === 'lounge_lesson_grade') {
+        graders.push(body);
+        return modelAnswer({ target: 'correct', intent: 'answer', free_used: [], errors: [], better: "I see where you're coming from, but I think we need a bit more time.", polished: "I take your point, but I'd argue we need a little more time.", keep: 'a bit more time', keep_meaning: '조금 더 시간' });
+      }
+      if (body.text?.format?.name === 'lounge_turn_analysis') { analyzerCalls++; return modelAnswer({}); }
+      if (isAfterReply(init)) return modelAnswer({ memory: '지금 장면: 창가 카페에서 수업 중', events: [], record_ops: [], history_merge: { refs: [], text: '' }, scene: { location: '창가 카페', scene_type: '카페', activity: '수업', time_of_day: '오후', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], self_story_updates: [], shared_experience: '', lingering: '', next_intent: '', room_memory_ops: [] });
+      writers.push(body);
+      return modelAnswer({ text: "좋아요, 힌트 없이 바로 나왔네요. 이렇게 말하면 더 자연스러워요: I see where you're coming from, but I think we need a bit more time.\n다음 상황이에요. 팀에서 매출을 올릴 방법을 고민 중인데, 좋은 아이디어를 하나 생각해 냈어요. 영어로 말해 볼래요?", inner_voice: '', character_life: { feeling: '', body: '', attention: '', want: '', cause: '' } });
+    }
+    if (url.includes('finish_voice_lounge_reply') || url.includes('prepare_voice_lounge_turn')) return result(true);
+    if (url.includes('commit_voice_lounge_turn')) return result('saved');
+    if (url.startsWith('https://db.test/')) return result(true);
+    throw new Error(`Unexpected request: ${url}`);
+  }, async () => {
+    const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }));
+    assert.equal(response.status, 200);
+    assert.doesNotMatch(await response.text(), /"type":"error"/);
+  }));
+  assert.equal(analyzerCalls, 0, 'a lesson has no analyzer');
+  assert.equal(graders.length, 1);
+  const graded = JSON.parse(graders[0].input);
+  assert.equal(graded.target.id, 'i-1'); assert.deepEqual(graded.level, { from: 'B1', target: 'B2' });
+  assert.match(graded.asked, /마감 연장/); assert.match(graded.said, /coming from/);
+  const [writer] = writers, input = JSON.parse(writer.input);
+  assert.equal(input.lesson.step, 'next');
+  assert.equal(input.lesson.finished.how, 'unprompted');
+  assert.equal(input.lesson.target.meaning, '생각해 내다');
+  assert.equal(JSON.stringify(input.lesson).includes('come up with'), false, 'the next expression is not given to the tutor before the member tries it');
+  assert.match(input.lesson.feedback.better, /a bit more time/);
+  assert.match(writer.instructions, /영어 수업: 이 방은 사용자와의 1:1 영어 수업이다/);
+  assert.equal(input.relationship, undefined, 'no relationship in a lesson');
+  const room = writes.find(entry => entry[0] === 'room')[1].story_state;
+  assert.equal(room.current.id, 'i-2'); assert.deepEqual(room.done, [{ id: 'i-1', verdict: 'unprompted' }]); assert.equal(room.kept, 1);
+  const item = writes.find(entry => entry[0] === 'item');
+  assert.equal(item[1], 'i-1'); assert.equal(item[2].stage, 3); assert.deepEqual(item[2].days, [day]);
+  const [attempt] = writes.find(entry => entry[0] === 'attempts')[1];
+  assert.equal(attempt.verdict, 'unprompted'); assert.match(attempt.better, /a bit more time/); assert.match(attempt.polished, /take your point/);
+  assert.deepEqual(writes.find(entry => entry[0] === 'keep')[1], { user_id: 'user-1', expression: 'a bit more time', meaning: '조금 더 시간', level: 'B2', source: 'upgrade' });
 });
