@@ -149,6 +149,10 @@ export type LoungeLessonAlternative = { expression: string; note: string };
 /** The tutor whose lessons also say why Koreans mix an expression up (2026-11-26, by the owner). */
 export const loungeLessonConfusionTutor = 'interpretertutor';
 
+/** What the task card's buttons say for the member: words of the lesson, not English to correct. */
+export const loungeLessonHintText = '힌트 주세요';
+export const loungeLessonSkipText = '이건 다음에 할게요. 넘어갈게요.';
+
 /** The labels of the learning board: an expression's importance, and the two corrections of the member's goal. */
 export const loungeLessonImportance = [
   { value: 3, label: '꼭 필요', stars: '★★★' },
@@ -271,6 +275,8 @@ export type LoungeLessonState = {
   queue: string[]; done: Array<{ id: string; verdict: LoungeLessonVerdict }>;
   current?: { id: string; hints: number; tries: number; given?: boolean; retell?: boolean };
   kept: number; turns: number;
+  /** When the day's lesson was planned: only what the member makes for a situation after it joins the day (2026-11-26). */
+  since?: string;
 };
 export function readLoungeLessonState(value: unknown): LoungeLessonState | undefined {
   const state = value && typeof value === 'object' ? value as Partial<LoungeLessonState> : undefined;
@@ -283,6 +289,7 @@ export function readLoungeLessonState(value: unknown): LoungeLessonState | undef
     kind: 'lesson', day: state.day, phase: state.phase === 'drill' || state.phase === 'free' ? state.phase : 'warmup',
     queue: strings(state.queue), done: Array.isArray(state.done) ? state.done.filter(item => item && typeof item.id === 'string').slice(0, 24) : [],
     ...(current ? { current } : {}), kept: Math.max(0, Number(state.kept) || 0), turns: Math.max(0, Number(state.turns) || 0),
+    ...(typeof state.since === 'string' ? { since: state.since } : {}),
   };
 }
 
@@ -292,17 +299,22 @@ export function readLoungeLessonState(value: unknown): LoungeLessonState | undef
  * own expressions to add when that is not six (the caller adds them as the member's, so they have stages too).
  */
 const sourceRank: Record<LoungeLessonSource, number> = { situation: 0, mine: 1, upgrade: 2, tutor: 3 };
-/** The expressions the member marked to learn first (the learning board), the more important first: all of them come before the day's others. */
-const focused = (items: readonly LoungeLessonItem[]) => items.filter(item => item.focus && item.stage < 5)
-  .sort((a, b) => (b.importance ?? 2) - (a.importance ?? 2) || Date.parse(a.created_at ?? '') - Date.parse(b.created_at ?? ''));
+/**
+ * The order the member asked for (2026-11-26): the more important first, then the easier (lower CEFR level), then the
+ * older. An expression not rated yet counts as 자주 씀 and B2.
+ */
+const levelRank = (difficulty?: string | null) => { const at = (loungeLessonDifficulties as readonly string[]).indexOf(difficulty ?? ''); return at < 0 ? 2 : at; };
+const lessonOrder = (a: LoungeLessonItem, b: LoungeLessonItem) => (b.importance ?? 2) - (a.importance ?? 2) || levelRank(a.difficulty) - levelRank(b.difficulty);
+const older = (a: LoungeLessonItem, b: LoungeLessonItem) => Date.parse(a.created_at ?? '') - Date.parse(b.created_at ?? '');
+/** The expressions the member marked to learn first (the learning board), in that order: all of them come before the day's others. */
+const focused = (items: readonly LoungeLessonItem[]) => items.filter(item => item.focus && item.stage < 5).sort((a, b) => lessonOrder(a, b) || older(a, b));
 export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date) {
   const first = focused(items).slice(0, 12);
   const due = items.filter(item => !first.includes(item) && item.stage > 0 && item.next_review_at && Date.parse(item.next_review_at) <= now.getTime())
     .sort((a, b) => Date.parse(a.next_review_at!) - Date.parse(b.next_review_at!)).slice(0, Math.max(0, Math.min(loungeLessonSize.reviews, loungeLessonSize.total - first.length)));
-  // New ones: those made for the member's situation first, then the more important, then the member's own before the tutor's.
+  // New ones: those made for the member's situation first, then the more important and the easier, then the member's own before the tutor's.
   const fresh = items.filter(item => item.stage === 0 && !first.includes(item) && !due.includes(item))
-    .sort((a, b) => Number(b.source === 'situation') - Number(a.source === 'situation') || (b.importance ?? 2) - (a.importance ?? 2)
-      || sourceRank[a.source] - sourceRank[b.source] || Date.parse(a.created_at ?? '') - Date.parse(b.created_at ?? ''))
+    .sort((a, b) => Number(b.source === 'situation') - Number(a.source === 'situation') || lessonOrder(a, b) || sourceRank[a.source] - sourceRank[b.source] || older(a, b))
     .slice(0, Math.max(0, loungeLessonSize.total - first.length - due.length));
   const queue = [...first, ...due, ...fresh].map(item => item.id);
   return { queue, pack: Math.max(0, loungeLessonSize.total - queue.length) };
@@ -340,6 +352,7 @@ target: target이 있으면 학습자가 said에서 그 표현을 썼는지 본�
 intent: answer는 과제에 답하려 한 말, question은 튜터에게 묻는 말(영어 질문 포함), meaning은 써야 할 표현이 생각나지 않는다고 하거나 그 표현이 무엇인지, 뜻이나 쓰는 법을 묻는 말, skip은 넘어가자·모르겠다·패스, stop은 수업을 그만하자·오늘은 여기까지, chat은 과제와 상관없는 잡담, korean은 과제에 한국어로만 답한 말, situation은 학습자가 자기 실제 상황(곧 있을 미팅·면접·여행·통화 등)이나 영어로 하고 싶은 말을 꺼내며 그때 쓸 표현을 배우고 싶어 하는 말이다(과제 문장 속 상황이 아니라 학습자 자신의 일).
 free_used: others 가운데 학습자가 시키지 않았는데 said에서 자연스럽고 맞게 쓴 표현의 id다. target의 id는 넣지 않는다.
 errors: said의 영어에서 뜻을 해치거나 B2 학습자가 반드시 고쳐야 할 오류만 많아야 2개다. wrong은 학습자가 실제로 한 말의 해당 부분, right는 고친 부분, why는 한국어 한 줄(40자 이내)이다. 구두점·대소문자·받아 적기 흔적·한국어 부분은 오류가 아니다. 오류가 없으면 빈 배열.
+intent가 answer나 korean이 아니면(힌트 요청, 수업에 대한 질문, 넘어가기 등) 학습자가 영어로 표현하려 한 말이 아니므로 errors, better, polished, keep, keep_meaning을 모두 비운다.
 better: said의 영어 문장 전체를 학습자가 하려던 말 그대로, level.target 수준의 자연스러운 영어 한두 문장으로 다시 쓴다. 실제로 더 정확하거나 자연스러워질 때만 쓴다. 이미 자연스럽거나, 같은 수준의 다른 말로 바꾸기만 하는 것이면 빈 문자열. target이 있고 학습자가 그 표현을 쓰지 않았으면 better와 polished에 target 표현을 넣지 않는다(학습자가 스스로 떠올려야 한다). 학습자가 한국어로만 말했으면 그 뜻을 level.target 수준의 영어로 쓴다. 짧은 대답(yes, okay, 인사)이면 빈 문자열.
 polished: better를 한 단계 더 세련되게(level.target이 B2면 C1, C1이면 원어민 비즈니스 수준) 한 문장으로 쓴다. better가 비었으면 빈 문자열.
 keep: better나 polished에서 학습자가 said에서 쓰지 않은, 다음에 다시 써 볼 만한 2~6단어 표현 하나(예: "I'm not entirely sure", "get my work done"). level.target 학습자에게 쓸모 있는 기능 표현(의견·동의와 반대·추측·완곡한 말·연결어·구동사·자주 붙어 다니는 단어 조합)만 고른다. 학습자 문장에서 떼어 낸 평범한 조각("I still think we need", "next month")이나 흔한 단어 하나, target 자체는 아니다. 없으면 빈 문자열. keep_meaning은 그 표현의 한국어 뜻(20자 이내), keep이 비면 빈 문자열.`;
@@ -390,17 +403,25 @@ export function advanceLoungeLesson(input: { state?: LoungeLessonState; items: r
   const byId = new Map(input.items.map(item => [item.id, item]));
   const fresh = !input.state || input.state.day !== day;
   const state: LoungeLessonState = fresh
-    ? { kind: 'lesson', day, phase: 'warmup', queue: input.plan.filter(id => byId.has(id)), done: [], kept: 0, turns: 0 }
+    ? { kind: 'lesson', day, phase: 'warmup', queue: input.plan.filter(id => byId.has(id)), done: [], kept: 0, turns: 0, since: input.now.toISOString() }
     : { ...input.state!, queue: input.state!.queue.filter(id => byId.has(id)), done: [...input.state!.done] };
-  // The member's own new expressions added during the day join it at once; those made for a situation they told come first.
-  const joining = input.items.filter(item => (item.source === 'mine' || item.source === 'situation') && item.stage === 0 && !state.queue.includes(item.id)
-    && !state.done.some(done => done.id === item.id) && state.current?.id !== item.id);
-  // Marked on the learning board during the day: they come next (after a situation's), even if already further down the day.
-  const marked = focused(input.items).filter(item => !state.done.some(done => done.id === item.id) && state.current?.id !== item.id).map(item => item.id);
-  if (joining.length || marked.some((id, at) => state.queue[joining.filter(item => item.source === 'situation').length + at] !== id)) {
-    const told = joining.filter(item => item.source === 'situation').map(item => item.id);
-    state.queue = [...new Set([...told, ...marked, ...state.queue, ...joining.filter(item => item.source === 'mine').map(item => item.id)])].slice(0, 16);
+  const doneToday = (id: string) => state.done.some(done => done.id === id) || state.current?.id === id;
+  if (!state.since) {
+    // A day planned before 2026-11-26 took in every new expression of the member's as each one was done, so it kept
+    // growing (1/16, then 6/21): it is cut back to the day's size, the marked ones kept, in the member's order.
+    const marks = new Set(focused(input.items).map(item => item.id));
+    const rest = state.queue.filter(id => !marks.has(id)).map(id => byId.get(id)!).sort((a, b) => lessonOrder(a, b) || older(a, b)).map(item => item.id);
+    state.queue = [...state.queue.filter(id => marks.has(id)), ...rest.slice(0, Math.max(0, loungeLessonSize.total - state.done.length - state.queue.filter(id => marks.has(id)).length))];
+    state.since = input.now.toISOString();
   }
+  // Only expressions made for a situation the member told during the day join it (first); the member's other new
+  // expressions wait for a later day's plan, so the day keeps the size it started with.
+  const since = Date.parse(state.since);
+  const toldToday = input.items.filter(item => item.source === 'situation' && item.stage === 0 && Date.parse(item.created_at ?? '') > since && !state.queue.includes(item.id) && !doneToday(item.id)).map(item => item.id);
+  // Marked on the learning board: they come next (after a situation's), even if already further down the day.
+  const marked = focused(input.items).filter(item => !doneToday(item.id)).map(item => item.id);
+  const situations = state.queue.filter(id => byId.get(id)?.source === 'situation' && !marked.includes(id));
+  state.queue = [...new Set([...toldToday, ...marked, ...situations, ...state.queue])].slice(0, 16);
   if (state.current && !byId.has(state.current.id)) delete state.current;
   state.turns += input.opening ? 0 : 1;
   const verdicts: LoungeLessonTurn['verdicts'] = [];
@@ -493,8 +514,10 @@ export const loungeLessonFirstWords = (expression: string) => {
 export const loungeLessonCleanGrade = (grade: LoungeLessonGrade | undefined, said: string): LoungeLessonGrade | undefined => {
   if (!grade) return grade;
   const plain = (text: string) => text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9'가-힣 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-  // Telling a situation of their own is a request, not a try at English: it is not corrected (it was translated back, 2026-11-25).
-  return grade.intent === 'situation' || plain(grade.better) === plain(said) ? { ...grade, better: '', polished: '', keep: '', keep_meaning: '', errors: [] } : grade;
+  // Only an answer to the task (or one in Korean) is corrected. Telling a situation of their own is a request (it was
+  // translated back, 2026-11-25); asking for a hint, asking about the lesson or skipping is not a try at English either
+  // (the hint button's words got a B2 and a C1 version, and a question was corrected again and again, 2026-11-26).
+  return (grade.intent !== 'answer' && grade.intent !== 'korean') || plain(grade.better) === plain(said) ? { ...grade, better: '', polished: '', keep: '', keep_meaning: '', errors: [] } : grade;
 };
 
 /**
@@ -630,12 +653,12 @@ export const loungeLessonRules = `영어 수업: 이 방은 사용자와의 1:1 
 - step별로 한다:
   warmup: 짧게 인사하고 오늘 하루나 요즘 일을 영어로 하나 묻는다.
   ask: target의 situation이 있으면 그 상황을, 없으면 그 표현이 자연스럽게 나올 수밖에 없는 구체적인 상황 하나를 네가 만들어 한국어로 짧게 주고, 그 상황에서 영어로 말해 보라고 한다. target.review가 있으면 전에 배운 표현을 다시 꺼내 보는 것이다.
-  hint: 방금 시도에서 좋았던 점을 한마디로 받고 힌트 하나만 준다. hint_level 1이면 expression_do_not_say의 뜻이나 쓰임(어떤 뉘앙스, 어떤 자리에서 쓰는지)을 한국어로 짚고 영어 단어는 말하지 않는다. 2이면 target.first_words만 알려 주고 나머지는 말하지 않는다. 그리고 다시 말해 보게 한다.
+  hint: 방금 시도에서 좋았던 점을 한마디로 받고 힌트 하나만 준다. hint_level 1이면 expression_do_not_say의 뜻이나 쓰임(어떤 뉘앙스, 어떤 자리에서 쓰는지)을 한국어로 짚고 영어 단어는 말하지 않는다. 2이면 target.first_words만 알려 주고 나머지는 말하지 않는다(예: "figure로 시작해요"까지만. 뜻을 보고 짐작한 나머지 단어를 붙여 "figure out이에요"처럼 완성하지 않는다). 그리고 다시 말해 보게 한다.
   fix: 표현을 쓰려 했지만 형태가 틀렸다. 틀린 곳 한 군데만 짚고 다시 말하게 한다.
   give: 표현을 알려 주고 뜻을 한 줄로 말한 뒤, 그 표현으로 사용자 자신의 문장을 하나 만들어 보게 한다.
   retell: finished의 표현을 잘 썼다고 짧게 인정하고, 같은 표현을 네가 새로 준 다른 상황에서 한 번 더 말해 보게 한다.
   next: finished가 있으면 무엇을 잘했는지 짧게 인정하고(how가 missed면 괜찮다고 하고 표현을 한 번 들려준다), 바로 새 target으로 ask를 한다.
-  answer: 사용자의 질문이나 말에 먼저 짧게 답하고, 하던 target 과제로 돌아온다. 이때 연습할 표현의 단어는 알려 주지 않는다.
+  answer: 사용자의 질문(수업 내용, 표현의 쓰임, 문법 등)에 제대로 답한다. 사용자의 질문 문장 자체는 고치거나 영어로 다시 말해 주지 않는다. 답한 뒤 하던 target 과제로 짧게 돌아온다. 이때 연습할 표현의 단어는 알려 주지 않는다.
   free: 오늘 연습할 표현은 끝났다. 사용자의 관심사로 자유롭게 영어 대화를 이어 가며 질문 하나로 말을 끌어낸다. 오늘 연습한 표현을 쓸 기회를 자연스럽게 만든다.
   wrap: 오늘 수업을 짧게 마무리하고 다음에 다시 확인하겠다고 한다.
 - fix, give, retell에서 target.nuance가 있으면 그 표현의 뉘앙스(어떤 자리, 어떤 어감)를 한 줄로 짚고, target.alternatives가 있으면 "비슷하게 이렇게도 말해요"로 하나나 둘을 차이와 함께 들려준다. target.why_koreans_mix_it_up이 있으면 "한국 사람들이 여기서 자주 헷갈리는 이유는"으로 한 줄 덧붙인다. 통화에서는 이 중 하나만.

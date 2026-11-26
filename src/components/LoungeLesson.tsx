@@ -6,7 +6,7 @@ import { startLoungeScenario } from '../lib/loungeApi';
 import { addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonLevel, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
 import { readLoungeLessonFile } from '../lib/loungeLessonFile';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { loungeLessonConfusionTutor, loungeLessonFeedbackLabels, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
+import { loungeLessonConfusionTutor, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const shortDay = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '';
@@ -114,8 +114,8 @@ function LoungeLessonTaskCard({ task, send, disabled, confusion }: { task: Loung
       : 'first' in item && item.first ? <p className="lounge-lesson-reveal"><span>힌트</span><b lang="en">{item.first} …</b> 로 시작해요</p>
       : <p className="lounge-lesson-reveal muted">영어 표현은 직접 떠올려서 말해 보세요{task.hints ? ` · 힌트 ${task.hints}번 받음` : ''}</p>}
     {send && <div className="lounge-lesson-task-actions">
-      {!('expression' in item && item.expression) && <button type="button" disabled={disabled} onClick={() => void send('힌트 주세요')}><Lightbulb size={14} /> 힌트 받기</button>}
-      <button type="button" disabled={disabled} onClick={() => void send('이건 다음에 할게요. 넘어갈게요.')}><SkipForward size={14} /> 넘어가기</button>
+      {!('expression' in item && item.expression) && <button type="button" disabled={disabled} onClick={() => void send(loungeLessonHintText)}><Lightbulb size={14} /> 힌트 받기</button>}
+      <button type="button" disabled={disabled} onClick={() => void send(loungeLessonSkipText)}><SkipForward size={14} /> 넘어가기</button>
     </div>}
   </section>;
 }
@@ -128,9 +128,11 @@ const verdictText: Record<string, string> = { unprompted: '스스로 말했어�
 export function LoungeLessonFeedback({ text, attempts, level }: { text: string; attempts: readonly LoungeLessonAttempt[]; level: LoungeLessonLevel }) {
   const [more, setMore] = useState(false);
   const said = plain(text).slice(0, 600);
+  // The task card's buttons are words of the lesson, not English to correct (older lessons corrected them).
+  const lessonWords = said === loungeLessonHintText || said === loungeLessonSkipText;
   const mine = attempts.filter(attempt => { const words = plain(attempt.said); return words === said || (said.length > 20 && (words.startsWith(said) || said.startsWith(words))); });
   if (!mine.length) return null;
-  const note = mine.find(attempt => attempt.better || attempt.why);
+  const note = lessonWords ? undefined : mine.find(attempt => attempt.better || attempt.why);
   const verdicts = [...new Set(mine.map(attempt => attempt.verdict).filter(verdict => verdictText[verdict]))];
   const labels = loungeLessonFeedbackLabels(level);
   const errors = (note?.why ?? '').split('\n').map(line => line.match(/^(.*?) → (.*?): (.*)$/)).filter((match): match is RegExpMatchArray => Boolean(match));
