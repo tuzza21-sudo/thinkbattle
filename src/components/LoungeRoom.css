@@ -1459,3 +1459,24 @@
 .lounge-training-flip span { display:grid; gap:2px; }
 .lounge-training-flip b { font-size:13.5px; }
 .lounge-training-flip small { font-size:12px; opacity:.75; line-height:1.5; }
+
+/* 문화기행·미술사: what the member sees now, the viewing points, and the picture at full size (2026-11-26). */
+.lounge-class-view { gap:8px; padding:8px; }
+.lounge-class-view-picture { position:relative; display:block; width:100%; padding:0; border:0; border-radius:10px; overflow:hidden; background:#000; cursor:zoom-in; }
+.lounge-class-view-picture img { display:block; width:100%; height:clamp(140px,26vh,260px); object-fit:cover; }
+.lounge-class-view-picture span { position:absolute; right:8px; bottom:8px; display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px; background:#000a; color:#fff; font-size:11.5px; }
+.lounge-class-spots { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:thin; }
+.lounge-class-spots button, .lounge-class-spots figure { flex:none; display:grid; gap:3px; width:96px; margin:0; padding:0; border:2px solid transparent; border-radius:9px; background:none; color:#f3f7ff; text-align:left; font:inherit; cursor:pointer; }
+.lounge-class-spots button.active { border-color:#ffd27a; }
+.lounge-class-spots button:disabled { opacity:.6; cursor:default; }
+.lounge-class-spots img, .lounge-class-spot-busy { width:100%; height:64px; object-fit:cover; border-radius:7px; }
+.lounge-class-spot-busy { display:grid; place-items:center; background:#ffffff14; }
+.lounge-class-spots small { padding:0 2px 2px; font-size:10.5px; line-height:1.35; word-break:keep-all; }
+.lounge-class-spots.static { margin:8px 0 4px; }
+.lounge-class-spots.static figure { cursor:default; }
+.lounge-class-spots.static small { color:#fff5e8; opacity:.8; }
+.lounge-class-lightbox { position:fixed; inset:0; z-index:1000; display:grid; place-items:center; align-content:center; gap:10px; padding:20px; background:#000e; cursor:zoom-out; }
+.lounge-class-lightbox img { max-width:min(100%,1100px); max-height:80vh; object-fit:contain; border-radius:6px; }
+.lounge-class-lightbox p { margin:0; color:#eee; font-size:12.5px; text-align:center; }
+.lounge-class-lightbox a { color:#bbb; }
+.lounge-class-lightbox button { position:absolute; top:14px; right:14px; display:grid; place-items:center; width:38px; height:38px; border:0; border-radius:999px; background:#ffffff22; color:#fff; cursor:pointer; }

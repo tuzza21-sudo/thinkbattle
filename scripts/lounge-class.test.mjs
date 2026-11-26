@@ -78,3 +78,26 @@ test('picking starts an item, the first reply starts it and the next ones contin
   assert.match(classes.loungeWritingCritiqueInstructions('logical'), /주장의 명확성/);
   for (const kind of ['emotional', 'logical', 'travel', 'art']) assert.match(classes.loungeClassRules(kind), /지어내지 않/);
 });
+
+test('a culture-trip site has viewing points with pictures; going to one changes the background and the next reply arrives at it (2026-11-26)', () => {
+  const spots = classes.loungeClassSpots('uffizi');
+  assert.ok(spots.length >= 4 && spots.every(spot => spot.image.src.startsWith('/lounge/class/spots/')));
+  for (const site of classes.loungeClassSites) assert.ok(classes.loungeClassSpots(site.id).length >= 1, `${site.id} has a viewing point`);
+  let state = classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'travel'), 'uffizi');
+  assert.equal(classes.loungeClassScene('travel', state).src, images.loungeClassImages.uffizi.src, 'the site behind the class');
+  state = classes.advanceLoungeClass(state).state;
+  assert.equal(classes.pickLoungeClassSpot(state, 'david'), undefined, 'a spot of another site is not taken');
+  state = classes.pickLoungeClassSpot(state, 'birth-venus');
+  assert.equal(classes.loungeClassScene('travel', JSON.parse(JSON.stringify(state))).src, '/lounge/class/spots/birth-venus.webp');
+  const turn = classes.advanceLoungeClass(classes.readLoungeClassState(JSON.parse(JSON.stringify(state)), 'travel'));
+  assert.equal(turn.step, 'spot');
+  const prompt = classes.loungeClassForPrompt(turn.state, turn.step);
+  assert.equal(prompt.spot.name, '보티첼리 "비너스의 탄생"'); assert.equal(prompt.spot.image, undefined);
+  assert.ok(prompt.spots.includes('카라바조 "메두사"'));
+  assert.equal(classes.advanceLoungeClass(turn.state).step, 'continue');
+  assert.equal(classes.pickLoungeClassItem(turn.state, 'duomo').spot, undefined, 'a new site starts at its front');
+  assert.equal(classes.loungeClassScene('art', classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'kiss')).src, images.loungeClassImages.kiss.src);
+  assert.equal(classes.loungeClassScene('art', classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'guernica')), undefined, 'no picture for a work under copyright');
+  assert.match(classes.loungeClassRules('travel'), /step spot/);
+  for (const [id, image] of Object.entries(images.loungeClassImages)) assert.ok(existsSync(fileURLToPath(new URL(`../public${image.src}`, import.meta.url))), id);
+});

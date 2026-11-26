@@ -1,10 +1,10 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, Maximize2, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
-import { requestLoungeClassPick, startLoungeScenario } from '../lib/loungeApi';
+import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } from '../lib/loungeApi';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { loungeClasses, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
+import { loungeClasses, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
 import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeWritingExercise } from '../lib/loungeClassContent';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -33,20 +33,47 @@ export function LoungeClassBar({ kind, roomId, storyState, send, disabled }: { k
   };
   const Icon = kind === 'travel' ? MapPin : kind === 'art' ? Palette : kind === 'logical' ? Newspaper : Feather;
   const image = item && 'image' in item ? item.image : undefined;
+  // What the member sees now: the viewing point they went to, the site, or the work (it is also the room's background).
+  const spots = kind === 'travel' ? loungeClassSpots(state.item) : [];
+  const spot = spots.find(entry => entry.id === state.spot);
+  const scene = loungeClassScene(kind, state);
+  const sceneName = spot?.name ?? titleOf(kind, state.item);
+  const [large, setLarge] = useState<LoungeClassImage | null>(null);
+  const [busySpot, setBusySpot] = useState<string | null>(null);
+  const setStateOverride = (next: LoungeClassState) => setOverride(next);
+  const visit = async (id: string, name: string) => {
+    setBusySpot(id);
+    try { const { state: next } = await requestLoungeClassSpot(roomId, id); setOverride(readLoungeClassState(next, kind)); await send?.(`${name} 보러 가요.`); }
+    catch { /* the strip stays as it was */ }
+    finally { setBusySpot(null); }
+  };
   return <div className="lounge-lesson-bar lounge-class-bar">
     <div className="lounge-lesson-head">
       <Icon size={16} />
       <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind)}</b></span>
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind)}</button>
     </div>
-    {item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
-      {image && <img src={image.src} alt="" loading="lazy" />}
-      <div>
-        {'task' in item ? <><p className="lounge-lesson-scene"><span>과제</span>{item.task}</p><p className="lounge-lesson-meaning"><span>분량</span>{item.length} · {item.focus.join(' · ')}</p></>
-          : 'city' in item ? <p className="lounge-lesson-scene"><span>{item.city}</span>{item.summary}</p>
-          : <p className="lounge-lesson-scene"><span>{item.year}</span>{item.artist} · {item.movement}</p>}
-      </div>
+    {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
+      <div><p className="lounge-lesson-scene"><span>과제</span>{item.task}</p><p className="lounge-lesson-meaning"><span>분량</span>{item.length} · {item.focus.join(' · ')}</p></div>
     </section>}
+    {item && !('task' in item) && scene && <section className="lounge-lesson-task lounge-class-view" aria-label="지금 보는 곳">
+      <button type="button" className="lounge-class-view-picture" onClick={() => setLarge(scene)} aria-label="크게 보기">
+        <img src={scene.src} alt={sceneName} /><span><Maximize2 size={14} /> 크게 보기</span>
+      </button>
+      <p className="lounge-lesson-scene"><span>{spot ? '지금 보는 것' : 'city' in item ? item.city : item.year}</span>{spot ? `${spot.name} · ${spot.note}` : 'city' in item ? item.summary : `${item.artist} · ${item.movement}`}</p>
+      {spots.length > 0 && <div className="lounge-class-spots" role="group" aria-label="꼭 봐야 할 곳">
+        <button type="button" className={!spot ? 'active' : ''} disabled={busySpot !== null || disabled} onClick={() => setStateOverride({ ...state, spot: undefined })}>
+          {image && <img src={image.src} alt="" loading="lazy" />}<small>{titleOf(kind, state.item).split(' (')[0]}</small></button>
+        {spots.map(entry => <button key={entry.id} type="button" className={spot?.id === entry.id ? 'active' : ''} disabled={busySpot !== null || disabled} onClick={() => void visit(entry.id, entry.name)}>
+          {busySpot === entry.id ? <span className="lounge-class-spot-busy"><LoaderCircle size={16} className="lounge-spin" /></span> : <img src={entry.image.src} alt="" loading="lazy" />}<small>{entry.name}</small>
+        </button>)}
+      </div>}
+    </section>}
+    {large && <div className="lounge-class-lightbox" role="dialog" aria-modal="true" aria-label={sceneName} onClick={() => setLarge(null)}>
+      <img src={large.src} alt={sceneName} />
+      <p><b>{sceneName}</b> · <a href={large.source} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()}>{large.credit} · {large.license} · Wikimedia Commons</a></p>
+      <button type="button" aria-label="닫기" onClick={() => setLarge(null)}><X size={20} /></button>
+    </div>}
     {!item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? '문화기행 지도에서 가 보고 싶은 명소를 골라요. 한지오가 그곳에 함께 서서 안내해요.' : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
     {open && <LoungeClassBoard kind={kind} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
   </div>;
@@ -110,8 +137,10 @@ function LoungeClassBoard({ kind, roomId, state, onPicked, onClose, disabled }: 
 }
 
 function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.ReactNode }) {
+  const spots = loungeClassSpots(site.id);
   return <div className="lounge-memory-panel lounge-class-detail">
     {site.image && <figure><img src={site.image.src} alt={site.name} /><figcaption><Credit image={site.image} /></figcaption></figure>}
+    {spots.length > 0 && <div className="lounge-class-spots static" aria-label="꼭 봐야 할 곳 미리 보기">{spots.map(entry => <figure key={entry.id}><img src={entry.image.src} alt={entry.name} loading="lazy" /><small>{entry.name}</small></figure>)}</div>}
     <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
     <p className="lounge-class-lead">{site.summary}</p>
     <h4>배경과 역사</h4><p>{site.history}</p>

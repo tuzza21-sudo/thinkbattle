@@ -11,7 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { advanceLoungeClass, isLoungeClass, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
+import { advanceLoungeClass, isLoungeClass, pickLoungeClassSpot, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
 import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
 import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
@@ -822,7 +822,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string; story_state?: unknown }>>(roomResponse, 'lounge') : [];
       if (!mine || mine.host_id !== user.id || !isLoungeClass(mine.host_persona)) return json({ error: '클래스 방에서만 쓸 수 있어요.' }, 403);
       const kind = loungeClasses[mine.host_persona].kind;
-      const state = pickLoungeClassItem(readLoungeClassState(mine.story_state, kind), typeof body.item === 'string' ? body.item : '');
+      const current = readLoungeClassState(mine.story_state, kind);
+      // A viewing point of the site the member is at, or a new assignment, site or work.
+      const state = typeof body.spot === 'string' ? pickLoungeClassSpot(current, body.spot) : pickLoungeClassItem(current, typeof body.item === 'string' ? body.item : '');
       if (!state) return json({ error: '고른 항목을 찾지 못했어요.' }, 400);
       const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
       if (!saved.ok) return json({ error: '잠시 뒤 다시 골라 주세요.' }, 502);
