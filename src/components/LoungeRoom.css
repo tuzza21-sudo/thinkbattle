@@ -1322,3 +1322,34 @@
   .lounge-lesson-task p { font-size:13px; }
   .lounge-lesson-summary b { font-size:15px; }
 }
+
+/* 영어 수업: an expression's nuance, similar expressions and (문정우) why Koreans mix it up (2026-11-26). */
+.lounge-lesson-notes-box { display:grid; gap:4px; padding:8px 10px; border-left:2px solid #8fd3ff66; border-radius:0 8px 8px 0; background:#ffffff08; }
+.lounge-lesson-notes-box p { margin:0; font-size:12.5px !important; line-height:1.6; }
+.lounge-lesson-notes-box p > span:first-child { display:block; font-size:10.5px; font-weight:700; color:#9fb6cc; }
+.lounge-lesson-alt b { color:#ffe3a3; font-weight:600; }
+.lounge-lesson-alt small { opacity:.75; }
+.lounge-lesson-confusion > span:first-child { color:#ffb38a !important; }
+.lounge-lesson-list .lounge-lesson-notes-box { margin:2px 0; }
+
+/* 실전 훈련 (2026-11-26): the training's status, result and setup. */
+.lounge-training-status .lounge-lesson-scene b, .lounge-training-result b { color:#ffe3a3; }
+.lounge-training-meter { display:grid; gap:4px; }
+.lounge-training-meter i { display:block; height:8px; border-radius:999px; background:#ffffff26; overflow:hidden; }
+.lounge-training-meter i span { display:block; height:100%; background:linear-gradient(90deg,#8fd3ff,#9fd8a8); }
+.lounge-training-meter small { font-size:12.5px; }
+.lounge-training-tips { display:grid; gap:5px; margin:2px 0 0; padding-left:16px; font-size:12.5px; line-height:1.55; }
+.lounge-training-tips b { margin-right:4px; color:#9fd8a8; }
+.lounge-training-scores { display:grid; gap:7px; margin:0; padding-left:18px; font-size:12.5px; }
+.lounge-training-scores li { display:grid; grid-template-columns:1fr 70px 28px; align-items:center; gap:4px 8px; }
+.lounge-training-scores li > span { grid-column:1 / -1; line-height:1.5; opacity:.9; }
+.lounge-training-scores li i { grid-column:1 / 3; height:6px; border-radius:999px; background:#ffffff26; overflow:hidden; }
+.lounge-training-scores li i span { display:block; height:100%; background:#8fd3ff; }
+.lounge-training-scores li.weak i span { background:#ff9b8a; }
+.lounge-training-scores li.best i span { background:#9fd8a8; }
+.lounge-training-scores li small { grid-column:1 / -1; opacity:.75; }
+.lounge-training-choices { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; }
+.lounge-training-choices button { display:grid; gap:2px; padding:9px 10px; border:1px solid #ffffff24; border-radius:10px; background:transparent; color:#fff5e8; text-align:left; font:inherit; cursor:pointer; }
+.lounge-training-choices button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; }
+.lounge-training-choices small { font-size:11px; opacity:.7; }
+.lounge-training-levels { grid-template-columns:repeat(3,1fr); }

@@ -11,6 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
+import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
@@ -510,7 +511,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -781,25 +782,66 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona`, { headers });
       const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string }>>(roomResponse, 'lounge') : [];
       if (!mine || mine.host_id !== user.id || !isLoungeTutor(mine.host_persona)) return json({ error: '영어 수업에서만 쓸 수 있어요.' }, 403);
-      const [itemsResponse, profileResponse] = await Promise.all([
-        fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&importance=is.null&select=*&order=created_at.desc&limit=30`, { headers: serviceHeaders }),
+      const itemsFor = (filter: string) => fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&${filter}&select=*&order=created_at.desc&limit=20`, { headers: serviceHeaders });
+      // With the nuance columns (migration 20270119000000) an expression rated before them is written again; without, only the ratings.
+      const [fullResponse, profileResponse] = await Promise.all([
+        itemsFor('or=(importance.is.null,nuance.is.null)'),
         fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=level`, { headers: serviceHeaders }),
       ]);
-      // Before the migration the column is not there: nothing to fill in.
+      const nuanceColumns = fullResponse.ok;
+      const itemsResponse = nuanceColumns ? fullResponse : await itemsFor('importance=is.null');
+      // Before migration 20270118000000 the columns are not there: nothing to fill in.
       if (!itemsResponse.ok) return json({ updated: 0 });
       const items = await readJson<LoungeLessonItem[]>(itemsResponse, 'lounge');
       if (!items.length) return json({ updated: 0 });
       const level = readLoungeLessonLevel(profileResponse.ok ? (await readJson<Array<{ level?: string }>>(profileResponse, 'lounge'))[0]?.level : undefined);
       const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
-        model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 6000, store: false, prompt_cache_key: 'lounge-lesson-enrich',
+        model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 8000, store: false, prompt_cache_key: 'lounge-lesson-enrich',
         instructions: loungeLessonEnrichInstructions, input: JSON.stringify(loungeLessonEnrichInput(level, items)),
         text: { format: { type: 'json_schema', name: 'lounge_lesson_enrich', strict: true, schema: loungeLessonEnrichSchema } },
-      }), undefined, 45_000), 'openai');
-      const rows = readLoungeLessonEnrich(JSON.parse(modelOutputText(result) ?? '{}'), items);
+      }), undefined, 60_000), 'openai');
+      const rows = readLoungeLessonEnrich(JSON.parse(modelOutputText(result) ?? '{}'), items)
+        .map(({ nuance, alternatives, confusion, ...rest }) => nuanceColumns ? { ...rest, nuance: nuance ?? '', alternatives: alternatives ?? [], confusion: confusion ?? '' } : rest);
       const saved = await Promise.all(rows.map(({ id, ...fields }) => fetchTimed(`${url}/rest/v1/lounge_english_items?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(user.id)}`, {
         method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(fields) }).then(response => response.ok, () => false)));
       console.info('[Lounge lesson]', JSON.stringify({ enrich: items.length, saved: saved.filter(Boolean).length }));
       return json({ updated: saved.filter(Boolean).length });
+    }
+
+    // 실전 훈련 (loungeTraining.ts): a new negotiation (the counterpart's limit and need drawn now, kept in the room) or a new
+    // interview (its questions written now from the job, the posting and the member's summary), set as the room's state.
+    if (body.action === 'training-start') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id || !isLoungeTrainer(mine.host_persona)) return json({ error: '실전 훈련 방에서만 쓸 수 있어요.' }, 403);
+      const setup = body.setup && typeof body.setup === 'object' ? body.setup as Record<string, unknown> : {};
+      let state: LoungeTrainingState | undefined;
+      if (loungeTrainers[mine.host_persona].kind === 'negotiation') state = startLoungeNegotiation(setup);
+      else {
+        const interview = readLoungeInterviewSetup(setup);
+        if (!interview) return json({ error: '지원 직무를 적어 주세요.' }, 400);
+        const questions = await (async () => {
+          try {
+            const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+              model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 3000, store: false, prompt_cache_key: 'lounge-interview-questions',
+              instructions: loungeInterviewQuestionsInstructions, input: JSON.stringify(loungeInterviewQuestionsInput(interview)),
+              text: { format: { type: 'json_schema', name: 'lounge_interview_questions', strict: true, schema: loungeInterviewQuestionsSchema } },
+            }), undefined, 40_000), 'openai');
+            return readLoungeInterviewQuestions(JSON.parse(modelOutputText(result) ?? '{}'), interview);
+          } catch (error) {
+            console.warn('[Lounge training] questions not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error');
+            return readLoungeInterviewQuestions(undefined, interview);
+          }
+        })();
+        state = startLoungeInterview(interview, questions);
+      }
+      if (!state) return json({ error: '협상 상황을 골라 주세요.' }, 400);
+      const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
+      if (!saved.ok) return json({ error: '훈련을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, 502);
+      console.info('[Lounge training]', JSON.stringify({ start: state.kind, ...(state.kind === 'negotiation' ? { scenario: state.scenario, level: state.level } : { questions: state.questions.length, pressure: state.setup.pressure }) }));
+      return json({ state });
     }
 
     if (body.action === 'call-tick') {
@@ -810,7 +852,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const [room] = await readJson<Array<{ host_id: string; host_persona?: string; capacity: number; space_id?: string | null; status: string; voice_on?: boolean | null }>>(roomResponse, 'lounge');
       if (!room || room.host_id !== user.id || room.capacity !== 1 || room.space_id || room.status !== 'active' || room.voice_on === false) return json({ call: null });
       // English lessons are free while they are tried out (2026-11-25, by the owner): their calls are not counted.
-      if (isLoungeTutor(room.host_persona)) return json({ call: null });
+      if (isLoungeTutor(room.host_persona) || isLoungeTrainer(room.host_persona)) return json({ call: null });
       return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }).catch(() => null) });
     }
 
@@ -1184,6 +1226,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const scenario = personaStory ? loungePersonaStoryScenario(personaStory, memberPersona) : roomScenario;
     // An English tutor's room is a lesson, not a scene: no analyzer, no scene moves, no inner voice and no photos.
     const lessonRoom = Boolean(lessonRead) && solo;
+    // 실전 훈련 (loungeTraining.ts): the same, for 강무진's negotiation and 백도하's interview.
+    const trainingRoom = solo && !room.space_id && isLoungeTrainer(room.host_persona);
+    const practiceRoom = lessonRoom || trainingRoom;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
@@ -1226,7 +1271,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const pendingContext = pendingTurns.map(item => ({ turn: item.turn, user: item.user_text, character: splitLoungeInnerVoice(item.reply).reply }));
 
     // The member hides inner voices (대화 설정 › 속마음): the reply writes none, and they show in what is said instead.
-    const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' || lessonRoom ? 'off' : 'on';
+    const innerVoiceMode: 'on' | 'off' = body.innerVoice === 'off' || practiceRoom ? 'off' : 'on';
     // Every character with adult flirtation has it, a character a member made included (2026-11-18, by the owner): its sheet is an adult of 20 to 80 and the AI review at creation turns away anyone who reads as a minor; the member chose flirtation for it.
     // A phone call has it too (2026-11-03): it is the same room, and a GPT-answered call kept refusing.
     const adultMode = Boolean(relationship?.config.adultFlirtation && solo && !room.space_id && await adultUnlocked);
@@ -1274,7 +1319,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const longMemory = relationship && memoryRows ? selectMemoriesForPrompt(memoryRows, relationship.config.characterId, relationship.now, relevance, memoryLimits) : undefined;
     const analyzerStarted = performance.now();
     const skipAnalyzer = loungeSkipsAnalyzer(companionState, adultMode && stageNumber === 4, messages[0]?.kind === 'human' ? String(messages[0].text ?? '') : '', companionTurn);
-    const analyzerRead = !skipAnalyzer && !lessonRoom && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
+    const analyzerRead = !skipAnalyzer && !practiceRoom && companionChat && companionState && process.env.LOUNGE_ANALYZER !== 'off' && messages[0]?.kind === 'human' ? (async () => {
       const state = currentRelationshipContext();
       const characterReading = companionCharacter ? { name: companionCharacter.name, role: companionCharacter.role,
         personality: companionCharacter.personality, lens: companionCharacter.bible?.interpretationLens,
@@ -1569,9 +1614,46 @@ ${photoRule}`;
           body: JSON.stringify({ user_id: user.id, expression: keep.expression, meaning: keep.meaning, level: loungeLessonLevel(level).target, source: 'upgrade' }) })] : []),
       ]);
       console.info('[Lounge lesson]', JSON.stringify({ host: host.id, step: turn.step, phase: turn.state.phase, graded: grade ? { target: grade.target, intent: grade.intent, free: grade.free_used.length, errors: grade.errors.length } : null, gradeMs: grade ? Math.round(performance.now() - graded) : 0, verdicts: turn.verdicts.map(entry => entry.verdict), kept: Boolean(keep), done: turn.state.done.length, queue: turn.state.queue.length }));
-      return { prompt: loungeLessonForPrompt(turn, level, grade), state: turn.state };
+      return { prompt: loungeLessonForPrompt(turn, level, grade, host.id), state: turn.state };
     })().catch(error => { console.warn('[Lounge lesson] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
-    const sceneFound = companionChat && companionState && !lessonRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
+    // 실전 훈련: the member's words are judged (in a negotiation the number and the moves, in an interview the answer's
+    // scores and gaps) while the rest loads; code takes the counterpart's or the interviewer's next move and the reply says it.
+    const trainingWork = trainingRoom ? (async () => {
+      const kind = loungeTrainers[room.host_persona as LoungeTrainerId].kind;
+      const prior = readLoungeTrainingState(room.story_state);
+      const state = prior?.kind === kind ? prior : undefined;
+      if (!state || !serviceHeaders) return { prompt: loungeTrainingForPrompt(kind, undefined, 'setup'), state: undefined };
+      const opening = body.reason === 'opening' && !lastHuman;
+      // A call or a chat opened in the middle: the training goes on where it is, nothing is judged.
+      if (opening && state.opened) return { prompt: loungeTrainingForPrompt(kind, state, state.phase === 'done' ? 'review' : 'answer'), state: undefined };
+      const judge = !opening && state.opened && state.phase === 'talk' && lastHuman;
+      const started = performance.now();
+      const ask = async (instructions: string, input: unknown, name: string, schema: unknown) => {
+        const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+          model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 1500 : 700, store: false, prompt_cache_key: `lounge-${name}`,
+          instructions, input: JSON.stringify(input), text: { format: { type: 'json_schema', name, strict: true, schema } },
+        }), undefined, chat ? 20_000 : 8_000), 'openai');
+        return JSON.parse(modelOutputText(result) ?? '');
+      };
+      const graded = async <T,>(task: () => Promise<T>) => { try { return await task(); } catch (error) { console.warn('[Lounge training] not graded', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; } };
+      let next: LoungeTrainingState, step: string, revealed: string | undefined;
+      if (state.kind === 'negotiation') {
+        const grade = judge ? await graded(async () => readLoungeNegotiationGrade(await ask(loungeNegotiationGradeInstructions, loungeNegotiationGradeInput(state, lastHuman), 'lounge_negotiation_grade', loungeNegotiationGradeSchema))) : undefined;
+        const turn = advanceLoungeNegotiation(state, grade);
+        next = turn.state; step = turn.step; revealed = turn.revealed;
+        console.info('[Lounge training]', JSON.stringify({ host: host.id, step, round: turn.state.rounds, offer: grade?.offer ?? null, tactics: grade?.tactics ?? [], gradeMs: Math.round(performance.now() - started) }));
+      } else {
+        const grade = judge ? await graded(async () => readLoungeInterviewGrade(await ask(loungeInterviewGradeInstructions, loungeInterviewGradeInput(state, lastHuman), 'lounge_interview_grade', loungeInterviewGradeSchema))) : undefined;
+        const turn = advanceLoungeInterview(state, grade, lastHuman);
+        next = turn.state; step = turn.step;
+        console.info('[Lounge training]', JSON.stringify({ host: host.id, step, question: turn.state.index, gaps: grade?.gaps ?? [], gradeMs: Math.round(performance.now() - started) }));
+      }
+      const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: next }) })
+        .then(response => response.ok, () => false);
+      if (!saved) console.warn('[Lounge training] not saved');
+      return { prompt: loungeTrainingForPrompt(kind, next, step, { revealed }), state: next };
+    })().catch(error => { console.warn('[Lounge training] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
+    const sceneFound = companionChat && companionState && !practiceRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, userText: lastHuman, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
     const agreedSpeech = companionState ? loungeRoomSpeechLevel(companionState) : undefined;
@@ -1650,6 +1732,7 @@ ${photoRule}`;
     // reasoning, Gemini Pro) answers chats only; a voice reply uses its faster fallback instead of a long silence.
     const lessonTurn = lessonWork ? await lessonWork : undefined;
     const lessonPrompt = lessonTurn?.prompt;
+    const trainingTurn = trainingWork ? await trainingWork : undefined;
     const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
     const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
     // How hard the reasoning model thinks: medium by default, LOUNGE_REPLY_REASONING (low, medium, high) changes it.
@@ -1657,7 +1740,7 @@ ${photoRule}`;
     // In a chat the character may send a photo with the reply: the call after it writes the scene the reply shows being
     // sent. Photos are kept per member, so a guest's character does not offer them; a member's character sends photos
     // only when its portrait was made by the AI (an uploaded portrait is never used to make photos).
-    const chatPhotos = split && chat && !user.is_anonymous && !lessonRoom && (!custom || custom.portrait_source === 'ai');
+    const chatPhotos = split && chat && !user.is_anonymous && !practiceRoom && (!custom || custom.portrait_source === 'ai');
     const modelRequest = {
       // Without the split, the reply, a memory of up to 600 characters and (for relationship characters) the classified
       // events share this budget. A worst case measured about 680 tokens, so leave generous headroom.
@@ -1679,6 +1762,7 @@ ${photoRule}`;
           : [roleInstruction, ...(solo && !room.space_id ? [soloInputFieldRules] : [])].filter(Boolean).join('\n'),
         consultRoom ? loungeConsultRules : '',
         lessonRoom ? loungeLessonRules : '',
+        trainingRoom ? loungeTrainingRules(loungeTrainers[room.host_persona as LoungeTrainerId].kind) : '',
         // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
         relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
         // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.
@@ -1686,7 +1770,7 @@ ${photoRule}`;
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       // Finish a companion's context with what was actually said, rather than an older intention or a retrieved card.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(trainingTurn ? { training: trainingTurn.prompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
         ? loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
@@ -2012,7 +2096,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         .catch(() => { console.warn('[Lounge speech] allowance not read, speaking anyway'); })
       : Promise.resolve();
     // Past the month's minutes of calls (unless LOUNGE_CALL_LIMITS=off) the call's replies stay text, the same way a used premium voice does.
-    const callGate: Promise<void> | undefined = phoneCall && !lessonRoom && loungeCallLimitsOn(process.env) && !user.is_anonymous
+    const callGate: Promise<void> | undefined = phoneCall && !practiceRoom && loungeCallLimitsOn(process.env) && !user.is_anonymous
       ? callService('lounge_call_status', { p_user: user.id }).then(state => {
         if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.tester ? '이번 달 베타테스터 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.legacy ? '이번 달 통화 시간을 다 썼어요. 다음 달에 다시 쓸 수 있어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
       }).catch(() => { console.warn('[Lounge call] allowance not read, speaking anyway'); })
@@ -2548,6 +2632,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             if (consultSaved) send({ type: 'story', state: consultSaved });
             // The lesson's task card moves with the reply, not at the room's next reload.
             if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
+            if (trainingTurn?.state) send({ type: 'story', state: trainingTurn.state });
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
             // A chat gets the text alone; the voice reads the words without the *actions*.
@@ -2605,6 +2690,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // Where the story is now, so the choices the reply put to the member show without waiting for the room's reload.
             if (storySaved) send({ type: 'story', state: storySaved });
             if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
+            if (trainingTurn?.state) send({ type: 'story', state: trainingTurn.state });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
             // Only a photo of the character can be made (from their reference photos): on 2026-11-01 a member asked 한지오
             // to take their picture and got his, twice. So the call names who is in it, and anything else makes none.
