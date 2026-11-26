@@ -22,7 +22,7 @@ function run(config, turns, start = createRelationship(config)) {
 const withScores = (config, scores, stage) => ({ ...createRelationship(config), scores: { ...createRelationship(config).scores, ...scores }, ...(stage ? { stage } : {}) });
 
 const uniqueMetricOf = { closer: ['nerve', '배짱'], diplomat: ['banter', '티키타카'], auditor: ['candor', '솔직함'], trickster: ['mental', '멘탈'],
-  velvet: ['boldness', '대담함'], ina: ['banter', '티키타카'], jaeseok: ['viewpoint', '시선'], guide: ['pace', '발걸음'], shaman: ['banter', '기싸움'], poker: ['judgment', '맞수'], teacher: ['tension', '긴장감'], interpreter: ['clarity', '분명함'] };
+  velvet: ['boldness', '대담함'], ina: ['banter', '티키타카'], jaeseok: ['viewpoint', '시선'], guide: ['pace', '발걸음'], shaman: ['banter', '기싸움'], poker: ['judgment', '맞수'], teacher: ['tension', '긴장감'], interpreter: ['clarity', '분명함'], explorer: ['rope', '자일'] };
 const retiredNow = ['PLAYS_ALONG', 'SHOWS_CURIOSITY', 'ASKS_GOOD_QUESTION', 'ANSWERS_DIRECTLY', 'CORRECTS_UNDERSTANDING', 'SHOWS_COMPOSURE', 'SHOWS_DECISIVENESS', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'MAKES_CREATIVE_JOKE'];
 const warm = [['SHARES_FEELING'], ['SHOWS_CARE'], [], ['REMEMBERS_DETAIL'], ['FLIRTS_PLAYFULLY'], [], ['KEEPS_PROMISE'], ['SHOWS_VULNERABILITY'], [], ['APPRECIATES_SINCERELY'], ['BUILDS_ON_INSIDE_JOKE'], []];
 const templated = () => relationship.relationshipTemplateIds.map(id => relationship.relationshipFromTemplate(id, { characterId: `c_${id}`, displayName: id, core: ['다정하다'], flirtation: true }));
