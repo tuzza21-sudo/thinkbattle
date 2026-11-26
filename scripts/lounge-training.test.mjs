@@ -153,3 +153,34 @@ test('an English expression\'s nuance and similar expressions are said once it i
   assert.equal(lesson.loungeLessonForPrompt(given, 'B1', undefined, 'teachertutor').target.alternatives[0].expression, 'think of');
   assert.match(lesson.loungeLessonRules, /why_koreans_mix_it_up/);
 });
+
+test('a negotiation of the member\'s own: a built-in one edited keeps its room to give, a written one gets a limit on the right side; the debrief has sentences and advice (2026-11-26)', () => {
+  const base = training.loungeNegotiationScenario('usedcar');
+  const edited = training.editLoungeNegotiationScenario(base, { context: '2019년식 SUV, 판매자가 2,900만 원을 불렀다.', opening: '2,900', counterpart: { name: '김 사장' } });
+  assert.equal(edited.opening, 2900); assert.equal(edited.counterpart.name, '김 사장'); assert.equal(edited.counterpart.role, base.counterpart.role);
+  const ratio = 2900 / base.opening;
+  assert.ok(Math.abs(edited.reservation[0] - base.reservation[0] * ratio) <= edited.step && edited.reservation[1] < 2900);
+  let state = training.startLoungeNegotiation({ scenario: 'usedcar', level: 'normal' }, () => 0.5, new Date(), edited);
+  assert.equal(state.custom.opening, 2900); assert.equal(state.theirs[0], 2900);
+  assert.ok(training.readLoungeTrainingState(JSON.parse(JSON.stringify(state))), 'kept across the room\'s state');
+  assert.equal(training.loungeTrainingForPrompt('negotiation', training.advanceLoungeNegotiation(state, undefined).state, 'open').scenario.context, edited.context);
+  // A written one: a limit on the wrong side of the first number is set by code.
+  const wrote = training.readLoungeNegotiationCustom({ title: '이사 견적', role: 'buyer', member: '이사를 앞둔 사람', counterpart_name: '정 실장', counterpart_role: '이사 업체 영업', counterpart_style: '바쁘다며 서두른다',
+    context: '포장이사 220만 원을 불렀다.', unit: '만원', opening: 220, reservation_low: 260, reservation_high: 300, interests: ['그날 일정이 비어 있다'], trades: ['평일 이사', '현금 결제'] }, { situation: '포장이사 견적이 220만 원', side: 'buyer', unit: '만원', opening: '220' });
+  assert.equal(wrote.role, 'buyer'); assert.equal(wrote.opening, 220);
+  assert.ok(wrote.reservation[0] < 220 && wrote.reservation[1] < 220 && wrote.reservation[0] <= wrote.reservation[1], 'below the first number for a buyer');
+  assert.equal(training.readLoungeNegotiationCustom({ context: '' }, { situation: 'x' }), undefined, 'no number, no negotiation');
+  assert.equal(training.readLoungeNegotiationCustom({ role: 'seller', opening: 5000, context: '연봉 5,000만 원 제시', reservation_low: 5400, reservation_high: 5800 }, { situation: '연봉 협상' }).role, 'seller');
+  // The debrief: missed moves with sentences, advice from what happened.
+  state = training.advanceLoungeNegotiation(state, undefined).state;
+  state = training.advanceLoungeNegotiation(state, { intent: 'negotiate', offer: null, tactics: [], caved: true, asked_interest: false }).state;
+  const done = training.advanceLoungeNegotiation(state, { intent: 'accept', offer: null, tactics: [], caved: false, asked_interest: false }).state;
+  const titles = done.result.advice.map(item => item.title);
+  assert.ok(titles.includes('압박에는 질문으로 버티기') && titles.includes('목표보다 유리한 첫 숫자'));
+  assert.ok(done.result.advice.length <= 4 && done.result.advice.every(item => item.phrases.length));
+  const prompt = training.loungeTrainingForPrompt('negotiation', done, 'deal');
+  assert.ok(prompt.result.missed[0].say_like_this.length >= 1 && prompt.result.missed[0].avoid);
+  assert.ok(prompt.result.advice.length >= 2);
+  assert.match(training.loungeTrainingRules('negotiation'), /say_like_this/);
+  for (const tactic of Object.values(training.loungeNegotiationTactics)) assert.ok(tactic.phrases.length >= 1 && tactic.avoid, tactic.label);
+});

@@ -13,11 +13,23 @@ import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScena
 import { loungeGroupRoomsEnabled, loungeHouseGender, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
 /** The buttons under "누구와 이야기할까요?": all, men, women, the new ones (2026-11-17). */
-export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'training', label: '실전 훈련' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
+export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'training', label: '실전체험' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
 /**
- * 실전 훈련 (2026-11-26, by the owner): the characters who also train the member for real situations, with what each
+ * 실전체험 (2026-11-26, by the owner; was 실전 훈련): the characters who train the member for real situations, with what each
  * trains. `ready` is false while the training is still being made: the card says so and opens the character's page.
  */
+/** The 실전체험 segments (2026-11-26, by the owner): what to practise, and who teaches it. */
+export const loungeExperienceSegments = [
+  { id: 'all', label: '전체', ids: [] as string[] },
+  { id: 'english', label: '실전영어', ids: ['teacher', 'interpreter'] },
+  { id: 'negotiation', label: '협상', ids: ['closer'] },
+  { id: 'interview', label: '면접', ids: ['trickster'] },
+  { id: 'writing', label: '글쓰기', ids: ['ina', 'diplomat'] },
+  { id: 'literature', label: '문학', ids: ['ina'] },
+  { id: 'travel', label: '여행', ids: ['guide'] },
+  { id: 'art', label: '미술', ids: ['velvet'] },
+] as const;
+export type LoungeExperienceSegment = typeof loungeExperienceSegments[number]['id'];
 export const loungeTrainingCast = [
   { id: 'teacher', label: '영어 말하기 코치 · B1→B2', ready: true },
   { id: 'interpreter', label: '영어 뉘앙스·통역 · B2→C1', ready: true },
@@ -161,7 +173,9 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   // The filter: "전체" is the row as it was; 남성/여성 look through the new characters too; 신규 shows the new ones, which also stay on their own row below.
   const [castFilter, setCastFilter] = useState<LoungeCastFilter>('all');
   const newHouseCast = loungeNewCharacters.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
-  const trainingCast = loungeTrainingCast.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
+  const [segment, setSegment] = useState<LoungeExperienceSegment>('all');
+  const segmentIds: readonly string[] = loungeExperienceSegments.find(item => item.id === segment)?.ids ?? [];
+  const trainingCast = loungeTrainingCast.filter(item => !segmentIds.length || segmentIds.includes(item.id)).map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
   const shownCast = castFilter === 'all' ? lobbyCast : castFilter === 'new' ? newHouseCast : castFilter === 'training' ? trainingCast : [...lobbyCast, ...newHouseCast].filter(character => loungeHouseGender(character.id) === castFilter);
   const shownMemberCast = memberCast.rows.filter(row => {
     const isNewPublic = newIds.has(row.id) && row.status === 'public';
@@ -215,6 +229,9 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
       <div className="lounge-cast-filter" role="group" aria-label="캐릭터 필터">
         {loungeCastFilters.map(filter => <button key={filter.id} type="button" aria-pressed={castFilter === filter.id} onClick={() => setCastFilter(filter.id)}>{filter.label}</button>)}
       </div>
+      {castFilter === 'training' && <div className="lounge-cast-filter lounge-cast-segments" role="group" aria-label="실전체험 분야">
+        {loungeExperienceSegments.map(item => <button key={item.id} type="button" aria-pressed={segment === item.id} onClick={() => setSegment(item.id)}>{item.label}</button>)}
+      </div>}
       {shownCast.length + shownMemberCast.length === 0 ? <p className="lounge-cast-empty" role="status">조건에 맞는 캐릭터가 아직 없어요.</p> : <LoungeRow key={castFilter} label="캐릭터" className="lounge-cast-row">
         {shownCast.map(character => {
           const host = getLoungeHost(character.id), count = tables?.filter(table => table.host_persona === character.id).length ?? 0;

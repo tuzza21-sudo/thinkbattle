@@ -13,6 +13,7 @@ import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHou
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
 import { advanceLoungeClass, isLoungeClass, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
 import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
+import { editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
@@ -836,7 +837,29 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!mine || mine.host_id !== user.id || !isLoungeTrainer(mine.host_persona)) return json({ error: '실전 훈련 방에서만 쓸 수 있어요.' }, 403);
       const setup = body.setup && typeof body.setup === 'object' ? body.setup as Record<string, unknown> : {};
       let state: LoungeTrainingState | undefined;
-      if (loungeTrainers[mine.host_persona].kind === 'negotiation') state = startLoungeNegotiation(setup);
+      if (loungeTrainers[mine.host_persona].kind === 'negotiation') {
+        if (setup.scenario === 'custom') {
+          // A negotiation the member wrote (2026-11-26): the counterpart's hidden limit and need are written for it, checked by code.
+          if (String(setup.situation ?? '').trim().length < 10) return json({ error: '협상 상황을 조금 더 자세히 적어 주세요.' }, 400);
+          const custom = await (async () => {
+            try {
+              const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+                model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 2000, store: false, prompt_cache_key: 'lounge-negotiation-custom',
+                instructions: loungeNegotiationCustomInstructions, input: JSON.stringify(loungeNegotiationCustomInput(setup)),
+                text: { format: { type: 'json_schema', name: 'lounge_negotiation_custom', strict: true, schema: loungeNegotiationCustomSchema } },
+              }), undefined, 30_000), 'openai');
+              return readLoungeNegotiationCustom(JSON.parse(modelOutputText(result) ?? '{}'), setup);
+            } catch (error) { console.warn('[Lounge training] custom scenario not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
+          })();
+          if (!custom) return json({ error: '상대의 첫 제안 숫자와 상황을 조금 더 적어 주세요.' }, 422);
+          state = startLoungeNegotiation(setup, Math.random, new Date(), custom);
+        } else {
+          // A built-in situation edited to the member's own.
+          const base = loungeNegotiationScenario(typeof setup.scenario === 'string' ? setup.scenario : undefined);
+          const edit = setup.edit && typeof setup.edit === 'object' ? setup.edit as Record<string, unknown> : undefined;
+          state = startLoungeNegotiation(setup, Math.random, new Date(), base && edit ? editLoungeNegotiationScenario(base, edit) : undefined);
+        }
+      }
       else {
         const interview = readLoungeInterviewSetup(setup);
         if (!interview) return json({ error: '지원 직무를 적어 주세요.' }, 400);
@@ -858,7 +881,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!state) return json({ error: '협상 상황을 골라 주세요.' }, 400);
       const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
       if (!saved.ok) return json({ error: '훈련을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, 502);
-      console.info('[Lounge training]', JSON.stringify({ start: state.kind, ...(state.kind === 'negotiation' ? { scenario: state.scenario, level: state.level } : { questions: state.questions.length, pressure: state.setup.pressure }) }));
+      console.info('[Lounge training]', JSON.stringify({ start: state.kind, ...(state.kind === 'negotiation' ? { scenario: state.custom?.id ?? state.scenario, level: state.level } : { questions: state.questions.length, pressure: state.setup.pressure }) }));
       return json({ state });
     }
 

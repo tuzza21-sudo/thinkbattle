@@ -5105,7 +5105,7 @@ test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 �
   assert.deepEqual(['ina', 'velvet', 'diplomat', 'teacher'].map(id => lounge.loungeHouseGender(id)), Array(4).fill('female'));
   assert.equal(lounge.loungeHouseGender('c_someone'), undefined, 'a member\'s character has its own gender in its sheet');
   const home = readFileSync(new URL('../src/components/LoungeSpaces.tsx', import.meta.url), 'utf8');
-  assert.match(home, /\{ id: 'all', label: '전체' \}, \{ id: 'training', label: '실전 훈련' \}, \{ id: 'male', label: '남성' \}, \{ id: 'female', label: '여성' \}, \{ id: 'new', label: '신규' \}/);
+  assert.match(home, /\{ id: 'all', label: '전체' \}, \{ id: 'training', label: '실전체험' \}, \{ id: 'male', label: '남성' \}, \{ id: 'female', label: '여성' \}, \{ id: 'new', label: '신규' \}/);
   // 실전 훈련 (2026-11-26, by the owner): the two English tutors, the negotiator and the interviewer, each house characters.
   for (const id of ['teacher', 'interpreter', 'closer', 'trickster']) assert.match(home, new RegExp(`\{ id: '${id}', label: '[^']+', ready: (true|false) \}`));
   assert.match(home, /castFilter === 'training' \? trainingCast/);

@@ -83,5 +83,5 @@ test('a pass is paid by card or by Naver Pay, Kakao Pay or Toss Pay, all through
   assert.deepEqual(plans.loungePayRequest('tosspay').easyPay, { easyPayProvider: 'TOSSPAY' });
   assert.equal(plans.readLoungePayMethod('bitcoin'), 'card', 'anything else is a card');
   assert.match(read('api/payments.ts'), /\.\.\.loungePayRequest\(readLoungePayMethod\(body\.method\)\)/);
-  assert.match(read('src/components/LoungeBusinessFooter.tsx'), /고객센터<\/span> <a href="tel:\+821086434224">010-8643-4224<\/a>/);
+  assert.match(read('src/components/LoungeBusinessFooter.tsx'), /고객센터<\/span> <a href="tel:\+821030567987">010-3056-7987<\/a>/);
 });
