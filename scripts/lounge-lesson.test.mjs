@@ -246,3 +246,56 @@ test('the member\'s own situation: its expressions are read defensively and take
   assert.equal(lesson.planLoungeLesson([item('m'), item('s', { source: 'situation' }), item('t', { source: 'tutor' })], now).queue[0], 's');
   assert.match(lesson.loungeLessonSituationInstructions, /known/); assert.match(lesson.loungeLessonRules, /target\.yours/);
 });
+
+test('the learning board: marked expressions are taken first, the more important first, and join the day when marked during it (2026-11-26)', () => {
+  const items = [
+    item('a', { importance: 1 }), item('b', { importance: 3 }), item('c', { focus: true, importance: 2 }),
+    item('d', { focus: true, importance: 3, stage: 2, next_review_at: '2026-12-10T00:00:00Z', source: 'tutor' }), item('e', { focus: true, stage: 5 }),
+  ];
+  const plan = lesson.planLoungeLesson(items, now);
+  assert.deepEqual(plan.queue.slice(0, 2), ['d', 'c'], 'marked first, the more important first, whatever their stage');
+  assert.ok(!plan.queue.includes('e'), 'one already theirs is not asked for a mark');
+  assert.deepEqual(plan.queue.slice(2), ['b', 'a'], 'then new ones, the more important first');
+  // Marked during the day: it comes next, after the one being asked.
+  let turn = lesson.advanceLoungeLesson({ items: [item('x'), item('y'), item('z')], plan: ['x', 'y', 'z'], now, said: 'hi', grade: grade() });
+  assert.equal(turn.target.id, 'x');
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items: [item('x'), item('y'), item('z', { focus: true })], plan: [], now, said: 'hmm', grade: grade({ intent: 'question' }) });
+  assert.equal(turn.state.current.id, 'x', 'the one being asked stays');
+  assert.deepEqual(turn.state.queue, ['z', 'y']);
+});
+
+test('the task card shows only what the tutor may say, and the feedback hides a correction that gives the expression away', () => {
+  const items = [item('a', { expression: 'figure out', meaning: '알아내다', situation: '문제 원인을 찾을 때', importance: 3, difficulty: 'B2', focus: true }), item('b')];
+  let turn = lesson.advanceLoungeLesson({ items, plan: ['a', 'b'], now, said: 'hi', grade: grade() });
+  let task = lesson.loungeLessonTask(turn.state, items, now);
+  assert.equal(task.phase, 'drill'); assert.deepEqual(task.progress, { done: 0, total: 2 });
+  assert.equal(task.item.situation, '문제 원인을 찾을 때'); assert.equal(task.item.importance, 3); assert.equal(task.item.difficulty, 'B2'); assert.equal(task.item.focus, true);
+  assert.equal(task.item.expression, undefined); assert.equal(task.item.first, undefined, 'nothing of the English before a hint');
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'I tried to find', grade: grade() });
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'I search it', grade: grade() });
+  task = lesson.loungeLessonTask(turn.state, items, now);
+  assert.equal(task.item.first, 'figure', 'the second hint: the first word');
+  assert.equal(lesson.loungeLessonTask(turn.state, items, new Date('2026-11-26T03:00:00Z')), undefined, 'another day has no card until the lesson starts it');
+  const shown = lesson.loungeLessonFeedback({ step: 'hint', target: items[0] }, grade({ better: 'I need to figure out why.', polished: 'I need to work out why.', errors: [{ wrong: 'search it', right: 'figure it out', why: '알아내다' }, { wrong: 'I tried', right: 'I was trying', why: '진행' }] }));
+  assert.equal(shown.better, ''); assert.deepEqual(shown.errors.map(error => error.right), ['I was trying'], 'nothing that says the expression while it is asked');
+  assert.equal(lesson.loungeLessonFeedback({ step: 'next', target: items[1] }, grade({ better: 'I need to figure out why.', polished: 'I need to pin down why.' })).polished, 'I need to pin down why.');
+  assert.deepEqual(lesson.loungeLessonFeedbackLabels('B1'), { better: 'B2 표현', polished: 'C1 · 더 세련되게' });
+  assert.equal(lesson.loungeLessonFeedbackLabels('B2').better, 'C1 표현');
+});
+
+test('importance, difficulty and a situation are read defensively: only the items asked, no situation that says the expression', () => {
+  const items = [item('a', { expression: 'put off', situation: '' }), item('b', { expression: 'come up with', situation: '회의에서' }), item('c', { expression: 'look into', level: 'C1' })];
+  const read = lesson.readLoungeLessonEnrich({ items: [
+    { id: 'a', importance: 3, difficulty: 'B1', situation: '귀찮은 일을 자꾸 미룰 때' },
+    { id: 'b', importance: 2, difficulty: 'B2', situation: '새 상황' },
+    { id: 'c', importance: 9, difficulty: 'Z9', situation: 'when you look into it' },
+    { id: 'nope', importance: 1, difficulty: 'A2', situation: 'x' }, { id: 'a', importance: 1, difficulty: 'A2', situation: 'twice' },
+  ] }, items);
+  assert.deepEqual(read, [
+    { id: 'a', importance: 3, difficulty: 'B1', situation: '귀찮은 일을 자꾸 미룰 때' },
+    { id: 'b', importance: 2, difficulty: 'B2' },
+    { id: 'c', importance: 2, difficulty: 'C1' },
+  ]);
+  assert.equal(lesson.loungeLessonEnrichInput('B1', items).level.target, 'B2');
+  assert.equal(lesson.loungeLessonEnrichInput('B1', items).items[1].has_situation, true);
+});

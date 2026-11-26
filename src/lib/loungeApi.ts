@@ -282,6 +282,8 @@ export function saveLoungeInnerVoice(value: 'on' | 'off') { try { localStorage.s
 /** Three replies the member could say next in a one-to-one conversation. */
 /** 영어 수업: the expressions for a situation the member told, saved in their 단어장 (see loungeLesson.ts). */
 export const requestLoungeLessonSituation = (roomId: string, situation: string) => apiRequest({ action: 'lesson-situation', roomId, situation }) as Promise<{ title: string; items: import('./loungeLesson').LoungeLessonItem[] }>;
+/** 영어 수업 학습 보드: importance, difficulty and a situation written for the member's expressions that have none yet. */
+export const requestLoungeLessonEnrich = (roomId: string) => apiRequest({ action: 'lesson-enrich', roomId }) as Promise<{ updated: number }>;
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**
  * A photo from the character in the member's one-to-one room: `request` when the member asked, `character` when the

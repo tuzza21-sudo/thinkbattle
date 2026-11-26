@@ -1262,3 +1262,63 @@
 .lounge-lesson-preview > ul:not(.lounge-memory-list) { display:grid; gap:3px; margin:0; padding-left:18px; font-size:13px; }
 .lounge-lesson-preview > div { display:flex; gap:8px; justify-content:flex-end; }
 .lounge-lesson-preview small, .lounge-lesson-where { font-size:12px; opacity:.75; line-height:1.5; }
+
+/* 영어 수업 학습 보드 (2026-11-26): the day's progress and the task card above the composer, the feedback under the
+   member's words, and the learning board's list with its marks, importance and difficulty. */
+.lounge-lesson-bar { flex-direction:column; align-items:stretch; gap:8px; }
+.lounge-lesson-head { display:flex; align-items:center; gap:8px; color:#f3f7ff; text-shadow:0 1px 3px #000c; }
+.lounge-lesson-progress { display:flex; align-items:center; gap:8px; flex:1; min-width:0; font-size:13px; }
+.lounge-lesson-progress i { flex:1; max-width:160px; height:6px; border-radius:999px; background:#ffffff2e; overflow:hidden; }
+.lounge-lesson-progress i span { display:block; height:100%; border-radius:inherit; background:#8fd3ff; transition:width .3s ease; }
+.lounge-lesson-fold { display:inline-grid; place-items:center; width:30px; height:30px; border:1px solid #ffffff33; border-radius:999px; background:#0f1d2ccc; color:#f3f7ff; cursor:pointer; }
+.lounge-lesson-task { display:grid; gap:6px; padding:11px 13px; border:1px solid #8fd3ff55; border-radius:14px; background:#0d1a28e6; color:#f3f7ff; box-shadow:0 4px 18px #0007; backdrop-filter:blur(6px); }
+.lounge-lesson-task.quiet { border-color:#ffffff26; }
+.lounge-lesson-task p { margin:0; font-size:13.5px; line-height:1.6; word-break:keep-all; }
+.lounge-lesson-task header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; }
+.lounge-lesson-task header > b { color:#8fd3ff; }
+.lounge-lesson-task p > span:first-child { display:inline-block; min-width:34px; margin-right:6px; font-size:11px; font-weight:700; color:#9fb6cc; }
+.lounge-lesson-scene { font-size:14.5px !important; font-weight:600; }
+.lounge-lesson-reveal b { color:#ffe3a3; }
+.lounge-lesson-reveal.muted { opacity:.75; font-size:12.5px !important; }
+.lounge-lesson-task-actions { display:flex; gap:6px; justify-content:flex-end; }
+.lounge-lesson-task-actions button { display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:0 12px; border:1px solid #ffffff33; border-radius:999px; background:#ffffff12; color:#f3f7ff; font:inherit; font-size:12.5px; cursor:pointer; }
+.lounge-lesson-task-actions button:disabled { opacity:.45; cursor:default; }
+.lounge-lesson-badges { display:inline-flex; flex-wrap:wrap; gap:5px; }
+.lounge-lesson-badge { display:inline-flex; align-items:center; gap:3px; padding:1px 8px; border-radius:999px; border:1px solid #ffffff2b; background:#ffffff10; font-size:11px; font-weight:600; line-height:1.7; white-space:nowrap; }
+.lounge-lesson-badge b { color:#ffd27a; letter-spacing:-1px; }
+.lounge-lesson-badge.importance-3 { border-color:#ffd27a80; }
+.lounge-lesson-badge.level { border-color:#8fd3ff66; color:#bfe6ff; }
+.lounge-lesson-badge.kind { border-color:#ffffff40; }
+.lounge-lesson-badge.focus { border-color:#ffd27a; color:#ffd27a; }
+.lounge-lesson-feedback { display:grid; gap:5px; max-width:100%; margin:6px 2px 0; padding:9px 11px; border:1px solid #9fd8a855; border-radius:10px; background:#0d1d16e0; color:#eef8ef; text-align:left; font-size:12.5px; line-height:1.6; }
+.lounge-lesson-feedback > div > span { display:block; font-size:10.5px; font-weight:700; color:#9fd8a8; }
+.lounge-lesson-feedback > div > b { font-weight:600; font-size:13.5px; }
+.lounge-lesson-polished > b { color:#ffe3a3; }
+.lounge-lesson-verdicts { display:flex; flex-wrap:wrap; gap:5px; }
+.lounge-lesson-verdict { padding:0 8px; border-radius:999px; background:#ffffff14; font-size:11px; font-weight:700; }
+.lounge-lesson-verdict.unprompted, .lounge-lesson-verdict.free { background:#2f6b3f; }
+.lounge-lesson-verdict.hinted { background:#5b5320; }
+.lounge-lesson-verdict.given, .lounge-lesson-verdict.missed { background:#5a3434; }
+.lounge-lesson-errors { display:grid; gap:4px; margin:0; padding-left:16px; }
+.lounge-lesson-errors s { opacity:.7; text-decoration-color:#ff8a8a; }
+.lounge-lesson-errors small { display:block; opacity:.8; }
+.lounge-lesson-more { justify-self:start; padding:0; border:0; background:none; color:#9fd8a8; font:inherit; font-size:12px; text-decoration:underline; cursor:pointer; }
+.lounge-lesson-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.lounge-lesson-summary span { display:grid; justify-items:center; padding:7px 4px; border:1px solid #ffffff1c; border-radius:10px; background:#ffffff08; font-size:11px; opacity:.85; }
+.lounge-lesson-summary b { font-size:17px; }
+.lounge-lesson-filters { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
+.lounge-lesson-filters button { flex:none; padding:5px 11px; border:1px solid #ffffff24; border-radius:999px; background:transparent; color:#fff5e8; font:inherit; font-size:12px; cursor:pointer; }
+.lounge-lesson-filters button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; font-weight:700; }
+.lounge-lesson-list li { align-items:flex-start; }
+.lounge-lesson-list li.focused { border-color:#ffd27a66; background:#ffd27a0d; }
+.lounge-lesson-list li > div:nth-child(2) { display:grid; gap:3px; min-width:0; flex:1; }
+.lounge-lesson-list p { margin:0; font-weight:600; }
+.lounge-lesson-star { flex:none; display:inline-grid; place-items:center; width:32px; height:32px; border:1px solid #ffffff2b; border-radius:999px; background:transparent; color:#ffffff80; cursor:pointer; }
+.lounge-lesson-star.on { border-color:#ffd27a; color:#ffd27a; background:#ffd27a1a; }
+.lounge-lesson-star.on svg { fill:currentColor; }
+.lounge-lesson-star:disabled { opacity:.35; cursor:default; }
+@media (max-width: 560px) {
+  .lounge-lesson-task { padding:9px 11px; }
+  .lounge-lesson-task p { font-size:13px; }
+  .lounge-lesson-summary b { font-size:15px; }
+}

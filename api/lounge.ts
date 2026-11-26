@@ -11,7 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
+import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
@@ -510,7 +510,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -771,6 +771,35 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!made.rows.length) return json({ error: '이 상황에 맞는 표현을 만들지 못했어요. 영어로 말해야 하는 장면을 조금 더 구체적으로 적어 주세요.' }, 422);
       console.info('[Lounge lesson]', JSON.stringify({ situation: true, made: made.rows.length }));
       return json({ title: made.title, items: made.rows });
+    }
+
+    // 영어 수업 학습 보드: each expression's importance (1-3), difficulty (CEFR) and, where it has none, a situation where it
+    // is used, written for up to thirty expressions that have none yet (migration 20270118000000). Asked by the board when it opens.
+    if (body.action === 'lesson-enrich') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id || !isLoungeTutor(mine.host_persona)) return json({ error: '영어 수업에서만 쓸 수 있어요.' }, 403);
+      const [itemsResponse, profileResponse] = await Promise.all([
+        fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&importance=is.null&select=*&order=created_at.desc&limit=30`, { headers: serviceHeaders }),
+        fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=level`, { headers: serviceHeaders }),
+      ]);
+      // Before the migration the column is not there: nothing to fill in.
+      if (!itemsResponse.ok) return json({ updated: 0 });
+      const items = await readJson<LoungeLessonItem[]>(itemsResponse, 'lounge');
+      if (!items.length) return json({ updated: 0 });
+      const level = readLoungeLessonLevel(profileResponse.ok ? (await readJson<Array<{ level?: string }>>(profileResponse, 'lounge'))[0]?.level : undefined);
+      const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+        model: 'gpt-6-luna', reasoning: { effort: 'low' }, max_output_tokens: 6000, store: false, prompt_cache_key: 'lounge-lesson-enrich',
+        instructions: loungeLessonEnrichInstructions, input: JSON.stringify(loungeLessonEnrichInput(level, items)),
+        text: { format: { type: 'json_schema', name: 'lounge_lesson_enrich', strict: true, schema: loungeLessonEnrichSchema } },
+      }), undefined, 45_000), 'openai');
+      const rows = readLoungeLessonEnrich(JSON.parse(modelOutputText(result) ?? '{}'), items);
+      const saved = await Promise.all(rows.map(({ id, ...fields }) => fetchTimed(`${url}/rest/v1/lounge_english_items?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(user.id)}`, {
+        method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify(fields) }).then(response => response.ok, () => false)));
+      console.info('[Lounge lesson]', JSON.stringify({ enrich: items.length, saved: saved.filter(Boolean).length }));
+      return json({ updated: saved.filter(Boolean).length });
     }
 
     if (body.action === 'call-tick') {
@@ -1523,20 +1552,24 @@ ${photoRule}`;
       if (keep) turn.state.kept++;
       const write = (path: string, init: RequestInit) => fetchTimed(`${url}/rest/v1/${path}`, { ...init, headers: { ...serviceHeaders, Prefer: 'return=minimal', ...(init.headers as Record<string, string> | undefined) } })
         .then(response => { if (!response.ok) console.warn('[Lounge lesson] not saved', path.split('?')[0], response.status); }).catch(() => console.warn('[Lounge lesson] not saved', path.split('?')[0]));
-      const notes = grade && (grade.better || grade.errors.length) ? { said: lastHuman.slice(0, 600), better: grade.better, polished: grade.polished, why: grade.errors.map(error => `${error.wrong} → ${error.right}: ${error.why}`).join('\n').slice(0, 400) } : undefined;
+      // The correction kept is the one the tutor may say now (the member's feedback card shows it under their words).
+      const visible = loungeLessonFeedback(turn, grade);
+      const notes = visible ? { said: lastHuman.slice(0, 600), better: visible.better, polished: visible.polished ?? '', why: visible.errors.map(error => `${error.wrong} → ${error.right}: ${error.why}`).join('\n').slice(0, 400) } : undefined;
       const attempts: Array<Record<string, unknown>> = turn.verdicts.map(({ item, verdict }) => ({ user_id: user.id, item_id: item.id, room_id: roomId, character_id: host.id, verdict, said: lastHuman.slice(0, 600), ...(notes && item.id === turn.finished?.item.id ? { better: notes.better, polished: notes.polished, why: notes.why } : { better: '', polished: '', why: '' }) }));
       // Every row has the same keys (PostgREST inserts an array only so); a correction with no expression finished is a note of its own.
       if (notes && !attempts.some(attempt => attempt.better)) attempts.push({ user_id: user.id, item_id: null, room_id: roomId, character_id: host.id, verdict: 'note', ...notes });
       await Promise.all([
         write(`voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', body: JSON.stringify({ story_state: turn.state }) }),
         ...turn.verdicts.map(({ item, verdict }) => write(`lounge_english_items?id=eq.${encodeURIComponent(item.id)}&user_id=eq.${encodeURIComponent(user.id)}`, { method: 'PATCH',
-          body: JSON.stringify({ ...applyLoungeLessonVerdict(item, verdict, now), last_said: lastHuman.slice(0, 300), updated_at: now.toISOString() }) })),
+          body: JSON.stringify({ ...applyLoungeLessonVerdict(item, verdict, now), last_said: lastHuman.slice(0, 300), updated_at: now.toISOString(),
+            // Practised: no longer marked to learn first (sent only when marked, so never before migration 20270118000000).
+            ...(item.focus && verdict !== 'free' ? { focus: false } : {}) }) })),
         ...(attempts.length ? [write('lounge_english_attempts', { method: 'POST', body: JSON.stringify(attempts) })] : []),
         ...(keep ? [write('lounge_english_items?on_conflict=user_id,expression_key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
           body: JSON.stringify({ user_id: user.id, expression: keep.expression, meaning: keep.meaning, level: loungeLessonLevel(level).target, source: 'upgrade' }) })] : []),
       ]);
       console.info('[Lounge lesson]', JSON.stringify({ host: host.id, step: turn.step, phase: turn.state.phase, graded: grade ? { target: grade.target, intent: grade.intent, free: grade.free_used.length, errors: grade.errors.length } : null, gradeMs: grade ? Math.round(performance.now() - graded) : 0, verdicts: turn.verdicts.map(entry => entry.verdict), kept: Boolean(keep), done: turn.state.done.length, queue: turn.state.queue.length }));
-      return loungeLessonForPrompt(turn, level, grade);
+      return { prompt: loungeLessonForPrompt(turn, level, grade), state: turn.state };
     })().catch(error => { console.warn('[Lounge lesson] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
     const sceneFound = companionChat && companionState && !lessonRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
@@ -1615,7 +1648,8 @@ ${photoRule}`;
     }
     // The model the member chose for a one-to-one room (the fast GPT unless they picked another). A slow model (GPT with
     // reasoning, Gemini Pro) answers chats only; a voice reply uses its faster fallback instead of a long silence.
-    const lessonPrompt = lessonWork ? await lessonWork : undefined;
+    const lessonTurn = lessonWork ? await lessonWork : undefined;
+    const lessonPrompt = lessonTurn?.prompt;
     const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
     const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
     // How hard the reasoning model thinks: medium by default, LOUNGE_REPLY_REASONING (low, medium, high) changes it.
@@ -2512,6 +2546,8 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const textAt = performance.now();
             const consultSaved = consult ? await saveConsult() : undefined;
             if (consultSaved) send({ type: 'story', state: consultSaved });
+            // The lesson's task card moves with the reply, not at the room's next reload.
+            if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
             // A chat gets the text alone; the voice reads the words without the *actions*.
@@ -2568,6 +2604,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             if (relationshipSaved) send({ type: 'relationship', ...relationshipSaved });
             // Where the story is now, so the choices the reply put to the member show without waiting for the room's reload.
             if (storySaved) send({ type: 'story', state: storySaved });
+            if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
             // Only a photo of the character can be made (from their reference photos): on 2026-11-01 a member asked 한지오
             // to take their picture and got his, twice. So the call names who is in it, and anything else makes none.
