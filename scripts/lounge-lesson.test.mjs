@@ -323,3 +323,15 @@ test('the day keeps its size: marked first, then the more important and the easi
   assert.match(lesson.loungeLessonRules, /질문 문장 자체는 고치거나/);
   assert.equal(lesson.loungeLessonHintText, '힌트 주세요');
 });
+
+test('the learning list by day: the Korean day it was put in, practised or not, priority from importance and the level in words (2026-11-26)', () => {
+  assert.equal(lesson.loungeLessonDayOf('2026-11-25T16:30:00Z'), '2026-11-26', 'after midnight in Korea');
+  assert.equal(lesson.loungeLessonDayOf(null), '');
+  assert.equal(lesson.loungeLessonStudied(item('a')), false);
+  assert.equal(lesson.loungeLessonStudied(item('b', { attempts: 1 })), true);
+  assert.deepEqual([3, 2, 1, null].map(value => lesson.loungeLessonPriority(value).label), ['1순위', '2순위', '3순위', '2순위']);
+  assert.equal(lesson.loungeLessonLevelLabel('B1'), 'B1 · 쉬움'); assert.equal(lesson.loungeLessonLevelLabel('C1'), 'C1 · 어려움'); assert.equal(lesson.loungeLessonLevelLabel(null), '');
+  const sorted = [item('low', { importance: 1, difficulty: 'B1' }), item('hard', { importance: 3, difficulty: 'C1' }), item('easy', { importance: 3, difficulty: 'B1' }), item('mark', { focus: true, importance: 1 }), item('mine', { stage: 5, importance: 3 })]
+    .sort(lesson.loungeLessonListOrder).map(entry => entry.id);
+  assert.deepEqual(sorted, ['mark', 'easy', 'hard', 'low', 'mine']);
+});
