@@ -1,4 +1,4 @@
-.lounge-pricing-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; max-width:1040px; margin:0; padding:0; list-style:none; }
+.lounge-pricing-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; max-width:720px; margin:0; padding:0; list-style:none; }
 .lounge-pricing-card { display:flex; flex-direction:column; padding:24px 22px 22px; border:1px solid var(--l-line); border-radius:18px; background:var(--l-paper,#fffefb); }
 .lounge-pricing-card.featured { border-color:var(--l-green); box-shadow:0 10px 28px #425c441f; }
 .lounge-pricing-head { display:flex; align-items:center; gap:8px; }

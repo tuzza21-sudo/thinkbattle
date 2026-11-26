@@ -23,7 +23,8 @@ const proFeatures = ['음성 통화 월 100분', '채팅 무제한', `사석 ${l
 
 export const loungePlans: LoungePlan[] = [
   { id: 'pro', term: 'month', key: 'pro-month', name: 'Plus 월간', price: 20_000, tagline: '더 길게, 더 깊게 이야기하고 싶다면', features: proFeatures },
-  { id: 'pro', term: 'year', key: 'pro-year', name: 'Plus 연간', price: 150_000, tagline: '1년 동안 꾸준히, 더 저렴하게', featured: true, badge: '연 90,000원 절약', perMonth: '월 12,500원 꼴', features: proFeatures },
+  // The yearly pass (150,000원) is off sale (2026-11-26, by the owner): selling a year ahead needs a prepayment guarantee
+  // insurance first. Orders already paid by the year keep their SY prefix and receipt name.
 ];
 
 /** The year in a plan's name and receipts: an order id from a year plan starts with SY, a month's with SS. */
