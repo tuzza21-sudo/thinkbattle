@@ -132,21 +132,21 @@ test('a lesson turn: asked, the expression said unprompted moves on; a miss gets
   assert.equal(turn.step, 'wrap');
 });
 
-test('a lesson goes on where it was the same day, starts again the next, takes the member\'s new words at once, and skips or stops', () => {
+test('a lesson goes on where it was the same day, starts again the next, keeps the size it started with, and skips or stops', () => {
   const items = [item('a'), item('b')];
   let turn = lesson.advanceLoungeLesson({ items, plan: ['a', 'b'], now, said: 'hello', grade: grade() });
   assert.equal(turn.step, 'ask');
   const opened = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: '', opening: true });
   assert.equal(opened.step, 'ask'); assert.equal(opened.target.id, 'a', 'a call opened the same day asks the same expression');
   const tomorrow = lesson.advanceLoungeLesson({ state: turn.state, items, plan: ['b'], now: new Date('2026-11-26T03:00:00Z'), said: '', opening: true });
-  assert.equal(tomorrow.step, 'warmup'); assert.deepEqual(tomorrow.state.queue, ['b', 'a'], 'the day\'s plan, and the member\'s own new expression not tried yet');
+  assert.equal(tomorrow.step, 'warmup'); assert.deepEqual(tomorrow.state.queue, ['b'], 'the day\'s plan only (2026-11-26: the day grew from 16 to 21)');
   const added = [...items, item('new')];
   turn = lesson.advanceLoungeLesson({ state: turn.state, items: added, plan: [], now, said: 'pass', grade: grade({ intent: 'skip' }) });
   assert.equal(turn.finished.verdict, 'missed'); assert.equal(turn.target.id, 'b');
-  assert.deepEqual(turn.state.queue, ['new'], 'the word added in the 단어장 joins today');
+  assert.deepEqual(turn.state.queue, [], 'a word added during the day waits for a later day');
   turn = lesson.advanceLoungeLesson({ state: turn.state, items: added, plan: [], now, said: '그만할래요', grade: grade({ intent: 'stop' }) });
   assert.equal(turn.step, 'wrap'); assert.equal(turn.state.phase, 'free');
-  assert.deepEqual(turn.state.queue, ['b', 'new'], 'what was asked waits for the next time');
+  assert.deepEqual(turn.state.queue, ['b'], 'what was asked waits for the next time');
   assert.deepEqual(lesson.readLoungeLessonState(JSON.parse(JSON.stringify(turn.state))), turn.state);
   assert.equal(lesson.readLoungeLessonState({ phase: 'tarot' }), undefined);
   const failed = lesson.advanceLoungeLesson({ state: turn.state, items: added, plan: [], now, said: 'hi' });
@@ -231,7 +231,7 @@ test('the member\'s own situation: its expressions are read defensively and take
   ] }, have);
   assert.equal(made.title, '납기 연기 요청');
   assert.deepEqual(made.expressions.map(entry => entry.expression), ["I was wondering if we could …", 'I appreciate your flexibility'], 'none the member has, English only');
-  const items = [item('a'), item('b'), item('s1', { source: 'situation', situation: '회의 시작하고 본론을 꺼낼 때', example: 'I was wondering if we could move the delivery date.' })];
+  const items = [item('a'), item('b'), item('s1', { source: 'situation', situation: '회의 시작하고 본론을 꺼낼 때', example: 'I was wondering if we could move the delivery date.', created_at: '2026-11-25T03:00:05Z' })];
   let turn = lesson.advanceLoungeLesson({ items: items.slice(0, 2), plan: ['a', 'b'], now, said: 'hi', grade: grade() });
   assert.equal(turn.target.id, 'a');
   turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: '다음 주 거래처 회의에서 납기를 미뤄 달라고 해야 해요', grade: grade({ intent: 'situation' }) });
@@ -298,4 +298,28 @@ test('importance, difficulty and a situation are read defensively: only the item
   ]);
   assert.equal(lesson.loungeLessonEnrichInput('B1', items).level.target, 'B2');
   assert.equal(lesson.loungeLessonEnrichInput('B1', items).items[1].has_situation, true);
+});
+
+test('the day keeps its size: marked first, then the more important and the easier; an old day that grew is cut back; hint and question words are not corrected (2026-11-26)', () => {
+  const items = [
+    item('easy', { importance: 2, difficulty: 'B1' }), item('hard', { importance: 2, difficulty: 'C1' }), item('key', { importance: 3, difficulty: 'C1' }),
+    item('mark', { focus: true, importance: 1, difficulty: 'C1' }), ...Array.from({ length: 12 }, (_, at) => item(`w${at}`, { importance: 1 })),
+  ];
+  const plan = lesson.planLoungeLesson(items, now);
+  assert.deepEqual(plan.queue.slice(0, 4), ['mark', 'key', 'easy', 'hard'], 'marked, then importance, then the easier level');
+  assert.equal(plan.queue.length, 6);
+  let turn = lesson.advanceLoungeLesson({ items, plan: plan.queue, now, said: 'hi', grade: grade() });
+  const total = turn.state.queue.length + 1;
+  for (let at = 0; at < 3; at++) turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'x', grade: grade({ intent: 'skip' }) });
+  assert.equal(turn.state.done.length + turn.state.queue.length + (turn.state.current ? 1 : 0), total, 'nothing joins: the total stays');
+  // A day planned before the fix had taken in every new expression: it is cut back to six, the marked one kept.
+  const old = { kind: 'lesson', day: lesson.loungeLessonDay(now), phase: 'drill', queue: items.slice(1).map(entry => entry.id), done: [{ id: 'easy', verdict: 'missed' }], current: { id: 'w0', hints: 0, tries: 0 }, kept: 0, turns: 5 };
+  const cut = lesson.advanceLoungeLesson({ state: old, items, plan: [], now, said: 'hmm', grade: grade({ intent: 'question' }) });
+  assert.equal(cut.state.queue[0], 'mark'); assert.ok(cut.state.queue.length <= 5, String(cut.state.queue.length)); assert.ok(cut.state.since);
+  const hint = lesson.loungeLessonCleanGrade(grade({ intent: 'meaning', better: 'Could you give me a hint?', polished: 'Would you mind giving me a hint?', keep: 'give me a hint' }), '힌트 주세요');
+  assert.equal(hint.better, ''); assert.equal(hint.polished, ''); assert.equal(hint.keep, '');
+  assert.equal(lesson.loungeLessonCleanGrade(grade({ intent: 'question', better: 'What does it mean?' }), '이게 무슨 뜻이에요?').better, '');
+  assert.equal(lesson.loungeLessonCleanGrade(grade({ intent: 'answer', better: 'I put it off.' }), 'I put off it.').better, 'I put it off.');
+  assert.match(lesson.loungeLessonRules, /질문 문장 자체는 고치거나/);
+  assert.equal(lesson.loungeLessonHintText, '힌트 주세요');
 });
