@@ -6,7 +6,7 @@ import { startLoungeScenario } from '../lib/loungeApi';
 import { addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonLevel, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
 import { readLoungeLessonFile } from '../lib/loungeLessonFile';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { loungeLessonFeedbackLabels, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
+import { loungeLessonConfusionTutor, loungeLessonFeedbackLabels, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const shortDay = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '';
@@ -41,7 +41,7 @@ export function useLoungeLessonRoom(roomId: string | undefined, enabled: boolean
     if (nextBook) { setBook(nextBook); setError(''); }
     if (nextAttempts) setAttempts(nextAttempts);
     // Once a room: expressions the board has not rated yet (the column is there only after the migration).
-    if (nextBook && !enriched.current && nextBook.items.some(item => 'importance' in item && item.importance == null)) {
+    if (nextBook && !enriched.current && nextBook.items.some(item => ('importance' in item && item.importance == null) || ('nuance' in item && item.nuance == null))) {
       enriched.current = true; setEnriching(true);
       try { if (await enrichLoungeLessonBook(roomId)) { const fresh = await loadLoungeLessonBook().catch(() => null); if (fresh) setBook(fresh); } }
       catch { /* the board still works without the ratings */ }
@@ -57,7 +57,7 @@ export function useLoungeLessonRoom(roomId: string | undefined, enabled: boolean
 // ── The bar above the composer: the day's progress and the task being asked ────────────────────────────────────────
 
 /** The lesson's place above the composer: today's progress, the expression asked now, and the learning board. */
-export function LoungeLessonBar({ tutorName, roomId, lesson, storyState, send, disabled }: { tutorName: string; roomId: string; lesson: LoungeLessonRoom; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
+export function LoungeLessonBar({ tutorName, tutorId, roomId, lesson, storyState, send, disabled }: { tutorName: string; tutorId?: string; roomId: string; lesson: LoungeLessonRoom; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [folded, setFolded] = useState(false);
   const task = useMemo(() => lesson.book ? loungeLessonTask(storyState, lesson.book.items) : undefined, [storyState, lesson.book]);
@@ -71,8 +71,8 @@ export function LoungeLessonBar({ tutorName, roomId, lesson, storyState, send, d
       {task?.phase === 'drill' && <button type="button" className="lounge-lesson-fold" onClick={() => setFolded(value => !value)} aria-expanded={!folded} aria-label={folded ? '과제 펼치기' : '과제 접기'}>{folded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>}
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> 학습 보드</button>
     </div>
-    {task && !folded && <LoungeLessonTaskCard task={task} send={send} disabled={disabled} />}
-    {open && <LoungeLessonSheet tutorName={tutorName} roomId={roomId} lesson={lesson} onClose={() => setOpen(false)} />}
+    {task && !folded && <LoungeLessonTaskCard task={task} send={send} disabled={disabled} confusion={tutorId === loungeLessonConfusionTutor} />}
+    {open && <LoungeLessonSheet tutorName={tutorName} roomId={roomId} lesson={lesson} confusion={tutorId === loungeLessonConfusionTutor} onClose={() => setOpen(false)} />}
   </div>;
 }
 
@@ -86,7 +86,17 @@ function Badges({ importance, difficulty, extra }: { importance?: number | null;
 }
 
 /** The expression asked now: its situation, importance and difficulty, and only as much of the English as the tutor may say. */
-function LoungeLessonTaskCard({ task, send, disabled }: { task: LoungeLessonTask; send?: (text: string) => Promise<void>; disabled?: boolean }) {
+/** What an expression carries, once it may be seen: its nuance, similar expressions, and (in 문정우's lessons) why Koreans mix it up. */
+function ExpressionNotes({ nuance, alternatives, confusion }: { nuance?: string | null; alternatives?: Array<{ expression: string; note: string }> | null; confusion?: string | null }) {
+  if (!nuance && !alternatives?.length && !confusion) return null;
+  return <div className="lounge-lesson-notes-box">
+    {nuance && <p><span>뉘앙스</span>{nuance}</p>}
+    {alternatives && alternatives.length > 0 && <p><span>비슷한 표현</span>{alternatives.map((alt, index) => <span key={alt.expression} className="lounge-lesson-alt">{index ? ' · ' : ''}<b lang="en">{alt.expression}</b>{alt.note && <small> ({alt.note})</small>}</span>)}</p>}
+    {confusion && <p className="lounge-lesson-confusion"><span>한국인이 헷갈리는 이유</span>{confusion}</p>}
+  </div>;
+}
+
+function LoungeLessonTaskCard({ task, send, disabled, confusion }: { task: LoungeLessonTask; send?: (text: string) => Promise<void>; disabled?: boolean; confusion?: boolean }) {
   if (task.phase === 'warmup') return <div className="lounge-lesson-task quiet"><p>가볍게 영어로 인사부터 해요. 그다음 오늘의 표현을 하나씩 물어볼게요.</p></div>;
   if (task.phase !== 'drill' || !('item' in task) || !task.item) return <div className="lounge-lesson-task quiet"><p>오늘 연습할 표현을 다 했어요. 이제 자유롭게 영어로 이야기하면서, 배운 표현을 먼저 써 보세요.</p></div>;
   const { item } = task;
@@ -98,7 +108,9 @@ function LoungeLessonTaskCard({ task, send, disabled }: { task: LoungeLessonTask
     </>} /></header>
     {item.situation && <p className="lounge-lesson-scene"><span>상황</span>{item.situation}</p>}
     {item.meaning && <p className="lounge-lesson-meaning"><span>뜻</span>{item.meaning}</p>}
-    {'expression' in item && item.expression ? <p className="lounge-lesson-reveal"><span>표현</span><b lang="en">{item.expression}</b>{task.retell ? ' · 새 상황에서 한 번 더' : ' · 이 표현으로 내 문장을 말해 보세요'}</p>
+    {'expression' in item && item.expression ? <p className="lounge-lesson-reveal"><span>표현</span><b lang="en">{item.expression}</b>{task.retell ? ' · 새 상황에서 한 번 더' : ' · 이 표현으로 내 문장을 말해 보세요'}</p> : null}
+    {'expression' in item && item.expression && <ExpressionNotes nuance={item.nuance} alternatives={item.alternatives} confusion={confusion ? item.confusion : null} />}
+    {'expression' in item && item.expression ? null
       : 'first' in item && item.first ? <p className="lounge-lesson-reveal"><span>힌트</span><b lang="en">{item.first} …</b> 로 시작해요</p>
       : <p className="lounge-lesson-reveal muted">영어 표현은 직접 떠올려서 말해 보세요{task.hints ? ` · 힌트 ${task.hints}번 받음` : ''}</p>}
     {send && <div className="lounge-lesson-task-actions">
@@ -144,7 +156,7 @@ const filters: Array<[Filter, string]> = [['all', '전체'], ['focus', '우선 �
  * (marked ones are asked first, with each one's importance, difficulty and stage), and the feedback of past lessons.
  * The stages move only when the member says the expression in a lesson; they are not edited here.
  */
-export function LoungeLessonSheet({ tutorName, roomId, lesson, onClose }: { tutorName: string; roomId: string; lesson: LoungeLessonRoom; onClose: () => void }) {
+export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClose }: { tutorName: string; roomId: string; lesson: LoungeLessonRoom; confusion?: boolean; onClose: () => void }) {
   const book = lesson.book;
   const [tab, setTab] = useState<Tab>(() => book?.items.length ? 'list' : 'input');
   const [filter, setFilter] = useState<Filter>('all');
@@ -201,6 +213,7 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, onClose }: { tuto
       <p lang="en">{item.expression}</p>
       {item.meaning && <small>{item.meaning}</small>}
       {item.situation && <small className="lounge-lesson-where">상황: {item.situation}</small>}
+      <ExpressionNotes nuance={item.nuance} alternatives={item.alternatives} confusion={confusion ? item.confusion : null} />
       <Badges importance={item.importance} difficulty={item.difficulty} extra={<span className={`lounge-lesson-badge lounge-lesson-stage stage-${item.stage}`}>{loungeLessonStageLabel(item.stage)}</span>} />
       <span className="lounge-memory-kind">{sourceLabel[item.source] ?? item.source}{item.next_review_at && item.stage > 0 && item.stage < 5 ? ` · 다음 확인 ${shortDay(item.next_review_at)}` : ''}</span>
     </div>

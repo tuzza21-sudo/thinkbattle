@@ -21,8 +21,8 @@ export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'trainin
 export const loungeTrainingCast = [
   { id: 'teacher', label: '영어 말하기 코치 · B1→B2', ready: true },
   { id: 'interpreter', label: '영어 뉘앙스·통역 · B2→C1', ready: true },
-  { id: 'closer', label: '실전 협상 연습', ready: false },
-  { id: 'trickster', label: '실전 압박 면접', ready: false },
+  { id: 'closer', label: '실전 협상 연습', ready: true },
+  { id: 'trickster', label: '실전 압박 면접', ready: true },
 ] as const;
 export type LoungeCastFilter = typeof loungeCastFilters[number]['id'];
 
