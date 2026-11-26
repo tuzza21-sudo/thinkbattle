@@ -10,22 +10,23 @@ import { listMyLoungeCharacters, listPublicLoungeCharacters, loungeCustomPortrai
 import type { LoungeCustomCharacterRow } from '../lib/loungeCustomCharacters';
 import { loungeTopicLimit } from '../lib/loungeTopics';
 import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScenarios';
-import { loungeGroupRoomsEnabled, loungeHouseGender, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
+import { loungeGroupRoomsEnabled, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
-/** The buttons under "누구와 이야기할까요?": all, men, women, the new ones (2026-11-17). */
-export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'training', label: '실전체험' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
 /**
  * 실전체험 (2026-11-26, by the owner; was 실전 훈련): the characters who train the member for real situations, with what each
  * trains. `ready` is false while the training is still being made: the card says so and opens the character's page.
  */
-/** The 실전체험 segments (2026-11-26, by the owner): what to practise, and who teaches it. */
+/**
+ * The buttons under "실전 체험하기" (2026-11-26, by the owner; the heading was "누구와 이야기할까요?" with 전체/실전체험/남성/여성/신규):
+ * 전체 is every character as before, and each other button is one thing to practise with who teaches it. 문학 was dropped:
+ * 윤서연 is under 글쓰기 only.
+ */
 export const loungeExperienceSegments = [
   { id: 'all', label: '전체', ids: [] as string[] },
   { id: 'english', label: '실전영어', ids: ['teacher', 'interpreter'] },
   { id: 'negotiation', label: '협상', ids: ['closer'] },
   { id: 'interview', label: '면접', ids: ['trickster'] },
   { id: 'writing', label: '글쓰기', ids: ['ina', 'diplomat'] },
-  { id: 'literature', label: '문학', ids: ['ina'] },
   { id: 'travel', label: '여행', ids: ['guide'] },
   { id: 'art', label: '미술', ids: ['velvet'] },
 ] as const;
@@ -40,7 +41,6 @@ export const loungeTrainingCast = [
   { id: 'guide', label: '이탈리아 문화기행', ready: true },
   { id: 'velvet', label: '근현대 미술사', ready: true },
 ] as const;
-export type LoungeCastFilter = typeof loungeCastFilters[number]['id'];
 
 /** With group rooms closed there are no open tables to fetch. */
 const noTables = async (): Promise<LoungeOpenTable[]> => [];
@@ -170,26 +170,18 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   const memberCast = useMemberCast(user);
   const lobbyCast = [...loungeLobbyCastOrder.map(id => loungeCharacters.find(character => character.id === id)), ...loungeCharacters.filter(character => !loungeLobbyCastOrder.includes(character.id))]
     .filter((character): character is LoungeCharacter => Boolean(character) && !newIds.has(character!.id));
-  // The filter: "전체" is the row as it was; 남성/여성 look through the new characters too; 신규 shows the new ones, which also stay on their own row below.
-  const [castFilter, setCastFilter] = useState<LoungeCastFilter>('all');
-  const newHouseCast = loungeNewCharacters.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
-  const [segment, setSegment] = useState<LoungeExperienceSegment>('all');
-  const segmentIds: readonly string[] = loungeExperienceSegments.find(item => item.id === segment)?.ids ?? [];
-  const trainingCast = loungeTrainingCast.filter(item => !segmentIds.length || segmentIds.includes(item.id)).map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
-  const shownCast = castFilter === 'all' ? lobbyCast : castFilter === 'new' ? newHouseCast : castFilter === 'training' ? trainingCast : [...lobbyCast, ...newHouseCast].filter(character => loungeHouseGender(character.id) === castFilter);
-  const shownMemberCast = memberCast.rows.filter(row => {
-    const isNewPublic = newIds.has(row.id) && row.status === 'public';
-    if (castFilter === 'all') return !isNewPublic;
-    if (castFilter === 'new') return isNewPublic;
-    if (castFilter === 'training') return false;
-    return row.sheet.gender === castFilter;
-  });
+  // The filter: "전체" is the row as it was; a field shows who teaches it, each card saying what it trains.
+  const [castFilter, setCastFilter] = useState<LoungeExperienceSegment>('all');
+  const segmentIds: readonly string[] = loungeExperienceSegments.find(item => item.id === castFilter)?.ids ?? [];
+  const trainingCast = loungeTrainingCast.filter(item => segmentIds.includes(item.id)).map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
+  const shownCast = castFilter === 'all' ? lobbyCast : trainingCast;
+  const shownMemberCast = memberCast.rows.filter(row => castFilter === 'all' && !(newIds.has(row.id) && row.status === 'public'));
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
   const openSheet = (id: string) => setParams({ character: id }, { state: { sheet: true } });
   const closeSheet = () => { if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1); else setParams({}, { replace: true }); };
   const castCard = (character: LoungeCharacter, host: ReturnType<typeof getLoungeHost>) => {
     // Under 실전 훈련 a card says what the character trains, not their stories.
-    const training = castFilter === 'training' ? loungeTrainingCast.find(item => item.id === character.id) : undefined;
+    const training = castFilter !== 'all' ? loungeTrainingCast.find(item => item.id === character.id) : undefined;
     return <>
       <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
       <span><strong>{character.name}</strong><small>{training ? training.label : character.job}</small>
@@ -221,17 +213,14 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     <section className="lounge-home-section" aria-labelledby="lounge-cast-title">
       <header className={`lounge-home-subhead with-action ${loungeGroupRoomsEnabled ? '' : 'lounge-home-intro'}`}>
         <div>
-          <h2 id="lounge-cast-title">{loungeGroupRoomsEnabled ? '대화를 도와줄 캐릭터' : '누구와 이야기할까요?'}</h2>
+          <h2 id="lounge-cast-title">{loungeGroupRoomsEnabled ? '대화를 도와줄 캐릭터' : '실전 체험하기'}</h2>
           {loungeGroupRoomsEnabled && <p>대화방을 만들 때 함께할 캐릭터를 골라요. 둘이서만 이야기할 수도 있어요.</p>}
         </div>
         <Link to="/lounge/create" className="lounge-home-create"><Plus size={16} /> 캐릭터 추가하기</Link>
       </header>
-      <div className="lounge-cast-filter" role="group" aria-label="캐릭터 필터">
-        {loungeCastFilters.map(filter => <button key={filter.id} type="button" aria-pressed={castFilter === filter.id} onClick={() => setCastFilter(filter.id)}>{filter.label}</button>)}
+      <div className="lounge-cast-filter" role="group" aria-label="실전체험 분야">
+        {loungeExperienceSegments.map(item => <button key={item.id} type="button" aria-pressed={castFilter === item.id} onClick={() => setCastFilter(item.id)}>{item.label}</button>)}
       </div>
-      {castFilter === 'training' && <div className="lounge-cast-filter lounge-cast-segments" role="group" aria-label="실전체험 분야">
-        {loungeExperienceSegments.map(item => <button key={item.id} type="button" aria-pressed={segment === item.id} onClick={() => setSegment(item.id)}>{item.label}</button>)}
-      </div>}
       {shownCast.length + shownMemberCast.length === 0 ? <p className="lounge-cast-empty" role="status">조건에 맞는 캐릭터가 아직 없어요.</p> : <LoungeRow key={castFilter} label="캐릭터" className="lounge-cast-row">
         {shownCast.map(character => {
           const host = getLoungeHost(character.id), count = tables?.filter(table => table.host_persona === character.id).length ?? 0;

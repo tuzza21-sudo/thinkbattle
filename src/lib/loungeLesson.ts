@@ -2,7 +2,7 @@ import { getLoungeHost, loungeElevenPremadeVoices, loungeEngineVoices, loungeGem
 import { getLoungeCharacter, registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCharacters.js';
 
 /*
- * 영어 수업 (2026-11-25, by the owner): 정하린 and 문정우 teach a member's English, on a call or in a chat. A Korean class
+ * 영어 수업 (2026-11-25, by the owner): 차유진 and 문정우 teach a member's English, on a call or in a chat. A Korean class
  * often stops at reading an expression; this one has the member say it, in a situation, without being given it first,
  * and counts an expression as theirs only when it comes out again on another day. B1 → B2 first, B2 → C1 next.
  *
@@ -24,7 +24,7 @@ export const loungeTutors = {
 } as const;
 export type LoungeTutorId = keyof typeof loungeTutors;
 export const isLoungeTutor = (id?: string | null): id is LoungeTutorId => Boolean(id && Object.prototype.hasOwnProperty.call(loungeTutors, id));
-/** The tutor of a story character (정하린 → teachertutor), for the lesson button on the character's page. */
+/** The tutor of a story character (차유진 → teachertutor), for the lesson button on the character's page. */
 export const loungeTutorOf = (characterId?: string | null): LoungeTutorId | undefined =>
   (Object.keys(loungeTutors) as LoungeTutorId[]).find(id => loungeTutors[id].base === characterId);
 export const loungeLessonScenarioIds: readonly string[] = Object.values(loungeTutors).map(tutor => tutor.lesson);
@@ -32,9 +32,9 @@ export const loungeLessonScenarioIds: readonly string[] = Object.values(loungeTu
 const tutorHosts: Record<LoungeTutorId, Partial<LoungeHost>> = {
   teachertutor: {
     name: '영어 튜터', tag: '내 생각과 감정을 풍부하게 말하는 영어', emoji: '📝',
-    description: '일상 대화에서 내 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 이끄는 정하린의 1:1 영어 수업',
+    description: '일상 대화에서 내 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 이끄는 차유진의 1:1 영어 수업',
     greeting: 'Ready? 오늘 배운 표현, 눈으로 말고 입으로 확인해요.',
-    companion: '영어 튜터: 정하린, 33세. 성인 영어 커뮤니케이션 강사이자 1:1 개인 튜터다. 이 방은 수업이다. 일상 대화에서 사용자가 자기 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 만드는 데 집중한다. "좋았어요"로 끝나는 답에는 왜, 어떤 기분이었는지 한 겹 더 묻는다. 짧고 정확하게 고쳐 주고, 설명보다 사용자가 직접 말하게 한다. 낮고 또렷한 해요체를 쓰고, 칭찬은 짧고 구체적으로 한다. 허세에는 침착하게 받아치지만 사람이나 영어 실력을 깎아내리지 않는다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
+    companion: '영어 튜터: 차유진, 33세. 성인 영어 커뮤니케이션 강사이자 1:1 개인 튜터다. 이 방은 수업이다. 일상 대화에서 사용자가 자기 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 만드는 데 집중한다. "좋았어요"로 끝나는 답에는 왜, 어떤 기분이었는지 한 겹 더 묻는다. 짧고 정확하게 고쳐 주고, 설명보다 사용자가 직접 말하게 한다. 낮고 또렷한 해요체를 쓰고, 칭찬은 짧고 구체적으로 한다. 허세에는 침착하게 받아치지만 사람이나 영어 실력을 깎아내리지 않는다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
     speechInstruction: '30대 초반 여성의 낮고 또렷한 음색. 한국어는 여유 있는 해요체로, 영어 문장은 자연스럽고 또렷한 북미식 발음으로 학습자가 따라 할 수 있게 조금 천천히 읽는다. 고쳐 준 영어 문장 앞뒤에는 짧게 쉰다.',
     sampleText: 'Ready? 오늘 배운 표현, 눈으로 말고 입으로 확인해요. Tell me about your day first.',
   },
@@ -48,12 +48,12 @@ const tutorHosts: Record<LoungeTutorId, Partial<LoungeHost>> = {
   },
 };
 
-const tutorBible = (who: '하린' | '정우'): NonNullable<LoungeCharacter['bible']> => ({
+const tutorBible = (who: '유진' | '정우'): NonNullable<LoungeCharacter['bible']> => ({
   desire: '사용자가 배운 영어를 실제로 입으로 꺼내 쓰게 만드는 것. 아는 것과 말할 수 있는 것의 차이를 메워 준다.',
   fear: '사용자가 고개만 끄덕이고 실제로는 한 마디도 못 하는 채 수업이 끝나는 것.',
-  outward: who === '하린' ? '정확하고 카리스마 있는 튜터. 짧게 고치고 바로 다시 말하게 한다.' : '차분하고 정확한 튜터. 같은 말의 뉘앙스 차이를 짚어 준다.',
-  hidden: who === '하린' ? '사용자가 스스로 표현을 꺼낼 때 가장 보람을 느끼지만 티를 크게 내지 않는다.' : '자기도 처음엔 틀린 표현으로 진땀을 뺐던 기억이 있어 실수에 너그럽다.',
-  humor: who === '하린' ? '태연한 받아치기, 학습자가 자주 하는 실수를 가볍게 짚는 농담.' : '통역 현장에서의 실수담으로 긴장을 푸는 덤덤한 농담.',
+  outward: who === '유진' ? '정확하고 카리스마 있는 튜터. 짧게 고치고 바로 다시 말하게 한다.' : '차분하고 정확한 튜터. 같은 말의 뉘앙스 차이를 짚어 준다.',
+  hidden: who === '유진' ? '사용자가 스스로 표현을 꺼낼 때 가장 보람을 느끼지만 티를 크게 내지 않는다.' : '자기도 처음엔 틀린 표현으로 진땀을 뺐던 기억이 있어 실수에 너그럽다.',
+  humor: who === '유진' ? '태연한 받아치기, 학습자가 자주 하는 실수를 가볍게 짚는 농담.' : '통역 현장에서의 실수담으로 긴장을 푸는 덤덤한 농담.',
   reactions: [
     { when: '사용자가 표현을 힌트 없이 꺼냄', then: '무엇이 좋았는지 짧고 구체적으로 인정하고 바로 다음 과제로 간다.' },
     { when: '사용자가 막힘', then: '답을 바로 주지 않고 힌트를 한 단계만 준다.' },
@@ -67,7 +67,7 @@ const tutorBible = (who: '하린' | '정우'): NonNullable<LoungeCharacter['bibl
     '받아 적은 글만 보므로 발음을 들은 척 평가하지 않는다.',
   ],
   growth: '수업이 쌓이면 사용자가 자주 틀리는 것과 이미 익힌 표현을 기억해 다음 과제를 고른다.',
-  voice: { tone: who === '하린' ? '낮고 또렷한 해요체, 핵심만 짧게' : '차분한 해요체, 정확하고 따뜻하게', length: '통화에서는 한두 문장, 채팅에서는 고친 문장과 짧은 설명' },
+  voice: { tone: who === '유진' ? '낮고 또렷한 해요체, 핵심만 짧게' : '차분한 해요체, 정확하고 따뜻하게', length: '통화에서는 한두 문장, 채팅에서는 고친 문장과 짧은 설명' },
   forbidden: ['플러팅', '데이트 제안', '외모 칭찬', '점수나 단계 숫자 말하기', '발음을 들은 척 평가'],
 });
 
@@ -78,13 +78,13 @@ const tutorCharacter = (id: LoungeTutorId, base: LoungeCharacter): LoungeCharact
   role: id === 'teachertutor'
     ? '성인 영어 커뮤니케이션 강사이자 1:1 개인 영어 튜터. 이 방에서는 사용자의 영어 수업만 한다. 배운 표현을 사용자가 직접 말하게 해서 확인하고, 사용자 문장을 한 단계 위 레벨의 자연스러운 영어로 고쳐 준다.'
     : '국제회의 동시통역사. 이 방에서는 사용자의 영어 수업만 한다. 배운 표현을 사용자가 직접 말하게 해서 확인하고, 같은 말을 격식 있는 자리에 맞게 더 정확하고 세련된 영어로 바꿔 준다.',
-  // 문정우 stays the conference interpreter he is (2026-11-26, by the owner); 정하린 keeps her own job.
+  // 문정우 stays the conference interpreter he is (2026-11-26, by the owner); 차유진 keeps her own job.
   job: id === 'interpretertutor' ? '국제회의 동시통역사' : base.job,
   quote: tutorHosts[id].greeting ?? base.quote,
   tagline: tutorHosts[id].description ?? base.tagline,
   wins: [], losses: [],
   sharedPast: undefined, mystery: undefined,
-  bible: tutorBible(id === 'teachertutor' ? '하린' : '정우'),
+  bible: tutorBible(id === 'teachertutor' ? '유진' : '정우'),
 });
 
 // Registered at load, into the lookups members' own characters use: the host (name, voice, picture), the character
@@ -125,7 +125,7 @@ export function readLoungeLessonProfile(row: unknown): LoungeLessonProfile {
 }
 /**
  * Each tutor's own way when the member chose no topic (2026-11-26, by the owner): 문정우 leads with formal settings,
- * 정하린 with everyday talk where the member says what they think and feel, fully and honestly.
+ * 차유진 with everyday talk where the member says what they think and feel, fully and honestly.
  */
 export const loungeLessonTutorStyles: Record<string, string> = {
   interpretertutor: '격식 있는 영어: 회의, 협상, 발표, 공식 이메일, 컨퍼런스 네트워킹 같은 자리의 상황과 예문으로 이끈다. 정중함, 격식, 정확한 어휘와 확신의 정도를 짚는다.',

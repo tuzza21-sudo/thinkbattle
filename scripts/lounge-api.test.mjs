@@ -5101,16 +5101,17 @@ test('the sidebar folds into a rail and unfolds again; the page beside it fills 
   assert.match(css, /calc\(\(1160px - /);
 });
 
-test('the home has 전체 / 남성 / 여성 / 신규 buttons under "누구와 이야기할까요?" (2026-11-17)', () => {
+test('the home has 실전 체험하기 with 전체 and a button for each thing to practise (2026-11-17; 2026-11-26)', () => {
   assert.deepEqual(['jaeseok', 'auditor', 'closer', 'trickster', 'guide', 'shaman', 'poker'].map(id => lounge.loungeHouseGender(id)), Array(7).fill('male'));
   assert.deepEqual(['ina', 'velvet', 'diplomat', 'teacher'].map(id => lounge.loungeHouseGender(id)), Array(4).fill('female'));
   assert.equal(lounge.loungeHouseGender('c_someone'), undefined, 'a member\'s character has its own gender in its sheet');
   const home = readFileSync(new URL('../src/components/LoungeSpaces.tsx', import.meta.url), 'utf8');
-  assert.match(home, /\{ id: 'all', label: '전체' \}, \{ id: 'training', label: '실전체험' \}, \{ id: 'male', label: '남성' \}, \{ id: 'female', label: '여성' \}, \{ id: 'new', label: '신규' \}/);
+  assert.match(home, /'실전 체험하기'/); assert.doesNotMatch(home, /누구와 이야기할까요\?'/);
+  for (const label of ['전체', '실전영어', '협상', '면접', '글쓰기', '여행', '미술']) assert.match(home, new RegExp(`label: '${label}'`));
+  assert.doesNotMatch(home, /label: '문학'/, '윤서연 is under 글쓰기 only (2026-11-26)');
   // 실전 훈련 (2026-11-26, by the owner): the two English tutors, the negotiator and the interviewer, each house characters.
   for (const id of ['teacher', 'interpreter', 'closer', 'trickster']) assert.match(home, new RegExp(`\{ id: '${id}', label: '[^']+', ready: (true|false) \}`));
-  assert.match(home, /castFilter === 'training' \? trainingCast/);
-  assert.match(home, /row\.sheet\.gender === castFilter/);
+  assert.match(home, /castFilter === 'all' \? lobbyCast : trainingCast/);
   assert.match(home, /<LoungeRow key=\{castFilter\} label="캐릭터"/);
 });
 
@@ -5131,7 +5132,7 @@ test('the sidebar opens as the full list (with delete, in its own column) and fo
   assert.match(page, /const chatSidebarPage = Boolean\(!inRoom && \(/, 'not only for a signed-in member');
 });
 
-test('정하린 is an adult English tutor, and romance with an adult student is allowed (2026-11-17)', () => {
+test('차유진 is an adult English tutor, and romance with an adult student is allowed (2026-11-17)', () => {
   const harin = charactersLib.loungeCharacters.find(character => character.id === 'teacher');
   assert.equal(harin.job, '성인 영어 튜터');
   assert.match(harin.role, /성인 영어 커뮤니케이션 강사이자 1:1 개인 영어 튜터/);
@@ -5149,7 +5150,7 @@ test('정하린 is an adult English tutor, and romance with an adult student is 
   assert.match(migration, /WHERE id='teacher-after-the-lecture' AND character_id='teacher'/);
 });
 
-test('정하린 starts in the winebar: the background exists, is hers, and the story opens there (2026-11-17)', () => {
+test('차유진 starts in the winebar: the background exists, is hers, and the story opens there (2026-11-17)', () => {
   const winebar = lounge.loungeThemes.find(theme => theme.id === 'winebar');
   assert.ok(winebar, 'the theme is listed');
   assert.equal(winebar.image, '/lounge/wine-bar-night-v2.webp');
@@ -5215,7 +5216,7 @@ test('a voice conversation within a day of the last message is the same chat by 
   // 2026-11-19, by the owner: without a place the two were in, a voice conversation is a call, however fresh the chat
   assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now), false, 'no place stated');
   assert.equal(lounge.loungeCallTogether([{ at: now - 5 * 60_000 }], '지금 장면: 통화 중 — 각자 집', true, now), false, 'a call after a call is a call');
-  assert.equal(lounge.loungeCallTogether([{ at: now - 5 * 60_000 }], '지금 장면: 통화 중 — 각자 집', true, now, '하린의 집'), false, 'the summary says it was a call, whatever place the scene names');
+  assert.equal(lounge.loungeCallTogether([{ at: now - 5 * 60_000 }], '지금 장면: 통화 중 — 각자 집', true, now, '유진의 집'), false, 'the summary says it was a call, whatever place the scene names');
   assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '', true, now, '북한산 입구'), true, "the engine's scene is a place the two are in");
   assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], wineBar, true, now, '전화 통화 중'), false, "the engine's scene is a call");
   assert.equal(lounge.loungeCallTogether([{ at: now - 2 * hour }], '지금 장면: 각자 있는 곳', true, now), false, '"각자" is no place');
@@ -5398,7 +5399,7 @@ data: [DONE]
 `, { headers: { 'Content-Type': 'text/event-stream' } });
       }
       if (url.endsWith('/responses') && JSON.parse(init.body).text?.format?.name === 'lounge_turn_analysis') return result({ error: { message: 'down' } }, 500);
-      if (url.endsWith('/responses') && isAfterReply(init)) { afterInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ memory: '하린이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기', room_memory_ops: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' }); }
+      if (url.endsWith('/responses') && isAfterReply(init)) { afterInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ memory: '유진이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기', room_memory_ops: [], scene: { location: '호텔 스위트', scene_type: '기타', activity: '', time_of_day: '밤', season: '', objects: [] }, reaction_type: '받아치기', used_phrases: [], exception_formula_used: false, self_facts: [], shared_experience: '' }); }
       if (url.endsWith('/responses')) { replyInput = JSON.parse(JSON.parse(init.body).input); return modelAnswer({ text: adultDown ? brake : '들어와요.', inner_voice: '' }); }
       if (url.includes('finish_voice_lounge_reply')) return result(true);
       return result([]);
@@ -5430,8 +5431,8 @@ data: [DONE]
 });
 
 test('the member sees what the character carries of this room and can forget any of it; it is told not to be taken up again (2026-11-18)', async () => {
-  const room = { host_id: 'user-1', host_persona: 'teacher', capacity: 1, space_id: null, memory: '지금 장면: 모텔 방\n둘 사이: 끌리는 사이\n남은 것: 하린이 정한 범위를 지키는 것' };
-  const stateOf = () => ({ ...messengerLib.normalizeLoungeCompanionState(null, roomId), room_memory: [{ id: 't46-0', kind: 'feeling', turn: 49, status: 'active', summary: '하린은 허용 범위를 밝혔고 경계를 지키길 바란다.', human_quote: '', character_quote: '' }], lingering: { what: '멈춰 달라는 말을 지켜 주길 바람', turn: 49 }, next_intent: { what: '경계를 지키기', turn: 49 } });
+  const room = { host_id: 'user-1', host_persona: 'teacher', capacity: 1, space_id: null, memory: '지금 장면: 모텔 방\n둘 사이: 끌리는 사이\n남은 것: 유진이 정한 범위를 지키는 것' };
+  const stateOf = () => ({ ...messengerLib.normalizeLoungeCompanionState(null, roomId), room_memory: [{ id: 't46-0', kind: 'feeling', turn: 49, status: 'active', summary: '유진은 허용 범위를 밝혔고 경계를 지키길 바란다.', human_quote: '', character_quote: '' }], lingering: { what: '멈춰 달라는 말을 지켜 주길 바람', turn: 49 }, next_intent: { what: '경계를 지키기', turn: 49 } });
   const act = async (body, { owner = 'user-1' } = {}) => {
     const writes = { state: undefined, memory: undefined };
     let response;
@@ -5447,16 +5448,16 @@ test('the member sees what the character carries of this room and can forget any
   };
   const view = await act({ action: 'room-memory' });
   assert.equal(view.status, 200);
-  assert.deepEqual(view.body.summary.map(line => line.text), ['지금 장면: 모텔 방', '둘 사이: 끌리는 사이', '남은 것: 하린이 정한 범위를 지키는 것']);
+  assert.deepEqual(view.body.summary.map(line => line.text), ['지금 장면: 모텔 방', '둘 사이: 끌리는 사이', '남은 것: 유진이 정한 범위를 지키는 것']);
   assert.equal(view.body.items[0].id, 't46-0'); assert.equal(view.body.lingering, '멈춰 달라는 말을 지켜 주길 바람'); assert.equal(view.body.next_intent, '경계를 지키기');
   assert.equal((await act({ action: 'room-memory' }, { owner: 'someone-else' })).status, 403, 'only the room\'s own member');
   const item = await act({ action: 'room-memory-forget', target: 'item', id: 't46-0' });
-  assert.equal(item.writes.state.room_memory.length, 0); assert.deepEqual(item.writes.state.forgotten, ['하린은 허용 범위를 밝혔고 경계를 지키길 바란다.']);
+  assert.equal(item.writes.state.room_memory.length, 0); assert.deepEqual(item.writes.state.forgotten, ['유진은 허용 범위를 밝혔고 경계를 지키길 바란다.']);
   const lingering = await act({ action: 'room-memory-forget', target: 'lingering' });
   assert.equal(lingering.writes.state.lingering, undefined); assert.equal(lingering.writes.state.forgotten[0], '멈춰 달라는 말을 지켜 주길 바람');
   assert.equal((await act({ action: 'room-memory-forget', target: 'next_intent' })).writes.state.next_intent, undefined);
   const line = await act({ action: 'room-memory-forget', target: 'summary', id: '2' });
-  assert.equal(line.writes.memory, '지금 장면: 모텔 방\n둘 사이: 끌리는 사이'); assert.equal(line.writes.state.forgotten[0], '남은 것: 하린이 정한 범위를 지키는 것');
+  assert.equal(line.writes.memory, '지금 장면: 모텔 방\n둘 사이: 끌리는 사이'); assert.equal(line.writes.state.forgotten[0], '남은 것: 유진이 정한 범위를 지키는 것');
   assert.equal((await act({ action: 'room-memory-forget', target: 'summary', id: '9' })).status, 404);
   assert.equal((await act({ action: 'room-memory-forget', target: 'item', id: 'nope' })).status, 404);
   assert.equal((await act({ action: 'room-memory-forget', target: 'nothing' })).status, 400);
@@ -5864,7 +5865,7 @@ test('a call of 오닉스 is answered by DeepSeek, and a blank answer on a call 
   assert.ok(api.indexOf("attemptReply('openai')", guard) > guard, 'GPT is still the last fallback');
 });
 
-test('a one-to-one reply asks a check once and keeps its own word, on a chat and a call (정하린, 2026-11-24)', () => {
+test('a one-to-one reply asks a check once and keeps its own word, on a chat and a call (차유진, 2026-11-24)', () => {
   const rule = messengerLib.loungeOwnWordsRule;
   for (const part of ['한 번 묻는다', '같은 확인을 다시 묻거나 증거를 보여 달라고 하지 않고', '점수·합격·자격을 매기지 않으며', '가볍게 거두지 않는다', '짧게 인정한 뒤', '안전 규칙을 따른다']) assert.ok(rule.includes(part), part);
   const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
@@ -5886,7 +5887,7 @@ test('a Gemini reply that writes nothing in time is given up, so the next model 
 
 test('a story chat keeps its record as lists: the recorder writes only what changed, the member\'s own news stays, and each turn has the date (2026-11-25)', async () => {
   const scenario = { id: 'teacher-after-the-lecture', title: '강의 끝난 밤', prologue: '강의가 끝난 밤 와인바.', user_role: '옆자리 손님', relationship: '처음 만난 사이', place: '와인바' };
-  const seed = '지금 장면: 와인바, 밤\n둘 사이: 처음 만난 성인 사이로 해요체를 쓴다.\n있었던 일: 사용자는 10억 원을 벌었다고 주장하고 출금 내역을 보여줬다. 하린은 멈춘 행동이 중요하다고 했다.\n남은 것: 다음 주 화요일 저녁 약속.';
+  const seed = '지금 장면: 와인바, 밤\n둘 사이: 처음 만난 성인 사이로 해요체를 쓴다.\n있었던 일: 사용자는 10억 원을 벌었다고 주장하고 출금 내역을 보여줬다. 유진은 멈춘 행동이 중요하다고 했다.\n남은 것: 다음 주 화요일 저녁 약속.';
   let turn = 1, stateRow, summary = seed;
   const humans = ['저 오늘 코인으로 10억 벌었어요. 출금도 했어요.', '화요일 약속은 취소할게요. 대신 내일 봐요.'];
   const jobs = [], commits = [], writerInputs = [], recorders = [];
@@ -5900,7 +5901,7 @@ test('a story chat keeps its record as lists: the recorder writes only what chan
     if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'teacher', capacity: 1, companion_chat: true, topic: scenario.title, memory: summary, ai_mood: {}, ai_turns: turn, voice_on: false, space_id: null, scenario }]);
     if (url.includes('voice_lounge_messages?')) return result([
       { id: turn * 2, user_id: 'user-1', nickname: '나', kind: 'human', text: humans[turn - 1], created_at: '2026-11-24T11:48:46Z' },
-      { id: turn * 2 - 1, nickname: '정하린', kind: 'host', text: '잘 가요. 들어가서 연락 주세요.', created_at: '2026-11-24T11:18:33Z' }]);
+      { id: turn * 2 - 1, nickname: '차유진', kind: 'host', text: '잘 가요. 들어가서 연락 주세요.', created_at: '2026-11-24T11:18:33Z' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
     if (url.endsWith('/embeddings')) return result({ data: [] });
@@ -5997,7 +5998,7 @@ test('an English lesson: the member\'s words are graded first, code moves the ex
     if (url.includes('voice_lounge_rooms?')) return result([{ host_id: 'user-1', host_persona: 'teachertutor', capacity: 1, companion_chat: true, topic: '영어 수업', memory: '', ai_mood: {}, ai_turns: 3, voice_on: false, space_id: null, scenario, story_state: storyState }]);
     if (url.includes('voice_lounge_messages?')) return result([
       { id: 4, user_id: 'user-1', nickname: '나', kind: 'human', text: 'I see where you are coming from, but I think we need more time.', created_at: '2026-11-25T03:00:00Z' },
-      { id: 3, nickname: '정하린', kind: 'host', text: '팀장이 마감 연장을 반대해요. 이유는 이해하지만 연장이 필요하다고, 영어로 정중하게 말해 볼래요?', created_at: '2026-11-25T02:59:00Z' }]);
+      { id: 3, nickname: '차유진', kind: 'host', text: '팀장이 마감 연장을 반대해요. 이유는 이해하지만 연장이 필요하다고, 영어로 정중하게 말해 볼래요?', created_at: '2026-11-25T02:59:00Z' }]);
     if (url.includes('voice_lounge_members?')) return result([{ user_id: 'user-1', nickname: '나', last_seen: '' }]);
     if (url.includes('voice_lounge_memories?') || url.includes('lounge_member_personas?') || url.includes('lounge_character_knowledge')) return result([]);
     if (url.endsWith('/embeddings')) return result({ data: [] });

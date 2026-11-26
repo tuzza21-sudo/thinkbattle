@@ -99,5 +99,12 @@ test('a culture-trip site has viewing points with pictures; going to one changes
   assert.equal(classes.loungeClassScene('art', classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'kiss')).src, images.loungeClassImages.kiss.src);
   assert.equal(classes.loungeClassScene('art', classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'guernica')), undefined, 'no picture for a work under copyright');
   assert.match(classes.loungeClassRules('travel'), /step spot/);
+  // The art class stays in the museum while the works change; the trip's background follows where the member stands.
+  const art = classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'kiss');
+  assert.equal(classes.loungeClassBackground('art', art), '/lounge/museum-gallery-v1.webp');
+  assert.equal(classes.loungeClassBackground('art', null), '/lounge/museum-gallery-v1.webp');
+  assert.equal(classes.loungeClassBackground('travel', state), '/lounge/class/spots/birth-venus.webp');
+  assert.equal(classes.loungeClassBackground('emotional', null), undefined);
+  assert.ok(existsSync(fileURLToPath(new URL('../public/lounge/museum-gallery-v1.webp', import.meta.url))));
   for (const [id, image] of Object.entries(images.loungeClassImages)) assert.ok(existsSync(fileURLToPath(new URL(`../public${image.src}`, import.meta.url))), id);
 });

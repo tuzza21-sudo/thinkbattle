@@ -36,6 +36,11 @@ const scenes = {
     prompt: `${common} Wide 3:2 photograph of a quiet city side street at night just after rain, empty of people: wet asphalt and pavement reflecting warm shop-window light and street lamps, a few small shops with their lights on and blurred neon glow with no readable text, a tree-lined pavement with a bench, light mist, cinematic and calm.`,
   },
   // 한지오's story starts in Florence (2026-11-07): the Arno at golden hour from a stone bridge.
+  // 선우령's art-history class (2026-11-26, by the owner): the class stays in one museum while the works change.
+  museum: {
+    file: 'museum-gallery-v1.webp',
+    prompt: `${common} A quiet modern art museum gallery after closing: tall white walls and a polished pale wooden floor, a long upholstered viewing bench in the middle of the room, framed paintings hung far apart and slightly out of focus with no readable labels, soft gallery spotlights from a high ceiling, a doorway opening to the next gallery room, calm and contemplative.`,
+  },
   arnobridge: {
     file: 'arno-bridge-v1.webp',
     prompt: `${common} The Arno river in Florence at golden hour, seen from an old stone arch bridge: a worn stone parapet in the foreground, the calm river reflecting a warm orange and pink sky, terracotta-roofed buildings and a distant medieval bridge with small shops along the water, a few swallows in the sky, soft haze. Warm, peaceful, no people, no cars. Nothing readable on any sign.`,

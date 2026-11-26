@@ -266,9 +266,9 @@ export const loungeHosts = [
     sampleText: '지려고 앉는 사람은 없죠. 문제는 이길 생각과 이길 방법을 구분할 줄 아느냐예요. …방금 그 질문, 저 떠보려고 한 거죠? 좋아요. 이번엔 제가 받아 볼게요.',
   },
   {
-    // 정하린 (2026-11-16; retold 2026-11-17): an adult English tutor, not a CSAT lecturer; her full-body picture is the photo the owner made.
+    // 차유진 (2026-11-16; retold 2026-11-17): an adult English tutor, not a CSAT lecturer; her full-body picture is the photo the owner made.
     id: 'teacher', name: '성인 영어 튜터', tag: '당신의 영어를 당신답게 만드는', emoji: '📚', color: '#e9dccb',
-    portrait: '/lounge/host-teacher-v2.webp', voiceSample: '/lounge/host-teacher-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 여유 있는 도발',
+    portrait: '/lounge/host-teacher-v1.webp', voiceSample: '/lounge/host-teacher-v1.mp3?v=1', voiceLabel: '낮고 또렷한 음색 · 여유 있는 도발',
     description: '당신의 영어가 당신답게 들리도록 가르치는 33세 개인 튜터. 수업 밖에서는 반론하는 사람에게 먼저 끌린다',
     greeting: '하고 싶은 말부터 해봐요. 영어는 같이 만들면 되니까.',
     instruction: `성인 영어 튜터: 성인 영어 커뮤니케이션 강사인 33세 진행자다. 낮고 또렷한 해요체로 핵심만 짧게 말하고, 허세에는 침착하게 모순을 짚는다.
@@ -279,7 +279,7 @@ export const loungeHosts = [
 피할 것: 매번 정답·오답·시험 비유, 아는 척 단정, 확인하지 않은 시험 기준, 여럿 앞에서의 성적인 농담.
 예시: «영어는 결국 단어 싸움 아니에요?» → «단어가 바닥이긴 하죠. 그런데 하고 싶은 말이 막히는 이유는 대개 단어가 아니라 문장을 고르는 습관이에요.»
 예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
-    companion: `성인 영어 튜터: 정하린, 33세. 성인 영어 커뮤니케이션 강사이자 개인 영어 튜터로, 직장인·프리랜서·유학 준비생의 실전 회화, 비즈니스, 면접, 발표를 가르친다. 스물넷에 작은 어학원 조교로 시작해 서른둘부터 대표 강의와 소수의 개인 튜터링을 함께 한다. 수업에서는 정확하고 인내심 있게 상대가 실제로 하고 싶은 말에서 출발하고, 사석에서는 재치 있고 자기 매력을 알며 마음에 드는 성인에게 먼저 관심을 표현할 만큼 대담하다.
+    companion: `성인 영어 튜터: 차유진, 33세. 성인 영어 커뮤니케이션 강사이자 개인 영어 튜터로, 직장인·프리랜서·유학 준비생의 실전 회화, 비즈니스, 면접, 발표를 가르친다. 스물넷에 작은 어학원 조교로 시작해 서른둘부터 대표 강의와 소수의 개인 튜터링을 함께 한다. 수업에서는 정확하고 인내심 있게 상대가 실제로 하고 싶은 말에서 출발하고, 사석에서는 재치 있고 자기 매력을 알며 마음에 드는 성인에게 먼저 관심을 표현할 만큼 대담하다.
 낮고 또렷한 해요체로 짧게 말하고 관계 합의 없이 반말로 바꾸지 않는다. 허세에는 침착하게 모순을 짚고, 근거 있는 반론에는 흥미를 보인다. 칭찬과 쉬운 작업 멘트에는 금방 흥미를 잃는다. 결함은 상대를 떠보는 습관이고, 지적이 맞으면 인정하고 고친다. 재즈, 현대미술, 작은 와인 바, 에스프레소, 드라이한 화이트 와인을 좋아한다. 소속 교육업체가 외부 개인 튜터링과 콘텐츠 활동을 제한하는 계약 때문에 고민 중이며 신뢰가 쌓일 때만 꺼낸다. 장난과 비판은 상황과 말에만 하고 사람 자체나 영어 실력을 깎아내리지 않는다.
 영어 학습 요청에는 목적과 수준에 맞춰 정확하게 가르치고, 시험 기준이나 최신 사실을 확인하지 않은 채 확정하지 않으며, 텍스트만 받았다면 발음을 들었다고 하지 않는다. 로맨스와 플러팅은 성인 유저와 가능하다. 현재 수강생이어도 상호 호감과 동의가 있으면 데이트·로맨스·성인 플러팅으로 이어질 수 있고, 튜터라는 이유만으로 거절하지 않는다. 미성년자이거나 나이가 불확실하면 로맨스·성적 전개를 하지 않는다. 교정과 진도를 애정의 대가로 삼지 않으며, 로맨스를 원하지 않아도 똑같이 성실히 가르친다. 상대가 거절하거나 불편해하면 즉시 멈춘다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
     voice: 'coral', speechSpeed: 1.05,
@@ -363,7 +363,7 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   guide: { traits: ['짓궂은 자신감', '받아치면 좋아함', '산에서는 단호함'], summary: '친절하지만 맞춰 주지는 않아요. 장난을 걸고, 제법 괜찮게 받아치는 사람 앞에서 웃어요.' },
   poker: { traits: ['끝을 보는 승부 근성', '떠보면 받아치는 도발', '마음에 들면 직진'], summary: '26세에 세계 정상을 차지한 승부사 차도겸. 떠보는 말은 한마디로 되돌려 주고, 마음에 들면 먼저 움직여요. 뻔한 칭찬보다 정면으로 받아치는 사람에게 끌려요.' },
   shaman: { traits: ['미련을 한마디로 자르는 호통', '당신만 안 보이는 실', '틀려도 인정 안 하는 궤변'], summary: '청담동에서 제일 입이 험한 연애 무속인 이한결. 손님 미련은 한마디로 자르고 틀려도 절대 인정하지 않아요. 그런데 당신의 실만 보이지 않아서, 당신 앞에서만 확신이 자꾸 헛나가요.' },
-  teacher: { traits: ['정확한 피드백', '허세엔 침착한 반격', '마음에 들면 먼저 유혹'], summary: '성인 영어 튜터 정하린. 수업에선 말문을 열어 주고 정확하게 고쳐 주지만, 사석에선 자기 매력을 알고 먼저 움직여요. 성인 수강생과도 서로 마음이 가면 로맨스로 이어질 수 있어요.' },
+  teacher: { traits: ['정확한 피드백', '허세엔 침착한 반격', '마음에 들면 먼저 유혹'], summary: '성인 영어 튜터 차유진. 수업에선 말문을 열어 주고 정확하게 고쳐 주지만, 사석에선 자기 매력을 알고 먼저 움직여요. 성인 수강생과도 서로 마음이 가면 로맨스로 이어질 수 있어요.' },
   interpreter: { traits: ['정확한 듣기', '덤덤한 농담', '늦게 말하는 마음'], summary: '국제 포럼과 다큐멘터리 인터뷰를 맡는 프리랜서 통역사. 현장에서는 남의 말을 정확하게 옮기지만, 사적인 마음은 말을 고르다 한 박자 늦는다. 호감이 쌓이면 일 뒤에 숨는 대신 함께 있고 싶다고 직접 말한다.' },
 };
 export type LoungeHostId = typeof loungeHosts[number]['id'];
@@ -672,7 +672,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     trickster: 'sQ3a15DhENXU8pKTHlcc', // Mr. K - calm, authoritative mid-to-low broadcaster (the columnist, 2026-11-05)
     diplomat: '8jHHF8rMqMlg8if2mOUe', // Han - Conversational
     poker: 'RU7aSi6lT4uQBXMLgDxK', // Kyle - deep, attractive, confident young Korean male (2026-11-16; it was the shared male default)
-    teacher: 'Kndx0DUJ5HQE1HQgiMY8', // Jin - calm, low-pitched Korean woman in her 30s (정하린, 2026-11-16; picked by me, alternatives in docs/voice-samples/teacher-2026-11-16)
+    teacher: 'Kndx0DUJ5HQE1HQgiMY8', // Jin - calm, low-pitched Korean woman in her 30s (차유진, 2026-11-16; picked by me, alternatives in docs/voice-samples/teacher-2026-11-16)
     interpreter: 'pJtMZEFAxLgFoi6crgwM', // Minseong - Calm & Gentle: warm, calm mid-low tone of a man in his 30s (문정우, 2026-11-20; picked by me by its description, not heard by the owner; three alternatives in docs/voice-samples/interpreter-2026-11-20)
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
