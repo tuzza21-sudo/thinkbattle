@@ -13,6 +13,9 @@ import './LoungePricing.css';
 const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 const phoneDigits = (value: string) => value.replace(/\D/g, '');
 const phoneOk = (value: string) => /^01\d{8,9}$/.test(phoneDigits(value));
+/** Where this browser keeps the buyer's phone number after the first payment (never sent to 사석's server). */
+const phoneKey = 'saseok.payPhone';
+const rememberedPhone = () => { try { return localStorage.getItem(phoneKey) ?? ''; } catch { return ''; } };
 
 /**
  * Opens the PortOne (KG Inicis) window. On a phone the page moves to the card company and comes back to /lounge/payment;
@@ -36,7 +39,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   const [noticeFor, setNoticeFor] = useState<string | null>(null);
   // KG Inicis's PC window needs the buyer's phone number; it is asked for on the card, sent to the window and not kept.
   const [asking, setAsking] = useState<string | null>(null);
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(rememberedPhone);
   const [method, setMethod] = useState<LoungePayMethod>('card');
   // In the store app a pass is not sold yet (the stores require their own in-app billing for it): the plans show, without a buy button.
   const inApp = isSaseokApp();
@@ -45,6 +48,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
     if (!user || user.isAnonymous) { setNotice('회원가입 또는 로그인 후 결제할 수 있어요.'); onLoginRequest?.(); return; }
     const mobile = isMobile();
     if (!mobile && !phoneOk(phone)) { setAsking(plan.key); return; }
+    if (!mobile) { try { localStorage.setItem(phoneKey, phoneDigits(phone)); } catch { /* private mode: asked again next time */ } }
     setBusy(plan.key);
     try {
       const done = await openPaymentWindow(await createLoungePayment(plan.id, plan.term, mobile ? 'mobile' : 'pc', mobile ? undefined : phoneDigits(phone), method));
@@ -89,7 +93,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
           {asking === plan.key && <form className="lounge-pricing-phone" onSubmit={event => { event.preventDefault(); void start(plan); }}>
             <label htmlFor={`lounge-pay-phone-${plan.key}`}>휴대폰 번호</label>
             <input id={`lounge-pay-phone-${plan.key}`} type="tel" inputMode="numeric" autoComplete="tel" placeholder="010-1234-5678" maxLength={13} value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
-            <p>결제창(KG이니시스)에 필요해요. 결제창에만 전달하고 사석에는 저장하지 않아요.</p>
+            <p>결제창(KG이니시스)에 필요해요. PC의 KG이니시스 결제창이 꼭 요구해서 처음 한 번만 물어요. 이 브라우저에만 기억하고 사석 서버에는 저장하지 않아요.</p>
           </form>}
           <button type="button" className="lounge-pricing-cta" disabled={busy !== null || (asking === plan.key && !phoneOk(phone))} onClick={() => void start(plan)}>
             {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : asking === plan.key ? '결제창 열기' : `${plan.name} 시작하기`}

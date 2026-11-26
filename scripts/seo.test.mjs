@@ -98,7 +98,7 @@ test('the static page of an address carries its own head, text and structured da
   const home = JSON.parse(renderPage(template, pagesToWrite()[0]).match(/id="seo-jsonld">(.*?)<\/script>/s)[1])['@graph'];
   assert.deepEqual(home.map(item => item['@type']).sort(), ['FAQPage', 'Organization', 'WebApplication', 'WebPage', 'WebSite']);
   const offers = home.find(item => item['@type'] === 'WebApplication').offers;
-  assert.deepEqual(offers.map(item => item.price), [0, 20000, 150000]);
+  assert.deepEqual(offers.map(item => item.price), [0, 20000]);
 });
 
 test('a character page shares the character portrait and never marks a made-up character as a real person', () => {
@@ -118,7 +118,7 @@ test('llms.txt lists the pages and llms-full.txt carries the text, both in Korea
   for (const guide of seoGuides) assert.ok(short.includes(`https://saseok.kr${guide.path}`) && full.includes(guide.h1));
   for (const character of loungeCharacters) assert.ok(short.includes(`/lounge/characters/${character.id}`));
   assert.ok(short.startsWith('# 사석') && /가상의 인물/.test(short) && /만 18세/.test(short));
-  assert.ok(/20,000원/.test(short) && /150,000원/.test(short));
+  assert.ok(/20,000원/.test(short) && !/150,000원/.test(short), "the yearly pass is off sale (2026-11-26)");
 });
 
 test('no search or answer engine is shut out, and the build writes the static pages', () => {

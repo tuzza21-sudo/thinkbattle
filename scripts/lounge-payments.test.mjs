@@ -133,10 +133,10 @@ test('Pro is sold by the month (20,000) and by the year (150,000); the server se
   assert.equal(req.redirectUrl, 'https://app.test/lounge/payment');
   assert.deepEqual(req.noticeUrls, ['https://app.test/api/payments?action=webhook']);
   assert.ok(!JSON.stringify(month.body).includes('portone-secret'), 'the API secret never reaches the browser');
+  const phone = await ask('create', { plan: 'pro', term: 'month', device: 'mobile' });
+  assert.equal(phone.body.request.customer.phoneNumber, undefined, 'a phone pays without giving the number');
   const year = await ask('create', { plan: 'pro', term: 'year', device: 'mobile' });
-  assert.equal(year.inserted[0].amount, 150_000); assert.match(year.inserted[0].oid, /^SY/);
-  assert.equal(year.body.request.totalAmount, 150_000); assert.match(year.body.request.orderName, /1년/);
-  assert.equal(year.body.request.customer.phoneNumber, undefined, 'a phone pays without giving the number');
+  assert.equal(year.inserted.length, 0, 'the yearly pass is off sale (2026-11-26)'); assert.match(year.body.error, /요금제/);
   const none = await ask('create', { plan: 'pro', device: 'mobile' });
   assert.equal(none.inserted[0].amount, 20_000, 'no term is the month');
 });

@@ -5079,12 +5079,13 @@ test('the lounge tab for conversations is called 사석, its page 대화중인 �
 
 test('the plans page: Pro is named Plus, the free plan has 20 chats a day and 2 사석, Plus has 10 사석 (2026-11-17)', () => {
   assert.deepEqual(plansLib.loungeFreePlan.features, ['일 채팅 20회', '사석 2개까지', '이한결 사주 일 1회 제공']);
-  assert.deepEqual(plansLib.loungePlans.map(plan => plan.name), ['Plus 월간', 'Plus 연간']);
-  assert.deepEqual(plansLib.loungePlans.map(plan => plan.id), ['pro', 'pro'], 'the id stays: the database knows it by that');
+  assert.deepEqual(plansLib.loungePlans.map(plan => plan.name), ['Plus 월간'], 'the yearly pass is off sale (2026-11-26)');
+  assert.deepEqual(plansLib.loungePlans.map(plan => plan.id), ['pro'], 'the id stays: the database knows it by that');
+  assert.equal(plansLib.getLoungePlan('pro', 'year'), undefined);
   for (const plan of plansLib.loungePlans) assert.ok(plan.features.includes('사석 10개까지') && plan.features.includes('채팅 무제한'));
   assert.equal(plansLib.loungePlanReceiptName('pro', 'SS123'), 'Plus 1개월 이용권');
   assert.equal(plansLib.loungePlanReceiptName('plus', 'SY123'), 'Plus 1년 이용권');
-  assert.equal(plansLib.loungePlanGoodName(plansLib.loungePlans[1]), '사석 Plus 1년 이용권');
+  assert.equal(plansLib.loungePlanGoodName(plansLib.loungePlans[0]), '사석 Plus 1개월 이용권');
 });
 
 test('the sidebar folds into a rail and unfolds again; the page beside it fills its column so the row arrows stay on screen (2026-11-17)', () => {

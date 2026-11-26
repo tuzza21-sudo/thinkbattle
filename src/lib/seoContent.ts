@@ -21,7 +21,6 @@ export type SeoGuide = {
 };
 
 const pro = loungePlans.find(plan => plan.key === 'pro-month')!;
-const proYear = loungePlans.find(plan => plan.key === 'pro-year')!;
 const won = (value: number) => `${value.toLocaleString('ko-KR')}원`;
 const castCount = loungeCharacters.length;
 const callMinutes = loungeCallMinutes.pro;
@@ -66,7 +65,7 @@ export const seoGuides: readonly SeoGuide[] = [
     ],
     faq: [
       { question: 'AI 컴패니언이 뭔가요?', answer: '대화 상대가 되어 주는 AI입니다. 정보를 찾아 주는 비서가 아니라, 나를 기억하고 이야기를 이어 가며 가까워지는 캐릭터와 대화하는 서비스예요. 사석은 한국어 AI 컴패니언 서비스입니다.' },
-      { question: '사석은 무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작은 Plus 이용권(월 ${won(pro.price)}, 연 ${won(proYear.price)})에서 쓸 수 있어요.` },
+      { question: '사석은 무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작은 Plus 이용권(월 ${won(pro.price)})에서 쓸 수 있어요.` },
       { question: '캐릭터가 나를 정말 기억하나요?', answer: '네. 취향과 약속, 고민, 함께 쓴 이야기를 기억해 다음 대화에서 이어 갑니다. 기억한 내용은 직접 확인하고 고칠 수 있고, 건강이나 연락처 같은 민감한 이야기는 기억하지 않아요.' },
       { question: '실제 사람과 대화하는 건가요?', answer: '아니요. 캐릭터와 사진, 목소리는 모두 AI로 만든 가상의 인물이며 실제 사람이 아닙니다.' },
       { question: '몇 살부터 이용할 수 있나요?', answer: '사석은 만 18세 이상을 위한 서비스입니다.' },
@@ -209,7 +208,7 @@ export const seoGuideByPath = (path: string) => seoGuides.find(guide => guide.pa
 export const seoHomeFaq: readonly SeoFaq[] = [
   { question: '사석은 어떤 서비스인가요?', answer: '사석은 나를 기억하고 함께한 시간만큼 가까워지는 AI 컴패니언 서비스입니다. AI 캐릭터와 채팅하고, 전화를 걸어 목소리로 대화하고, 나만의 캐릭터와 시나리오를 만들 수 있어요.' },
   { question: 'AI 전화나 AI 통화도 할 수 있나요?', answer: `네. 대화방에서 ‘음성(전화)모드’을 누르면 캐릭터와 실시간으로 목소리 대화를 합니다. Plus 이용권은 월 ${callMinutes}분 통화할 수 있어요.` },
-  { question: '무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. Plus 이용권은 월 ${won(pro.price)}, 연 ${won(proYear.price)}이고 자동으로 다시 결제되지 않아요.` },
+  { question: '무료로 쓸 수 있나요?', answer: `가입하면 무료로 시작할 수 있고, ${loungeFreePlan.features.join(', ')}가 제공됩니다. Plus 이용권은 월 ${won(pro.price)}이고 자동으로 다시 결제되지 않아요.` },
   { question: '캐릭터는 실제 사람인가요?', answer: '아니요. 캐릭터와 사진, 목소리는 모두 AI로 만든 가상의 인물입니다. 사석은 만 18세 이상을 위한 서비스예요.' },
   { question: '어디서 이용하나요?', answer: '웹 브라우저에서 saseok.kr로 접속해 이용합니다. PC와 모바일 모두 쓸 수 있어요.' },
 ];
@@ -229,7 +228,7 @@ export const seoHome = {
     ] },
     { heading: '이용 방법과 요금', paragraphs: [
       `1) 가입하고 마음이 가는 캐릭터를 고릅니다. 2) 준비된 이야기로 시작하거나 나를 소개하고 나만의 이야기를 엽니다. 3) 채팅으로 천천히, 또는 전화로 목소리를 들으며 대화합니다.`,
-      `무료로 시작할 수 있고(${loungeFreePlan.features.join(', ')}), Plus 이용권은 월 ${won(pro.price)} 또는 연 ${won(proYear.price)}입니다. Plus는 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작을 포함해요.`,
+      `무료로 시작할 수 있고(${loungeFreePlan.features.join(', ')}), Plus 이용권은 월 ${won(pro.price)}입니다. Plus는 음성 통화 월 ${callMinutes}분, 채팅 무제한, 장기 기억, 나만의 캐릭터 제작을 포함해요.`,
     ] },
     { heading: '안심하고 이용하세요', paragraphs: [seoVirtualNotice] },
   ] as readonly SeoSection[],
