@@ -42,6 +42,7 @@ export const loungeChatModels = [
   { id: 'deepseek-flash', label: '오닉스', description: '빠르고 자유로운 대화', provider: 'deepseek', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'gemini-flash', label: '아리아', description: '표현이 풍부한 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
   { id: 'deepseek-raccoon', label: '라쿤', description: '균형잡힌 대화', provider: 'openrouter', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: null },
+  { id: 'claude-haiku', label: '하이쿠', description: '섬세하게 풀어 가는 대화', provider: 'openrouter', model: null, stallModel: null, reasoning: 'none', listed: true, voiceFallback: 'gpt' },
   { id: 'gpt', label: '노바', description: '바로바로 주고받는 기본 대화', provider: 'openai', model: 'gpt-6-luna', stallModel: null, reasoning: 'none', listed: false, voiceFallback: null },
   { id: 'gemini-pro', label: '아리아 딥', description: '답은 느리지만 더 깊이 생각하는 대화', provider: 'gemini', model: null, stallModel: null, reasoning: 'none', listed: false, voiceFallback: 'gemini-flash' },
 ] as const;
@@ -56,6 +57,17 @@ export const loungeOfferedChatModels = loungeChatModels.filter(model => model.li
  * site's domain it is not offered. A room already on it keeps answering with it and shows its name; the menu there lists the others.
  */
 export const loungeLocalOnlyChatModelIds: readonly string[] = ['deepseek-raccoon'];
+/**
+ * 2026-11-26, by the owner: 하이쿠 is offered in every one-to-one room, and an English lesson's room offers only 루나 (the fast
+ * GPT, id 'gpt') and 하이쿠 to compare; a lesson room on no model is on 루나.
+ */
+export const loungeLessonChatModels = [
+  { id: 'gpt', label: '루나', description: '규칙을 정확히 따르는 또렷한 수업' },
+  { id: 'claude-haiku', label: '하이쿠', description: '설명을 섬세하게 풀어 주는 수업' },
+] as const;
+export const loungeLessonDefaultChatModelId = 'gpt';
+/** The model a room answers with: its own, or for a lesson room on none, 루나. */
+export const loungeRoomChatModelId = (aiModel: string | null | undefined, lesson: boolean) => lesson && !aiModel ? loungeLessonDefaultChatModelId : aiModel;
 export const isLoungeLocalHost = (hostname: string) => /^(localhost|127\.0\.0\.1|\[?::1\]?)$/i.test(hostname);
 export const loungeChatModelsFor = (hostname: string) => isLoungeLocalHost(hostname) ? loungeOfferedChatModels : loungeOfferedChatModels.filter(model => !loungeLocalOnlyChatModelIds.includes(model.id));
 
@@ -65,6 +77,17 @@ export const loungeGeminiChatModels = { 'gemini-flash': 'gemini-3.8-flash', 'gem
 /** OpenRouter model of 라쿤; LOUNGE_RACCOON_MODEL changes it. Chat-completions URL for it (OPENROUTER_API_KEY). */
 export const loungeRaccoonModel = 'qwen/qwen3.8-flash';
 export const loungeRaccoonUrl = 'https://openrouter.ai/api/v1/chat/completions';
+
+/**
+ * 2026-11-22, by the owner: 하이쿠 ('claude-haiku') is tried next to 라쿤 (offered everywhere since 2026-11-26). It is Anthropic's Haiku on the same
+ * OpenRouter route (LOUNGE_HAIKU_MODEL changes the model). It answers chats only: a call goes to the fast GPT (voiceFallback), the same path as a call of 오닉스, and an adult scene goes to
+ * DeepSeek or NanoGPT as for 오닉스, since Haiku would decline it.
+ */
+export const loungeHaikuModel = 'anthropic/claude-haiku-5.5';
+/** The OpenRouter model that answers for a room's chosen model (라쿤 or 하이쿠). */
+export const loungeOpenrouterModelFor = (id: string, env: Record<string, string | undefined> = {}) => id === 'claude-haiku' ? env.LOUNGE_HAIKU_MODEL || loungeHaikuModel : env.LOUNGE_RACCOON_MODEL || loungeRaccoonModel;
+/** Only 라쿤 also takes the adult scenes of its room. */
+export const loungeOpenrouterAnswersAdult = (id: string) => id === 'deepseek-raccoon';
 
 /** NanoGPT model that answers adult-mode turns; LOUNGE_ADULT_MODEL changes it. */
 export const loungeAdultChatModel = 'deepseek/deepseek-v4.1-flash-1017-uncensored';

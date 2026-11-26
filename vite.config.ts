@@ -45,6 +45,10 @@ export default defineConfig(({ mode }) => {
     // The model that answers the turns adult mode opens (NanoGPT; without the key OpenAI answers them).
     'DEEPSEEK_API_KEY',
     'NANOGPT_API_KEY',
+    // 라쿤: OpenRouter's Qwen. Without the key the local server answers a room on it with DeepSeek, as a failed reply would.
+    'OPENROUTER_API_KEY',
+    'LOUNGE_RACCOON_MODEL',
+    'LOUNGE_HAIKU_MODEL',
     'LOUNGE_ADULT_MODEL',
     // Z.ai GLM for one-to-one chat (GLM 5.3 Flash). LOUNGE_GLM_MODEL overrides the model id.
     'GLM_API_KEY',
