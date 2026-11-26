@@ -1,16 +1,20 @@
 import { supabase } from './supabase';
 import { parseLoungeLessonWords, readLoungeLessonLevel, type LoungeLessonItem, type LoungeLessonLevel } from './loungeLesson';
-import { requestLoungeLessonSituation } from './loungeApi';
+import { requestLoungeLessonEnrich, requestLoungeLessonSituation } from './loungeApi';
 
 /** A correction from a lesson (lounge_english_attempts): what the member said and how it reads better. */
 export type LoungeLessonNote = { id: number; said: string; better: string; polished: string; why: string; verdict: string; created_at: string; item_id: string | null };
 export type LoungeLessonBook = { items: LoungeLessonItem[]; notes: LoungeLessonNote[]; level: LoungeLessonLevel };
+/** What a lesson made of one thing the member said (rows of lounge_english_attempts with the same words). */
+export type LoungeLessonAttempt = LoungeLessonNote & { room_id: string | null };
 
 const failed = (error: { message?: string; code?: string } | null) => {
   if (!error) return;
   // Before migration 20270116000000 the tables are not there.
   if (error.code === '42P01' || error.code === 'PGRST205') throw new Error('영어 수업은 곧 열려요. 조금만 기다려 주세요.');
   if (error.message?.includes('단어장')) throw new Error(error.message);
+  // Before migration 20270118000000 an expression has no mark to learn first.
+  if (error.code === 'PGRST204' || error.code === '42703' || error.code === '42501') throw new Error('우선 학습 표시는 곧 열려요. 조금만 기다려 주세요.');
   throw new Error('잠시 연결이 어려워요. 다시 시도해 주세요.');
 };
 
@@ -74,4 +78,24 @@ export async function importLoungeLessonWords(words: ReadonlyArray<{ expression:
 /** Expressions written for a situation the member told; they come first in the next lesson turn. */
 export async function makeLoungeLessonSituation(roomId: string, situation: string) {
   return requestLoungeLessonSituation(roomId, situation);
+}
+
+/** Marks an expression to learn first, or takes the mark off (the learning board, migration 20270118000000). */
+export async function setLoungeLessonFocus(id: string, focus: boolean) {
+  const { data, error } = await supabase.from('lounge_english_items').update({ focus }).eq('id', id).select('id');
+  failed(error);
+  if (!data?.length) throw new Error('우선 학습 표시는 곧 열려요. 조금만 기다려 주세요.');
+}
+
+/** The lesson's judgement of what the member said in this room: newest first, for the feedback under their words. */
+export async function loadLoungeLessonAttempts(roomId: string): Promise<LoungeLessonAttempt[]> {
+  const { data, error } = await supabase.from('lounge_english_attempts').select('id,said,better,polished,why,verdict,created_at,item_id,room_id')
+    .eq('room_id', roomId).order('created_at', { ascending: false }).limit(120);
+  failed(error);
+  return (data ?? []) as LoungeLessonAttempt[];
+}
+
+/** Importance, difficulty and a situation for the expressions that have none yet; how many were filled in. */
+export async function enrichLoungeLessonBook(roomId: string) {
+  return (await requestLoungeLessonEnrich(roomId)).updated ?? 0;
 }
