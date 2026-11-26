@@ -149,6 +149,20 @@ export type LoungeLessonAlternative = { expression: string; note: string };
 /** The tutor whose lessons also say why Koreans mix an expression up (2026-11-26, by the owner). */
 export const loungeLessonConfusionTutor = 'interpretertutor';
 
+/**
+ * The learning list by day (2026-11-26, by the owner: all at once was too much): the Korean day an expression was put
+ * in, whether it has been practised, its priority (from its importance: the order the lesson takes them in) and its
+ * level in words, so the member sees what comes first.
+ */
+export const loungeLessonDayOf = (createdAt?: string | null) => createdAt && Number.isFinite(Date.parse(createdAt)) ? loungeLessonDay(new Date(createdAt)) : '';
+export const loungeLessonStudied = (item: Pick<LoungeLessonItem, 'attempts' | 'stage'>) => (item.attempts ?? 0) > 0 || item.stage > 0;
+export const loungeLessonPriority = (importance?: number | null) => importance === 3 ? { rank: 1, label: '1순위' } : importance === 1 ? { rank: 3, label: '3순위' } : { rank: 2, label: '2순위' };
+const levelWords: Record<string, string> = { A2: '기초', B1: '쉬움', B2: '보통', C1: '어려움', C2: '최상급' };
+export const loungeLessonLevelLabel = (difficulty?: string | null) => difficulty && levelWords[difficulty] ? `${difficulty} · ${levelWords[difficulty]}` : '';
+/** The order of the list and of the lesson: marked first, not yet theirs, the higher priority, the easier level, the older. */
+export const loungeLessonListOrder = (a: LoungeLessonItem, b: LoungeLessonItem) => Number(Boolean(b.focus)) - Number(Boolean(a.focus)) || Number(a.stage >= 5) - Number(b.stage >= 5)
+  || (b.importance ?? 2) - (a.importance ?? 2) || levelRank(a.difficulty) - levelRank(b.difficulty) || Date.parse(a.created_at ?? '') - Date.parse(b.created_at ?? '');
+
 /** What the task card's buttons say for the member: words of the lesson, not English to correct. */
 export const loungeLessonHintText = '힌트 주세요';
 export const loungeLessonSkipText = '이건 다음에 할게요. 넘어갈게요.';

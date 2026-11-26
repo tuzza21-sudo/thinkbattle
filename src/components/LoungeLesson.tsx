@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, ChevronDown, ChevronUp, FileUp, GraduationCap, Lightbulb, LoaderCircle, Plus, SkipForward, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronUp, FileUp, GraduationCap, Lightbulb, LoaderCircle, Plus, SkipForward, Sparkles, Star, Trash2, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { startLoungeScenario } from '../lib/loungeApi';
 import { addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonLevel, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
 import { readLoungeLessonFile } from '../lib/loungeLessonFile';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { loungeLessonConfusionTutor, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
+import { loungeLessonConfusionTutor, loungeLessonDayOf, loungeLessonLevelLabel, loungeLessonListOrder, loungeLessonPriority, loungeLessonStudied, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const shortDay = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '';
@@ -78,10 +78,11 @@ export function LoungeLessonBar({ tutorName, tutorId, roomId, lesson, storyState
 
 function Badges({ importance, difficulty, extra }: { importance?: number | null; difficulty?: string | null; extra?: ReactNode }) {
   const rank = loungeLessonImportanceOf(importance);
+  const priority = loungeLessonPriority(importance), level = loungeLessonLevelLabel(difficulty);
   return <span className="lounge-lesson-badges">
     {extra}
-    {rank && <span className={`lounge-lesson-badge importance-${rank.value}`} title="중요도">중요도 <b aria-hidden>{rank.stars}</b> {rank.label}</span>}
-    {difficulty && <span className="lounge-lesson-badge level" title="난이도">난이도 {difficulty}</span>}
+    {rank && <span className={`lounge-lesson-badge importance-${rank.value}`} title={`중요도: ${rank.label}`}>{priority.label} <b aria-hidden>{rank.stars}</b> {rank.label}</span>}
+    {level && <span className={`lounge-lesson-badge level level-${difficulty}`} title="레벨">{level}</span>}
   </span>;
 }
 
@@ -162,6 +163,7 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
   const book = lesson.book;
   const [tab, setTab] = useState<Tab>(() => book?.items.length ? 'list' : 'input');
   const [filter, setFilter] = useState<Filter>('all');
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
   const [draft, setDraft] = useState('');
   const [fileWords, setFileWords] = useState<FileWords | null>(null);
   const [situation, setSituation] = useState('');
@@ -203,12 +205,17 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
   const now = Date.now();
   const due = (item: LoungeLessonItem) => item.stage > 0 && item.stage < 5 && Boolean(item.next_review_at) && Date.parse(item.next_review_at!) <= now;
   const shown = items.filter(item => filter === 'all' ? true : filter === 'focus' ? item.focus : filter === 'due' ? due(item) : filter === 'new' ? item.stage === 0 : item.stage >= 5)
-    // The order the lesson takes them in: marked first, then the more important, then the less practised.
-    .sort((a, b) => Number(Boolean(b.focus)) - Number(Boolean(a.focus)) || Number(a.stage >= 5) - Number(b.stage >= 5) || (b.importance ?? 2) - (a.importance ?? 2) || a.stage - b.stage || Date.parse(b.created_at ?? '') - Date.parse(a.created_at ?? ''));
+    // The order the lesson takes them in: marked first, then the higher priority, then the easier level.
+    .sort(loungeLessonListOrder);
+  // By the day they were put in, the newest day first; each day folds (the newest one starts open).
+  const days = [...shown.reduce((map, item) => { const day = loungeLessonDayOf(item.created_at); map.set(day, [...(map.get(day) ?? []), item]); return map; }, new Map<string, LoungeLessonItem[]>())]
+    .sort((a, b) => b[0].localeCompare(a[0]));
+  const dayLabel = (day: string) => day ? new Date(`${day}T12:00:00+09:00`).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Seoul' }) : '날짜 없음';
+  const dayOpen = (day: string, index: number) => openDays[day] ?? index === 0;
   const counts = { focus: items.filter(item => item.focus).length, due: items.filter(due).length, mine: items.filter(item => item.stage >= 5).length };
   const marks = items.length > 0 && 'focus' in items[0];
   const labels = loungeLessonFeedbackLabels(book?.level ?? 'B1');
-  const row = (item: LoungeLessonItem) => <li key={item.id} className={item.focus ? 'focused' : undefined}>
+  const row = (item: LoungeLessonItem) => <li key={item.id} className={[item.focus ? 'focused' : '', loungeLessonStudied(item) ? 'studied' : ''].filter(Boolean).join(' ') || undefined}>
     {marks && <button type="button" className={`lounge-lesson-star${item.focus ? ' on' : ''}`} aria-pressed={Boolean(item.focus)} title={item.focus ? '우선 학습 해제' : '우선 학습'} disabled={Boolean(busy) || item.stage >= 5} onClick={() => void focus(item)}>
       {busy === `focus-${item.id}` ? <LoaderCircle size={16} className="lounge-spin" /> : <Star size={16} />}</button>}
     <div>
@@ -216,7 +223,7 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
       {item.meaning && <small>{item.meaning}</small>}
       {item.situation && <small className="lounge-lesson-where">상황: {item.situation}</small>}
       <ExpressionNotes nuance={item.nuance} alternatives={item.alternatives} confusion={confusion ? item.confusion : null} />
-      <Badges importance={item.importance} difficulty={item.difficulty} extra={<span className={`lounge-lesson-badge lounge-lesson-stage stage-${item.stage}`}>{loungeLessonStageLabel(item.stage)}</span>} />
+      <Badges importance={item.importance} difficulty={item.difficulty} extra={<>{loungeLessonStudied(item) ? <span className="lounge-lesson-badge studied"><Check size={11} /> 학습함</span> : <span className="lounge-lesson-badge fresh">아직 안 함</span>}<span className={`lounge-lesson-badge lounge-lesson-stage stage-${item.stage}`}>{loungeLessonStageLabel(item.stage)}</span></>} />
       <span className="lounge-memory-kind">{sourceLabel[item.source] ?? item.source}{item.next_review_at && item.stage > 0 && item.stage < 5 ? ` · 다음 확인 ${shortDay(item.next_review_at)}` : ''}</span>
     </div>
     <div className="lounge-memory-actions"><button type="button" title="지우기" disabled={Boolean(busy)} onClick={() => { if (window.confirm('이 표현을 학습 목록에서 지울까요?')) void run(item.id, () => deleteLoungeLessonItem(item.id)); }}>{busy === item.id ? <LoaderCircle size={14} className="lounge-spin" /> : <Trash2 size={14} />}</button></div>
@@ -276,8 +283,17 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
           <div className="lounge-lesson-filters" role="group" aria-label="보기">
             {filters.map(([id, label]) => <button key={id} type="button" aria-pressed={filter === id} className={filter === id ? 'active' : ''} onClick={() => setFilter(id)}>{label}</button>)}
           </div>
-          <p className="lounge-memory-note">{marks ? <>★를 누른 표현부터 수업에서 먼저 물어봐요. 중요도가 높은 것부터, 연습하고 나면 표시가 풀려요.</> : <>우선 학습 표시는 곧 열려요.</>}{lesson.enriching && <> <LoaderCircle size={12} className="lounge-spin" /> 중요도·난이도를 매기는 중…</>}</p>
-          {shown.length ? <ul className="lounge-memory-list lounge-lesson-list">{shown.map(row)}</ul>
+          <p className="lounge-memory-note">수업 순서: {marks ? '★ 우선 학습 → ' : ''}1순위 → 2순위 → 3순위, 같은 순위면 쉬운 레벨(B1 → B2 → C1)부터. {marks ? '★는 연습하고 나면 풀려요.' : ''}{lesson.enriching && <> <LoaderCircle size={12} className="lounge-spin" /> 순위·레벨을 매기는 중…</>}</p>
+          {shown.length ? <div className="lounge-lesson-days">{days.map(([day, list], index) => {
+            const open = dayOpen(day, index), studied = list.filter(loungeLessonStudied).length, first = list.filter(item => item.importance === 3 && !loungeLessonStudied(item)).length;
+            return <section key={day || 'none'} className={`lounge-lesson-day${open ? ' open' : ''}`}>
+              <button type="button" className="lounge-lesson-day-head" aria-expanded={open} onClick={() => setOpenDays(value => ({ ...value, [day]: !open }))}>
+                <b>{dayLabel(day)}</b><span>{list.length}개 입력</span><span className="done">학습함 {studied}/{list.length}</span>{first > 0 && <span className="first">1순위 남음 {first}</span>}
+                {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </button>
+              {open && <ul className="lounge-memory-list lounge-lesson-list">{list.map(row)}</ul>}
+            </section>;
+          })}</div>
             : <p className="lounge-memory-empty">{items.length ? '이 보기에 맞는 표현이 없어요.' : `아직 표현이 없어요. '1 학습할 것 넣기'에서 넣거나, 그냥 수업을 시작하면 ${koreanSubject(tutorName)} 레벨에 맞는 표현을 골라 와요.`}</p>}
         </div>}
         {tab === 'notes' && <div className="lounge-memory-panel">

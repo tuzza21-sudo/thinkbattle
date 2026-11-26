@@ -1353,3 +1353,24 @@
 .lounge-training-choices button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; }
 .lounge-training-choices small { font-size:11px; opacity:.7; }
 .lounge-training-levels { grid-template-columns:repeat(3,1fr); }
+
+/* 영어 수업 학습 목록, by day (2026-11-26): a fold per day with its count and what was practised, priority and level labels. */
+.lounge-lesson-days { display:grid; gap:8px; }
+.lounge-lesson-day { border:1px solid #ffffff1f; border-radius:12px; background:#ffffff06; overflow:hidden; }
+.lounge-lesson-day.open { border-color:#ffffff33; }
+.lounge-lesson-day-head { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; width:100%; padding:10px 12px; border:0; background:transparent; color:#fff5e8; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+.lounge-lesson-day-head b { font-size:14px; }
+.lounge-lesson-day-head span { opacity:.8; }
+.lounge-lesson-day-head .done { color:#9fd8a8; opacity:1; }
+.lounge-lesson-day-head .first { color:#ffd27a; opacity:1; }
+.lounge-lesson-day-head svg { margin-left:auto; opacity:.7; }
+.lounge-lesson-day .lounge-lesson-list { padding:0 8px 8px; }
+.lounge-lesson-list li.studied { opacity:.78; }
+.lounge-lesson-badge.studied { border-color:#9fd8a880; color:#9fd8a8; }
+.lounge-lesson-badge.fresh { border-color:#ffffff33; opacity:.75; }
+.lounge-lesson-badge.importance-3 { border-color:#ffd27a; color:#ffd27a; }
+.lounge-lesson-badge.importance-2 { border-color:#ffffff55; }
+.lounge-lesson-badge.importance-1 { opacity:.7; }
+.lounge-lesson-badge.level-A2, .lounge-lesson-badge.level-B1 { border-color:#9fd8a866; color:#c4ecc9; }
+.lounge-lesson-badge.level-B2 { border-color:#8fd3ff66; color:#bfe6ff; }
+.lounge-lesson-badge.level-C1, .lounge-lesson-badge.level-C2 { border-color:#ff9b8a66; color:#ffc2b8; }
