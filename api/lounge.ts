@@ -2396,7 +2396,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               body: JSON.stringify({
                 model, stream: true, stream_options: { include_usage: true },
                 ...(router ? { reasoning: { enabled: false } } : adult ? { reasoning: { exclude: true } } : { thinking: { type: 'disabled' } }),
-                response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
+                // 하이쿠 on OpenRouter does not keep to json_object (it answered in prose, so every turn went to DeepSeek,
+                // 2026-11-26); with the schema itself, strict, it answers in it.
+                response_format: router && chatModel.id === 'claude-haiku' ? { type: 'json_schema', json_schema: { name: modelRequest.text.format.name, strict: true, schema: modelRequest.text.format.schema } } : { type: 'json_object' },
+                max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
                   { role: 'user', content: adultReply ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
@@ -2614,7 +2617,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               if (fixed) full = again;
             }
             authoredLife = normalizeLoungeCharacterLife(full?.character_life, companionTurn, now);
-            const said = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
+            const cleaned = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
+            // A lesson or a training is talk only: a stage direction (하이쿠 writes "*찻잔을 내려놓는다*" despite the rules, 2026-11-26) is taken out.
+            const plainText = practiceRoom ? cleaned.text.replace(/\*[^*\n]{1,160}\*/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim() : cleaned.text;
+            const said = { ...cleaned, text: plainText || cleaned.text };
             // Keep the thought the character chose to share, including consecutive turns; off still hides it.
             const thought = innerVoiceMode === 'on' && typeof full?.inner_voice === 'string' ? cleanLoungeInnerVoice(full.inner_voice, said.text, companionState?.inner ?? []) : { inner: '', notes: [] as string[] };
             const notes = [...said.notes, ...thought.notes];
