@@ -54,8 +54,8 @@
     },
     "work": {
       "portrait": "host-teacher-v1.webp",
-      "file": "host-teacher-work-v3.webp",
-      "prompt": "The owner's own picture (2026-11-16, host-teacher-work-v1.webp) with the old name signed on the chalkboard painted out (2026-11-26, OpenCV inpaint). No prompt."
+      "file": "host-teacher-work-v4.webp",
+      "prompt": "The owner's own picture (2026-11-26): 차유진 on a phone call at a walnut desk in a study with a laptop and flowers. No prompt."
     }
   },
   "interpreter": {

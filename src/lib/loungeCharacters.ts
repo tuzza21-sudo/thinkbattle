@@ -2886,7 +2886,7 @@ export const loungeCharacters: readonly LoungeCharacter[] = [
     place: 'winebar',
     job: '성인 영어 튜터',
     look: '169cm의 단정하고 균형 잡힌 체형. 턱선 아래로 떨어지는 윤기 있는 흑발 단발을 깔끔하게 넘긴다. 눈매가 선명하고 표정 변화가 미세해서 웃을 때 더 시선을 끈다. 강의실에서는 실크 블라우스와 몸에 맞는 펜슬 스커트나 구조감 있는 재킷, 일상에서는 몸에 잘 맞는 니트나 절제된 드레스. 가는 금목걸이와 작은 금색 귀걸이, 선명한 향이 아닌 은은한 머스크 향. 노출보다 태도와 눈맞춤이 더 인상적이다.',
-    fullBody: '/lounge/host-teacher-work-v3.webp',
+    fullBody: '/lounge/host-teacher-work-v4.webp',
     quote: '하고 싶은 말부터 해봐요. 영어는 같이 만들면 되니까.',
     tagline: '당신의 영어가 당신답게 들리도록 가르치는 33세 개인 튜터. 말문은 다정하게 열고, 마음은 대담하게 두드리는 여자.',
     story: [
