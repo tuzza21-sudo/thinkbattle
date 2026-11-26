@@ -1440,3 +1440,15 @@
 .lounge-class-rewrite span { display:block; font-size:10.5px; font-weight:700; color:#9fd8a8; }
 .lounge-class-next { color:#ffe3a3; }
 .lounge-class-critique p { margin:0; }
+
+/* 협상 설정: 직접 만들기, 내 상황에 맞게 고치기; 결과의 실전 문장과 팁 (2026-11-26). */
+.lounge-training-choices button.custom { border-style:dashed; }
+.lounge-training-own { display:grid; gap:8px; padding:12px; border:1px solid #ffffff24; border-radius:12px; background:#ffffff08; }
+.lounge-training-inline { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.lounge-training-reset { justify-self:start; padding:4px 10px; border:1px solid #ffffff33; border-radius:999px; background:transparent; color:#fff5e8; font:inherit; font-size:12px; cursor:pointer; }
+.lounge-lesson-preview > div button { padding:6px 12px; border:1px solid #ffffff40; border-radius:999px; background:#ffffff12; color:#fff5e8; font:inherit; font-size:12.5px; cursor:pointer; }
+.lounge-training-section { margin:6px 0 0 !important; font-size:12px !important; font-weight:700; color:#ead0a3; }
+.lounge-training-phrases { display:grid; gap:3px; margin:4px 0 2px; }
+.lounge-training-phrases q { display:block; padding:4px 8px; border-left:2px solid #9fd8a8; background:#ffffff0a; font-style:normal; quotes:none; }
+.lounge-training-tips li small { display:block; opacity:.75; }
+@media (max-width: 560px) { .lounge-training-inline { grid-template-columns:1fr; } }

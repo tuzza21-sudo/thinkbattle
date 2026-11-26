@@ -289,3 +289,7 @@
 .lounge-cast-training svg { color:#9fd3ff; }
 .lounge-cast-training.soon { background:#00000040; border-color:#ffffff2b; }
 .lounge-cast-training.soon svg { color:#ffffffb3; }
+
+/* 실전체험 segments (2026-11-26) */
+.lounge-cast-segments { margin-top:-6px; gap:8px; }
+.lounge-cast-segments button { min-width:0; padding:7px 14px; font-size:13px; }

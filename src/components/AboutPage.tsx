@@ -253,7 +253,7 @@ export const AboutPage = () => {
           <div className="about-business-info">
             <p><span>대표</span> 최석빈 <i /> <span>사업자등록번호</span> 218-14-16906</p>
             <p><span>주소</span> 서울시 서초구 사임당로8길 13, 4층 402-331A호</p>
-            <p><span>고객센터</span> <a href="tel:+821086434224">010-8643-4224</a> <i /> <span>문의</span> <a href="mailto:thinkfit99@gmail.com">thinkfit99@gmail.com</a></p>
+            <p><span>고객센터</span> <a href="tel:+821030567987">010-3056-7987</a> <i /> <span>문의</span> <a href="mailto:thinkfit99@gmail.com">thinkfit99@gmail.com</a></p>
           </div>
           <div className="about-business-links">
             <button type="button" onClick={() => navigate('/terms')}>이용약관</button>
