@@ -13,6 +13,7 @@ import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHou
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
+import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
 import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
@@ -1143,8 +1144,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const lessonRead = isLoungeTutor(room.host_persona) && serviceHeaders && !room.space_id ? Promise.all([
       fetchTimed(`${url}/rest/v1/lounge_english_items?user_id=eq.${encodeURIComponent(user.id)}&select=*&order=created_at.asc&limit=400`, { headers: serviceHeaders })
         .then(async response => response.ok ? await readJson<LoungeLessonItem[]>(response, 'lounge') : null),
-      fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=level`, { headers: serviceHeaders })
-        .then(async response => readLoungeLessonLevel(response.ok ? (await readJson<Array<{ level?: string }>>(response, 'lounge'))[0]?.level : undefined)),
+      fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=*`, { headers: serviceHeaders })
+        .then(async response => readLoungeLessonProfile(response.ok ? (await readJson<unknown[]>(response, 'lounge'))[0] : undefined)),
     ]).catch(() => undefined) : undefined;
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
@@ -1551,7 +1552,8 @@ ${photoRule}`;
     const lessonWork = lessonRoom && lessonRead ? (async () => {
       const read = await lessonRead;
       if (!read?.[0] || !serviceHeaders) return undefined;
-      const [stored, level] = read;
+      const [stored, profile] = read;
+      const level = profile.level;
       const items = [...stored];
       const now = new Date(), today = loungeLessonDay(now);
       const prior = readLoungeLessonState(room.story_state);
@@ -1614,7 +1616,7 @@ ${photoRule}`;
           body: JSON.stringify({ user_id: user.id, expression: keep.expression, meaning: keep.meaning, level: loungeLessonLevel(level).target, source: 'upgrade' }) })] : []),
       ]);
       console.info('[Lounge lesson]', JSON.stringify({ host: host.id, step: turn.step, phase: turn.state.phase, graded: grade ? { target: grade.target, intent: grade.intent, free: grade.free_used.length, errors: grade.errors.length } : null, gradeMs: grade ? Math.round(performance.now() - graded) : 0, verdicts: turn.verdicts.map(entry => entry.verdict), kept: Boolean(keep), done: turn.state.done.length, queue: turn.state.queue.length }));
-      return { prompt: loungeLessonForPrompt(turn, level, grade, host.id), state: turn.state };
+      return { prompt: loungeLessonForPrompt(turn, level, grade, host.id, profile), state: turn.state };
     })().catch(error => { console.warn('[Lounge lesson] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
     // 실전 훈련: the member's words are judged (in a negotiation the number and the moves, in an interview the answer's
     // scores and gaps) while the rest loads; code takes the counterpart's or the interviewer's next move and the reply says it.

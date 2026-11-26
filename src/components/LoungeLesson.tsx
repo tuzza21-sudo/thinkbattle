@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BookOpen, Check, ChevronDown, ChevronUp, FileUp, GraduationCap, Lightbulb, LoaderCircle, Plus, SkipForward, Sparkles, Star, Trash2, X } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronUp, FileUp, GraduationCap, Lightbulb, LoaderCircle, Plus, SkipForward, Sparkles, Star, Target, Trash2, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { startLoungeScenario } from '../lib/loungeApi';
-import { addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonLevel, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
+import { setLoungeLessonProfile, addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonLevel, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
 import { readLoungeLessonFile } from '../lib/loungeLessonFile';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { loungeLessonConfusionTutor, loungeLessonDifficulties, loungeLessonDayOf, loungeLessonLevelLabel, loungeLessonListOrder, loungeLessonPriority, loungeLessonStudied, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
+import { loungeLessonPurposes, loungeLessonTopics, loungeLessonConfusionTutor, loungeLessonDifficulties, loungeLessonDayOf, loungeLessonLevelLabel, loungeLessonListOrder, loungeLessonPriority, loungeLessonStudied, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonStageLabel, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const shortDay = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '';
@@ -70,7 +70,10 @@ export function useLoungeLessonRoom(roomId: string | undefined, enabled: boolean
 export function LoungeLessonBar({ tutorName, tutorId, roomId, lesson, storyState, send, disabled }: { tutorName: string; tutorId?: string; roomId: string; lesson: LoungeLessonRoom; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [folded, setFolded] = useState(false);
+  const [goal, setGoal] = useState<'auto' | 'open' | 'closed'>('auto');
   const task = useMemo(() => lesson.book ? loungeLessonTask(storyState, lesson.book.items) : undefined, [storyState, lesson.book]);
+  // Before the day's lesson starts the goal card shows by itself; later it opens from 수업 목표.
+  const goalShown = Boolean(lesson.book) && (goal === 'open' || (goal === 'auto' && !task));
   const progress = task?.progress;
   return <div className="lounge-lesson-bar">
     <div className="lounge-lesson-head">
@@ -79,11 +82,69 @@ export function LoungeLessonBar({ tutorName, tutorId, roomId, lesson, storyState
         <b>오늘 {progress.done}/{progress.total}</b><i><span style={{ width: `${Math.round(progress.done / progress.total * 100)}%` }} /></i>
       </span> : <span className="lounge-lesson-progress"><b>1:1 영어 수업</b></span>}
       {task?.phase === 'drill' && <button type="button" className="lounge-lesson-fold" onClick={() => setFolded(value => !value)} aria-expanded={!folded} aria-label={folded ? '과제 펼치기' : '과제 접기'}>{folded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>}
+      <button type="button" className="lounge-lesson-button ghost" onClick={() => setGoal(value => value === 'open' ? 'closed' : 'open')} aria-expanded={goalShown}><Target size={15} /> 수업 목표</button>
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> 학습 보드</button>
     </div>
-    {task && !folded && <LoungeLessonTaskCard task={task} send={send} disabled={disabled} confusion={tutorId === loungeLessonConfusionTutor} />}
+    {goalShown && <LoungeLessonGoalCard key={goal} lesson={lesson} tutorId={tutorId} start={!task} send={send} disabled={disabled} onDone={() => setGoal('closed')} />}
+    {task && !folded && !goalShown && <LoungeLessonTaskCard task={task} send={send} disabled={disabled} confusion={tutorId === loungeLessonConfusionTutor} />}
     {open && <LoungeLessonSheet tutorName={tutorName} roomId={roomId} lesson={lesson} confusion={tutorId === loungeLessonConfusionTutor} onClose={() => setOpen(false)} />}
   </div>;
+}
+
+/**
+ * The session's goal (2026-11-26, by the owner), asked when a day's lesson has not started yet and open from 수업 목표:
+ * the level aimed at (B1 초급, B2 중급, C1 상급, each with what it means), what the member learns for and the topics
+ * they want to talk about. The tutor builds the day's situations on it; with none chosen, the tutor's own way.
+ */
+function LoungeLessonGoalCard({ lesson, tutorId, start, send, disabled, onDone }: { lesson: LoungeLessonRoom; tutorId?: string; start: boolean; send?: (text: string) => Promise<void>; disabled?: boolean; onDone: () => void }) {
+  const profile = lesson.book?.profile;
+  const [level, setLevel] = useState<LoungeLessonLevel>(profile?.level ?? 'B1');
+  const [purpose, setPurpose] = useState(profile?.purpose ?? '');
+  const [topics, setTopics] = useState<string[]>(profile?.topics ?? []);
+  const [topicDraft, setTopicDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const custom = (purpose && !(loungeLessonPurposes as readonly string[]).includes(purpose)) ? purpose : '';
+  const toggle = (topic: string) => setTopics(list => list.includes(topic) ? list.filter(item => item !== topic) : [...list, topic].slice(0, 6));
+  const addTopic = () => { const topic = topicDraft.replace(/\s+/g, ' ').trim().slice(0, 30); if (topic && !topics.includes(topic)) setTopics(list => [...list, topic].slice(0, 6)); setTopicDraft(''); };
+  const save = async () => {
+    setBusy(true); setError('');
+    const next = { level, purpose: purpose.trim(), topics };
+    let saved = true;
+    try { await setLoungeLessonProfile(next); } catch (err) { saved = false; setError(errorText(err)); }
+    await lesson.reload().catch(() => undefined);
+    setBusy(false);
+    if (start) await send?.(`오늘 수업 시작할게요. 목표는 ${loungeLessonLevels.find(item => item.id === level)?.label ?? ''}${next.purpose ? `, ${next.purpose}` : ''}${topics.length ? `, 주제는 ${topics.join(', ')}` : ''}.`);
+    if (saved || start) onDone();
+  };
+  const style = tutorId === 'interpretertutor' ? '주제를 고르지 않으면 회의·협상·발표 같은 격식 있는 자리의 영어로 수업해요.' : '주제를 고르지 않으면 일상 대화에서 내 생각과 느낌을 풍부하게 말하는 연습으로 수업해요.';
+  return <section className="lounge-lesson-task lounge-lesson-goal" aria-label="수업 목표">
+    <header><b>{start ? '오늘 수업 목표' : '수업 목표 바꾸기'}</b><button type="button" className="lounge-lesson-goal-close" onClick={onDone} aria-label="닫기"><X size={15} /></button></header>
+    <div className="lounge-lesson-goal-levels" role="radiogroup" aria-label="목표 레벨">
+      {loungeLessonLevels.map(item => <button key={item.id} type="button" role="radio" aria-checked={level === item.id} className={level === item.id ? 'active' : ''} onClick={() => setLevel(item.id)}>
+        <b>{item.label}</b><small>{item.note}</small>
+      </button>)}
+    </div>
+    <p className="lounge-lesson-goal-label">학습 목적 <small>하나 고르거나 직접 적어요</small></p>
+    <div className="lounge-lesson-chips">
+      {loungeLessonPurposes.map(item => <button key={item} type="button" aria-pressed={purpose === item} className={purpose === item ? 'active' : ''} onClick={() => setPurpose(purpose === item ? '' : item)}>{item}</button>)}
+    </div>
+    <input className="lounge-lesson-goal-input" maxLength={200} value={custom} onChange={event => setPurpose(event.target.value)} placeholder="직접 입력: 예) 다음 달 해외 바이어 미팅, 아이 영어 유치원 상담" />
+    <p className="lounge-lesson-goal-label">대화하고 싶은 주제 <small>여러 개 골라도 돼요 (최대 6개)</small></p>
+    <div className="lounge-lesson-chips">
+      {loungeLessonTopics.map(item => <button key={item} type="button" aria-pressed={topics.includes(item)} className={topics.includes(item) ? 'active' : ''} onClick={() => toggle(item)}>{item}</button>)}
+      {topics.filter(item => !(loungeLessonTopics as readonly string[]).includes(item)).map(item => <button key={item} type="button" aria-pressed className="active" onClick={() => toggle(item)}>{item} ×</button>)}
+    </div>
+    <form className="lounge-lesson-goal-add" onSubmit={event => { event.preventDefault(); addTopic(); }}>
+      <input className="lounge-lesson-goal-input" maxLength={30} value={topicDraft} onChange={event => setTopicDraft(event.target.value)} placeholder="직접 입력: 예) 반려견 산책, K-pop, 와인, 캠핑" />
+      <button type="submit" disabled={!topicDraft.trim()}><Plus size={14} /> 추가</button>
+    </form>
+    <p className="lounge-lesson-reveal muted">{style}</p>
+    {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}
+    <div className="lounge-lesson-task-actions">
+      <button type="button" className="primary" disabled={busy || disabled} onClick={() => void save()}>{busy ? <LoaderCircle size={14} className="lounge-spin" /> : <GraduationCap size={14} />} {start ? '이대로 수업 시작' : '저장'}</button>
+    </div>
+  </section>;
 }
 
 function Badges({ importance, difficulty, extra }: { importance?: number | null; difficulty?: string | null; extra?: ReactNode }) {
@@ -255,7 +316,7 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
     <div className="lounge-background-backdrop" onClick={() => { if (!busy) onClose(); }} />
     <section className="lounge-background-sheet lounge-memory-sheet lounge-lesson-sheet" role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header><b id={titleId}>학습 보드</b><button type="button" onClick={onClose} disabled={Boolean(busy)} aria-label="닫기"><X size={18} /></button></header>
-      <div className="lounge-lesson-levels" role="radiogroup" aria-label="학습 목표">
+      <div className="lounge-lesson-levels three" role="radiogroup" aria-label="학습 목표">
         {loungeLessonLevels.map(item => <button key={item.id} type="button" role="radio" aria-checked={book?.level === item.id} className={book?.level === item.id ? 'active' : ''} disabled={!book || Boolean(busy)} onClick={() => void level(item.id)}>
           <b>{item.label}</b><small>{item.note}</small>
         </button>)}

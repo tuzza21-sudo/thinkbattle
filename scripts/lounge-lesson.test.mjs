@@ -93,7 +93,7 @@ test('a lesson turn: asked, the expression said unprompted moves on; a miss gets
   assert.equal(prompt.target.expression, undefined, 'asked, the English is not given'); assert.equal(prompt.target.expression_do_not_say, undefined); assert.equal(prompt.target.meaning, '뜻');
   assert.equal(lesson.loungeLessonForPrompt({ ...turn, target: { ...turn.target, meaning: '' } }, 'B1').target.expression_do_not_say, 'expression a', 'with no meaning or situation, it comes marked');
   assert.equal(lesson.loungeLessonForPrompt({ ...turn, step: 'fix' }, 'B1').target.expression, 'expression a');
-  assert.equal(prompt.level, 'B1 → B2'); assert.equal(prompt.feedback.better, "I'm good."); assert.deepEqual(prompt.progress, { done: 0, total: 3 });
+  assert.match(prompt.level, /^B1 → B2 \(목표 B2 중급/); assert.equal(prompt.feedback.better, "I'm good."); assert.deepEqual(prompt.progress, { done: 0, total: 3 });
   turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'expression a', grade: grade({ target: 'correct' }) });
   assert.equal(turn.step, 'next'); assert.equal(turn.target.id, 'b');
   assert.deepEqual(turn.verdicts.map(entry => [entry.item.id, entry.verdict]), [['a', 'unprompted']]);
@@ -334,4 +334,22 @@ test('the learning list by day: the Korean day it was put in, practised or not, 
   const sorted = [item('low', { importance: 1, difficulty: 'B1' }), item('hard', { importance: 3, difficulty: 'C1' }), item('easy', { importance: 3, difficulty: 'B1' }), item('mark', { focus: true, importance: 1 }), item('mine', { stage: 5, importance: 3 })]
     .sort(lesson.loungeLessonListOrder).map(entry => entry.id);
   assert.deepEqual(sorted, ['mark', 'easy', 'hard', 'low', 'mine']);
+});
+
+test('the session goal: three levels, the member purpose and topics, and each tutor own way when none is chosen (2026-11-26)', () => {
+  assert.deepEqual(lesson.loungeLessonLevels.map(level => [level.id, level.label, level.target]), [['A2', 'B1 초급', 'B1'], ['B1', 'B2 중급', 'B2'], ['B2', 'C1 상급', 'C1']]);
+  assert.equal(lesson.readLoungeLessonLevel('A2'), 'A2'); assert.equal(lesson.readLoungeLessonLevel('x'), 'B1');
+  assert.deepEqual(lesson.loungeLessonFeedbackLabels('A2'), { better: 'B1 표현', polished: 'B2 · 더 자연스럽게' });
+  assert.ok(lesson.loungeLessonPackFor('A2', [], 3).every(entry => entry.level === 'B2'), 'a B1 goal takes the B2 list');
+  assert.deepEqual(lesson.readLoungeLessonProfile({ level: 'A2', purpose: '  업무·회의 ', topics: ['여행', '여행', ' K-pop ', 3] }), { level: 'A2', purpose: '업무·회의', topics: ['여행', 'K-pop'] });
+  assert.deepEqual(lesson.readLoungeLessonProfile(undefined), { level: 'B1', purpose: '', topics: [] });
+  const turn = lesson.advanceLoungeLesson({ items: [item('a')], plan: ['a'], now, said: 'hi', grade: grade() });
+  const formal = lesson.loungeLessonForPrompt(turn, 'B2', undefined, 'interpretertutor');
+  assert.match(formal.session.tutor_style, /회의, 협상, 발표/); assert.equal(formal.session.topics, undefined);
+  const daily = lesson.loungeLessonForPrompt(turn, 'A2', undefined, 'teachertutor', { purpose: '여행', topics: ['여행', '음식'] });
+  assert.match(daily.session.tutor_style, /생각과 느낌/); assert.deepEqual(daily.session.topics, ['여행', '음식']); assert.equal(daily.session.purpose, '여행');
+  assert.match(daily.level, /^A2 → B1 \(목표 B1 초급/);
+  assert.match(lesson.loungeLessonRules, /session\.purpose와 topics/);
+  assert.equal(characters.getLoungeCharacter('interpretertutor').job, '국제회의 동시통역사');
+  assert.match(lounge.getLoungeHost('interpretertutor').companion, /동시통역사/);
 });

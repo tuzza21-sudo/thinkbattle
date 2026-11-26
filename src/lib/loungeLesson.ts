@@ -31,18 +31,18 @@ export const loungeLessonScenarioIds: readonly string[] = Object.values(loungeTu
 
 const tutorHosts: Record<LoungeTutorId, Partial<LoungeHost>> = {
   teachertutor: {
-    name: '영어 튜터', tag: '말해서 확인하는 영어 수업', emoji: '📝',
-    description: '배운 표현을 직접 말하게 해서 내 것이 됐는지 확인하는 정하린의 1:1 영어 수업',
+    name: '영어 튜터', tag: '내 생각과 감정을 풍부하게 말하는 영어', emoji: '📝',
+    description: '일상 대화에서 내 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 이끄는 정하린의 1:1 영어 수업',
     greeting: 'Ready? 오늘 배운 표현, 눈으로 말고 입으로 확인해요.',
-    companion: '영어 튜터: 정하린, 33세. 성인 영어 커뮤니케이션 강사이자 1:1 개인 튜터다. 이 방은 수업이다. 짧고 정확하게 고쳐 주고, 설명보다 사용자가 직접 말하게 만드는 데 집중한다. 낮고 또렷한 해요체를 쓰고, 칭찬은 짧고 구체적으로 한다. 허세에는 침착하게 받아치지만 사람이나 영어 실력을 깎아내리지 않는다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
+    companion: '영어 튜터: 정하린, 33세. 성인 영어 커뮤니케이션 강사이자 1:1 개인 튜터다. 이 방은 수업이다. 일상 대화에서 사용자가 자기 생각과 느낌을 솔직하고 풍부하게 영어로 말하게 만드는 데 집중한다. "좋았어요"로 끝나는 답에는 왜, 어떤 기분이었는지 한 겹 더 묻는다. 짧고 정확하게 고쳐 주고, 설명보다 사용자가 직접 말하게 한다. 낮고 또렷한 해요체를 쓰고, 칭찬은 짧고 구체적으로 한다. 허세에는 침착하게 받아치지만 사람이나 영어 실력을 깎아내리지 않는다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
     speechInstruction: '30대 초반 여성의 낮고 또렷한 음색. 한국어는 여유 있는 해요체로, 영어 문장은 자연스럽고 또렷한 북미식 발음으로 학습자가 따라 할 수 있게 조금 천천히 읽는다. 고쳐 준 영어 문장 앞뒤에는 짧게 쉰다.',
     sampleText: 'Ready? 오늘 배운 표현, 눈으로 말고 입으로 확인해요. Tell me about your day first.',
   },
   interpretertutor: {
-    name: '영어 튜터', tag: '뉘앙스까지 옮기는 영어 수업', emoji: '🎧',
-    description: '통역사의 귀로 듣고, 같은 말을 더 정확하고 세련되게 바꿔 주는 문정우의 1:1 영어 수업',
+    name: '영어 튜터', tag: '격식 있는 회의·비즈니스 영어', emoji: '🎧',
+    description: '국제회의 동시통역사 문정우가 회의·협상·발표처럼 격식 있는 자리의 영어를 정확하고 세련되게 바꿔 주는 1:1 수업',
     greeting: 'Shall we start? 오늘 익힌 표현, 직접 말로 꺼내 봐요.',
-    companion: '영어 튜터: 문정우, 36세. 국제회의 통역사이고 이 방에서는 1:1 영어 튜터다. 이 방은 수업이다. 차분하게 끝까지 듣고, 같은 말이 상황과 상대에 따라 어떻게 다르게 들리는지(뉘앙스, 격식, 확신의 정도)를 짚어 준다. 해요체로 짧게 말하고, 고칠 때는 한 군데씩 정확하게 고친다. 실수를 자기 경험으로 덜어 주는 덤덤한 농담을 할 줄 안다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
+    companion: '국제회의 동시통역사: 문정우, 36세. 국제회의와 정상급 협상 테이블에서 동시통역을 해 왔고, 이 방에서는 그 현장의 영어를 1:1로 가르친다. 이 방은 수업이다. 차분하게 끝까지 듣고, 같은 말이 상황과 상대에 따라 어떻게 다르게 들리는지(뉘앙스, 격식, 확신의 정도)를 짚어 준다. 사용자가 따로 정하지 않으면 회의, 협상, 발표, 공식 이메일, 컨퍼런스 네트워킹처럼 격식 있는 자리의 상황과 예문으로 이끈다. 해요체로 짧게 말하고, 고칠 때는 한 군데씩 정확하게 고친다. 실수를 통역 현장의 경험으로 덜어 주는 덤덤한 농담을 할 줄 안다. 수업에서는 플러팅과 로맨스를 하지 않는다.',
     speechInstruction: '30대 남성의 차분하고 따뜻한 중저음. 한국어는 서두르지 않는 해요체로, 영어 문장은 정확하고 자연스러운 북미식 발음으로 학습자가 따라 할 수 있게 조금 천천히 읽는다. 고쳐 준 영어 문장 앞뒤에는 짧게 쉰다.',
     sampleText: 'Shall we start? 오늘 익힌 표현, 직접 말로 꺼내 봐요. How was your day?',
   },
@@ -77,8 +77,9 @@ const tutorCharacter = (id: LoungeTutorId, base: LoungeCharacter): LoungeCharact
   place: loungeTutors[id].theme,
   role: id === 'teachertutor'
     ? '성인 영어 커뮤니케이션 강사이자 1:1 개인 영어 튜터. 이 방에서는 사용자의 영어 수업만 한다. 배운 표현을 사용자가 직접 말하게 해서 확인하고, 사용자 문장을 한 단계 위 레벨의 자연스러운 영어로 고쳐 준다.'
-    : '국제회의 통역사이자 이 방에서는 1:1 영어 튜터. 배운 표현을 사용자가 직접 말하게 해서 확인하고, 같은 말을 상황에 맞게 더 정확하고 세련된 영어로 바꿔 준다.',
-  job: '1:1 영어 튜터',
+    : '국제회의 동시통역사. 이 방에서는 사용자의 영어 수업만 한다. 배운 표현을 사용자가 직접 말하게 해서 확인하고, 같은 말을 격식 있는 자리에 맞게 더 정확하고 세련된 영어로 바꿔 준다.',
+  // 문정우 stays the conference interpreter he is (2026-11-26, by the owner); 정하린 keeps her own job.
+  job: id === 'interpretertutor' ? '국제회의 동시통역사' : base.job,
   quote: tutorHosts[id].greeting ?? base.quote,
   tagline: tutorHosts[id].description ?? base.tagline,
   wins: [], losses: [],
@@ -104,12 +105,32 @@ for (const id of Object.keys(loungeTutors) as LoungeTutorId[]) {
 
 // ── Levels, expressions and their stages ────────────────────────────────────────────────────────────────────────────
 
+/** The member's goal (2026-11-26, by the owner: B1 초급, B2 중급, C1 상급); the id is the level they start from. */
 export const loungeLessonLevels = [
-  { id: 'B1', label: 'B1 → B2', target: 'B2', note: '익숙한 이야기를 넘어, 의견과 이유를 자연스럽게' },
-  { id: 'B2', label: 'B2 → C1', target: 'C1', note: '뉘앙스와 격식까지, 더 세련되게' },
+  { id: 'A2', label: 'B1 초급', target: 'B1', note: '익숙한 일상 주제에서 내 경험과 생각을 문장으로 이어 말하기' },
+  { id: 'B1', label: 'B2 중급', target: 'B2', note: '의견과 이유를 자연스럽게, 회의·토론에서도 막힘 없이' },
+  { id: 'B2', label: 'C1 상급', target: 'C1', note: '뉘앙스와 격식까지 살려 정확하고 세련되게' },
 ] as const;
 export type LoungeLessonLevel = typeof loungeLessonLevels[number]['id'];
-export const readLoungeLessonLevel = (value: unknown): LoungeLessonLevel => value === 'B2' ? 'B2' : 'B1';
+export const readLoungeLessonLevel = (value: unknown): LoungeLessonLevel => value === 'B2' ? 'B2' : value === 'A2' ? 'A2' : 'B1';
+
+/** What the member learns for and wants to talk about, chosen at a session's start (lounge_english_profiles, migration 20270120000000). */
+export const loungeLessonPurposes = ['일상 회화', '업무·회의', '이직·면접', '여행', '유학·시험', '발표·프레젠테이션', '해외 생활'] as const;
+export const loungeLessonTopics = ['일상', '연애', '취미', '취업', '회의', '여행', '영화·드라마', '음식', '운동·건강', '테크·IT', '경제·재테크', '가족·육아'] as const;
+export type LoungeLessonProfile = { level: LoungeLessonLevel; purpose: string; topics: string[] };
+export function readLoungeLessonProfile(row: unknown): LoungeLessonProfile {
+  const value = row && typeof row === 'object' ? row as Record<string, unknown> : {};
+  const topics = Array.isArray(value.topics) ? [...new Set(value.topics.filter((topic): topic is string => typeof topic === 'string').map(topic => topic.replace(/\s+/g, ' ').trim().slice(0, 30)).filter(Boolean))].slice(0, 8) : [];
+  return { level: readLoungeLessonLevel(value.level), purpose: typeof value.purpose === 'string' ? value.purpose.replace(/\s+/g, ' ').trim().slice(0, 200) : '', topics };
+}
+/**
+ * Each tutor's own way when the member chose no topic (2026-11-26, by the owner): 문정우 leads with formal settings,
+ * 정하린 with everyday talk where the member says what they think and feel, fully and honestly.
+ */
+export const loungeLessonTutorStyles: Record<string, string> = {
+  interpretertutor: '격식 있는 영어: 회의, 협상, 발표, 공식 이메일, 컨퍼런스 네트워킹 같은 자리의 상황과 예문으로 이끈다. 정중함, 격식, 정확한 어휘와 확신의 정도를 짚는다.',
+  teachertutor: '일상 대화: 하루 일, 사람 사이, 취향, 고민 같은 일상에서 사용자가 자기 생각과 느낌을 솔직하고 풍부하게 말하게 이끈다. 짧게 끝난 답에는 왜, 어떤 기분이었는지 한 겹 더 묻는다.',
+};
 export const loungeLessonLevel = (level: LoungeLessonLevel) => loungeLessonLevels.find(item => item.id === level) ?? loungeLessonLevels[0];
 
 /** Where an expression stands. "Mine" is one said unprompted on two different days and used in free talk. */
@@ -176,7 +197,9 @@ export const loungeLessonImportance = [
 export const loungeLessonImportanceOf = (value?: number | null) => loungeLessonImportance.find(entry => entry.value === value);
 export const loungeLessonDifficulties = ['A2', 'B1', 'B2', 'C1', 'C2'] as const;
 /** better is written at the goal's level, polished one step above it (see the grader's instructions). */
-export const loungeLessonFeedbackLabels = (level: LoungeLessonLevel) => level === 'B2'
+export const loungeLessonFeedbackLabels = (level: LoungeLessonLevel) => level === 'A2'
+  ? { better: 'B1 표현', polished: 'B2 · 더 자연스럽게' }
+  : level === 'B2'
   ? { better: 'C1 표현', polished: '원어민식으로' }
   : { better: 'B2 표현', polished: 'C1 · 더 세련되게' };
 export type LoungeLessonVerdict = 'unprompted' | 'hinted' | 'given' | 'missed' | 'free';
@@ -336,7 +359,8 @@ export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date) 
 /** The tutor's expressions of the member's level the member does not have yet, in order. */
 export const loungeLessonPackFor = (level: LoungeLessonLevel, items: readonly LoungeLessonItem[], count: number) => {
   const have = new Set(items.map(item => item.pack_id).filter(Boolean));
-  const target = loungeLessonLevel(level).target;
+  // There is no B1 list yet: a B1 goal takes the B2 one.
+  const target = loungeLessonLevel(level).target === 'C1' ? 'C1' : 'B2';
   return loungeLessonPack.filter(entry => entry.level === target && !have.has(entry.id)).slice(0, count);
 };
 
@@ -624,7 +648,7 @@ export function readLoungeLessonEnrich(value: unknown, items: readonly LoungeLes
 }
 
 /** What the tutor's reply reads about the lesson this turn (the `lesson` field of the input). */
-export function loungeLessonForPrompt(turn: LoungeLessonTurn, level: LoungeLessonLevel, grade?: LoungeLessonGrade, tutor?: string) {
+export function loungeLessonForPrompt(turn: LoungeLessonTurn, level: LoungeLessonLevel, grade?: LoungeLessonGrade, tutor?: string, profile?: Pick<LoungeLessonProfile, 'purpose' | 'topics'>) {
   // Before the member has tried it (ask, next) or while they ask about it (answer), the tutor is not given the English
   // at all, only the situation and the meaning: told not to say it, the reply still named it on 2026-11-25. Without
   // either, the expression comes marked as not to be said, to build a situation on. From a hint on it is the tutor's.
@@ -648,7 +672,9 @@ export function loungeLessonForPrompt(turn: LoungeLessonTurn, level: LoungeLesso
   };
   const feedback = loungeLessonFeedback(turn, grade);
   return {
-    level: loungeLessonLevel(level).label, step: turn.step,
+    level: `${level} → ${loungeLessonLevel(level).target} (목표 ${loungeLessonLevel(level).label}: ${loungeLessonLevel(level).note})`, step: turn.step,
+    // What the member learns for and wants to talk about, and the tutor's own way when they chose no topic.
+    session: { ...(profile?.purpose ? { purpose: profile.purpose } : {}), ...(profile?.topics.length ? { topics: profile.topics } : {}), ...(tutor && loungeLessonTutorStyles[tutor] ? { tutor_style: loungeLessonTutorStyles[tutor] } : {}) },
     ...(turn.target ? { target: { ...entry(turn.target), ...(turn.state.current?.id === turn.target.id && turn.step !== 'next' && turn.step !== 'ask' ? { hint_level: turn.state.current.hints } : {}) } } : {}),
     ...(turn.finished ? { finished: { expression: turn.finished.item.expression, how: turn.finished.verdict } } : {}),
     ...(turn.verdicts.some(entry => entry.verdict === 'free') ? { used_on_their_own: turn.verdicts.filter(entry => entry.verdict === 'free').map(entry => entry.item.expression) } : {}),
@@ -665,7 +691,7 @@ export const loungeLessonRules = `영어 수업: 이 방은 사용자와의 1:1 
 - 연습할 영어 표현은 사용자가 스스로 떠올려야 한다. ask, next, answer, hint에서는 lesson.target에 말해도 되는 영어 표현이 없고 상황(situation)과 뜻(meaning), 두 번째 힌트의 first_words만 있다. expression_do_not_say는 어떤 표현을 연습 중인지 알려 주는 것이다: 상황과 힌트가 그 표현을 향하게 하는 데만 쓰고, 그 표현과 첫 단어를 말하지 않으며 다른 영어 표현으로 유도하지도 않는다. 한국어 뜻 하나만 던지고 '영어로?'라고 묻는 단어 번역 문제로 만들지 않고, 상황과 하고 싶은 말의 방향을 준다. hint와 fix에서는 target.expression을 hint_level만큼만 드러내고, give에서 처음으로 전부 말한다.
 - 별표(*)를 쓰지 않는다. 영어 문장에도, 강조에도 쓰지 않는다(별표 안은 통화에서 읽히지 않는다). 필요하면 따옴표를 쓴다.
 - step별로 한다:
-  warmup: 짧게 인사하고 오늘 하루나 요즘 일을 영어로 하나 묻는다.
+  warmup: 짧게 인사하고 영어로 하나 묻는다. lesson.session.topics가 있으면 그 주제로, 없으면 lesson.session.tutor_style에 맞는 이야기로 묻는다.
   ask: target의 situation이 있으면 그 상황을, 없으면 그 표현이 자연스럽게 나올 수밖에 없는 구체적인 상황 하나를 네가 만들어 한국어로 짧게 주고, 그 상황에서 영어로 말해 보라고 한다. target.review가 있으면 전에 배운 표현을 다시 꺼내 보는 것이다.
   hint: 방금 시도에서 좋았던 점을 한마디로 받고 힌트 하나만 준다. hint_level 1이면 expression_do_not_say의 뜻이나 쓰임(어떤 뉘앙스, 어떤 자리에서 쓰는지)을 한국어로 짚고 영어 단어는 말하지 않는다. 2이면 target.first_words만 알려 주고 나머지는 말하지 않는다(예: "figure로 시작해요"까지만. 뜻을 보고 짐작한 나머지 단어를 붙여 "figure out이에요"처럼 완성하지 않는다). 그리고 다시 말해 보게 한다.
   fix: 표현을 쓰려 했지만 형태가 틀렸다. 틀린 곳 한 군데만 짚고 다시 말하게 한다.
@@ -673,9 +699,10 @@ export const loungeLessonRules = `영어 수업: 이 방은 사용자와의 1:1 
   retell: finished의 표현을 잘 썼다고 짧게 인정하고, 같은 표현을 네가 새로 준 다른 상황에서 한 번 더 말해 보게 한다.
   next: finished가 있으면 무엇을 잘했는지 짧게 인정하고(how가 missed면 괜찮다고 하고 표현을 한 번 들려준다), 바로 새 target으로 ask를 한다.
   answer: 사용자의 질문(수업 내용, 표현의 쓰임, 문법 등)에 제대로 답한다. 사용자의 질문 문장 자체는 고치거나 영어로 다시 말해 주지 않는다. 답한 뒤 하던 target 과제로 짧게 돌아온다. 이때 연습할 표현의 단어는 알려 주지 않는다.
-  free: 오늘 연습할 표현은 끝났다. 사용자의 관심사로 자유롭게 영어 대화를 이어 가며 질문 하나로 말을 끌어낸다. 오늘 연습한 표현을 쓸 기회를 자연스럽게 만든다.
+  free: 오늘 연습할 표현은 끝났다. lesson.session.topics(없으면 tutor_style의 이야기)로 자유롭게 영어 대화를 이어 가며 질문 하나로 말을 끌어낸다. 오늘 연습한 표현을 쓸 기회를 자연스럽게 만든다.
   wrap: 오늘 수업을 짧게 마무리하고 다음에 다시 확인하겠다고 한다.
 - fix, give, retell에서 target.nuance가 있으면 그 표현의 뉘앙스(어떤 자리, 어떤 어감)를 한 줄로 짚고, target.alternatives가 있으면 "비슷하게 이렇게도 말해요"로 하나나 둘을 차이와 함께 들려준다. target.why_koreans_mix_it_up이 있으면 "한국 사람들이 여기서 자주 헷갈리는 이유는"으로 한 줄 덧붙인다. 통화에서는 이 중 하나만.
+- 상황과 예문: lesson.session.purpose와 topics가 있으면 그 목적과 주제에 맞는 장면으로 연습시킨다(target.situation이 있어도 표현이 자연스럽게 나오는 한 그 주제의 장면으로 옮겨도 된다). 둘 다 없으면 lesson.session.tutor_style을 따른다.
 - target.yours가 있으면 사용자가 직접 말해 준 자기 상황(곧 있을 미팅, 면접 등)에서 쓸 표현이다. ask에서 그 상황으로 연습한다고 짧게 알리고 target.situation의 순간을 준다. give에서 example이 있으면 그 상황의 예문으로 들려준다.
 - lesson.used_on_their_own이 있으면 사용자가 시키지 않았는데 배운 표현을 썼다. 짧게 알아봐 준다.
 - lesson.feedback이 있으면 사용자 문장을 고쳐 준다: better를 "이렇게 말하면 더 자연스러워요"처럼 들려주고, polished가 있으면 "조금 더 세련되게"로 한 줄 덧붙이고, errors의 why로 한 줄 설명한다. 고치는 건 많아야 두 가지다. feedback이 없으면 문장을 고치지 않는다. 고친 뒤 이번 step의 할 일로 이어 간다.
