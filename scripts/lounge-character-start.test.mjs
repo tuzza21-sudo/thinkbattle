@@ -73,3 +73,15 @@ test('on a computer the photo and the column beside it end on the same line (202
   assert.match(block, /\.lounge-character-hero \{ align-items:stretch; \}/, 'the photo takes the column\'s height');
   assert.match(block, /\.lounge-character-intro>\.lounge-character-actions \{ margin-top:auto;/, 'the stories sit at the column\'s foot');
 });
+
+test('a pass is paid by card or by Naver Pay, Kakao Pay or Toss Pay, all through KG Inicis on PortOne V2 (2026-11-26)', () => {
+  const plans = loadTs(fileURLToPath(new URL('../src/lib/loungePlans.ts', import.meta.url)));
+  assert.deepEqual(plans.loungePayMethods.map(method => method.label), ['신용·체크카드', '네이버페이', '카카오페이', '토스페이']);
+  assert.deepEqual(plans.loungePayRequest('card'), { payMethod: 'CARD' });
+  assert.deepEqual(plans.loungePayRequest('naverpay'), { payMethod: 'EASY_PAY', easyPay: { easyPayProvider: 'NAVERPAY' } });
+  assert.deepEqual(plans.loungePayRequest('kakaopay').easyPay, { easyPayProvider: 'KAKAOPAY' });
+  assert.deepEqual(plans.loungePayRequest('tosspay').easyPay, { easyPayProvider: 'TOSSPAY' });
+  assert.equal(plans.readLoungePayMethod('bitcoin'), 'card', 'anything else is a card');
+  assert.match(read('api/payments.ts'), /\.\.\.loungePayRequest\(readLoungePayMethod\(body\.method\)\)/);
+  assert.match(read('src/components/LoungeBusinessFooter.tsx'), /고객센터<\/span> <a href="tel:\+821086434224">010-8643-4224<\/a>/);
+});

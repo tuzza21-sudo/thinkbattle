@@ -1,4 +1,4 @@
-import { getLoungePlan, loungeCallLimitMinutes, loungeOrderPrefix, loungeOrderTerm, loungePhotoMonthly, loungePlanGoodName } from '../src/lib/loungePlans';
+import { getLoungePlan, loungeCallLimitMinutes, loungeOrderPrefix, loungeOrderTerm, loungePhotoMonthly, loungePlanGoodName, loungePayRequest, readLoungePayMethod } from '../src/lib/loungePlans';
 
 export const config = { runtime: 'edge' };
 
@@ -203,7 +203,7 @@ async function createOrder(req: Request) {
   if (!user.id) return json({ error: '다시 로그인해 주세요.' }, 401);
   if (user.is_anonymous || !user.email) return json({ error: '회원가입 후 결제할 수 있어요.', code: 'signup_required' }, 403);
 
-  let body: { plan?: unknown; term?: unknown; device?: unknown; phone?: unknown };
+  let body: { plan?: unknown; term?: unknown; device?: unknown; phone?: unknown; method?: unknown };
   try { body = JSON.parse(await req.text()); } catch { return json({ error: '요청 형식이 올바르지 않아요.' }, 400); }
   const plan = getLoungePlan(body.plan, body.term);
   if (!plan) return json({ error: '요금제를 다시 골라 주세요.' }, 400);
@@ -222,7 +222,7 @@ async function createOrder(req: Request) {
     oid,
     request: {
       storeId: storeId(), channelKey: channelKey(), paymentId: oid, orderName: loungePlanGoodName(plan), totalAmount: plan.price,
-      currency: 'KRW', payMethod: 'CARD',
+      currency: 'KRW', ...loungePayRequest(readLoungePayMethod(body.method)),
       customer: { fullName, email: user.email, ...(phoneOk ? { phoneNumber: phone } : {}) },
       // Phones leave the site for the card company and come back here with ?paymentId=…; a computer gets the answer in place.
       redirectUrl: `${self}/lounge/payment`,

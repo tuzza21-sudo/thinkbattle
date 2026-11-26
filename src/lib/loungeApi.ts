@@ -487,14 +487,15 @@ export const setLoungeRoomPersona = (roomId: string, personaId: string | null, n
 export type LoungePaymentOrder = {
   oid: string;
   request: {
-    storeId: string; channelKey: string; paymentId: string; orderName: string; totalAmount: number; currency: 'KRW'; payMethod: 'CARD';
+    storeId: string; channelKey: string; paymentId: string; orderName: string; totalAmount: number; currency: 'KRW'; payMethod: 'CARD' | 'EASY_PAY';
+    easyPay?: { easyPayProvider: 'NAVERPAY' | 'KAKAOPAY' | 'TOSSPAY' };
     customer: { fullName: string; email: string; phoneNumber?: string }; redirectUrl: string; noticeUrls: string[];
   };
 };
 
 /** Opens a pending order for a plan; the server sets the price and returns the request for the PortOne (KG Inicis) payment window. */
-export async function createLoungePayment(plan: string, term: 'month' | 'year', device: 'pc' | 'mobile', phone?: string): Promise<LoungePaymentOrder> {
-  const response = await loungeAuthorizedFetch('/api/payments?action=create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, term, device, phone }) }, '결제 서버');
+export async function createLoungePayment(plan: string, term: 'month' | 'year', device: 'pc' | 'mobile', phone?: string, method = 'card'): Promise<LoungePaymentOrder> {
+  const response = await loungeAuthorizedFetch('/api/payments?action=create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan, term, device, phone, method }) }, '결제 서버');
   const body = await response.json().catch(() => ({})) as LoungePaymentOrder & { error?: string; code?: string };
   if (!response.ok) throw new LoungeApiError(body.error || '결제를 준비하지 못했어요.', body.code || 'lounge_payment_failed', false);
   return body;

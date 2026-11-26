@@ -79,7 +79,7 @@ function App() {
     const pageTitles: Record<string, string> = {
       '/': '사석에서',
       '/lounge/personas': '내 페르소나 · 사석에서',
-      '/lounge/guide': '플레이 가이드 · 사석에서',
+      '/lounge/guide': '이용 가이드 · 사석에서',
       '/debate': '토론 훈련',
       '/battle/new': 'AI 토론',
       '/history': '훈련 기록',

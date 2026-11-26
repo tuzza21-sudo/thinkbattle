@@ -10,7 +10,7 @@ export function LoungeBusinessFooter() {
       <p><span>상호</span> 대치레드 <i aria-hidden="true" /> <span>대표</span> 최석빈</p>
       <p><span>사업자등록번호</span> 218-14-16906</p>
       <p><span>주소</span> 서울시 서초구 사임당로8길 13, 4층 402-331A호</p>
-      <p><span>문의</span> <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a></p>
+      <p><span>고객센터</span> <a href="tel:+821086434224">010-8643-4224</a> <i aria-hidden="true" /> <span>문의</span> <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a></p>
     </div>
     <div className="lounge-business-links">
       {seoGuides.map(guide => <Link key={guide.path} to={guide.path}>{guide.label}</Link>)}

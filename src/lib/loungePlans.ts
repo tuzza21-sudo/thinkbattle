@@ -28,6 +28,25 @@ export const loungePlans: LoungePlan[] = [
 
 /** The year in a plan's name and receipts: an order id from a year plan starts with SY, a month's with SS. */
 export const loungeOrderPrefix: Record<LoungePlanTerm, string> = { month: 'SS', year: 'SY' };
+
+/**
+ * How the member pays (2026-11-26, by the owner): a credit or check card, or an easy pay (네이버페이, 카카오페이, 토스페이), all in
+ * KG Inicis's window through PortOne V2. An easy pay is asked for by name (PortOne's easyPay.easyPayProvider), which
+ * opens that app directly where the Inicis contract has it, and the Inicis window's easy pay list otherwise.
+ */
+export const loungePayMethods = [
+  { id: 'card', label: '신용·체크카드' },
+  { id: 'naverpay', label: '네이버페이' },
+  { id: 'kakaopay', label: '카카오페이' },
+  { id: 'tosspay', label: '토스페이' },
+] as const;
+export type LoungePayMethod = typeof loungePayMethods[number]['id'];
+export const readLoungePayMethod = (value: unknown): LoungePayMethod => loungePayMethods.find(method => method.id === value)?.id ?? 'card';
+const easyPayProviders = { naverpay: 'NAVERPAY', kakaopay: 'KAKAOPAY', tosspay: 'TOSSPAY' } as const;
+/** The part of PortOne.requestPayment that says how to pay. */
+export const loungePayRequest = (method: LoungePayMethod) => method === 'card'
+  ? { payMethod: 'CARD' as const }
+  : { payMethod: 'EASY_PAY' as const, easyPay: { easyPayProvider: easyPayProviders[method] } };
 export const loungeOrderTerm = (oid: unknown): LoungePlanTerm => typeof oid === 'string' && oid.startsWith(loungeOrderPrefix.year) ? 'year' : 'month';
 export const loungeTermLabel = (term: LoungePlanTerm) => term === 'year' ? '1년' : '1개월';
 /** The plan as a receipt names it: "Plus 1개월 이용권" (the first buyers' plan is Plus too). */
