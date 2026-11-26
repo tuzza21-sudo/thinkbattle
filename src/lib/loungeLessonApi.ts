@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
-import { parseLoungeLessonWords, readLoungeLessonLevel, type LoungeLessonItem, type LoungeLessonLevel } from './loungeLesson';
+import { loungeLessonLevel, parseLoungeLessonWords, readLoungeLessonProfile, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonProfile } from './loungeLesson';
 import { requestLoungeLessonEnrich, requestLoungeLessonSituation } from './loungeApi';
 
 /** A correction from a lesson (lounge_english_attempts): what the member said and how it reads better. */
 export type LoungeLessonNote = { id: number; said: string; better: string; polished: string; why: string; verdict: string; created_at: string; item_id: string | null };
-export type LoungeLessonBook = { items: LoungeLessonItem[]; notes: LoungeLessonNote[]; level: LoungeLessonLevel };
+export type LoungeLessonBook = { items: LoungeLessonItem[]; notes: LoungeLessonNote[]; level: LoungeLessonLevel; profile: LoungeLessonProfile };
 /** What a lesson made of one thing the member said (rows of lounge_english_attempts with the same words). */
 export type LoungeLessonAttempt = LoungeLessonNote & { room_id: string | null };
 
@@ -23,10 +23,11 @@ export async function loadLoungeLessonBook(): Promise<LoungeLessonBook> {
   const [items, notes, profile] = await Promise.all([
     supabase.from('lounge_english_items').select('*').order('created_at', { ascending: false }).limit(400),
     supabase.from('lounge_english_attempts').select('id,said,better,polished,why,verdict,created_at,item_id').neq('better', '').order('created_at', { ascending: false }).limit(200),
-    supabase.from('lounge_english_profiles').select('level').maybeSingle(),
+    supabase.from('lounge_english_profiles').select('*').maybeSingle(),
   ]);
   failed(items.error); failed(notes.error);
-  return { items: (items.data ?? []) as LoungeLessonItem[], notes: (notes.data ?? []) as LoungeLessonNote[], level: readLoungeLessonLevel(profile.data?.level) };
+  const read = readLoungeLessonProfile(profile.data);
+  return { items: (items.data ?? []) as LoungeLessonItem[], notes: (notes.data ?? []) as LoungeLessonNote[], level: read.level, profile: read };
 }
 
 /** Adds the member's own expressions (one a line, "expression - 뜻"); one they already have is left as it is. Returns how many were new. */
@@ -35,7 +36,7 @@ export async function addLoungeLessonWords(text: string, level: LoungeLessonLeve
   if (!words.length) throw new Error('영어 표현을 한 줄에 하나씩 적어 주세요. 예: come up with - 생각해 내다');
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('로그인이 필요해요.');
-  const target = level === 'B2' ? 'C1' : 'B2';
+  const target = loungeLessonLevel(level).target;
   const { data, error } = await supabase.from('lounge_english_items')
     .upsert(words.map(word => ({ user_id: user.user!.id, expression: word.expression, meaning: word.meaning, level: target, source: 'mine' })), { onConflict: 'user_id,expression_key', ignoreDuplicates: true })
     .select('id');
@@ -46,6 +47,16 @@ export async function addLoungeLessonWords(text: string, level: LoungeLessonLeve
 export async function deleteLoungeLessonItem(id: string) {
   const { error } = await supabase.from('lounge_english_items').delete().eq('id', id);
   failed(error);
+}
+
+/** The session's goal, purpose and topics (migration 20270120000000; before it only the two older levels are kept). */
+export async function setLoungeLessonProfile(profile: LoungeLessonProfile) {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) throw new Error('로그인이 필요해요.');
+  const { error } = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level: profile.level, purpose: profile.purpose || null, topics: profile.topics, updated_at: new Date().toISOString() });
+  if (!error) return;
+  if (profile.level !== 'A2') { const older = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level: profile.level, updated_at: new Date().toISOString() }); if (!older.error) return; }
+  throw new Error('수업 목표 저장은 곧 열려요. 오늘은 고른 목표로 그대로 수업할게요.');
 }
 
 export async function setLoungeLessonLevel(level: LoungeLessonLevel) {
@@ -62,7 +73,7 @@ export async function setLoungeLessonLevel(level: LoungeLessonLevel) {
 export async function importLoungeLessonWords(words: ReadonlyArray<{ expression: string; meaning: string; situation: string }>, level: LoungeLessonLevel) {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('로그인이 필요해요.');
-  const target = level === 'B2' ? 'C1' : 'B2';
+  const target = loungeLessonLevel(level).target;
   const withSituation = words.some(word => word.situation);
   const row = (word: { expression: string; meaning: string; situation: string }) => ({ user_id: user.user!.id, expression: word.expression, meaning: word.meaning, level: target, source: 'mine', ...(withSituation ? { situation: word.situation || null } : {}) });
   const put = (rows: ReturnType<typeof row>[]) => supabase.from('lounge_english_items').upsert(rows, { onConflict: 'user_id,expression_key', ignoreDuplicates: true }).select('id');
