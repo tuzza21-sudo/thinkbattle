@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, AudioLines, BarChart3, BookMarked, BookOpen, Briefcase, Eye, Feather, GraduationCap, Handshake, Landmark, Lock,
-  MessageCircle, Mic, Newspaper, Palette, Phone, ShieldCheck, Target, UserRound,
-} from 'lucide-react';
+  MessageCircle, Mic, Newspaper, Palette, Phone, ShieldCheck, Target, UserRound, Mountain } from 'lucide-react';
 import { getLoungeHost, loungeCharacterProfiles } from '../lib/lounge';
 import { loungeCharacters } from '../lib/loungeCharacters';
 import './LoungeIntroduction.css';
@@ -30,6 +29,8 @@ const programs = [
     text: '주장 한 문장, 근거 세 개, 반론 먼저, 칼럼 첫 문단, 제안 메일 같은 과제를 골라 써요. 기자의 눈으로 주장·근거·반론·구조를 매기고 고칠 곳을 짚어 줘요.' },
   { id: 'guide', field: '이탈리아 문화기행 · 현지 가이드', title: '피렌체·베네치아 명소 탐험', icon: MessageCircle, training: true,
     text: '두오모, 우피치, 산 마르코, 리알토까지 15곳. 명소를 고르면 사진과 함께 배경과 역사, 문화유산의 가치, 꼭 볼 것을 보고, 한지오가 그곳에 함께 선 것처럼 안내해요.' },
+  { id: 'explorer', field: '세계 국립공원 탐험 · 탐험 다큐멘터리스트', title: '옐로스톤에서 파타고니아까지', icon: Mountain, training: true,
+    text: '옐로스톤, 그랜드캐니언, 요세미티, 밴프, 토레스 델 파이네까지 12곳. 공원을 고르면 사진과 함께 지질과 역사, 꼭 볼 곳과 안전 수칙을 보고, 민서하가 그곳에 먼저 도착해 길과 풍경을 풀어 줘요.' },
   { id: 'velvet', field: '근현대 미술사 · 미술사 전공 아트 디렉터', title: '그림 한 점에 담긴 시대', icon: Palette, training: true,
     text: '모네, 고흐, 클림트, 칸딘스키부터 피카소, 워홀, 김환기까지. 작품을 고르면 선우령이 먼저 무엇이 보이는지 묻고, 시대와 보는 법, 의미를 풀어 줘요.' },
 ] as const;

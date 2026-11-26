@@ -1,0 +1,208 @@
+[
+  {
+    "id": "yellowstone",
+    "dir": "parks",
+    "query": "Grand Prismatic Spring Yellowstone aerial"
+  },
+  {
+    "id": "old-faithful",
+    "dir": "parks/spots",
+    "query": "Old Faithful geyser eruption Yellowstone"
+  },
+  {
+    "id": "grand-prismatic",
+    "dir": "parks/spots",
+    "query": "Grand Prismatic Spring boardwalk colors"
+  },
+  {
+    "id": "lower-falls",
+    "dir": "parks/spots",
+    "query": "Lower Falls Grand Canyon of the Yellowstone Artist Point"
+  },
+  {
+    "id": "grandcanyon",
+    "dir": "parks",
+    "query": "Grand Canyon South Rim view sunset"
+  },
+  {
+    "id": "mather-point",
+    "dir": "parks/spots",
+    "query": "Mather Point Grand Canyon"
+  },
+  {
+    "id": "desert-view",
+    "dir": "parks/spots",
+    "query": "Desert View Watchtower Grand Canyon"
+  },
+  {
+    "id": "bright-angel",
+    "dir": "parks/spots",
+    "query": "Bright Angel Trail Grand Canyon switchbacks"
+  },
+  {
+    "id": "yosemite",
+    "dir": "parks",
+    "query": "Tunnel View Yosemite Valley El Capitan Half Dome"
+  },
+  {
+    "id": "half-dome",
+    "dir": "parks/spots",
+    "query": "Half Dome Yosemite"
+  },
+  {
+    "id": "el-capitan",
+    "dir": "parks/spots",
+    "query": "El Capitan Yosemite Valley"
+  },
+  {
+    "id": "yosemite-falls",
+    "dir": "parks/spots",
+    "query": "Yosemite Falls upper lower"
+  },
+  {
+    "id": "zion",
+    "dir": "parks",
+    "query": "Zion Canyon Virgin River Watchman"
+  },
+  {
+    "id": "zion-narrows",
+    "dir": "parks/spots",
+    "query": "Zion Narrows Virgin River hikers"
+  },
+  {
+    "id": "angels-landing",
+    "dir": "parks/spots",
+    "query": "Angels Landing Zion"
+  },
+  {
+    "id": "arches",
+    "dir": "parks",
+    "query": "Arches National Park Delicate Arch La Sal Mountains"
+  },
+  {
+    "id": "delicate-arch",
+    "dir": "parks/spots",
+    "query": "Delicate Arch Utah"
+  },
+  {
+    "id": "double-arch",
+    "dir": "parks/spots",
+    "query": "Double Arch Arches National Park"
+  },
+  {
+    "id": "glacier",
+    "dir": "parks",
+    "query": "Swiftcurrent Lake Many Glacier Hotel Glacier National Park"
+  },
+  {
+    "id": "going-to-the-sun",
+    "dir": "parks/spots",
+    "query": "Going-to-the-Sun Road Logan Pass cars road"
+  },
+  {
+    "id": "grinnell-glacier",
+    "dir": "parks/spots",
+    "query": "Grinnell Glacier Upper Grinnell Lake"
+  },
+  {
+    "id": "lake-mcdonald",
+    "dir": "parks/spots",
+    "query": "colorful rocks Lake McDonald"
+  },
+  {
+    "id": "denali",
+    "dir": "parks",
+    "query": "Denali mountain view snow peak alaska range",
+    "file": "File:Caribou and Denali (11330240034).jpg"
+  },
+  {
+    "id": "wonder-lake",
+    "dir": "parks/spots",
+    "query": "Wonder Lake Denali reflection"
+  },
+  {
+    "id": "denali-sled-dogs",
+    "dir": "parks/spots",
+    "query": "Denali National Park sled dogs kennels"
+  },
+  {
+    "id": "hawaiivolcanoes",
+    "dir": "parks",
+    "query": "Kilauea Halemaumau crater lava lake"
+  },
+  {
+    "id": "halemaumau",
+    "dir": "parks/spots",
+    "query": "Halemaumau crater Kilauea caldera"
+  },
+  {
+    "id": "lava-tube",
+    "dir": "parks/spots",
+    "query": "Thurston Lava Tube Nahuku"
+  },
+  {
+    "id": "banff",
+    "dir": "parks",
+    "query": "Banff National Park Moraine Lake Valley of the Ten Peaks"
+  },
+  {
+    "id": "moraine-lake",
+    "dir": "parks/spots",
+    "query": "Moraine Lake Banff"
+  },
+  {
+    "id": "lake-louise",
+    "dir": "parks/spots",
+    "query": "Lake Louise Victoria Glacier"
+  },
+  {
+    "id": "jasper",
+    "dir": "parks",
+    "query": "Pyramid Lake Jasper National Park"
+  },
+  {
+    "id": "athabasca-glacier",
+    "dir": "parks/spots",
+    "query": "Athabasca Glacier Columbia Icefield"
+  },
+  {
+    "id": "spirit-island",
+    "dir": "parks/spots",
+    "query": "Spirit Island Maligne Lake"
+  },
+  {
+    "id": "torresdelpaine",
+    "dir": "parks",
+    "query": "Torres del Paine Cuernos Lago Pehoe"
+  },
+  {
+    "id": "base-torres",
+    "dir": "parks/spots",
+    "query": "Torres del Paine towers"
+  },
+  {
+    "id": "cuernos",
+    "dir": "parks/spots",
+    "query": "Cuernos del Paine"
+  },
+  {
+    "id": "grey-glacier",
+    "dir": "parks/spots",
+    "query": "Grey Glacier Torres del Paine"
+  },
+  {
+    "id": "losglaciares",
+    "dir": "parks",
+    "query": "Fitz Roy Laguna de los Tres"
+  },
+  {
+    "id": "perito-moreno",
+    "dir": "parks/spots",
+    "query": "Perito Moreno Glacier front"
+  },
+  {
+    "id": "fitz-roy",
+    "dir": "parks/spots",
+    "query": "Monte Fitz Roy El Chalten"
+  }
+]

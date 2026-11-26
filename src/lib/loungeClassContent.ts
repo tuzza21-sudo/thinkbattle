@@ -48,8 +48,11 @@ export const loungeLogicalExercises: readonly LoungeWritingExercise[] = [
 
 // ── The Italian culture trip ────────────────────────────────────────────────────────────────────────────────────────
 
+/** A travel class's trip (2026-11-27): 한지오's Italy, and 민서하's national parks (loungeParkContent.ts). */
+export type LoungeTravelTripId = 'italy' | 'parks';
 export type LoungeTravelSite = {
-  id: string; city: '피렌체' | '베네치아'; name: string; local: string; era: string;
+  /** Its trip (Italy when not given), and its tab on the board: a city of Italy, or a region of the parks. */
+  id: string; trip?: LoungeTravelTripId; city: string; name: string; local: string; era: string;
   summary: string; history: string; heritage: string; mustSee: readonly string[]; experience: readonly string[]; tip: string;
   image?: LoungeClassImage;
 };
