@@ -57,10 +57,12 @@ export function LoungeClassBar({ kind, roomId, storyState, send, disabled }: { k
       <div><p className="lounge-lesson-scene"><span>과제</span>{item.task}</p><p className="lounge-lesson-meaning"><span>분량</span>{item.length} · {item.focus.join(' · ')}</p></div>
     </section>}
     {item && !('task' in item) && scene && <section className="lounge-lesson-task lounge-class-view" aria-label="지금 보는 곳">
-      <button type="button" className="lounge-class-view-picture" onClick={() => setLarge(scene)} aria-label="크게 보기">
-        <img src={scene.src} alt={sceneName} /><span><Maximize2 size={14} /> 크게 보기</span>
-      </button>
-      <p className="lounge-lesson-scene"><span>{spot ? '지금 보는 것' : 'city' in item ? item.city : item.year}</span>{spot ? `${spot.name} · ${spot.note}` : 'city' in item ? item.summary : `${item.artist} · ${item.movement}`}</p>
+      {/* No large picture over the chat (2026-11-27, by the owner): a small one beside the line, and 크게 보기 next to it. */}
+      <div className="lounge-class-view-line">
+        {spots.length === 0 && <button type="button" className="lounge-class-view-thumb" onClick={() => setLarge(scene)} aria-label={`${sceneName} 크게 보기`}><img src={scene.src} alt="" /></button>}
+        <p className="lounge-lesson-scene"><span>{spot ? '지금 보는 것' : 'city' in item ? item.city : item.year}</span>{spot ? `${spot.name} · ${spot.note}` : 'city' in item ? item.summary : `${item.artist} · ${item.movement}`}</p>
+        <button type="button" className="lounge-class-view-zoom" onClick={() => setLarge(scene)}><Maximize2 size={14} /> 크게 보기</button>
+      </div>
       {spots.length > 0 && <div className="lounge-class-spots" role="group" aria-label="꼭 봐야 할 곳">
         <button type="button" className={!spot ? 'active' : ''} disabled={busySpot !== null || disabled} onClick={() => setStateOverride({ ...state, spot: undefined })}>
           {image && <img src={image.src} alt="" loading="lazy" />}<small>{titleOf(kind, state.item).split(' (')[0]}</small></button>
