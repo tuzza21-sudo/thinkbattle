@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import * as PortOne from '@portone/browser-sdk/v2';
 import type { AppUser } from '../types';
 import { completeLoungePayment, createLoungePayment, type LoungePaymentOrder } from '../lib/loungeApi';
-import { loungeFreePlan, loungePlanReceiptName, loungePlans, loungeTermLabel, type LoungePlan } from '../lib/loungePlans';
+import { loungeFreePlan, loungePlanReceiptName, loungePlans, loungeTermLabel, type LoungePlan, loungePayMethods, type LoungePayMethod } from '../lib/loungePlans';
 import { supabase } from '../lib/supabase';
 import { isSaseokApp } from '../lib/nativeApp';
 import { LoungeBusinessFooter } from './LoungeBusinessFooter';
@@ -35,6 +35,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   // KG Inicis's PC window needs the buyer's phone number; it is asked for on the card, sent to the window and not kept.
   const [asking, setAsking] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
+  const [method, setMethod] = useState<LoungePayMethod>('card');
   // In the store app a pass is not sold yet (the stores require their own in-app billing for it): the plans show, without a buy button.
   const inApp = isSaseokApp();
   const start = async (plan: LoungePlan) => {
@@ -44,7 +45,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
     if (!mobile && !phoneOk(phone)) { setAsking(plan.key); return; }
     setBusy(plan.key);
     try {
-      const done = await openPaymentWindow(await createLoungePayment(plan.id, plan.term, mobile ? 'mobile' : 'pc', mobile ? undefined : phoneDigits(phone)));
+      const done = await openPaymentWindow(await createLoungePayment(plan.id, plan.term, mobile ? 'mobile' : 'pc', mobile ? undefined : phoneDigits(phone), method));
       if (done && 'paymentId' in done) navigate(`/lounge/payment?paymentId=${encodeURIComponent(done.paymentId)}`);
       else if (done) setNotice(done.message);
     }
@@ -57,6 +58,10 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
       <p>무료로 시작하고, 더 오래 통화하고 캐릭터가 나를 더 잘 알게 하고 싶다면 Plus를 골라 보세요.</p>
       <p className="lounge-pricing-draft">지금 보이는 요금제는 안이에요. 테스트 오픈 중에는 요금과 이용 한도가 바뀔 수 있고, 바뀌면 서비스 화면으로 미리 알려 드려요.</p>
     </header>
+    {!inApp && <div className="lounge-pricing-methods" role="radiogroup" aria-label="결제 수단">
+      <span>결제 수단</span>
+      {loungePayMethods.map(item => <button key={item.id} type="button" role="radio" aria-checked={method === item.id} className={method === item.id ? 'active' : ''} onClick={() => setMethod(item.id)}>{item.label}</button>)}
+    </div>}
     <ul className="lounge-pricing-grid">
       <li className="lounge-pricing-card free">
         <div className="lounge-pricing-head"><strong>{loungeFreePlan.name}</strong></div>
@@ -82,7 +87,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
           {asking === plan.key && <form className="lounge-pricing-phone" onSubmit={event => { event.preventDefault(); void start(plan); }}>
             <label htmlFor={`lounge-pay-phone-${plan.key}`}>휴대폰 번호</label>
             <input id={`lounge-pay-phone-${plan.key}`} type="tel" inputMode="numeric" autoComplete="tel" placeholder="010-1234-5678" maxLength={13} value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
-            <p>카드 결제창(KG이니시스)에 필요해요. 결제창에만 전달하고 사석에는 저장하지 않아요.</p>
+            <p>결제창(KG이니시스)에 필요해요. 결제창에만 전달하고 사석에는 저장하지 않아요.</p>
           </form>}
           <button type="button" className="lounge-pricing-cta" disabled={busy !== null || (asking === plan.key && !phoneOk(phone))} onClick={() => void start(plan)}>
             {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : asking === plan.key ? '결제창 열기' : `${plan.name} 시작하기`}
@@ -91,7 +96,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
       </li>)}
     </ul>
     {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}
-    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 포트원을 거쳐 KG이니시스에서 안전하게 처리돼요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
+    <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 포트원을 거쳐 KG이니시스에서 안전하게 처리되고, 신용·체크카드와 네이버페이·카카오페이·토스페이로 결제할 수 있어요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
   </section>;
 }
 
