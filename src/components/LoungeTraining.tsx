@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { startLoungeScenario, startLoungeTraining } from '../lib/loungeApi';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { loungeNegotiationScenarioOf, formatLoungeAmount, loungeInterviewGaps, loungeInterviewPressures, loungeNegotiationLevels, loungeNegotiationScenario, loungeNegotiationScenarios, loungeNegotiationTactics, loungeTrainerOf, loungeTrainers, readLoungeTrainingState, type LoungeInterviewState, type LoungeNegotiationState, type LoungeTrainingKind, type LoungeTrainingState } from '../lib/loungeTraining';
+import { flipLoungeNegotiationScenario, loungeNegotiationScenarioOf, formatLoungeAmount, loungeInterviewGaps, loungeInterviewPressures, loungeNegotiationLevels, loungeNegotiationScenario, loungeNegotiationScenarios, loungeNegotiationTactics, loungeTrainerOf, loungeTrainers, readLoungeTrainingState, type LoungeInterviewState, type LoungeNegotiationState, type LoungeTrainingKind, type LoungeTrainingState } from '../lib/loungeTraining';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const percent = (value: number | null | undefined) => value == null ? '' : `${Math.round(value * 100)}%`;
@@ -116,13 +116,15 @@ function LoungeTrainingSetup({ kind, roomId, onStarted, onClose }: { kind: Loung
   const [edit, setEdit] = useState<{ context: string; member: string; name: string; role: string; style: string; opening: string } | null>(null);
   const [own, setOwn] = useState({ title: '', situation: '', side: 'buyer', unit: '만원', opening: '', counterpart: '' });
   const unit = custom ? (own.unit === '%' ? '%' : '만 원') : chosen.unit === '%' ? '%' : `${chosen.per ? `${chosen.per} ` : ''}만 원`;
+  const [flip, setFlip] = useState(false);
+  const flipped = flipLoungeNegotiationScenario(chosen);
   const choose = (id: string) => { setScenario(id); setEdit(null); };
   const startEdit = () => setEdit({ context: chosen.context, member: chosen.member, name: chosen.counterpart.name, role: chosen.counterpart.role, style: chosen.counterpart.style, opening: String(chosen.opening) });
   const editPayload = edit ? { context: edit.context, member: edit.member, opening: edit.opening, counterpart: { name: edit.name, role: edit.role, style: edit.style } } : undefined;
   const start = async () => {
     setBusy(true); setError('');
     try {
-      const { state } = await startLoungeTraining(roomId, kind === 'negotiation' ? { scenario, level, target, walkaway, batna, ...(custom ? own : editPayload ? { edit: editPayload } : {}) } : { job, career, company, posting, resume, pressure });
+      const { state } = await startLoungeTraining(roomId, kind === 'negotiation' ? { scenario, level, target, walkaway, batna, ...(custom ? own : editPayload ? { edit: editPayload } : {}), ...(flip ? { flip: true } : {}) } : { job, career, company, posting, resume, pressure });
       const next = readLoungeTrainingState(state);
       if (!next) throw new Error('훈련을 시작하지 못했어요. 다시 시도해 주세요.');
       onStarted(next);
@@ -164,10 +166,11 @@ function LoungeTrainingSetup({ kind, roomId, onStarted, onClose }: { kind: Loung
             <p className="lounge-memory-fine">상대의 첫 숫자를 바꾸면, 숨은 한계선도 같은 비율로 맞춰져요.</p>
           </div> : <div className="lounge-lesson-preview"><p><b>나</b> {chosen.member}</p><p><b>상대</b> {chosen.counterpart.role} {chosen.counterpart.name}</p><small>{chosen.context}</small>
             <div><button type="button" onClick={startEdit}>내 상황에 맞게 고치기</button></div></div>}
+          <label className="lounge-training-flip"><input type="checkbox" checked={flip} onChange={event => setFlip(event.target.checked)} /><span><b>역할 바꾸기</b><small>{custom ? `반대 입장(${own.side === 'buyer' ? '파는 쪽' : '사는 쪽'})에서 협상해요. 상대가 지금의 나를 맡아요.` : `내가 '${chosen.counterpart.role}', 상대가 '${chosen.member}' 역할을 맡아요. 상대의 첫 숫자는 ${formatLoungeAmount(flipped.opening, flipped)}예요.`}</small></span></label>
           <div className="lounge-lesson-levels lounge-training-levels" role="radiogroup" aria-label="상대 난이도">
             {loungeNegotiationLevels.map(entry => <button key={entry.id} type="button" role="radio" aria-checked={level === entry.id} className={level === entry.id ? 'active' : ''} onClick={() => setLevel(entry.id)}><b>{entry.label}</b><small>{entry.note}</small></button>)}
           </div>
-          <label><span>내 목표 <small>{unit}, 선택</small></span><input inputMode="decimal" value={target} onChange={event => setTarget(event.target.value)} placeholder={(custom ? own.side : chosen.role) === 'buyer' ? '이 정도면 성공' : '이 정도는 받고 싶다'} /></label>
+          <label><span>내 목표 <small>{unit}, 선택</small></span><input inputMode="decimal" value={target} onChange={event => setTarget(event.target.value)} placeholder={((custom ? own.side : chosen.role) === 'buyer') !== flip ? '이 정도면 성공' : '이 정도는 받고 싶다'} /></label>
           <label><span>내 마지노선 <small>{unit}, 선택 · 이걸 넘으면 안 한다</small></span><input inputMode="decimal" value={walkaway} onChange={event => setWalkaway(event.target.value)} /></label>
           <label><span>협상이 깨지면 쓸 대안 <small>선택</small></span><input maxLength={200} value={batna} onChange={event => setBatna(event.target.value)} placeholder="예: 비슷한 매물 하나 더 봐 둠" /></label>
           <p className="lounge-memory-fine">상대의 실제 한계선과 숨은 사정은 시작할 때 정해지고, 끝나면 공개돼요.</p>

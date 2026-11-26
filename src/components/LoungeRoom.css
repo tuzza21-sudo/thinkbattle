@@ -1452,3 +1452,10 @@
 .lounge-training-phrases q { display:block; padding:4px 8px; border-left:2px solid #9fd8a8; background:#ffffff0a; font-style:normal; quotes:none; }
 .lounge-training-tips li small { display:block; opacity:.75; }
 @media (max-width: 560px) { .lounge-training-inline { grid-template-columns:1fr; } }
+
+/* 협상 역할 바꾸기 (2026-11-26) */
+.lounge-training-flip { display:flex !important; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid #ffffff24; border-radius:12px; background:#ffffff08; cursor:pointer; }
+.lounge-training-flip input { width:auto !important; margin-top:3px; }
+.lounge-training-flip span { display:grid; gap:2px; }
+.lounge-training-flip b { font-size:13.5px; }
+.lounge-training-flip small { font-size:12px; opacity:.75; line-height:1.5; }

@@ -13,7 +13,7 @@ import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHou
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
 import { advanceLoungeClass, isLoungeClass, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
 import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
-import { editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
+import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
@@ -852,12 +852,14 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
             } catch (error) { console.warn('[Lounge training] custom scenario not written', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); return undefined; }
           })();
           if (!custom) return json({ error: '상대의 첫 제안 숫자와 상황을 조금 더 적어 주세요.' }, 422);
-          state = startLoungeNegotiation(setup, Math.random, new Date(), custom);
+          state = startLoungeNegotiation(setup, Math.random, new Date(), setup.flip === true ? flipLoungeNegotiationScenario(custom) : custom);
         } else {
           // A built-in situation edited to the member's own.
           const base = loungeNegotiationScenario(typeof setup.scenario === 'string' ? setup.scenario : undefined);
           const edit = setup.edit && typeof setup.edit === 'object' ? setup.edit as Record<string, unknown> : undefined;
-          state = startLoungeNegotiation(setup, Math.random, new Date(), base && edit ? editLoungeNegotiationScenario(base, edit) : undefined);
+          const own = base && edit ? editLoungeNegotiationScenario(base, edit) : base;
+          // The other side of it, when the member switched roles.
+          state = startLoungeNegotiation(setup, Math.random, new Date(), own && setup.flip === true ? flipLoungeNegotiationScenario(own) : own && edit ? own : undefined);
         }
       }
       else {

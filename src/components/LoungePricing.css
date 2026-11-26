@@ -60,3 +60,5 @@
 .lounge-pricing-methods > span { margin-right:4px; color:var(--l-muted); font-size:13px; font-weight:700; }
 .lounge-pricing-methods button { padding:8px 14px; border:1px solid var(--l-line); border-radius:999px; background:var(--l-paper,#fffefb); color:var(--l-ink,#32352e); font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .lounge-pricing-methods button.active { border-color:var(--l-green); background:var(--l-green); color:#fffaf0; }
+
+.lounge-pricing-notice.inline { margin:8px 0 0; font-size:13px; }
