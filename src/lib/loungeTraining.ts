@@ -272,6 +272,27 @@ export function editLoungeNegotiationScenario(base: LoungeNegotiationScenario, e
   };
 }
 
+/**
+ * The other side of the same negotiation (2026-11-26, by the owner): the member takes the counterpart's place and the
+ * counterpart becomes who the member was. The new counterpart's first number mirrors the old one around the middle of
+ * the hidden limit's range, and the range stays, so the counterpart has the same room to give from the other side.
+ */
+export function flipLoungeNegotiationScenario(base: LoungeNegotiationScenario): LoungeNegotiationScenario {
+  const role = base.role === 'buyer' ? 'seller' : 'buyer';
+  const middle = (base.reservation[0] + base.reservation[1]) / 2;
+  const opening = Math.max(base.step, roundTo(2 * middle - base.opening, base.step));
+  const amount = formatLoungeAmount(opening, base);
+  return {
+    ...base, id: `${base.id}-flip`, role, opening,
+    member: base.counterpart.role,
+    counterpart: { name: role === 'seller' ? '구매 희망자' : '판매·제안자', role: base.member, style: role === 'seller' ? '이것저것 따지며 값을 깎으려 한다' : '자기 쪽 조건을 지키려 단단히 버틴다' },
+    context: `역할을 바꾼 협상이에요. 이번엔 당신이 '${base.counterpart.role}' 쪽이고, 상대('${base.member}')가 처음에 ${amount}을(를) 제시해요. 원래 상황: ${base.context}`,
+    interests: role === 'seller'
+      ? ['예산이 빠듯해서 이번 달 지출을 줄여야 한다', '다른 후보도 보고 있지만 이 조건이 가장 마음에 든다']
+      : ['이번 달 안에 결정이 나야 하는 사정이 있다', '다른 제안도 있지만 이쪽과 일하고 싶어 한다'],
+  };
+}
+
 /** What the member writes for a negotiation of their own; the rest (the counterpart's hidden limit and need) is written for it. */
 export const loungeNegotiationCustomSchema = {
   type: 'object', additionalProperties: false,

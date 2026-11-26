@@ -32,6 +32,8 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   const navigate = useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The plan whose button the notice is about, so it shows under that button too.
+  const [noticeFor, setNoticeFor] = useState<string | null>(null);
   // KG Inicis's PC window needs the buyer's phone number; it is asked for on the card, sent to the window and not kept.
   const [asking, setAsking] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
@@ -39,7 +41,7 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
   // In the store app a pass is not sold yet (the stores require their own in-app billing for it): the plans show, without a buy button.
   const inApp = isSaseokApp();
   const start = async (plan: LoungePlan) => {
-    setNotice(null);
+    setNotice(null); setNoticeFor(plan.key);
     if (!user || user.isAnonymous) { setNotice('회원가입 또는 로그인 후 결제할 수 있어요.'); onLoginRequest?.(); return; }
     const mobile = isMobile();
     if (!mobile && !phoneOk(phone)) { setAsking(plan.key); return; }
@@ -92,10 +94,11 @@ export function LoungePricing({ user, onLoginRequest }: { user: AppUser | null; 
           <button type="button" className="lounge-pricing-cta" disabled={busy !== null || (asking === plan.key && !phoneOk(phone))} onClick={() => void start(plan)}>
             {busy === plan.key ? <><LoaderCircle size={15} className="lounge-pricing-spin" aria-hidden="true" /> 결제창 여는 중</> : asking === plan.key ? '결제창 열기' : `${plan.name} 시작하기`}
           </button>
+          {notice && noticeFor === plan.key && <p className="lounge-pricing-notice inline" role="alert">{notice}</p>}
         </>}
       </li>)}
     </ul>
-    {notice && <p className="lounge-pricing-notice" role="status">{notice}</p>}
+    {notice && !noticeFor && <p className="lounge-pricing-notice" role="status">{notice}</p>}
     <p className="lounge-pricing-fine">부가세 포함 가격이에요. 결제한 날부터 월간은 1개월, 연간은 1년 동안 이용할 수 있고, 자동으로 다시 결제되지 않아요. 결제는 포트원을 거쳐 KG이니시스에서 안전하게 처리되고, 신용·체크카드와 네이버페이·카카오페이·토스페이로 결제할 수 있어요. 결제 후 7일 안에 늘어난 기능을 쓰지 않았다면 계정 관리의 ‘이용권’에서 바로 취소하고 환불받을 수 있어요. 그 밖의 취소·환불은 <Link to="/terms">이용약관</Link>을 확인하거나 <a href="mailto:ask.saseok@gmail.com">ask.saseok@gmail.com</a>으로 문의해 주세요.</p>
   </section>;
 }

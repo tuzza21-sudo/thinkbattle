@@ -184,3 +184,20 @@ test('a negotiation of the member\'s own: a built-in one edited keeps its room t
   assert.match(training.loungeTrainingRules('negotiation'), /say_like_this/);
   for (const tactic of Object.values(training.loungeNegotiationTactics)) assert.ok(tactic.phrases.length >= 1 && tactic.avoid, tactic.label);
 });
+
+test('switching roles: the member takes the counterpart\'s side, the first number mirrors around the hidden range, and the counterpart still has room to give (2026-11-26)', () => {
+  for (const id of ['usedcar', 'salary', 'supplier', 'land']) {
+    const base = training.loungeNegotiationScenario(id);
+    const flipped = training.flipLoungeNegotiationScenario(base);
+    assert.notEqual(flipped.role, base.role, id);
+    assert.equal(flipped.member, base.counterpart.role); assert.equal(flipped.counterpart.role, base.member);
+    const [low, high] = flipped.reservation;
+    // The new counterpart's limit lies on the member's side of its first number.
+    if (flipped.role === 'buyer') assert.ok(low < flipped.opening && high < flipped.opening, id); else assert.ok(low > flipped.opening && high > flipped.opening, id);
+    const state = training.startLoungeNegotiation({ scenario: id, level: 'normal' }, () => 0.5, new Date(), flipped);
+    const opened = training.advanceLoungeNegotiation(state, undefined).state;
+    const moved = training.advanceLoungeNegotiation(opened, { intent: 'negotiate', offer: null, tactics: ['justify'], caved: false, asked_interest: false }).state;
+    assert.ok(flipped.role === 'buyer' ? moved.theirs.at(-1) <= opened.theirs[0] : moved.theirs.at(-1) >= opened.theirs[0], `${id} moves toward the member`);
+  }
+  assert.equal(training.flipLoungeNegotiationScenario(training.loungeNegotiationScenario('usedcar')).opening, 1070);
+});
