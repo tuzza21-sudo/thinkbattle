@@ -53,7 +53,7 @@ test('going back takes back the member\'s message with its reply, two by two up 
 
 test('the server takes the actions only for the member\'s own chat, and the voice is counted once by the database', () => {
   const api = read('api/lounge.ts');
-  assert.match(api, /'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start']\.includes/);
+  assert.match(api, /'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start', 'class-pick']\.includes/);
   assert.match(api, /rpc\/rewind_voice_lounge_chat/);
   assert.match(api, /p_reply_only: body\.regenerate === true/, '다시 쓰기 takes back the reply only; 되감기 the whole exchange');
   assert.match(api, /mine\.host_id === user\.id && mine\.capacity === 1 && !mine\.space_id/);

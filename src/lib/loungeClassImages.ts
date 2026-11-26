@@ -1,0 +1,32 @@
+// Generated from Wikimedia Commons (scripts in the PR): each class picture's author, licence and file page.
+import type { LoungeClassImage } from './loungeClassContent';
+
+export const loungeClassImages: Record<string, LoungeClassImage> = {
+  duomo: { src: '/lounge/class/duomo.webp', credit: "Mariordo", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Santa_Maria_del_Fiore_Cathedral_Florence_04_2024_0907.jpg" },
+  uffizi: { src: '/lounge/class/uffizi.webp', credit: "Verum3414", license: "CC BY 4.0", source: "https://commons.wikimedia.org/wiki/File:Piazzale_degli_Uffizi_perspective_view,_Florence,_Italy,_August_2025.jpg" },
+  pontevecchio: { src: '/lounge/class/pontevecchio.webp', credit: "Martin Falbisoner", license: "CC BY-SA 3.0", source: "https://commons.wikimedia.org/wiki/File:Ponte_Vecchio_at_dusk_1.JPG" },
+  signoria: { src: '/lounge/class/signoria.webp', credit: "Jebulon", license: "CC0", source: "https://commons.wikimedia.org/wiki/File:Palazzo_vecchio_Florence.jpg" },
+  accademia: { src: '/lounge/class/accademia.webp', credit: "Mariordo", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Accademia_David_Florence_04_2024_6058_5x7.jpg" },
+  santacroce: { src: '/lounge/class/santacroce.webp', credit: "Rhododendrites", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Basilica_di_Santa_Croce_(12437).jpg" },
+  michelangelo: { src: '/lounge/class/michelangelo.webp', credit: "Diego Delso", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Vista_de_Florencia_desde_Piazzale_Michelangelo,_Italia,_2022-09-18,_DD_212-214_HDR.jpg" },
+  pitti: { src: '/lounge/class/pitti.webp', credit: "Diego Delso", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Palacio_Pitti,_Florencia,_Italia,_2022-09-18,_DD_197.jpg" },
+  sanmarco: { src: '/lounge/class/sanmarco.webp', credit: "Petar Milosevic", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:San_Marco_cathedral_in_Venice.JPG" },
+  rialto: { src: '/lounge/class/rialto.webp', credit: "kallerna", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Ponte_di_Rialto_Venice_1.jpg" },
+  grandcanal: { src: '/lounge/class/grandcanal.webp', credit: "Martin Falbisoner", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Panorama_of_Canal_Grande_and_Ponte_di_Rialto,_Venice_-_September_2017.jpg" },
+  accademiave: { src: '/lounge/class/accademiave.webp', credit: "Didier Descouens", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Accademia_(Venice).jpg" },
+  salute: { src: '/lounge/class/salute.webp', credit: "Wolfgang Moroder", license: "CC BY 3.0", source: "https://commons.wikimedia.org/wiki/File:Basilica_Santa_Maria_della_Salute_Dorsoduro_Venezia.jpg" },
+  murano: { src: '/lounge/class/murano.webp', credit: "Jorge Franganillo", license: "CC BY 2.0", source: "https://commons.wikimedia.org/wiki/File:Canal_and_colourful_houses_in_Burano_(50416720017).jpg" },
+  impression: { src: '/lounge/class/impression.webp', credit: "Claude Monet", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Monet_-_Impression,_Sunrise.jpg" },
+  waterlilies: { src: '/lounge/class/waterlilies.webp', credit: "Claude Monet", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Water_Lilies_(Agapanthus),_by_Claude_Monet,_Cleveland_Museum_of_Art,_1960.81.jpg" },
+  grandejatte: { src: '/lounge/class/grandejatte.webp', credit: "Georges Seurat", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:A_Sunday_on_La_Grande_Jatte,_Georges_Seurat,_1884.jpg" },
+  saintevictoire: { src: '/lounge/class/saintevictoire.webp', credit: "Paul Cézanne", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:La_Montagne_Sainte-Victoire_vue_de_la_carri%C3%A8re_Bib%C3%A9mus,_par_Paul_C%C3%A9zanne.jpg" },
+  starrynight: { src: '/lounge/class/starrynight.webp', credit: "Vincent van Gogh", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg" },
+  gauguin: { src: '/lounge/class/gauguin.webp', credit: "Paul Gauguin", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Gauguin_-_Where_Do_We_Come_From%3F_What_Are_We%3F_Where_Are_We_Going%3F_(1897-98).jpg" },
+  scream: { src: '/lounge/class/scream.webp', credit: "Edvard Munch", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Edvard_Munch,_1893,_The_Scream,_oil,_tempera_and_pastel_on_cardboard,_91_x_73_cm,_National_Gallery_of_Norway.jpg" },
+  kiss: { src: '/lounge/class/kiss.webp', credit: "Gustav Klimt", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:The_Kiss_-_Gustav_Klimt_-_Google_Cultural_Institute.jpg" },
+  dance: { src: '/lounge/class/dance.webp', credit: "Henri Matisse", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:La_Danse_II,_par_Henri_Matisse.jpg" },
+  composition7: { src: '/lounge/class/composition7.webp', credit: "Wassily Kandinsky", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Composition_VII_-_Wassily_Kandinsky,_GAC.jpg" },
+  mondrian: { src: '/lounge/class/mondrian.webp', credit: "Piet Mondrian", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Piet_Mondriaan,_1930_-_Mondrian_Composition_II_in_Red,_Blue,_and_Yellow.jpg" },
+  senecio: { src: '/lounge/class/senecio.webp', credit: "Paul Klee", license: "Public domain", source: "https://commons.wikimedia.org/wiki/File:Paul_Klee,_1922,_Senecio,_oil_on_gauze,_40.3_%C3%97_37.4_cm,_Kunstmuseum_Basel.jpg" },
+  ducale: { src: '/lounge/class/ducale.webp', credit: "Martin Falbisoner", license: "CC BY-SA 4.0", source: "https://commons.wikimedia.org/wiki/File:Saint_Mark%27s_Campanile_and_Palazzo_Ducale,_Venice,_September_2017_-2.jpg" },
+};

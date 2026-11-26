@@ -24,14 +24,14 @@ const programs = [
     text: '중고차, 연봉, 전세, 견적, 단가, 토지 매입. 협상가가 상대편을 맡고, 상대의 한계선과 숨은 사정은 끝날 때까지 숨겨져요. 끝나면 내가 가져온 몫을 숫자로 보여 줘요.' },
   { id: 'trickster', field: '압박 면접 · 심리 칼럼니스트', title: '두 번째 질문에서 무너지지 않게', icon: Briefcase, training: true,
     text: '지원 직무와 이력에 맞춘 질문을 만들고, 답이 막연하면 꼬리 질문으로 파고들어요. 압박은 답에만 해요. 끝나면 질문별 점수와 더 나은 답을 받아요.' },
-  { id: 'ina', field: '문학적 글쓰기 · 출판 편집자', title: '문장을 고치는 편집자의 눈', icon: Feather, training: false,
-    text: '에세이, 소설의 한 장면, 자기소개서. 쓴 글을 보여 주면 출판 편집자가 문장의 리듬과 군더더기를 짚고 함께 다듬어요.' },
-  { id: 'diplomat', field: '기자의 글쓰기 · 사회부 기자', title: '사실과 의견을 가르는 글', icon: Newspaper, training: false,
-    text: '첫 문장에 핵심을 세우는 법, 사실과 의견을 가르는 법, 긴 글을 세 줄로 줄이는 법을 기자의 관점으로 함께 연습해요.' },
-  { id: 'guide', field: '이탈리아 문화기행 · 현지 가이드', title: '떠나기 전에 먼저 걷는 도시', icon: MessageCircle, training: false,
-    text: '피렌체·베네치아·돌로미티 가이드와 도시의 역사와 골목, 식당에서의 한마디, 여행 일정까지 대화로 미리 걸어 봐요.' },
-  { id: 'velvet', field: '미술사 이야기 · 프라이빗 아트 디렉터', title: '그림 한 점에 담긴 시대', icon: Palette, training: false,
-    text: '컬렉션을 다루는 아트 디렉터에게 작품이 그려진 시대와 화가, 그림을 보는 눈을 대화로 들어요.' },
+  { id: 'ina', field: '감성적·문학적 글쓰기 · 출판 편집자', title: '감정을 보여 주는 문장', icon: Feather, training: true,
+    text: '오감 묘사, 이름 없는 감정, 보내지 않을 편지, 덜어 내기 같은 과제를 골라 써요. 쓴 글에는 감각·절제·리듬·여운을 매긴 첨삭 카드와 다시 쓴 예가 붙어요.' },
+  { id: 'diplomat', field: '논리적·설득적 글쓰기 · 사회부 기자', title: '주장과 근거로 움직이는 글', icon: Newspaper, training: true,
+    text: '주장 한 문장, 근거 세 개, 반론 먼저, 칼럼 첫 문단, 제안 메일 같은 과제를 골라 써요. 기자의 눈으로 주장·근거·반론·구조를 매기고 고칠 곳을 짚어 줘요.' },
+  { id: 'guide', field: '이탈리아 문화기행 · 현지 가이드', title: '피렌체·베네치아 명소 탐험', icon: MessageCircle, training: true,
+    text: '두오모, 우피치, 산 마르코, 리알토까지 15곳. 명소를 고르면 사진과 함께 배경과 역사, 문화유산의 가치, 꼭 볼 것을 보고, 한지오가 그곳에 함께 선 것처럼 안내해요.' },
+  { id: 'velvet', field: '근현대 미술사 · 미술사 전공 아트 디렉터', title: '그림 한 점에 담긴 시대', icon: Palette, training: true,
+    text: '모네, 고흐, 클림트, 칸딘스키부터 피카소, 워홀, 김환기까지. 작품을 고르면 선우령이 먼저 무엇이 보이는지 묻고, 시대와 보는 법, 의미를 풀어 줘요.' },
 ] as const;
 const records = [
   { icon: BookMarked, title: '학습 보드', text: '넣은 단어와 표현을 날짜별로, 순위와 레벨(B1 쉬움 · B2 보통 · C1 어려움)별로 정리해요. 무엇부터 할지 한눈에 보여요.' },
@@ -51,7 +51,7 @@ const trustItems = [
   { icon: Target, title: '숫자는 연습용이에요', text: '협상 결과와 면접 점수는 연습을 돕기 위한 지표예요. 실제 협상이나 채용 결과를 보장하지 않아요.' },
 ];
 const startSteps = [
-  { icon: Target, title: '실전 훈련을 골라요', text: '홈의 ‘실전 훈련’에서 영어, 협상, 면접 중 오늘 연습할 것을 골라요. 글쓰기·문화기행·미술사는 그 캐릭터와 1:1 대화로 시작해요.' },
+  { icon: Target, title: '실전 훈련을 골라요', text: '홈의 ‘실전 훈련’에서 영어, 협상, 면접, 글쓰기, 문화기행, 미술사 중 오늘 연습할 것을 골라요.' },
   { icon: UserRound, title: '목표와 상황을 정해요', text: '영어는 목표 레벨과 주제를, 협상은 상황과 난이도를, 면접은 직무와 압박 단계를 골라요.' },
   { icon: Mic, title: '직접 말하고 고쳐요', text: '채팅으로, 또는 전화로 직접 말해요. 끝나면 피드백과 결과가 기록으로 남아요.' },
 ];
@@ -121,11 +121,11 @@ export function LoungeIntroduction() {
     </div>
 
     <section className="lounge-intro-characters lounge-intro-stories" aria-labelledby="lounge-intro-programs-title">
-      <div className="lounge-intro-section-heading reveal"><span className="lounge-intro-number">01 · PRACTICE</span><h2 id="lounge-intro-programs-title">배우고 싶은 것을,<br />그 분야의 사람과 직접.</h2><p>영어·협상·면접은 단계와 결과가 있는 1:1 실전 훈련으로,<br />글쓰기·문화기행·미술사는 그 분야 캐릭터와의 1:1 대화로 배워요.</p></div>
+      <div className="lounge-intro-section-heading reveal"><span className="lounge-intro-number">01 · PRACTICE</span><h2 id="lounge-intro-programs-title">배우고 싶은 것을,<br />그 분야의 사람과 직접.</h2><p>영어·협상·면접은 단계와 결과가 있는 1:1 실전 훈련으로,<br />글쓰기·문화기행·미술사는 과제와 명소, 작품을 골라 배우는 1:1 클래스로 해요.</p></div>
       <div className="lounge-intro-story-grid">
         {programs.map(program => { const host = getLoungeHost(program.id); return <Link key={program.id} className="lounge-intro-story reveal" to={`/lounge/characters/${program.id}`} style={{ ['--tint' as string]: host.color }}>
           <img src={host.portrait} alt={`${nameOf(program.id)}, 가상의 AI 캐릭터`} loading="lazy" />
-          <div><span><program.icon size={12} aria-hidden="true" /> {program.field} · {nameOf(program.id)}</span><h3>{program.title}</h3><p>{program.text}</p><b>{program.training ? '1:1 실전 훈련' : '1:1 대화 클래스'} <ArrowRight size={14} /></b></div>
+          <div><span><program.icon size={12} aria-hidden="true" /> {program.field} · {nameOf(program.id)}</span><h3>{program.title}</h3><p>{program.text}</p><b>{['ina', 'diplomat', 'guide', 'velvet'].includes(program.id) ? '1:1 클래스' : '1:1 실전 훈련'} <ArrowRight size={14} /></b></div>
         </Link>; })}
       </div>
     </section>

@@ -11,6 +11,8 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
+import { advanceLoungeClass, isLoungeClass, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
+import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
@@ -512,7 +514,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start', 'class-pick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -811,6 +813,21 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
 
     // 실전 훈련 (loungeTraining.ts): a new negotiation (the counterpart's limit and need drawn now, kept in the room) or a new
     // interview (its questions written now from the job, the posting and the member's summary), set as the room's state.
+    // 클래스: the member picked an assignment, a site or a work on the class board; the next reply starts it.
+    if (body.action === 'class-pick') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,story_state`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string; story_state?: unknown }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id || !isLoungeClass(mine.host_persona)) return json({ error: '클래스 방에서만 쓸 수 있어요.' }, 403);
+      const kind = loungeClasses[mine.host_persona].kind;
+      const state = pickLoungeClassItem(readLoungeClassState(mine.story_state, kind), typeof body.item === 'string' ? body.item : '');
+      if (!state) return json({ error: '고른 항목을 찾지 못했어요.' }, 400);
+      const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
+      if (!saved.ok) return json({ error: '잠시 뒤 다시 골라 주세요.' }, 502);
+      return json({ state });
+    }
+
     if (body.action === 'training-start') {
       const user = await readJson<{ id: string }>(auth, 'lounge');
       if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
@@ -853,7 +870,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const [room] = await readJson<Array<{ host_id: string; host_persona?: string; capacity: number; space_id?: string | null; status: string; voice_on?: boolean | null }>>(roomResponse, 'lounge');
       if (!room || room.host_id !== user.id || room.capacity !== 1 || room.space_id || room.status !== 'active' || room.voice_on === false) return json({ call: null });
       // English lessons are free while they are tried out (2026-11-25, by the owner): their calls are not counted.
-      if (isLoungeTutor(room.host_persona) || isLoungeTrainer(room.host_persona)) return json({ call: null });
+      if (isLoungeTutor(room.host_persona) || isLoungeTrainer(room.host_persona) || isLoungeClass(room.host_persona)) return json({ call: null });
       return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }).catch(() => null) });
     }
 
@@ -1229,7 +1246,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const lessonRoom = Boolean(lessonRead) && solo;
     // 실전 훈련 (loungeTraining.ts): the same, for 강무진's negotiation and 백도하's interview.
     const trainingRoom = solo && !room.space_id && isLoungeTrainer(room.host_persona);
-    const practiceRoom = lessonRoom || trainingRoom;
+    // 클래스 (loungeClass.ts): 윤서연's and 윤지안's writing, 한지오's culture trip, 선우령's art history.
+    const classRoom = solo && !room.space_id && isLoungeClass(room.host_persona);
+    const practiceRoom = lessonRoom || trainingRoom || classRoom;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
     // One-to-one characters carry a long-term relationship; its context comes from stored state.
@@ -1655,6 +1674,32 @@ ${photoRule}`;
       if (!saved) console.warn('[Lounge training] not saved');
       return { prompt: loungeTrainingForPrompt(kind, next, step, { revealed }), state: next };
     })().catch(error => { console.warn('[Lounge training] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
+    // 클래스: the chosen item's facts go to the reply; a piece of writing is critiqued first (the card under the member's words).
+    const classWork = classRoom ? (async () => {
+      const kind = loungeClasses[room.host_persona as LoungeClassId].kind;
+      const prior = readLoungeClassState(room.story_state, kind);
+      const opening = body.reason === 'opening' && !lastHuman;
+      if (opening) return { prompt: loungeClassForPrompt(prior, prior.item ? 'continue' : 'pick'), state: prior };
+      let critique: LoungeWritingCritique | undefined;
+      if ((kind === 'emotional' || kind === 'logical') && prior.item && !prior.fresh && lastHuman.replace(/\s+/g, '').length >= 40 && serviceHeaders) {
+        try {
+          const exercise = loungeClassItem(kind, prior.item) as LoungeWritingExercise | undefined;
+          const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
+            model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 2500 : 1000, store: false, prompt_cache_key: `lounge-writing-${kind}`,
+            instructions: loungeWritingCritiqueInstructions(kind), input: JSON.stringify(loungeWritingCritiqueInput(kind, exercise, lastHuman)),
+            text: { format: { type: 'json_schema', name: 'lounge_writing_critique', strict: true, schema: loungeWritingCritiqueSchema } },
+          }), undefined, chat ? 25_000 : 8_000), 'openai');
+          critique = readLoungeWritingCritique(JSON.parse(modelOutputText(result) ?? '{}'), kind, lastHuman, prior.item);
+        } catch (error) { console.warn('[Lounge class] not critiqued', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
+      }
+      const turn = advanceLoungeClass(prior, critique);
+      if (serviceHeaders) {
+        const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: turn.state }) }).then(response => response.ok, () => false);
+        if (!saved) console.warn('[Lounge class] not saved');
+      }
+      console.info('[Lounge class]', JSON.stringify({ host: host.id, step: turn.step, item: prior.item ?? null, critique: Boolean(critique) }));
+      return { prompt: loungeClassForPrompt(turn.state, turn.step, critique), state: turn.state };
+    })().catch(error => { console.warn('[Lounge class] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
     const sceneFound = companionChat && companionState && !practiceRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
     const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, userText: lastHuman, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode }) : undefined;
@@ -1735,6 +1780,7 @@ ${photoRule}`;
     const lessonTurn = lessonWork ? await lessonWork : undefined;
     const lessonPrompt = lessonTurn?.prompt;
     const trainingTurn = trainingWork ? await trainingWork : undefined;
+    const classTurn = classWork ? await classWork : undefined;
     // An English lesson's room on no model answers with 루나 (2026-11-26); it can be set to 하이쿠 to compare.
     const chosenModel = getLoungeChatModel(solo ? loungeRoomChatModelId(room.ai_model, lessonRoom) : null);
     const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
@@ -1766,6 +1812,7 @@ ${photoRule}`;
         consultRoom ? loungeConsultRules : '',
         lessonRoom ? loungeLessonRules : '',
         trainingRoom ? loungeTrainingRules(loungeTrainers[room.host_persona as LoungeTrainerId].kind) : '',
+        classRoom ? loungeClassRules(loungeClasses[room.host_persona as LoungeClassId].kind) : '',
         // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
         relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
         // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.
@@ -1773,7 +1820,7 @@ ${photoRule}`;
       ].filter(Boolean).join('\n'),
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       // Finish a companion's context with what was actually said, rather than an older intention or a retrieved card.
-      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(trainingTurn ? { training: trainingTurn.prompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
+      input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(trainingTurn ? { training: trainingTurn.prompt } : {}), ...(classTurn ? { class: classTurn.prompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
         ? loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
@@ -2642,6 +2689,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             // The lesson's task card moves with the reply, not at the room's next reload.
             if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
             if (trainingTurn?.state) send({ type: 'story', state: trainingTurn.state });
+            if (classTurn) send({ type: 'story', state: classTurn.state });
             send({ type: 'host', text: firstText, timings: { contextMs: Math.round(modelStarted - contextStarted), modelMs: Math.round(textAt - modelStarted), saveMs: 0 } });
             let speechError: unknown;
             // A chat gets the text alone; the voice reads the words without the *actions*.
@@ -2700,6 +2748,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             if (storySaved) send({ type: 'story', state: storySaved });
             if (lessonTurn) send({ type: 'story', state: lessonTurn.state });
             if (trainingTurn?.state) send({ type: 'story', state: trainingTurn.state });
+            if (classTurn) send({ type: 'story', state: classTurn.state });
             // The browser asks for the photo itself (api/lounge-images.ts), so the reply is not held up by it.
             // Only a photo of the character can be made (from their reference photos): on 2026-11-01 a member asked 한지오
             // to take their picture and got his, twice. So the call names who is in it, and anything else makes none.

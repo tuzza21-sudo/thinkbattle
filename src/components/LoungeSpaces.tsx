@@ -23,6 +23,10 @@ export const loungeTrainingCast = [
   { id: 'interpreter', label: '영어 뉘앙스·통역 · B2→C1', ready: true },
   { id: 'closer', label: '실전 협상 연습', ready: true },
   { id: 'trickster', label: '실전 압박 면접', ready: true },
+  { id: 'ina', label: '감성적·문학적 글쓰기', ready: true },
+  { id: 'diplomat', label: '논리적·설득적 글쓰기', ready: true },
+  { id: 'guide', label: '이탈리아 문화기행', ready: true },
+  { id: 'velvet', label: '근현대 미술사', ready: true },
 ] as const;
 export type LoungeCastFilter = typeof loungeCastFilters[number]['id'];
 
@@ -175,7 +179,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     return <>
       <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
       <span><strong>{character.name}</strong><small>{training ? training.label : character.job}</small>
-        {training ? <em className={`lounge-cast-topic lounge-cast-training${training.ready ? '' : ' soon'}`}><GraduationCap size={11} aria-hidden="true" /><b>{training.ready ? '1:1 실전 훈련' : '곧 열려요'}</b></em> : <TopicPill titles={topics[character.id]} />}</span>
+        {training ? <em className={`lounge-cast-topic lounge-cast-training${training.ready ? '' : ' soon'}`}><GraduationCap size={11} aria-hidden="true" /><b>{!training.ready ? '곧 열려요' : ['ina', 'diplomat', 'guide', 'velvet'].includes(training.id) ? '1:1 클래스' : '1:1 실전 훈련'}</b></em> : <TopicPill titles={topics[character.id]} />}</span>
     </>;
   };
   // Places with no open room follow the rooms, each inviting the first room there.

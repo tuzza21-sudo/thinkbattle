@@ -284,6 +284,8 @@ export function saveLoungeInnerVoice(value: 'on' | 'off') { try { localStorage.s
 export const requestLoungeLessonSituation = (roomId: string, situation: string) => apiRequest({ action: 'lesson-situation', roomId, situation }) as Promise<{ title: string; items: import('./loungeLesson').LoungeLessonItem[] }>;
 /** 영어 수업 학습 보드: importance, difficulty and a situation written for the member's expressions that have none yet. */
 /** 실전 훈련: a new negotiation or interview in the member's training room (see loungeTraining.ts); returns the room's new state. */
+/** 클래스: the assignment, site or work the member picked on the class board (see loungeClass.ts); returns the room's new state. */
+export const requestLoungeClassPick = (roomId: string, item: string) => apiRequest({ action: 'class-pick', roomId, item }) as Promise<{ state: unknown }>;
 export const startLoungeTraining = (roomId: string, setup: Record<string, unknown>) => apiRequest({ action: 'training-start', roomId, setup }) as Promise<{ state: unknown }>;
 export const requestLoungeLessonEnrich = (roomId: string) => apiRequest({ action: 'lesson-enrich', roomId }) as Promise<{ updated: number }>;
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
