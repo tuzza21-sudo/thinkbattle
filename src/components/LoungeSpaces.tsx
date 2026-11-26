@@ -27,7 +27,7 @@ export const loungeExperienceSegments = [
   { id: 'negotiation', label: '협상', ids: ['closer'] },
   { id: 'interview', label: '면접', ids: ['trickster'] },
   { id: 'writing', label: '글쓰기', ids: ['ina', 'diplomat'] },
-  { id: 'travel', label: '여행', ids: ['guide'] },
+  { id: 'travel', label: '여행', ids: ['guide', 'explorer'] },
   { id: 'art', label: '미술', ids: ['velvet'] },
 ] as const;
 export type LoungeExperienceSegment = typeof loungeExperienceSegments[number]['id'];
@@ -39,6 +39,7 @@ export const loungeTrainingCast = [
   { id: 'ina', label: '감성적·문학적 글쓰기', ready: true },
   { id: 'diplomat', label: '논리적·설득적 글쓰기', ready: true },
   { id: 'guide', label: '이탈리아 문화기행', ready: true },
+  { id: 'explorer', label: '세계 국립공원 탐험', ready: true },
   { id: 'velvet', label: '근현대 미술사', ready: true },
 ] as const;
 

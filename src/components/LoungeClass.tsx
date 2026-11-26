@@ -4,13 +4,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } from '../lib/loungeApi';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { loungeClasses, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
-import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeWritingExercise } from '../lib/loungeClassContent';
+import { loungeClasses, loungeClassTrip, loungeTravelTrips, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
+import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeTravelTripId, LoungeWritingExercise } from '../lib/loungeClassContent';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
 const titleOf = (kind: LoungeClassKind, id?: string) => { const item = loungeClassItem(kind, id); return item ? ('name' in item ? item.name : item.title) : ''; };
-const boardName = (kind: LoungeClassKind) => kind === 'travel' ? '문화기행 지도' : kind === 'art' ? '작품 갤러리' : '글쓰기 과제';
+const boardName = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => kind === 'travel' ? loungeTravelTrips[trip].board : kind === 'art' ? '작품 갤러리' : '글쓰기 과제';
 
 function Credit({ image }: { image: LoungeClassImage }) {
   return <small className="lounge-class-credit">사진 {image.credit} · <a href={image.source} target="_blank" rel="noopener noreferrer">{image.license} · Wikimedia Commons</a></small>;
@@ -20,7 +20,7 @@ function Credit({ image }: { image: LoungeClassImage }) {
  * 클래스's place above the composer (2026-11-26, by the owner): what the class is on now, and the board to pick an
  * assignment, a site or a work. Picking one tells the server, then sends the member's line that starts it.
  */
-export function LoungeClassBar({ kind, roomId, storyState, send, disabled }: { kind: LoungeClassKind; roomId: string; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
+export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send, disabled }: { kind: LoungeClassKind; trip?: LoungeTravelTripId; roomId: string; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
   const [override, setOverride] = useState<LoungeClassState | null>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => { setOverride(null); }, [storyState]);
@@ -51,7 +51,7 @@ export function LoungeClassBar({ kind, roomId, storyState, send, disabled }: { k
     <div className="lounge-lesson-head">
       <Icon size={16} />
       <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind)}</b></span>
-      <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind)}</button>
+      <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind, trip)}</button>
     </div>
     {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
       <div><p className="lounge-lesson-scene"><span>과제</span>{item.task}</p><p className="lounge-lesson-meaning"><span>분량</span>{item.length} · {item.focus.join(' · ')}</p></div>
@@ -76,16 +76,17 @@ export function LoungeClassBar({ kind, roomId, storyState, send, disabled }: { k
       <p><b>{sceneName}</b> · <a href={large.source} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()}>{large.credit} · {large.license} · Wikimedia Commons</a></p>
       <button type="button" aria-label="닫기" onClick={() => setLarge(null)}><X size={20} /></button>
     </div>}
-    {!item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? '문화기행 지도에서 가 보고 싶은 명소를 골라요. 한지오가 그곳에 함께 서서 안내해요.' : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
-    {open && <LoungeClassBoard kind={kind} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
+    {!item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? loungeTravelTrips[trip].empty : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
+    {open && <LoungeClassBoard kind={kind} trip={trip} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
   </div>;
 }
 export const loungeClassLabel = (kind: LoungeClassKind) => Object.values(loungeClasses).find(entry => entry.kind === kind)?.label ?? '클래스';
 
 /** The board: the assignments, the sites of Florence and Venice, or the works; each opens on its own page with the start button. */
-function LoungeClassBoard({ kind, roomId, state, onPicked, onClose, disabled }: { kind: LoungeClassKind; roomId: string; state: LoungeClassState; onPicked: (state: LoungeClassState) => void; onClose: () => void; disabled?: boolean }) {
+function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClose, disabled }: { kind: LoungeClassKind; trip?: LoungeTravelTripId; roomId: string; state: LoungeClassState; onPicked: (state: LoungeClassState) => void; onClose: () => void; disabled?: boolean }) {
   const titleId = useId();
-  const [city, setCity] = useState<'피렌체' | '베네치아'>('피렌체');
+  const travel = loungeTravelTrips[trip];
+  const [city, setCity] = useState<string>(travel.tabs[0].name);
   const [view, setView] = useState<string | null>(null);
   const [tab, setTab] = useState<'list' | 'notes'>('list');
   const [busy, setBusy] = useState(false);
@@ -103,17 +104,17 @@ function LoungeClassBoard({ kind, roomId, state, onPicked, onClose, disabled }: 
   return <>
     <div className="lounge-background-backdrop" onClick={() => { if (!busy) onClose(); }} />
     <section className="lounge-background-sheet lounge-memory-sheet lounge-lesson-sheet lounge-class-board" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <header>{view ? <button type="button" onClick={() => setView(null)} aria-label="목록으로"><ArrowLeft size={18} /></button> : null}<b id={titleId}>{boardName(kind)}</b><button type="button" onClick={onClose} disabled={busy} aria-label="닫기"><X size={18} /></button></header>
+      <header>{view ? <button type="button" onClick={() => setView(null)} aria-label="목록으로"><ArrowLeft size={18} /></button> : null}<b id={titleId}>{boardName(kind, trip)}</b><button type="button" onClick={onClose} disabled={busy} aria-label="닫기"><X size={18} /></button></header>
       {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}
-      {site ? <SiteDetail site={site} start={start(site.id, '이곳 탐험하기')} />
+      {site ? <SiteDetail site={site} start={start(site.id, travel.start)} />
         : work ? <WorkDetail work={work} start={start(work.id, '이 작품 함께 보기')} />
         : exercise ? <ExerciseDetail exercise={exercise} start={start(exercise.id, '이 과제로 쓰기')} />
         : kind === 'travel' ? <div className="lounge-memory-panel">
-          <div className="lounge-memory-tabs" role="tablist">{(['피렌체', '베네치아'] as const).map(name => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
-          <p className="lounge-memory-note">{city === '피렌체' ? '1982년 유네스코 세계유산 "피렌체 역사지구". 르네상스가 시작된 도시예요.' : '1987년 유네스코 세계유산 "베네치아와 석호". 물 위에 세운 교역 공화국이에요.'} 명소를 눌러 배경과 역사, 꼭 볼 것을 보고 탐험을 시작해요.</p>
-          <ul className="lounge-class-grid">{loungeClassSites.filter(item => item.city === city).map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
+          <div className="lounge-memory-tabs" role="tablist">{travel.tabs.map(({ name }) => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
+          <p className="lounge-memory-note">{travel.tabs.find(tab => tab.name === city)?.note} {travel.stop}를 눌러 배경과 역사, 꼭 볼 것을 보고 탐험을 시작해요.</p>
+          <ul className="lounge-class-grid">{loungeClassSites.filter(item => (item.trip ?? 'italy') === trip && item.city === city).map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
             {item.image ? <img src={item.image.src} alt="" loading="lazy" /> : <span className="lounge-class-noimage"><Landmark size={22} /></span>}
-            <span><b>{item.name}</b><small>{item.era}</small>{seen.has(item.id) && <em>다녀옴</em>}</span>
+            <span><b>{item.name}</b><small>{item.era}</small>{seen.has(item.id) && <em>{travel.visited}</em>}</span>
           </button></li>)}</ul>
         </div>
         : kind === 'art' ? <div className="lounge-memory-panel">
@@ -146,7 +147,7 @@ function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.Reac
     <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
     <p className="lounge-class-lead">{site.summary}</p>
     <h4>배경과 역사</h4><p>{site.history}</p>
-    <h4>문화유산으로서의 가치</h4><p>{site.heritage}</p>
+    <h4>{site.trip === 'parks' ? '이 땅을 지키는 이유' : '문화유산으로서의 가치'}</h4><p>{site.heritage}</p>
     <h4>꼭 봐야 할 것</h4><ul>{site.mustSee.map(item => <li key={item}>{item}</li>)}</ul>
     <h4>해 볼 만한 체험</h4><ul>{site.experience.map(item => <li key={item}>{item}</li>)}</ul>
     <p className="lounge-class-tip">{site.tip}</p>
@@ -213,7 +214,7 @@ export function LoungeClassStart({ characterId, user }: { characterId: string; u
     catch (err) { setError(errorText(err)); setBusy(false); }
   };
   const Icon = entry.kind === 'travel' ? MapPin : entry.kind === 'art' ? Palette : entry.kind === 'logical' ? Newspaper : Feather;
-  const points = entry.kind === 'travel' ? ['피렌체·베네치아의 주요 명소 15곳을 사진과 함께 골라요.', '명소마다 배경과 역사, 문화유산으로서의 가치, 꼭 봐야 할 것을 보여 줘요.', '고르면 한지오가 그곳에 함께 선 것처럼 안내해요.']
+  const points = entry.kind === 'travel' ? loungeTravelTrips[loungeClassTrip(id)].points
     : entry.kind === 'art' ? ['인상주의부터 팝아트, 한국 추상까지 근현대 대표 작가의 작품을 골라요.', '작품마다 시대와 배경, 보는 법, 의미를 보여 줘요.', '선우령이 먼저 무엇이 보이는지 묻고, 함께 해석해요.']
     : entry.kind === 'logical' ? ['주장 한 문장, 근거 세 개, 반론 먼저, 칼럼 첫 문단 같은 과제를 골라 써요.', '쓴 글에는 주장·근거·반론·구조를 매긴 첨삭 카드가 붙어요.', '기자의 눈으로 고칠 곳과 다시 쓴 예를 받아요.']
     : ['오감 묘사, 이름 없는 감정, 보내지 않을 편지 같은 과제를 골라 써요.', '쓴 글에는 감각·절제·리듬·여운을 매긴 첨삭 카드가 붙어요.', '편집자의 눈으로 살아 있는 문장과 덜어 낼 곳을 짚어 줘요.'];

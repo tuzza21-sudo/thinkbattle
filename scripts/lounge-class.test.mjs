@@ -12,7 +12,7 @@ const characters = load('../src/lib/loungeCharacters.ts');
 const relationship = load('../src/lib/relationship/index.ts');
 
 test('the four classes are characters of their own, with the story character\'s face and voice and no relationship (2026-11-26)', () => {
-  for (const [id, base, kind] of [['inaclass', 'ina', 'emotional'], ['diplomatclass', 'diplomat', 'logical'], ['guideclass', 'guide', 'travel'], ['velvetclass', 'velvet', 'art']]) {
+  for (const [id, base, kind] of [['inaclass', 'ina', 'emotional'], ['diplomatclass', 'diplomat', 'logical'], ['guideclass', 'guide', 'travel'], ['velvetclass', 'velvet', 'art'], ['explorerclass', 'explorer', 'travel']]) {
     assert.ok(classes.isLoungeClass(id)); assert.equal(classes.loungeClassOf(base), id); assert.equal(classes.loungeClassKindOf(id), kind);
     const host = lounge.getLoungeHost(id);
     assert.equal(host.id, id); assert.equal(host.portrait, lounge.getLoungeHost(base).portrait);
@@ -107,4 +107,32 @@ test('a culture-trip site has viewing points with pictures; going to one changes
   assert.equal(classes.loungeClassBackground('emotional', null), undefined);
   assert.ok(existsSync(fileURLToPath(new URL('../public/lounge/museum-gallery-v1.webp', import.meta.url))));
   for (const [id, image] of Object.entries(images.loungeClassImages)) assert.ok(existsSync(fileURLToPath(new URL(`../public${image.src}`, import.meta.url))), id);
+});
+
+test("세계 국립공원 탐험 (2026-11-27): 민서하's trip of the travel class, twelve parks in four regions with viewing points, picked only in her room", () => {
+  assert.equal(classes.loungeClassTrip('explorerclass'), 'parks');
+  assert.equal(classes.loungeClassTrip('guideclass'), 'italy');
+  const parks = classes.loungeClassSites.filter(site => site.trip === 'parks');
+  assert.equal(parks.length, 12);
+  assert.deepEqual([...new Set(parks.map(site => site.city))], classes.loungeTravelTrips.parks.tabs.map(tab => tab.name));
+  for (const site of parks) {
+    assert.ok(site.image, `${site.id} has a picture`);
+    assert.ok(classes.loungeClassSpots(site.id).length >= 2, `${site.id} has viewing points with pictures`);
+    assert.match(site.tip, /\S/);
+  }
+  // The Italy board keeps its own sites only.
+  assert.ok(classes.loungeClassSites.filter(site => (site.trip ?? 'italy') === 'italy').every(site => ['피렌체', '베네치아'].includes(site.city)));
+  const empty = classes.readLoungeClassState(null, 'travel');
+  assert.ok(classes.pickLoungeClassItem(empty, 'yellowstone', new Date(), 'parks'));
+  assert.equal(classes.pickLoungeClassItem(empty, 'yellowstone', new Date(), 'italy'), undefined, "a park is not picked in 한지오's room");
+  assert.equal(classes.pickLoungeClassItem(empty, 'duomo', new Date(), 'parks'), undefined, 'nor a Florence site in hers');
+  const picked = classes.pickLoungeClassItem(empty, 'yellowstone', new Date(), 'parks');
+  assert.ok(classes.pickLoungeClassSpot(picked, 'old-faithful'));
+  assert.equal(classes.loungeClassBackground('travel', classes.pickLoungeClassSpot(picked, 'old-faithful')), images.loungeClassImages['old-faithful'].src);
+  // Her rules name her board and keep safety and changing facts straight; her class keeps her own voice.
+  const rules = classes.loungeClassRules('travel', 'parks');
+  assert.match(rules, /국립공원 지도/); assert.match(rules, /안전 수칙/); assert.match(rules, /공식 안내/); assert.match(rules, /지어내지 않/);
+  assert.match(classes.loungeClassRules('travel'), /문화기행 지도/);
+  assert.match(characters.getLoungeCharacter('explorerclass').bible.humor, /퀴즈/);
+  assert.notEqual(characters.getLoungeCharacter('explorerclass').bible.voice.tone, characters.getLoungeCharacter('inaclass').bible.voice.tone);
 });

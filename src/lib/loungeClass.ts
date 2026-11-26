@@ -1,21 +1,26 @@
 import { getLoungeHost, loungeElevenPremadeVoices, loungeEngineVoices, loungeGeminiSpeech, registerLoungeCustomElevenVoice, registerLoungeCustomHost, type LoungeHost, type LoungeHostId, type LoungeThemeId } from './lounge.js';
 import { getLoungeCharacter, registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCharacters.js';
-import { loungeArtWorks, loungeEmotionalExercises, loungeLogicalExercises, loungeTravelSites, loungeTravelSpots, type LoungeClassImage, type LoungeTravelSpot, type LoungeArtWork, type LoungeTravelSite, type LoungeWritingExercise } from './loungeClassContent.js';
+import { loungeArtWorks, loungeEmotionalExercises, loungeLogicalExercises, loungeTravelSites, loungeTravelSpots, type LoungeClassImage, type LoungeTravelSpot, type LoungeArtWork, type LoungeTravelSite, type LoungeTravelTripId, type LoungeWritingExercise } from './loungeClassContent.js';
+import { loungeParkSites, loungeParkSpots } from './loungeParkContent.js';
 import { loungeClassImages } from './loungeClassImages.js';
 
 /*
  * 클래스 (2026-11-26, by the owner): 윤서연 teaches emotional, literary writing; 윤지안 logical, persuasive writing; 한지오
  * leads an Italian culture trip through Florence and Venice; 선우령 reads modern and contemporary art. Like the English
  * lessons and the trainings, each is a character id of its own (inaclass, diplomatclass, guideclass, velvetclass) with
- * its own room, no relationship and no romance. The member picks an assignment, a site or a work on the class board
+ * its own room, no relationship and no romance. Since 2026-11-27 민서하 leads a second trip of the travel kind, the world's
+ * national parks (explorerclass, loungeParkContent.ts): the same board, spots and rules, with its own regions and words.
+ * Each class keeps its character's own voice and humour (classBible), so 한지오 or 민서하 still sounds like themselves.
+ * The member picks an assignment, a site or a work on the class board
  * (loungeClassContent.ts); the reply reads its facts from there. A piece of writing gets a code-shaped critique card.
  */
 
 export const loungeClasses = {
   inaclass: { base: 'ina', kind: 'emotional', scenario: 'inaclass-class', theme: 'cafe' as LoungeThemeId, label: '감성적·문학적 글쓰기' },
   diplomatclass: { base: 'diplomat', kind: 'logical', scenario: 'diplomatclass-class', theme: 'embassy' as LoungeThemeId, label: '논리적·설득적 글쓰기' },
-  guideclass: { base: 'guide', kind: 'travel', scenario: 'guideclass-class', theme: 'arnobridge' as LoungeThemeId, label: '이탈리아 문화기행' },
+  guideclass: { base: 'guide', kind: 'travel', trip: 'italy', scenario: 'guideclass-class', theme: 'arnobridge' as LoungeThemeId, label: '이탈리아 문화기행' },
   velvetclass: { base: 'velvet', kind: 'art', scenario: 'velvetclass-class', theme: 'hotellobby' as LoungeThemeId, label: '근현대 미술사' },
+  explorerclass: { base: 'explorer', kind: 'travel', trip: 'parks', scenario: 'explorerclass-class', theme: 'patagonia' as LoungeThemeId, label: '세계 국립공원 탐험' },
 } as const;
 export type LoungeClassId = keyof typeof loungeClasses;
 export type LoungeClassKind = typeof loungeClasses[LoungeClassId]['kind'];
@@ -24,6 +29,31 @@ export const loungeClassOf = (characterId?: string | null): LoungeClassId | unde
   (Object.keys(loungeClasses) as LoungeClassId[]).find(id => loungeClasses[id].base === characterId);
 export const loungeClassKindOf = (id?: string | null): LoungeClassKind | undefined => isLoungeClass(id) ? loungeClasses[id].kind : undefined;
 export const loungeClassScenarioIds: readonly string[] = Object.values(loungeClasses).map(entry => entry.scenario);
+/** The trip of a travel class (Italy for 한지오, the national parks for 민서하). */
+export const loungeClassTrip = (id?: string | null): LoungeTravelTripId => {
+  const entry = isLoungeClass(id) ? loungeClasses[id] as { trip?: LoungeTravelTripId } : undefined;
+  return entry?.trip ?? 'italy';
+};
+
+/** What each travel trip says on its board and page: the board, what a stop is called, the tabs and their notes. */
+export const loungeTravelTrips: Record<LoungeTravelTripId, { board: string; stop: string; guide: string; tabs: ReadonlyArray<{ name: string; note: string }>; empty: string; start: string; visited: string; points: readonly string[] }> = {
+  italy: { board: '문화기행 지도', stop: '명소', guide: '한지오',
+    tabs: [
+      { name: '피렌체', note: '1982년 유네스코 세계유산 "피렌체 역사지구". 르네상스가 시작된 도시예요.' },
+      { name: '베네치아', note: '1987년 유네스코 세계유산 "베네치아와 석호". 물 위에 세운 교역 공화국이에요.' },
+    ],
+    empty: '문화기행 지도에서 가 보고 싶은 명소를 골라요. 한지오가 그곳에 함께 서서 안내해요.', start: '이곳 탐험하기', visited: '다녀옴',
+    points: ['피렌체·베네치아의 주요 명소 15곳을 사진과 함께 골라요.', '명소마다 배경과 역사, 문화유산으로서의 가치, 꼭 봐야 할 것을 보여 줘요.', '고르면 한지오가 그곳에 함께 선 것처럼 안내해요.'] },
+  parks: { board: '국립공원 지도', stop: '국립공원', guide: '민서하',
+    tabs: [
+      { name: '미국 서부', note: '세계 최초의 국립공원 옐로스톤부터 그랜드캐니언, 요세미티까지. 국립공원이라는 생각이 시작된 땅이에요.' },
+      { name: '알래스카·하와이', note: '북미 최고봉 아래의 툰드라와, 지금도 땅이 만들어지는 화산섬이에요.' },
+      { name: '캐나다 로키', note: '1984년 유네스코 세계유산 "캐나다 로키 산맥 공원". 청록빛 빙하 호수의 산맥이에요.' },
+      { name: '파타고니아', note: '칠레와 아르헨티나에 걸친 바람과 빙하의 땅. 남극과 그린란드 다음으로 큰 빙원이 있어요.' },
+    ],
+    empty: '국립공원 지도에서 가 보고 싶은 공원을 골라요. 민서하가 그곳에 먼저 도착해 길과 풍경을 안내해요.', start: '이 공원 탐험하기', visited: '다녀옴',
+    points: ['미국 서부, 알래스카·하와이, 캐나다 로키, 파타고니아의 국립공원 12곳을 사진과 함께 골라요.', '공원마다 지질과 역사, 보호하는 이유, 꼭 볼 곳과 안전 수칙을 보여 줘요.', '고르면 민서하가 그곳에 함께 선 것처럼 길과 풍경을 풀어 줘요.'] },
+};
 
 const classHosts: Record<LoungeClassId, Partial<LoungeHost>> = {
   inaclass: { name: '글쓰기 클래스', tag: '감성적·문학적 글쓰기', emoji: '🖋️',
@@ -46,15 +76,33 @@ const classHosts: Record<LoungeClassId, Partial<LoungeHost>> = {
     greeting: '그림은 아는 만큼이 아니라, 오래 본 만큼 보여요.',
     companion: '미술사 클래스: 선우령, 미술사를 전공한 프라이빗 아트 디렉터. 이 방은 근현대 미술 작품을 보며 해석하는 수업이다. 먼저 사용자가 무엇을 보았는지 묻고, 그다음 작품의 시대와 작가, 보는 법, 의미를 차분히 풀어 준다. 정답 하나를 강요하지 않고 여러 해석을 열어 둔다. 사실은 주어진 자료 안에서만 말한다. 우아하고 절제된 존댓말을 쓴다. 이 방에서는 플러팅과 로맨스를 하지 않는다.',
     sampleText: '그림은 아는 만큼이 아니라, 오래 본 만큼 보여요.' },
+  explorerclass: { name: '국립공원 탐험', tag: '세계 국립공원 탐험', emoji: '🏔️',
+    description: '탐험 다큐멘터리스트 민서하와 세계의 국립공원을 하나씩 골라 지질과 역사, 풍경을 따라 걷는 1:1 탐험',
+    greeting: '사진 찍을 시간은 줄게요. 근데 진짜 중요한 건 카메라 내려놓은 다음에 보여요.',
+    companion: '국립공원 탐험: 민서하, 국립공원 전문 탐험 다큐멘터리스트. 이 방은 세계 국립공원 탐험 수업이다. 사용자가 고른 공원에 실제로 함께 도착한 것처럼 빛과 소리, 바람부터 짚고, 그 풍경이 어떻게 생겼는지(지질), 누가 어떻게 지켜 왔는지(역사), 지금 무엇이 위협하는지를 쉬운 비유로 재미있게 풀어 준다. 호기심이 많아 "이 돌 왜 여기 있게요?" 같은 퀴즈를 내고, 허세에는 무표정하게 툭 던지는 짧은 농담을 가끔 한다. 안전 수칙 앞에서는 농담하지 않는다. 사실은 주어진 자료 안에서만 말한다. 밝고 시원한 존댓말을 쓴다. 이 방에서는 플러팅과 로맨스를 하지 않는다.',
+    sampleText: '사진 찍을 시간은 줄게요. 근데 진짜 중요한 건 카메라 내려놓은 다음에 보여요.' },
+};
+
+/**
+ * A class keeps its character's own voice and humour (2026-11-27: a shared "calm" voice flattened them), within the class's
+ * limits: no romance, facts only from the material.
+ */
+const classVoices: Partial<Record<LoungeClassId, { tone: string; humor: string }>> = {
+  explorerclass: {
+    tone: '밝고 시원한 존댓말. 설명은 몸으로 느껴지는 비유로 차근차근, 안전 이야기는 짧고 단호하게. 좋은 풍경 앞에서는 "…30초만." 하고 말을 멈추기도 한다.',
+    humor: '호기심에서 나오는 웃음. "이 돌 왜 여기 있게요?" 같은 퀴즈를 내고 맞히면 진심으로 놀라고, 허세에는 사실 하나를 무표정하게 툭 던진 뒤 받아칠 틈을 준다. 자기 실수도 먼저 웃음거리로 삼는다. 놀림은 가끔이고, 위험 앞에서는 농담하지 않는다.',
+  },
 };
 
 const classBible = (id: LoungeClassId): NonNullable<LoungeCharacter['bible']> => ({
   desire: id === 'inaclass' ? '사용자가 자기 감정과 기억을 자기만의 문장으로 쓰게 만드는 것.' : id === 'diplomatclass' ? '사용자가 주장과 근거로 상대를 움직이는 글을 쓰게 만드는 것.'
-    : id === 'guideclass' ? '사용자가 이탈리아의 도시를 사진이 아니라 이야기로 기억하게 만드는 것.' : '사용자가 그림 앞에서 자기 눈으로 보고 말할 수 있게 만드는 것.',
+    : id === 'guideclass' ? '사용자가 이탈리아의 도시를 사진이 아니라 이야기로 기억하게 만드는 것.'
+    : id === 'explorerclass' ? '사용자가 풍경 앞에서 "왜 이렇게 생겼을까"를 스스로 묻고, 그 땅을 지켜야 하는 이유를 자기 말로 말하게 만드는 것.'
+    : '사용자가 그림 앞에서 자기 눈으로 보고 말할 수 있게 만드는 것.',
   fear: '사용자가 정답만 받아 적고 자기 생각은 하나도 꺼내지 않은 채 수업이 끝나는 것.',
   outward: classHosts[id].tag ?? '',
   hidden: '사용자가 스스로 한 걸음 나아갈 때 가장 보람을 느끼지만 크게 티를 내지 않는다.',
-  humor: '수업 흐름을 깨지 않는 가벼운 한마디.',
+  humor: classVoices[id]?.humor ?? '수업 흐름을 깨지 않는 가벼운 한마디.',
   reactions: [
     { when: '사용자가 자기 생각을 꺼냄', then: '그 생각에서 좋은 점을 구체적으로 짚고 한 걸음 더 묻는다.' },
     { when: '사용자가 플러팅하거나 사적인 만남을 제안', then: '가볍게 넘기고 수업으로 돌아온다.' },
@@ -65,7 +113,7 @@ const classBible = (id: LoungeClassId): NonNullable<LoungeCharacter['bible']> =>
     '사용자의 글이나 해석을 깎아내리지 않는다. 고칠 점은 구체적으로, 많아야 세 가지.',
   ],
   growth: '수업이 쌓이면 사용자가 자주 하는 실수와 좋아하는 주제를 기억해 다음 수업에 쓴다.',
-  voice: { tone: '차분하고 명료한 존댓말', length: '통화에서는 두세 문장, 채팅에서는 짧은 단락 두세 개' },
+  voice: { tone: classVoices[id]?.tone ?? '차분하고 명료한 존댓말', length: '통화에서는 두세 문장, 채팅에서는 짧은 단락 두세 개' },
   forbidden: ['플러팅', '데이트 제안', '외모 칭찬', '사실 지어내기'],
 });
 
@@ -99,11 +147,11 @@ for (const id of Object.keys(loungeClasses) as LoungeClassId[]) {
 // ── The catalogue of each class, with the pictures ──────────────────────────────────────────────────────────────────
 
 export const loungeClassExercises = (kind: LoungeClassKind): readonly LoungeWritingExercise[] => kind === 'emotional' ? loungeEmotionalExercises : kind === 'logical' ? loungeLogicalExercises : [];
-export const loungeClassSites: readonly LoungeTravelSite[] = loungeTravelSites.map(site => ({ ...site, ...(loungeClassImages[site.id] ? { image: loungeClassImages[site.id] } : {}) }));
+export const loungeClassSites: readonly LoungeTravelSite[] = [...loungeTravelSites, ...loungeParkSites].map(site => ({ ...site, ...(loungeClassImages[site.id] ? { image: loungeClassImages[site.id] } : {}) }));
 export const loungeClassWorks: readonly LoungeArtWork[] = loungeArtWorks.map(work => ({ ...work, ...(loungeClassImages[work.id] ? { image: loungeClassImages[work.id] } : {}) }));
 /** The viewing points of a site, each with its picture (a spot without one is left out). */
 export const loungeClassSpots = (siteId?: string | null): Array<LoungeTravelSpot & { image: LoungeClassImage }> =>
-  (loungeTravelSpots[siteId ?? ''] ?? []).flatMap(spot => loungeClassImages[spot.id] ? [{ ...spot, image: loungeClassImages[spot.id] }] : []);
+  ({ ...loungeTravelSpots, ...loungeParkSpots }[siteId ?? ''] ?? []).flatMap(spot => loungeClassImages[spot.id] ? [{ ...spot, image: loungeClassImages[spot.id] }] : []);
 /**
  * The picture behind the class (2026-11-26, by the owner: the Arno bridge stayed whatever site was picked): the spot the
  * member stands at, else the site, else the work being looked at.
@@ -155,8 +203,11 @@ export function readLoungeClassState(value: unknown, kind: LoungeClassKind): Lou
   };
 }
 /** The member picked an assignment, a site or a work: the class turns to it. */
-export function pickLoungeClassItem(state: LoungeClassState, id: string, now = new Date()): LoungeClassState | undefined {
-  if (!loungeClassItem(state.class, id)) return undefined;
+export function pickLoungeClassItem(state: LoungeClassState, id: string, now = new Date(), trip?: LoungeTravelTripId): LoungeClassState | undefined {
+  const item = loungeClassItem(state.class, id);
+  if (!item) return undefined;
+  // A travel class picks only from its own trip.
+  if (trip && state.class === 'travel' && ((item as LoungeTravelSite).trip ?? 'italy') !== trip) return undefined;
   const next: LoungeClassState = { ...state, item: id, started: now.toISOString(), fresh: true, done: [...state.done.filter(done => done !== id), id].slice(-40) };
   delete next.spot; delete next.spotFresh;
   return next;
@@ -229,11 +280,18 @@ export function loungeClassForPrompt(state: LoungeClassState, step: 'pick' | 'st
   };
 }
 
-export const loungeClassRules = (kind: LoungeClassKind) => {
+export const loungeClassRules = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => {
+  const travel = loungeTravelTrips[trip];
   const common = `클래스: 이 방은 1:1 수업이다. 이야기나 연애 장면이 아니다. 입력의 class가 이번 턴에 할 일과 자료다.
 - 사실(연도, 인물, 장소, 소장처, 수치)은 class.item에 있는 것만 말한다. 자료에 없는 사실은 지어내지 않고, 모르면 모른다고 하거나 일반적인 이야기로만 한다.
 - 별표(*)와 행동 묘사를 쓰지 않는다. 통화(reply_medium=voice)에서는 두세 문장으로 짧게.
-- step pick: 아직 아무것도 고르지 않았다. 입력창 위의 '${kind === 'travel' ? '문화기행 지도' : kind === 'art' ? '작품 갤러리' : '글쓰기 과제'}' 버튼에서 ${kind === 'travel' ? '가 보고 싶은 명소' : kind === 'art' ? '보고 싶은 작가와 작품' : '과제'}를 고르면 시작한다고 짧게 안내하고, 사용자가 말로 원하는 것을 말해도 된다고 한다.`;
+- step pick: 아직 아무것도 고르지 않았다. 입력창 위의 '${kind === 'travel' ? travel.board : kind === 'art' ? '작품 갤러리' : '글쓰기 과제'}' 버튼에서 ${kind === 'travel' ? `가 보고 싶은 ${travel.stop}` : kind === 'art' ? '보고 싶은 작가와 작품' : '과제'}를 고르면 시작한다고 짧게 안내하고, 사용자가 말로 원하는 것을 말해도 된다고 한다.`;
+  if (kind === 'travel' && trip === 'parks') return `${common}
+- step start: 사용자가 class.item 국립공원을 골랐다. 그곳에 막 도착한 것처럼 지금 보이는 빛과 소리, 바람으로 시작하고, summary와 history를 이야기로 풀어 준 뒤 heritage(이 땅을 지키는 이유)를 한두 문장으로 짚는다. 크기와 시간은 몸으로 느껴지는 비유로 바꿔 말한다. mustSee 가운데 하나를 골라 다음 걸음을 제안한다.
+- step spot: 사용자가 class.spot 앞에 막 섰고, 화면에 그 사진이 보이고 있다. 사진 속 풍경을 함께 보는 것처럼 무엇이 보이는지, 왜 이렇게 생겼는지 구체적으로 짚고(spot.note와 item의 자료 안에서), 가끔은 "이거 왜 이렇게 생겼게요?" 같은 퀴즈로 사용자가 먼저 추측하게 한다.
+- step continue: 사용자의 질문이나 선택에 답하며 같은 공원의 mustSee와 experience를 하나씩 이어 간다. class.spots가 있으면 다음에 가 볼 곳을 그 이름으로 제안하고, 입력창 위의 사진을 누르면 그 앞으로 간다고 알려 준다. 다 둘러봤으면 tip(안전 수칙)을 건네고 지도에서 다음 공원을 골라 보라고 권한다.
+- 안전 수칙(야생동물과의 거리, 날씨, 물, 통제선)은 자료에 있는 대로 정확히 말하고, 위험한 행동은 낭만이나 사진을 이유로 부추기지 않는다. 입장료, 예약, 허가, 도로 운영처럼 바뀌는 정보는 단정하지 않고 공식 안내를 확인하라고 한다.
+- 탐험가처럼 앞장서 걷되, 갈림길의 선택과 질문은 사용자가 하게 만든다.`;
   if (kind === 'travel') return `${common}
 - step start: 사용자가 class.item 명소를 골랐다. 그곳에 막 도착한 것처럼 현장의 첫 장면(무엇이 보이고 들리는지)으로 시작하고, summary와 history를 이야기로 풀어 준 뒤 heritage(문화유산으로서의 가치)를 한두 문장으로 짚는다. mustSee 가운데 하나를 골라 "먼저 이것부터 보러 갈까요?"처럼 다음 걸음을 제안한다.
 - step spot: 사용자가 class.spot 앞에 막 섰고, 화면에 그 사진이 보이고 있다. 사진 속 장면을 함께 보는 것처럼 무엇이 보이는지, 어디부터 보면 좋은지 구체적으로 짚고(spot.note와 item의 자료 안에서), 사용자에게 무엇이 먼저 눈에 들어오는지 묻는다.

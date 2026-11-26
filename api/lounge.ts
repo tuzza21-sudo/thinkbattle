@@ -11,7 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { advanceLoungeClass, isLoungeClass, pickLoungeClassSpot, loungeClasses, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
+import { advanceLoungeClass, isLoungeClass, pickLoungeClassSpot, loungeClasses, loungeClassTrip, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
 import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
 import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
@@ -824,7 +824,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const kind = loungeClasses[mine.host_persona].kind;
       const current = readLoungeClassState(mine.story_state, kind);
       // A viewing point of the site the member is at, or a new assignment, site or work.
-      const state = typeof body.spot === 'string' ? pickLoungeClassSpot(current, body.spot) : pickLoungeClassItem(current, typeof body.item === 'string' ? body.item : '');
+      const state = typeof body.spot === 'string' ? pickLoungeClassSpot(current, body.spot) : pickLoungeClassItem(current, typeof body.item === 'string' ? body.item : '', new Date(), loungeClassTrip(mine.host_persona));
       if (!state) return json({ error: '고른 항목을 찾지 못했어요.' }, 400);
       const saved = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', headers: { ...serviceHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ story_state: state }) });
       if (!saved.ok) return json({ error: '잠시 뒤 다시 골라 주세요.' }, 502);
@@ -1839,7 +1839,7 @@ ${photoRule}`;
         consultRoom ? loungeConsultRules : '',
         lessonRoom ? loungeLessonRules : '',
         trainingRoom ? loungeTrainingRules(loungeTrainers[room.host_persona as LoungeTrainerId].kind) : '',
-        classRoom ? loungeClassRules(loungeClasses[room.host_persona as LoungeClassId].kind) : '',
+        classRoom ? loungeClassRules(loungeClasses[room.host_persona as LoungeClassId].kind, loungeClassTrip(room.host_persona)) : '',
         // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
         relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
         // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.
