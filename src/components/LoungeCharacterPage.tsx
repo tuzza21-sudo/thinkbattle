@@ -14,6 +14,7 @@ import { LoungePersonaPicker } from './LoungePersonaPicker';
 import { LoungeStoryStart } from './LoungeStoryStart';
 import { LoungeLessonStart } from './LoungeLesson';
 import { LoungeTrainingStart } from './LoungeTraining';
+import { LoungeClassStart } from './LoungeClass';
 import { useLoungeScenarios } from '../lib/useLoungeScenarios';
 import './LoungeCharacter.css';
 
@@ -103,7 +104,7 @@ export function LoungeCharacterPage({ id, user }: { id: string; user: AppUser | 
         {made ? <>
           {custom.row && <CustomActions row={custom.row} user={user} />}
           {picker && <div className="lounge-character-actions">{picker}</div>}
-        </> : <><LoungeStoryStart scenarios={scenarios} user={user} extra={picker} /><LoungeLessonStart characterId={character.id} user={user} /><LoungeTrainingStart characterId={character.id} user={user} /></>}
+        </> : <><LoungeStoryStart scenarios={scenarios} user={user} extra={picker} /><LoungeLessonStart characterId={character.id} user={user} /><LoungeTrainingStart characterId={character.id} user={user} /><LoungeClassStart characterId={character.id} user={user} /></>}
       </div>
     </section>
 

@@ -1,0 +1,80 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { loadTs } from './lounge-ts-loader.mjs';
+const load = path => loadTs(fileURLToPath(new URL(path, import.meta.url)));
+const classes = load('../src/lib/loungeClass.ts');
+const content = load('../src/lib/loungeClassContent.ts');
+const images = load('../src/lib/loungeClassImages.ts');
+const lounge = load('../src/lib/lounge.ts');
+const characters = load('../src/lib/loungeCharacters.ts');
+const relationship = load('../src/lib/relationship/index.ts');
+
+test('the four classes are characters of their own, with the story character\'s face and voice and no relationship (2026-11-26)', () => {
+  for (const [id, base, kind] of [['inaclass', 'ina', 'emotional'], ['diplomatclass', 'diplomat', 'logical'], ['guideclass', 'guide', 'travel'], ['velvetclass', 'velvet', 'art']]) {
+    assert.ok(classes.isLoungeClass(id)); assert.equal(classes.loungeClassOf(base), id); assert.equal(classes.loungeClassKindOf(id), kind);
+    const host = lounge.getLoungeHost(id);
+    assert.equal(host.id, id); assert.equal(host.portrait, lounge.getLoungeHost(base).portrait);
+    assert.equal(characters.getLoungeCharacter(id).name, characters.getLoungeCharacter(base).name);
+    assert.match(characters.getLoungeCharacter(id).bible.invariants.join(' '), /플러팅/);
+    assert.equal(relationship.getRelationshipConfig(id), undefined);
+    assert.ok(!lounge.loungeHosts.some(entry => entry.id === id));
+    assert.ok(classes.loungeClassScenarioIds.includes(`${id}-class`));
+  }
+  assert.equal(classes.isLoungeClass('ina'), false);
+});
+
+test('the catalogue: assignments for each writing class, Florence and Venice sites, modern works; pictures only free ones, with credit', () => {
+  assert.equal(classes.loungeClassExercises('emotional').length, 6); assert.equal(classes.loungeClassExercises('logical').length, 7);
+  const sites = classes.loungeClassSites;
+  assert.ok(sites.filter(site => site.city === '피렌체').length >= 7 && sites.filter(site => site.city === '베네치아').length >= 6);
+  for (const site of sites) {
+    assert.ok(site.history.length > 60 && site.heritage.length > 40 && site.mustSee.length >= 2, site.id);
+    assert.ok(site.image, `${site.id} has a picture`);
+  }
+  const works = classes.loungeClassWorks;
+  assert.ok(works.length >= 18);
+  for (const work of works) {
+    assert.ok(work.look.length >= 2 && work.meaning && work.question, work.id);
+    // A work under copyright (artist died after 1955) has no picture, only its museum's page.
+    const died = Number(work.artistLife.split('~')[1]);
+    if (died > 1955) { assert.equal(work.image, undefined, `${work.id} is not in the public domain`); assert.ok(work.museum || work.id === 'whanki', work.id); }
+  }
+  for (const [id, image] of Object.entries(images.loungeClassImages)) {
+    assert.match(image.license, /^(Public domain|CC0|CC BY(-SA)? \d\.\d)$/, id);
+    assert.ok(image.credit && image.source.startsWith('https://commons.wikimedia.org/'), id);
+    assert.ok(existsSync(fileURLToPath(new URL(`../public${image.src}`, import.meta.url))), image.src);
+  }
+  assert.ok(content.loungeArtWorks.some(work => work.artist === '김환기'), 'a Korean artist too');
+});
+
+test('picking starts an item, the first reply starts it and the next ones continue; a critique is kept with its words', () => {
+  let state = classes.readLoungeClassState(null, 'travel');
+  assert.deepEqual(state, { kind: 'class', class: 'travel', done: [], critiques: [], turns: 0 });
+  assert.equal(classes.advanceLoungeClass(state).step, 'pick');
+  assert.equal(classes.pickLoungeClassItem(state, 'nope'), undefined);
+  state = classes.pickLoungeClassItem(state, 'duomo', new Date('2026-11-26T03:00:00Z'));
+  assert.equal(state.fresh, true); assert.deepEqual(state.done, ['duomo']);
+  let turn = classes.advanceLoungeClass(classes.readLoungeClassState(JSON.parse(JSON.stringify(state)), 'travel'));
+  assert.equal(turn.step, 'start'); assert.equal(turn.state.fresh, undefined);
+  turn = classes.advanceLoungeClass(turn.state);
+  assert.equal(turn.step, 'continue');
+  const prompt = classes.loungeClassForPrompt(turn.state, 'continue');
+  assert.equal(prompt.item.name.startsWith('두오모'), true); assert.equal(prompt.item.image, undefined, 'the picture is not the model\'s');
+  assert.equal(classes.readLoungeClassState(state, 'art').item, undefined, 'another class\'s state is not taken');
+  const work = classes.loungeClassForPrompt(classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'art'), 'guernica'), 'start');
+  assert.equal(work.item.has_picture, false); assert.equal(work.item.museum, undefined);
+  // Writing: a critique read defensively and kept for the card.
+  const said = '창밖에서 빗소리가 들렸다. 커피 냄새가 방 안에 오래 머물렀고, 나는 젖은 우산을 접지도 못한 채 서 있었다.';
+  assert.equal(classes.readLoungeWritingCritique({ is_writing: false }, 'emotional', said), undefined);
+  const critique = classes.readLoungeWritingCritique({ is_writing: true, strengths: ['빗소리와 커피 냄새로 장면을 열었어요'], edits: [{ before: '오래 머물렀고', after: '오래 남았고', why: '더 담백하게' }, { before: 'x', after: 'x', why: '같음' }],
+    rewrite: '젖은 우산을 접지도 못한 채, 나는 그 냄새 속에 서 있었다.', scores: [5, 4, 9, 'a'], next: '감정 단어 없이 마지막 문장을 바꿔 보세요' }, 'emotional', said, 'senses', new Date('2026-11-26T03:00:00Z'));
+  assert.equal(critique.edits.length, 1, 'an edit that changes nothing is dropped');
+  assert.deepEqual(critique.scores, { '감각과 구체성': 5, '감정의 절제': 4, '문장 리듬': 5, '여운': 3 });
+  const kept = classes.advanceLoungeClass(classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'emotional'), 'senses'), critique).state;
+  assert.equal(kept.critiques.length, 1);
+  assert.equal(classes.loungeClassForPrompt(kept, 'continue', critique).critique.next, '감정 단어 없이 마지막 문장을 바꿔 보세요');
+  assert.match(classes.loungeWritingCritiqueInstructions('logical'), /주장의 명확성/);
+  for (const kind of ['emotional', 'logical', 'travel', 'art']) assert.match(classes.loungeClassRules(kind), /지어내지 않/);
+});
