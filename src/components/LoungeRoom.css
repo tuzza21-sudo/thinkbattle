@@ -1374,3 +1374,5 @@
 .lounge-lesson-badge.level-A2, .lounge-lesson-badge.level-B1 { border-color:#9fd8a866; color:#c4ecc9; }
 .lounge-lesson-badge.level-B2 { border-color:#8fd3ff66; color:#bfe6ff; }
 .lounge-lesson-badge.level-C1, .lounge-lesson-badge.level-C2 { border-color:#ff9b8a66; color:#ffc2b8; }
+
+.lounge-lesson-groupby span { align-self:center; margin-right:2px; font-size:12px; opacity:.7; }

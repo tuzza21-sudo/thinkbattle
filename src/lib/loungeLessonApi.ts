@@ -22,7 +22,7 @@ const failed = (error: { message?: string; code?: string } | null) => {
 export async function loadLoungeLessonBook(): Promise<LoungeLessonBook> {
   const [items, notes, profile] = await Promise.all([
     supabase.from('lounge_english_items').select('*').order('created_at', { ascending: false }).limit(400),
-    supabase.from('lounge_english_attempts').select('id,said,better,polished,why,verdict,created_at,item_id').neq('better', '').order('created_at', { ascending: false }).limit(30),
+    supabase.from('lounge_english_attempts').select('id,said,better,polished,why,verdict,created_at,item_id').neq('better', '').order('created_at', { ascending: false }).limit(200),
     supabase.from('lounge_english_profiles').select('level').maybeSingle(),
   ]);
   failed(items.error); failed(notes.error);
@@ -64,15 +64,26 @@ export async function importLoungeLessonWords(words: ReadonlyArray<{ expression:
   if (!user.user) throw new Error('로그인이 필요해요.');
   const target = level === 'B2' ? 'C1' : 'B2';
   const withSituation = words.some(word => word.situation);
-  let added = 0;
+  const row = (word: { expression: string; meaning: string; situation: string }) => ({ user_id: user.user!.id, expression: word.expression, meaning: word.meaning, level: target, source: 'mine', ...(withSituation ? { situation: word.situation || null } : {}) });
+  const put = (rows: ReturnType<typeof row>[]) => supabase.from('lounge_english_items').upsert(rows, { onConflict: 'user_id,expression_key', ignoreDuplicates: true }).select('id');
+  // What happened to each word (2026-11-26: a file of 153 seemed not to go in): new, already in the list, or not taken.
+  const result = { added: 0, existing: 0, failed: 0, reason: '' };
   for (let at = 0; at < words.length; at += 100) {
-    const { data, error } = await supabase.from('lounge_english_items')
-      .upsert(words.slice(at, at + 100).map(word => ({ user_id: user.user!.id, expression: word.expression, meaning: word.meaning, level: target, source: 'mine', ...(withSituation ? { situation: word.situation || null } : {}) })), { onConflict: 'user_id,expression_key', ignoreDuplicates: true })
-      .select('id');
-    failed(error);
-    added += data?.length ?? 0;
+    const batch = words.slice(at, at + 100);
+    const { data, error } = await put(batch.map(row));
+    if (!error) { result.added += data?.length ?? 0; result.existing += batch.length - (data?.length ?? 0); continue; }
+    // A batch that fails is tried a word at a time, so one bad row (or the list's limit) does not take the rest with it.
+    for (const word of batch) {
+      const one = await put([row(word)]);
+      if (one.error) {
+        result.failed++;
+        if (!result.reason) result.reason = one.error.message?.includes('단어장') ? one.error.message : one.error.code === '42501' ? '권한이 없어요' : '저장하지 못했어요';
+      } else if (one.data?.length) result.added++;
+      else result.existing++;
+    }
   }
-  return added;
+  if (!result.added && !result.existing && result.failed) failed({ message: result.reason, code: '' });
+  return result;
 }
 
 /** Expressions written for a situation the member told; they come first in the next lesson turn. */
