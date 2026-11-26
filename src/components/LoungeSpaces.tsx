@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Coffee, Crown, DoorOpen, Hourglass, LoaderCircle, Plus, RefreshCw, Swords, Users, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, GraduationCap, ChevronLeft, ChevronRight, Coffee, Crown, DoorOpen, Hourglass, LoaderCircle, Plus, RefreshCw, Swords, Users, X } from 'lucide-react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { getLoungeHost, getLoungeTheme, isLoungeAgeGroup, loungeHostThemes, loungeAgeGroups, loungeAgeLimitLabel, loungeCharacterProfiles, loungeTopics, type LoungeAgeGroup, type LoungeHostId, type LoungeOpenTable, type LoungeSpace, type LoungeSpaceTable } from '../lib/lounge';
@@ -13,7 +13,17 @@ import { loungeOneToOneStoriesOnly, loungeStoriesPath } from '../lib/loungeScena
 import { loungeGroupRoomsEnabled, loungeHouseGender, loungeLobbyCastOrder, loungeNewCharacters } from '../lib/lounge';
 
 /** The buttons under "누구와 이야기할까요?": all, men, women, the new ones (2026-11-17). */
-export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
+export const loungeCastFilters = [{ id: 'all', label: '전체' }, { id: 'training', label: '실전 훈련' }, { id: 'male', label: '남성' }, { id: 'female', label: '여성' }, { id: 'new', label: '신규' }] as const;
+/**
+ * 실전 훈련 (2026-11-26, by the owner): the characters who also train the member for real situations, with what each
+ * trains. `ready` is false while the training is still being made: the card says so and opens the character's page.
+ */
+export const loungeTrainingCast = [
+  { id: 'teacher', label: '영어 말하기 코치 · B1→B2', ready: true },
+  { id: 'interpreter', label: '영어 뉘앙스·통역 · B2→C1', ready: true },
+  { id: 'closer', label: '실전 협상 연습', ready: false },
+  { id: 'trickster', label: '실전 압박 면접', ready: false },
+] as const;
 export type LoungeCastFilter = typeof loungeCastFilters[number]['id'];
 
 /** With group rooms closed there are no open tables to fetch. */
@@ -147,20 +157,27 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
   // The filter: "전체" is the row as it was; 남성/여성 look through the new characters too; 신규 shows the new ones, which also stay on their own row below.
   const [castFilter, setCastFilter] = useState<LoungeCastFilter>('all');
   const newHouseCast = loungeNewCharacters.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
-  const shownCast = castFilter === 'all' ? lobbyCast : castFilter === 'new' ? newHouseCast : [...lobbyCast, ...newHouseCast].filter(character => loungeHouseGender(character.id) === castFilter);
+  const trainingCast = loungeTrainingCast.map(item => loungeCharacters.find(character => character.id === item.id)).filter((character): character is LoungeCharacter => Boolean(character));
+  const shownCast = castFilter === 'all' ? lobbyCast : castFilter === 'new' ? newHouseCast : castFilter === 'training' ? trainingCast : [...lobbyCast, ...newHouseCast].filter(character => loungeHouseGender(character.id) === castFilter);
   const shownMemberCast = memberCast.rows.filter(row => {
     const isNewPublic = newIds.has(row.id) && row.status === 'public';
     if (castFilter === 'all') return !isNewPublic;
     if (castFilter === 'new') return isNewPublic;
+    if (castFilter === 'training') return false;
     return row.sheet.gender === castFilter;
   });
   // Opening a sheet adds a history entry so the back button closes it; a shared link to a sheet closes in place.
   const openSheet = (id: string) => setParams({ character: id }, { state: { sheet: true } });
   const closeSheet = () => { if ((location.state as { sheet?: boolean } | null)?.sheet) navigate(-1); else setParams({}, { replace: true }); };
-  const castCard = (character: LoungeCharacter, host: ReturnType<typeof getLoungeHost>) => <>
-    <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
-    <span><strong>{character.name}</strong><small>{character.job}</small><TopicPill titles={topics[character.id]} /></span>
-  </>;
+  const castCard = (character: LoungeCharacter, host: ReturnType<typeof getLoungeHost>) => {
+    // Under 실전 훈련 a card says what the character trains, not their stories.
+    const training = castFilter === 'training' ? loungeTrainingCast.find(item => item.id === character.id) : undefined;
+    return <>
+      <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
+      <span><strong>{character.name}</strong><small>{training ? training.label : character.job}</small>
+        {training ? <em className={`lounge-cast-topic lounge-cast-training${training.ready ? '' : ' soon'}`}><GraduationCap size={11} aria-hidden="true" /><b>{training.ready ? '1:1 실전 훈련' : '곧 열려요'}</b></em> : <TopicPill titles={topics[character.id]} />}</span>
+    </>;
+  };
   // Places with no open room follow the rooms, each inviting the first room there.
   const quietPlaces = spaces?.filter(space => !tables?.some(table => table.space_id === space.id)) ?? [];
   if (selected && !loungeGroupRoomsEnabled) return <Navigate to={`/lounge/characters/${selected.id}`} replace />;
