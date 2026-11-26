@@ -3,7 +3,7 @@ import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScen
 import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
-import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeRaccoonModel, loungeRaccoonUrl } from '../src/lib/loungeModels';
+import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeOpenrouterAnswersAdult, loungeOpenrouterModelFor, loungeRaccoonUrl, loungeRoomChatModelId } from '../src/lib/loungeModels';
 import { loungeClock, loungeClockRule, loungeMemoryLedgerFromSummary, loungeMemoryLedgerForRecorder, loungeMemoryLedgerInstructions, loungeMemoryLedgerSchema, loungeMemoryLedgerFields, loungeMemoryText, applyLoungeMemoryLedger, forgetLoungeMemoryLine, loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeOwnWordsRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
@@ -1668,7 +1668,7 @@ ${photoRule}`;
     const nanoKey = process.env.NANOGPT_API_KEY;
     // 라쿤 (2026-11-20, by the owner): OpenRouter's Qwen answers every turn of a room on it, an adult scene and a call included.
     const openrouterKey = process.env.OPENROUTER_API_KEY;
-    const raccoonViaOpenrouter = Boolean(openrouterKey && chosenChat.provider === 'openrouter');
+    const raccoonViaOpenrouter = Boolean(openrouterKey && chosenChat.provider === 'openrouter' && loungeOpenrouterAnswersAdult(chosenChat.id));
     // A call has no turn conditions (they are the chat engine's): at the closest stage the same text goes in as its own turn.
     const adultCallText = adultMode && !chat && stageNumber === 4 ? `${(character?.bible?.adultMode ?? loungeDefaultAdultMode).explicit} ${loungeAdultDepth} 통화에서도 높임말 없이 반말로 말한다(말투 합의가 존댓말이어도 이 장면 안에서는 반말). ${loungeAdultVoiceNote}` : undefined;
     // 2026-11-18: at the closest step the adult model answers only a sexual scene (the analyzer reads it from the recent talk and
@@ -1733,7 +1733,8 @@ ${photoRule}`;
     const lessonTurn = lessonWork ? await lessonWork : undefined;
     const lessonPrompt = lessonTurn?.prompt;
     const trainingTurn = trainingWork ? await trainingWork : undefined;
-    const chosenModel = getLoungeChatModel(solo ? room.ai_model : null);
+    // An English lesson's room on no model answers with 루나 (2026-11-26); it can be set to 하이쿠 to compare.
+    const chosenModel = getLoungeChatModel(solo ? loungeRoomChatModelId(room.ai_model, lessonRoom) : null);
     const chatModel = !chat && chosenModel.voiceFallback ? getLoungeChatModel(chosenModel.voiceFallback) : chosenModel;
     // How hard the reasoning model thinks: medium by default, LOUNGE_REPLY_REASONING (low, medium, high) changes it.
     const replyReasoning = chatModel.reasoning === 'none' ? 'none' : ['low', 'medium', 'high'].includes(process.env.LOUNGE_REPLY_REASONING ?? '') ? process.env.LOUNGE_REPLY_REASONING! : chatModel.reasoning;
@@ -2388,14 +2389,17 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             if (!quiet) partialLength = 0;
             const router = backend === 'openrouter';
             const adult = !router && (backend ? backend === 'nano' : adultReply && !adultViaDeepseek);
-            const model = router ? process.env.LOUNGE_RACCOON_MODEL || loungeRaccoonModel : adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
+            const model = router ? loungeOpenrouterModelFor(chatModel.id, process.env) : adult ? process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel : 'deepseek-flash';
             const key = router ? openrouterKey : adult ? nanoKey : deepseekKey;
             const response = await fetchTimed(router ? loungeRaccoonUrl : adult ? loungeAdultChatUrl : 'https://api.deepseek.com/chat/completions', {
               method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: replyStop,
               body: JSON.stringify({
                 model, stream: true, stream_options: { include_usage: true },
                 ...(router ? { reasoning: { enabled: false } } : adult ? { reasoning: { exclude: true } } : { thinking: { type: 'disabled' } }),
-                response_format: { type: 'json_object' }, max_tokens: modelRequest.max_output_tokens,
+                // 하이쿠 on OpenRouter does not keep to json_object (it answered in prose, so every turn went to DeepSeek,
+                // 2026-11-26); with the schema itself, strict, it answers in it.
+                response_format: router && chatModel.id === 'claude-haiku' ? { type: 'json_schema', json_schema: { name: modelRequest.text.format.name, strict: true, schema: modelRequest.text.format.schema } } : { type: 'json_object' },
+                max_tokens: modelRequest.max_output_tokens,
                 messages: [
                   { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
                   { role: 'user', content: adultReply ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
@@ -2479,7 +2483,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const label = {
               provider: adultBackend ? 'nanogpt' : provider === 'deepseek-plain' ? 'deepseek' : provider,
               model: provider === 'gemini' ? String(chatModel.id === 'gemini-pro' ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'])
-                : provider === 'openrouter' ? String(process.env.LOUNGE_RACCOON_MODEL || loungeRaccoonModel)
+                : provider === 'openrouter' ? String(loungeOpenrouterModelFor(chatModel.id, process.env))
                   : adultBackend ? String(process.env.LOUNGE_ADULT_MODEL || loungeAdultChatModel) : provider === 'openai' ? String(modelRequest.model ?? 'openai') : 'deepseek-flash',
             };
             const started = performance.now();
@@ -2496,7 +2500,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           // 2026-10-20) is retried once, so a brief hiccup does not end the turn. A slow failure is not retried, and
           // after the text has gone out to speech there is nothing to redo.
           // 라쿤 first answers with OpenRouter's model, for every turn; without its key it is DeepSeek's own model as before.
-          const provider = openrouterKey && chatModel.provider === 'openrouter' ? 'openrouter'
+          const provider = openrouterKey && chatModel.provider === 'openrouter' && (!adultReply || loungeOpenrouterAnswersAdult(chatModel.id)) ? 'openrouter'
             : adultReply || (deepseekKey && (chatModel.provider === 'deepseek' || chatModel.provider === 'openrouter')) ? 'deepseek' : chatModel.provider === 'gemini' && geminiKey ? 'gemini' : 'openai';
           const reply = (async () => {
             const attemptStarted = performance.now();
@@ -2613,7 +2617,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               if (fixed) full = again;
             }
             authoredLife = normalizeLoungeCharacterLife(full?.character_life, companionTurn, now);
-            const said = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
+            const cleaned = cleanLoungeCompanionReply(full?.text?.trim() || early, characterName);
+            // A lesson or a training is talk only: a stage direction (하이쿠 writes "*찻잔을 내려놓는다*" despite the rules, 2026-11-26) is taken out.
+            const plainText = practiceRoom ? cleaned.text.replace(/\*[^*\n]{1,160}\*/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim() : cleaned.text;
+            const said = { ...cleaned, text: plainText || cleaned.text };
             // Keep the thought the character chose to share, including consecutive turns; off still hides it.
             const thought = innerVoiceMode === 'on' && typeof full?.inner_voice === 'string' ? cleanLoungeInnerVoice(full.inner_voice, said.text, companionState?.inner ?? []) : { inner: '', notes: [] as string[] };
             const notes = [...said.notes, ...thought.notes];

@@ -57,8 +57,13 @@ test('no story card summary counts episodes (2026-11-20)', () => {
 
 test('라쿤 is offered by the picker only on a computer\'s own address, not on the site\'s domain (2026-11-20)', () => {
   const models = loadTs(fileURLToPath(new URL('../src/lib/loungeModels.ts', import.meta.url)));
-  for (const host of ['localhost', '127.0.0.1', '::1']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon'], host);
-  for (const host of ['saseok.kr', 'www.saseok.kr', 'localhost.evil.com', 'xlocalhost', '192.168.0.4']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash'], host);
+  for (const host of ['localhost', '127.0.0.1', '::1']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon', 'claude-haiku'], host);
+  for (const host of ['saseok.kr', 'www.saseok.kr', 'localhost.evil.com', 'xlocalhost', '192.168.0.4']) assert.deepEqual(models.loungeChatModelsFor(host).map(model => model.id), ['deepseek-flash', 'gemini-flash', 'claude-haiku'], host);
+  // 2026-11-26, by the owner: 하이쿠 everywhere; an English lesson offers 루나 and 하이쿠, and a lesson room on no model is on 루나.
+  assert.deepEqual(models.loungeLessonChatModels.map(model => [model.id, model.label]), [['gpt', '루나'], ['claude-haiku', '하이쿠']]);
+  assert.equal(models.loungeRoomChatModelId(null, true), 'gpt'); assert.equal(models.loungeRoomChatModelId('claude-haiku', true), 'claude-haiku');
+  assert.equal(models.loungeRoomChatModelId(null, false), null);
+  assert.equal(models.loungeOpenrouterModelFor('claude-haiku'), 'anthropic/claude-haiku-5.5'); assert.equal(models.loungeOpenrouterAnswersAdult('claude-haiku'), false);
   assert.match(read('src/components/LoungeModelPicker.tsx'), /loungeChatModelsFor\(window\.location\.hostname\)/, 'the menu follows the address');
 });
 

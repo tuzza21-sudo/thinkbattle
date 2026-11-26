@@ -4667,10 +4667,17 @@ test('a story in episodes: the character leads the current episode, the checkpoi
   }
 });
 
-test('the picker offers 아리아, 오닉스 and 라쿤 under code names (no 노바, no GLM), and 오닉스 is the default', () => {
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon']);
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['오닉스', '아리아', '라쿤'], '오닉스 first');
-  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.description), ['빠르고 자유로운 대화', '표현이 풍부한 대화', '균형잡힌 대화']);
+test('the picker offers 아리아, 오닉스, 라쿤 and 하이쿠 under code names (no 노바, no GLM), and 오닉스 is the default', () => {
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.id), ['deepseek-flash', 'gemini-flash', 'deepseek-raccoon', 'claude-haiku']);
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.label), ['오닉스', '아리아', '라쿤', '하이쿠'], '오닉스 first, 하이쿠 after 라쿤');
+  assert.deepEqual(modelsLib.loungeOfferedChatModels.map(model => model.description), ['빠르고 자유로운 대화', '표현이 풍부한 대화', '균형잡힌 대화', '섬세하게 풀어 가는 대화']);
+  // 하이쿠 (2026-11-22): the same OpenRouter route as 라쿤 with its own model; a call goes to the fast GPT and an adult scene is not asked of it
+  const haiku = modelsLib.getLoungeChatModel('claude-haiku');
+  assert.equal(haiku.provider, 'openrouter'); assert.equal(haiku.voiceFallback, 'gpt', 'a call takes 오닉스\'s path: the fast GPT');
+  assert.equal(modelsLib.loungeOpenrouterModelFor('claude-haiku', {}), 'anthropic/claude-haiku-5.5');
+  assert.equal(modelsLib.loungeOpenrouterModelFor('claude-haiku', { LOUNGE_HAIKU_MODEL: 'x/y' }), 'x/y');
+  assert.equal(modelsLib.loungeOpenrouterModelFor('deepseek-raccoon', {}), 'qwen/qwen3.8-flash', '라쿤 keeps its own model');
+  assert.equal(modelsLib.loungeOpenrouterAnswersAdult('claude-haiku'), false); assert.equal(modelsLib.loungeOpenrouterAnswersAdult('deepseek-raccoon'), true);
   for (const model of modelsLib.loungeChatModels) assert.doesNotMatch(model.description, /채팅|음성/, 'no word about chat or voice after a model');
   // On a phone the chat's bottom bar has the model button (2026-11-20), with 사진 and 추천 as the short labels; the voice-engine picker stays hidden there.
   const css = readFileSync(new URL('../src/components/LoungeRoom.css', import.meta.url), 'utf8');
