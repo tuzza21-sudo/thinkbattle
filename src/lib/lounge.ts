@@ -601,8 +601,14 @@ export const loungeSpeechEngines = [
 export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
 export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
 export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines.find(engine => engine.id === id) ?? loungeSpeechEngines[0];
-/** The engine every character speaks with: ElevenLabs alone since 2026-10-26 (a reply it cannot speak stays text, so the voice never changes in a call). */
-export const loungeDefaultSpeechEngine = (_hostId: string): LoungeSpeechEngine => 'eleven-v4-turbo';
+/**
+ * ElevenLabs is paused (2026-11-26, by the owner: its billing is blocked until it is paid): every character speaks with Gemini,
+ * and OpenAI speaks when Gemini fails. When it is paid, set this to false (or LOUNGE_ELEVEN_PAUSED=off in Vercel, which the
+ * server reads first, to resume at once without a release).
+ */
+export const loungeElevenPaused = true;
+/** The engine every character speaks with: ElevenLabs alone since 2026-10-26 (a reply it cannot speak stays text, so the voice never changes in a call), Gemini while it is paused. */
+export const loungeDefaultSpeechEngine = (_hostId: string, paused: boolean = loungeElevenPaused): LoungeSpeechEngine => paused ? 'gemini' : 'eleven-v4-turbo';
 /** The engine that speaks where the default is not open to the member (a guest, or the month's allowance used): Gemini; OpenAI speaks when that fails too. */
 export const loungeOrdinarySpeechEngine = (): LoungeSpeechEngine => 'gemini';
 /**

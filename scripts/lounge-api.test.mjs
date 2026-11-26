@@ -33,6 +33,7 @@ process.env.LOUNGE_ANALYZER ??= 'off';
 // The same for the director, which a fast-model chat asks beside the analyzer (back on 2026-11-02).
 process.env.LOUNGE_DIRECTOR ??= 'off';
 process.env.LOUNGE_EXTENDED_COMPANION_REPLIES ??= 'on';
+process.env.LOUNGE_ELEVEN_PAUSED ??= 'off'; // ElevenLabs is paused in the code (2026-11-26); these tests cover it speaking, the pause has its own test
 const consultLib = loadTs(fileURLToPath(new URL('../src/lib/loungeConsult.ts', import.meta.url)));
 const lessonLib = loadTs(fileURLToPath(new URL('../src/lib/loungeLesson.ts', import.meta.url)));
 const trainingLib = loadTs(fileURLToPath(new URL('../src/lib/loungeTraining.ts', import.meta.url)));
@@ -4005,6 +4006,45 @@ test('윤지안 (id diplomat) speaks with Gemini through the same PCM stream, an
       });
     } finally { delete process.env.GEMINI_API_KEY; }
   }
+});
+
+test('while ElevenLabs is paused (its billing is blocked, 2026-11-26) every character speaks with Gemini and OpenAI speaks when that fails; ElevenLabs is never asked', async () => {
+  assert.equal(lounge.loungeElevenPaused, true, 'paused in the code until it is paid');
+  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok'), 'gemini'); assert.equal(lounge.loungeDefaultSpeechEngine('c_0123456789abcdef0123456789abcdef'), 'gemini');
+  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok', false), 'eleven-v4-turbo', 'paid again: ElevenLabs');
+  const pcm = Uint8Array.from({ length: 3000 }, (_, index) => (index * 7) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
+  const sse = chunks => chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('');
+  const piece = bytes => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(bytes).toString('base64') } }] } }] });
+  const scenarios = {
+    'Gemini speaks': { upstream: () => new Response(sse([piece(pcm)]), { headers: { 'Content-Type': 'text/event-stream' } }), expect: pcm, gemini: 1, openai: 0 },
+    'Gemini fails, OpenAI speaks': { upstream: () => new Response('nope', { status: 500 }), expect: fallback, gemini: 1, openai: 1 },
+  };
+  process.env.LOUNGE_ELEVEN_PAUSED = 'on'; process.env.ELEVENLABS_API_KEY = 'el-key'; process.env.GEMINI_API_KEY = 'gem-key'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
+  try {
+    for (const [name, scenario] of Object.entries(scenarios)) {
+      const calls = { gemini: 0, openai: 0, eleven: 0 };
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'user-1' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: 'jaeseok', memory: '', capacity: 1, ai_turns: 3 }]);
+        if (url.includes('voice_lounge_messages?') || url.includes('voice_lounge_members?') || url.includes('voice_lounge_relationships?') || url.includes('voice_lounge_memories')) return result([]);
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '', events: [], memory_ops: [] });
+        if (url.endsWith('/responses')) return result({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ text: '그건 좀 다르게 찍고 싶네요.' }) }] }] });
+        if (url.startsWith('https://api.elevenlabs.io/')) { calls.eleven++; return new Response(new Uint8Array()); }
+        if (url.includes('generativelanguage.googleapis.com')) { calls.gemini++; assert.equal(JSON.parse(init.body).generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon'); return scenario.upstream(); }
+        if (url.endsWith('/audio/speech')) { calls.openai++; return new Response(fallback); }
+        if (url.includes('finish_voice_lounge_reply') || url.includes('finish_voice_lounge_host') || url.includes('save_voice_lounge')) return result(true);
+        throw new Error('Unexpected call ' + url);
+      }, async () => {
+        const response = await handler(request({ action: 'host', roomId, reason: 'followup', stream: true, speech: 'eleven-v4-turbo' }));
+        assert.equal(response.status, 200, name);
+        const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line));
+        const heard = Buffer.concat(events.filter(event => event.type === 'audio').map(event => Buffer.from(event.audio, 'base64')));
+        assert.deepEqual([...heard], [...scenario.expect], `${name}: what the listener hears`);
+        assert.deepEqual(calls, { gemini: scenario.gemini, openai: scenario.openai, eleven: 0 }, name);
+      });
+    }
+  } finally { process.env.LOUNGE_ELEVEN_PAUSED = 'off'; for (const key of ['ELEVENLABS_API_KEY', 'GEMINI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[key]; }
 });
 
 test('every character speaks with ElevenLabs whatever engine the page sends; a deployment without its key speaks every reply with OpenAI', async () => {

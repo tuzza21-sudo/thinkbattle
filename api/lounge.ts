@@ -2145,7 +2145,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
     const geminiKey = process.env.GEMINI_API_KEY, geminiHost = Boolean(geminiKey && loungeGeminiSpeech[host.id]);
     // Every character speaks with ElevenLabs (2026-10-26): a voice that changes in the middle of a call breaks it, so a
     // choice sent by an older page is not followed and nothing else speaks when ElevenLabs fails (the reply stays text).
-    const chosenSpeech: LoungeSpeechEngine = loungeDefaultSpeechEngine(host.id);
+    const chosenSpeech: LoungeSpeechEngine = loungeDefaultSpeechEngine(host.id, process.env.LOUNGE_ELEVEN_PAUSED ? process.env.LOUNGE_ELEVEN_PAUSED !== 'off' : undefined);
     type SpeechPlan = { engine: LoungeSpeechEngine; family?: 'gemini' | 'eleven' | 'typecast'; voice?: string; key?: string };
     const planSpeech = (choice: LoungeSpeechEngine): SpeechPlan => {
       const family = choice === 'gemini' ? 'gemini' : choice === 'typecast' ? 'typecast' : choice === 'openai' ? undefined : 'eleven';
