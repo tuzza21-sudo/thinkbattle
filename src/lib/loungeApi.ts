@@ -286,6 +286,8 @@ export const requestLoungeLessonSituation = (roomId: string, situation: string) 
 /** 실전 훈련: a new negotiation or interview in the member's training room (see loungeTraining.ts); returns the room's new state. */
 /** 클래스: the assignment, site or work the member picked on the class board (see loungeClass.ts); returns the room's new state. */
 export const requestLoungeClassPick = (roomId: string, item: string) => apiRequest({ action: 'class-pick', roomId, item }) as Promise<{ state: unknown }>;
+/** 문화기행: the viewing point of the current site the member went to. */
+export const requestLoungeClassSpot = (roomId: string, spot: string) => apiRequest({ action: 'class-pick', roomId, spot }) as Promise<{ state: unknown }>;
 export const startLoungeTraining = (roomId: string, setup: Record<string, unknown>) => apiRequest({ action: 'training-start', roomId, setup }) as Promise<{ state: unknown }>;
 export const requestLoungeLessonEnrich = (roomId: string) => apiRequest({ action: 'lesson-enrich', roomId }) as Promise<{ updated: number }>;
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;

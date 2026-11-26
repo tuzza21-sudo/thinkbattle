@@ -257,3 +257,73 @@ export const loungeArtWorks: readonly LoungeArtWork[] = [
     look: ['두 개의 화면이 하나의 우주를 이루는 구성', '푸른 점들이 소용돌이처럼 퍼져 나가는 모습', '가까이서 보면 점마다 다른 번짐'],
     meaning: '한국적인 정서와 서구 추상을 하나로 엮은 전면점화의 대표작으로, 한국 현대미술이 세계와 만나는 장면을 보여 줘요.', question: '점 하나하나가 무엇이라고 생각하면 그림이 달라 보일까요?' },
 ];
+
+/**
+ * Where the guide stops inside each site (2026-11-26, by the owner: the member should see what is talked about). Each
+ * spot has its picture in loungeClassImages under the same id; the note is the one line the guide starts from.
+ */
+export type LoungeTravelSpot = { id: string; name: string; note: string };
+export const loungeTravelSpots: Record<string, readonly LoungeTravelSpot[]> = {
+  duomo: [
+    { id: 'duomo-dome', name: '돔 안쪽 "최후의 심판"', note: '돔 안쪽을 가득 채운 프레스코. 463계단을 오르는 길에 가까이 지나가요.' },
+    { id: 'duomo-campanile', name: '조토의 종탑', note: '조토가 설계를 시작한 종탑. 414계단 위에서 돔을 정면으로 봐요.' },
+    { id: 'duomo-baptistery', name: '세례당 천장 모자이크', note: '성당보다 오래된 산 조반니 세례당의 황금빛 천장.' },
+  ],
+  uffizi: [
+    { id: 'birth-venus', name: '보티첼리 "비너스의 탄생"', note: '조개를 타고 바다에서 막 태어난 비너스. 보티첼리 방의 주인공.' },
+    { id: 'primavera', name: '보티첼리 "봄(프리마베라)"', note: '오렌지 숲에 선 비너스와 신화 속 인물들이 봄을 연다.' },
+    { id: 'annunciation', name: '레오나르도 다 빈치 "수태고지"', note: '천사가 마리아에게 소식을 전하는 장면. 젊은 레오나르도의 작품.' },
+    { id: 'doni-tondo', name: '미켈란젤로 "도니 톤도"', note: '둥근 화면 속 성가족. 조각가 미켈란젤로의 단단한 인체.' },
+    { id: 'venus-urbino', name: '티치아노 "우르비노의 비너스"', note: '베네치아 화가 티치아노의 색과 빛으로 그린 누운 비너스.' },
+    { id: 'medusa', name: '카라바조 "메두사"', note: '방패 위에 그린, 비명 지르는 메두사의 머리.' },
+  ],
+  pontevecchio: [
+    { id: 'vasari-corridor', name: '바사리 회랑', note: '다리 위층으로 지나가는, 메디치 가문이 궁전 사이를 오가던 통로.' },
+  ],
+  signoria: [
+    { id: 'perseus', name: '첼리니 "페르세우스"', note: '란치 회랑에 선, 메두사의 머리를 든 청동 페르세우스.' },
+    { id: 'neptune', name: '넵투누스 분수', note: '암만나티가 만든 바다의 신 분수.' },
+    { id: 'cinquecento', name: '베키오 궁전 500인의 방', note: '공화국 대회의가 열리던 거대한 홀.' },
+  ],
+  accademia: [
+    { id: 'david', name: '"다비드" 원본', note: '1873년 광장에서 옮겨 온 미켈란젤로의 원본 대리석상.' },
+    { id: 'prisoners', name: '미완성 "포로"', note: '돌 속에서 몸을 빼내는 듯한 미완성 조각.' },
+  ],
+  santacroce: [
+    { id: 'michelangelo-tomb', name: '미켈란젤로의 무덤', note: '회화·조각·건축을 상징하는 세 여인이 지키는 무덤.' },
+    { id: 'galileo-tomb', name: '갈릴레이의 무덤', note: '근대 과학의 아버지가 잠든 자리.' },
+    { id: 'bardi-chapel', name: '조토의 바르디 예배당 프레스코', note: '평면에서 사람의 감정으로 넘어가는 조토의 그림.' },
+    { id: 'pazzi-chapel', name: '브루넬레스키의 파치 예배당', note: '르네상스 건축의 비례를 보여 주는 작은 예배당.' },
+  ],
+  michelangelo: [
+    { id: 'san-miniato', name: '산 미니아토 알 몬테 성당', note: '광장에서 조금 더 올라간 언덕 위의 성당.' },
+  ],
+  pitti: [
+    { id: 'seggiola', name: '라파엘로 "의자의 성모"', note: '팔라티나 미술관의 둥근 성모자 그림.' },
+    { id: 'grotto', name: '부온탈렌티 동굴', note: '보볼리 정원의 조각으로 꾸민 인공 동굴.' },
+  ],
+  sanmarco: [
+    { id: 'pala-doro', name: '팔라 도로', note: '보석으로 장식한 황금 제단화.' },
+    { id: 'horses', name: '청동 말 네 마리', note: '1204년 콘스탄티노플에서 가져온 말. 원본은 성당 박물관에 있어요.' },
+  ],
+  ducale: [
+    { id: 'paradise', name: '틴토레토 "천국"', note: '대평의회실 벽을 덮은 거대한 그림.' },
+    { id: 'sighs', name: '탄식의 다리', note: '궁전과 감옥을 잇는 다리. 죄수가 마지막으로 본 바다.' },
+  ],
+  rialto: [
+    { id: 'rialto-market', name: '리알토 생선 시장', note: '천 년 이어진 베네치아의 아침 시장.' },
+  ],
+  grandcanal: [
+    { id: 'ca-doro', name: '카도로', note: '금빛 장식으로 유명했던 대운하의 궁전.' },
+  ],
+  accademiave: [
+    { id: 'tempest', name: '조르조네 "폭풍우"', note: '번개 치는 하늘 아래 두 인물. 아직도 해석이 갈리는 그림.' },
+    { id: 'levi', name: '베로네세 "레위 가의 향연"', note: '최후의 만찬으로 그렸다가 종교재판 뒤 제목을 바꾼 그림.' },
+  ],
+  salute: [
+    { id: 'salute-interior', name: '팔각형 내부와 큰 돔', note: '흑사병이 끝나길 빌며 지은 성당의 빛나는 안쪽.' },
+  ],
+  murano: [
+    { id: 'glassblowing', name: '무라노 유리 불기', note: '1291년부터 이어진 유리 장인의 불 앞 시연.' },
+  ],
+};

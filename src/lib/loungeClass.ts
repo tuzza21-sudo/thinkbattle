@@ -1,6 +1,6 @@
 import { getLoungeHost, loungeElevenPremadeVoices, loungeEngineVoices, loungeGeminiSpeech, registerLoungeCustomElevenVoice, registerLoungeCustomHost, type LoungeHost, type LoungeHostId, type LoungeThemeId } from './lounge.js';
 import { getLoungeCharacter, registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCharacters.js';
-import { loungeArtWorks, loungeEmotionalExercises, loungeLogicalExercises, loungeTravelSites, type LoungeArtWork, type LoungeTravelSite, type LoungeWritingExercise } from './loungeClassContent.js';
+import { loungeArtWorks, loungeEmotionalExercises, loungeLogicalExercises, loungeTravelSites, loungeTravelSpots, type LoungeClassImage, type LoungeTravelSpot, type LoungeArtWork, type LoungeTravelSite, type LoungeWritingExercise } from './loungeClassContent.js';
 import { loungeClassImages } from './loungeClassImages.js';
 
 /*
@@ -101,6 +101,21 @@ for (const id of Object.keys(loungeClasses) as LoungeClassId[]) {
 export const loungeClassExercises = (kind: LoungeClassKind): readonly LoungeWritingExercise[] => kind === 'emotional' ? loungeEmotionalExercises : kind === 'logical' ? loungeLogicalExercises : [];
 export const loungeClassSites: readonly LoungeTravelSite[] = loungeTravelSites.map(site => ({ ...site, ...(loungeClassImages[site.id] ? { image: loungeClassImages[site.id] } : {}) }));
 export const loungeClassWorks: readonly LoungeArtWork[] = loungeArtWorks.map(work => ({ ...work, ...(loungeClassImages[work.id] ? { image: loungeClassImages[work.id] } : {}) }));
+/** The viewing points of a site, each with its picture (a spot without one is left out). */
+export const loungeClassSpots = (siteId?: string | null): Array<LoungeTravelSpot & { image: LoungeClassImage }> =>
+  (loungeTravelSpots[siteId ?? ''] ?? []).flatMap(spot => loungeClassImages[spot.id] ? [{ ...spot, image: loungeClassImages[spot.id] }] : []);
+/**
+ * The picture behind the class (2026-11-26, by the owner: the Arno bridge stayed whatever site was picked): the spot the
+ * member stands at, else the site, else the work being looked at.
+ */
+export function loungeClassScene(kind: LoungeClassKind | undefined, value: unknown): LoungeClassImage | undefined {
+  if (kind !== 'travel' && kind !== 'art') return undefined;
+  const state = readLoungeClassState(value, kind);
+  const spot = kind === 'travel' ? loungeClassSpots(state.item).find(entry => entry.id === state.spot) : undefined;
+  const item = loungeClassItem(kind, state.item) as { image?: LoungeClassImage } | undefined;
+  return spot?.image ?? item?.image;
+}
+
 /** The item a class can be on: an assignment, a site or a work. */
 export function loungeClassItem(kind: LoungeClassKind, id?: string | null) {
   if (!id) return undefined;
@@ -114,13 +129,16 @@ export function loungeClassItem(kind: LoungeClassKind, id?: string | null) {
 /** A critique of one piece of writing, kept with the words it was about (the card under the member's message). */
 export type LoungeWritingCritique = { said: string; exercise: string; strengths: string[]; edits: Array<{ before: string; after: string; why: string }>; rewrite: string; scores: Record<string, number>; next: string; at: string };
 /** `fresh`: the item was just picked and the next reply starts it. */
-export type LoungeClassState = { kind: 'class'; class: LoungeClassKind; item?: string; started?: string; fresh?: boolean; done: string[]; critiques: LoungeWritingCritique[]; turns: number };
+export type LoungeClassState = { kind: 'class'; class: LoungeClassKind; item?: string; started?: string; fresh?: boolean;
+  /** The viewing point of the site the member went to, and whether the next reply arrives at it. */
+  spot?: string; spotFresh?: boolean; done: string[]; critiques: LoungeWritingCritique[]; turns: number };
 export function readLoungeClassState(value: unknown, kind: LoungeClassKind): LoungeClassState {
   const state = value && typeof value === 'object' ? value as Partial<LoungeClassState> : {};
   const same = state.kind === 'class' && state.class === kind;
   return {
     kind: 'class', class: kind, ...(same && typeof state.item === 'string' && loungeClassItem(kind, state.item) ? { item: state.item } : {}),
     ...(same && typeof state.started === 'string' ? { started: state.started } : {}), ...(same && state.fresh === true ? { fresh: true } : {}),
+    ...(same && typeof state.spot === 'string' && loungeClassSpots(state.item).some(spot => spot.id === state.spot) ? { spot: state.spot, ...(state.spotFresh === true ? { spotFresh: true } : {}) } : {}),
     done: same && Array.isArray(state.done) ? state.done.filter((id): id is string => typeof id === 'string').slice(-40) : [],
     critiques: same && Array.isArray(state.critiques) ? state.critiques.slice(-12) as LoungeWritingCritique[] : [],
     turns: same ? Math.max(0, Number(state.turns) || 0) : 0,
@@ -129,7 +147,14 @@ export function readLoungeClassState(value: unknown, kind: LoungeClassKind): Lou
 /** The member picked an assignment, a site or a work: the class turns to it. */
 export function pickLoungeClassItem(state: LoungeClassState, id: string, now = new Date()): LoungeClassState | undefined {
   if (!loungeClassItem(state.class, id)) return undefined;
-  return { ...state, item: id, started: now.toISOString(), fresh: true, done: [...state.done.filter(done => done !== id), id].slice(-40) };
+  const next: LoungeClassState = { ...state, item: id, started: now.toISOString(), fresh: true, done: [...state.done.filter(done => done !== id), id].slice(-40) };
+  delete next.spot; delete next.spotFresh;
+  return next;
+}
+/** The member went to a viewing point of the site they are at: the next reply arrives at it. */
+export function pickLoungeClassSpot(state: LoungeClassState, spotId: string): LoungeClassState | undefined {
+  if (!loungeClassSpots(state.item).some(spot => spot.id === spotId)) return undefined;
+  return { ...state, spot: spotId, spotFresh: true };
 }
 
 // ── Critique of a piece of writing ─────────────────────────────────────────────────────────────────────────────────
@@ -179,13 +204,16 @@ export function readLoungeWritingCritique(value: unknown, kind: LoungeClassKind,
 // ── What the reply reads, and the rules ─────────────────────────────────────────────────────────────────────────────
 
 /** The class field of the reply's input: the chosen item's facts, and the critique when the member sent writing. */
-export function loungeClassForPrompt(state: LoungeClassState, step: 'pick' | 'start' | 'continue', critique?: LoungeWritingCritique) {
+export function loungeClassForPrompt(state: LoungeClassState, step: 'pick' | 'start' | 'spot' | 'continue', critique?: LoungeWritingCritique) {
   const item = loungeClassItem(state.class, state.item);
   const facts = !item ? undefined : state.class === 'travel' ? (({ image, ...site }) => site)(item as LoungeTravelSite)
     : state.class === 'art' ? (({ image, museum, ...work }) => ({ ...work, has_picture: Boolean(image) }))(item as LoungeArtWork)
     : item;
   return {
     kind: state.class, step, ...(facts ? { item: facts } : {}),
+    // The viewing points the member can go to (each shown with its picture), and the one they stand at.
+    ...(state.class === 'travel' && state.item ? { spots: loungeClassSpots(state.item).map(spot => spot.name) } : {}),
+    ...(state.class === 'travel' && state.spot ? { spot: (({ image, ...spot }) => spot)(loungeClassSpots(state.item).find(entry => entry.id === state.spot)!) } : {}),
     ...(critique ? { critique: { strengths: critique.strengths, edits: critique.edits, rewrite: critique.rewrite, scores: critique.scores, next: critique.next } } : {}),
     ...(state.class === 'travel' || state.class === 'art' ? { seen_count: state.done.length } : {}),
   };
@@ -198,7 +226,8 @@ export const loungeClassRules = (kind: LoungeClassKind) => {
 - step pick: 아직 아무것도 고르지 않았다. 입력창 위의 '${kind === 'travel' ? '문화기행 지도' : kind === 'art' ? '작품 갤러리' : '글쓰기 과제'}' 버튼에서 ${kind === 'travel' ? '가 보고 싶은 명소' : kind === 'art' ? '보고 싶은 작가와 작품' : '과제'}를 고르면 시작한다고 짧게 안내하고, 사용자가 말로 원하는 것을 말해도 된다고 한다.`;
   if (kind === 'travel') return `${common}
 - step start: 사용자가 class.item 명소를 골랐다. 그곳에 막 도착한 것처럼 현장의 첫 장면(무엇이 보이고 들리는지)으로 시작하고, summary와 history를 이야기로 풀어 준 뒤 heritage(문화유산으로서의 가치)를 한두 문장으로 짚는다. mustSee 가운데 하나를 골라 "먼저 이것부터 보러 갈까요?"처럼 다음 걸음을 제안한다.
-- step continue: 사용자의 질문이나 선택에 답하며 같은 명소의 mustSee와 experience를 하나씩 이어 간다. 다 둘러봤으면 tip을 건네고 보드에서 다음 명소를 골라 보라고 권한다.
+- step spot: 사용자가 class.spot 앞에 막 섰고, 화면에 그 사진이 보이고 있다. 사진 속 장면을 함께 보는 것처럼 무엇이 보이는지, 어디부터 보면 좋은지 구체적으로 짚고(spot.note와 item의 자료 안에서), 사용자에게 무엇이 먼저 눈에 들어오는지 묻는다.
+- step continue: 사용자의 질문이나 선택에 답하며 같은 명소의 mustSee와 experience를 하나씩 이어 간다. class.spots가 있으면 다음에 가 볼 곳을 그 이름으로 제안하고, 입력창 위의 사진을 누르면 그 앞으로 간다고 알려 준다. 다 둘러봤으면 tip을 건네고 지도에서 다음 명소를 골라 보라고 권한다.
 - 가이드처럼 걸으며 말하되, 사용자가 직접 고르고 묻게 만든다.`;
   if (kind === 'art') return `${common}
 - step start: 사용자가 class.item 작품을 골랐다. 먼저 작품 제목과 작가를 소개하고, 해석을 들려주기 전에 사용자에게 "무엇이 먼저 보이세요?"처럼 첫 인상을 묻는다(item.question을 써도 된다). has_picture가 false면 저작권이 있는 작품이라 이미지는 미술관 페이지에서 볼 수 있다고 한마디 한다.
@@ -210,9 +239,9 @@ export const loungeClassRules = (kind: LoungeClassKind) => {
 };
 
 /** The step of this turn, and the state after it: the first reply after a pick starts the item. */
-export function advanceLoungeClass(state: LoungeClassState, critique?: LoungeWritingCritique): { state: LoungeClassState; step: 'pick' | 'start' | 'continue' } {
-  const step = !state.item ? 'pick' : state.fresh ? 'start' : 'continue';
+export function advanceLoungeClass(state: LoungeClassState, critique?: LoungeWritingCritique): { state: LoungeClassState; step: 'pick' | 'start' | 'spot' | 'continue' } {
+  const step = !state.item ? 'pick' : state.fresh ? 'start' : state.spotFresh ? 'spot' : 'continue';
   const next: LoungeClassState = { ...state, turns: state.turns + 1, critiques: critique ? [...state.critiques, critique].slice(-12) : state.critiques };
-  delete next.fresh;
+  delete next.fresh; delete next.spotFresh;
   return { state: next, step };
 }
