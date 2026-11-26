@@ -2109,7 +2109,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
         // four such turns took 선우령's interest and trust down with her stage).
         const closestTurn = Boolean(turnConditions?.intimacy && 'explicit' in turnConditions.intimacy) || Boolean(relationship.config.adultFlirtation && stageNumber && stageNumber >= 4);
         // 2026-11-17: in adult mode at the closest step the character never draws the line, so the member's hands are not "crossing
-        // a line" either. A 정하린 chat (first turns at stage 1, a thigh she had not allowed) was read so four turns running,
+        // a line" either. A 차유진 chat (first turns at stage 1, a thigh she had not allowed) was read so four turns running,
         // took empathy 82 to 53 and the stage 4 to 2, and adult mode went off with it.
         const adultClosest = adultMode && closestTurn;
         const events = closestTurn && Array.isArray(refused) ? refused.filter(event => { const type = (event as { type?: unknown })?.type; return type !== 'MAKES_CRUDE_ADVANCE' && !(adultClosest && type === 'VIOLATES_BOUNDARY'); })
@@ -2412,7 +2412,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const pro = chatModel.id === 'gemini-pro';
             const model = pro ? process.env.LOUNGE_GEMINI_PRO_MODEL || loungeGeminiChatModels['gemini-pro'] : process.env.LOUNGE_GEMINI_FLASH_MODEL || loungeGeminiChatModels['gemini-flash'];
             // No reply text yet after loungeGeminiFirstTextMs: given up, so DeepSeek answers (2026-11-24, by the owner: Gemini held
-            // a 정하린 turn for 68 s before failing, and three turns were lost while the member waited up to 2m41s).
+            // a 차유진 turn for 68 s before failing, and three turns were lost while the member waited up to 2m41s).
             const stall = new AbortController();
             let begun = false;
             const stallTimer = setTimeout(() => { if (!begun) stall.abort(new DOMException('gemini stalled', 'TimeoutError')); }, loungeGeminiFirstTextMs(pro));

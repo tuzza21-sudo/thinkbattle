@@ -116,6 +116,16 @@ export function loungeClassScene(kind: LoungeClassKind | undefined, value: unkno
   return spot?.image ?? item?.image;
 }
 
+/**
+ * The room's background for a class (2026-11-26, by the owner): the culture trip walks, so it follows the spot or the site;
+ * the art class stays in one museum gallery while only the works change (the work is shown on the board, not behind).
+ */
+export const loungeClassMuseum = '/lounge/museum-gallery-v1.webp';
+export function loungeClassBackground(kind: LoungeClassKind | undefined, value: unknown): string | undefined {
+  if (kind === 'art') return loungeClassMuseum;
+  return kind === 'travel' ? loungeClassScene(kind, value)?.src : undefined;
+}
+
 /** The item a class can be on: an assignment, a site or a work. */
 export function loungeClassItem(kind: LoungeClassKind, id?: string | null) {
   if (!id) return undefined;

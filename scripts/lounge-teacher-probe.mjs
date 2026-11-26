@@ -1,4 +1,4 @@
-// 정하린 (teacher), added 2026-11-16: the production handler with mocked storage, first-meeting cases, live on the chosen provider.
+// 차유진 (teacher), added 2026-11-16: the production handler with mocked storage, first-meeting cases, live on the chosen provider.
 //   node scripts/lounge-teacher-probe.mjs --live --provider=openai [--out=docs/....json]
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const realFetch = globalThis.fetch;
 const requirePackage = createRequire(import.meta.url);
 const root = process.cwd();
 const roomId = 'lounge-00000000-0000-4000-8000-000000000015';
-const scenario = {"id": "teacher-after-the-lecture", "title": "강의가 끝난 뒤의 라운지", "place": "도심 호텔 로비 라운지의 창가 자리. 낮게 흐르는 재즈, 드라이한 화이트 와인 한 잔, 테이블 위에 놓인 사인용 만년필", "user_role": "정하린의 첫 에세이 북토크에 온 성인 청중. 그녀의 수강생이 아니고, 북토크 질의응답에서 그녀의 답에 반론을 하나 던졌다.", "relationship": "오늘 처음 마주 앉는 성인 사이. 그녀는 예의 바른 해요체로 말하지만 쉽게 맞춰 주지 않는다. 허세에는 모순을 짚고, 근거 있는 반론에는 눈빛이 달라진다.", "prologue": "북토크는 아홉 시가 조금 넘어 끝났다.\n\n수능 영어 1타 강사 정하린의 첫 에세이. 객석은 성인 독자들로 가득 찼고, 질의응답은 대부분 비슷했다. 공부법, 슬럼프, 그리고 어떻게 하면 선생님처럼 될 수 있느냐는 질문들.\n\n당신의 질문만 조금 달랐다. 그녀가 '틀린 이유를 정확히 알면 사람은 바뀐다'고 했을 때, 당신은 손을 들고 말했다. 이유를 알아도 안 바뀌는 사람이 더 많지 않느냐고.\n\n객석이 잠깐 조용해졌다. 그녀는 웃으며 '좋은 반론이네요'라고만 하고 다음 질문으로 넘어갔다.\n\n사인회 줄이 끝나고, 당신은 호텔 로비 라운지 창가에 앉아 있었다. 낮은 재즈 사이로 구두 소리가 다가왔다.\n\n턱선 아래로 떨어지는 흑발 단발, 크림색 실크 블라우스. 강연장의 조명 아래서보다 표정이 한결 느긋했다. 그녀는 허락을 구하지 않고 맞은편 의자에 앉았다.\n\n“아까 그 질문, 당신 맞죠.”\n\n그녀가 웨이터에게 화이트 와인 한 잔을 부탁하고, 테이블 위에 만년필을 내려놓았다.\n\n“사람들 앞이라 짧게 넘겼는데, 집에 가는 길에 계속 생각나더라고요. 반론을 받으면 보통은 기분이 상하는데, 오늘은 좀 이상하게 재미있었어요.”\n\n잔이 도착했다. 그녀는 한 모금 마시고 당신을 똑바로 봤다. 입꼬리가 아주 조금 올라갔다.\n\n“수업은 끝났어요. 여긴 강의실도 아니고요. 그러니까 이번엔 제대로 들어 볼게요. 아까 그 말, 진심이었어요? 아니면 제가 흔들리는지 보고 싶었던 거예요?”"};
+const scenario = {"id": "teacher-after-the-lecture", "title": "강의가 끝난 뒤의 라운지", "place": "도심 호텔 로비 라운지의 창가 자리. 낮게 흐르는 재즈, 드라이한 화이트 와인 한 잔, 테이블 위에 놓인 사인용 만년필", "user_role": "차유진의 첫 에세이 북토크에 온 성인 청중. 그녀의 수강생이 아니고, 북토크 질의응답에서 그녀의 답에 반론을 하나 던졌다.", "relationship": "오늘 처음 마주 앉는 성인 사이. 그녀는 예의 바른 해요체로 말하지만 쉽게 맞춰 주지 않는다. 허세에는 모순을 짚고, 근거 있는 반론에는 눈빛이 달라진다.", "prologue": "북토크는 아홉 시가 조금 넘어 끝났다.\n\n수능 영어 1타 강사 차유진의 첫 에세이. 객석은 성인 독자들로 가득 찼고, 질의응답은 대부분 비슷했다. 공부법, 슬럼프, 그리고 어떻게 하면 선생님처럼 될 수 있느냐는 질문들.\n\n당신의 질문만 조금 달랐다. 그녀가 '틀린 이유를 정확히 알면 사람은 바뀐다'고 했을 때, 당신은 손을 들고 말했다. 이유를 알아도 안 바뀌는 사람이 더 많지 않느냐고.\n\n객석이 잠깐 조용해졌다. 그녀는 웃으며 '좋은 반론이네요'라고만 하고 다음 질문으로 넘어갔다.\n\n사인회 줄이 끝나고, 당신은 호텔 로비 라운지 창가에 앉아 있었다. 낮은 재즈 사이로 구두 소리가 다가왔다.\n\n턱선 아래로 떨어지는 흑발 단발, 크림색 실크 블라우스. 강연장의 조명 아래서보다 표정이 한결 느긋했다. 그녀는 허락을 구하지 않고 맞은편 의자에 앉았다.\n\n“아까 그 질문, 당신 맞죠.”\n\n그녀가 웨이터에게 화이트 와인 한 잔을 부탁하고, 테이블 위에 만년필을 내려놓았다.\n\n“사람들 앞이라 짧게 넘겼는데, 집에 가는 길에 계속 생각나더라고요. 반론을 받으면 보통은 기분이 상하는데, 오늘은 좀 이상하게 재미있었어요.”\n\n잔이 도착했다. 그녀는 한 모금 마시고 당신을 똑바로 봤다. 입꼬리가 아주 조금 올라갔다.\n\n“수업은 끝났어요. 여긴 강의실도 아니고요. 그러니까 이번엔 제대로 들어 볼게요. 아까 그 말, 진심이었어요? 아니면 제가 흔들리는지 보고 싶었던 거예요?”"};
 const cases = [
   { id: 'reply-to-prologue', user: '진심이었어요. 이유를 알아도 안 바뀌는 사람, 저 포함해서 꽤 많거든요.' },
   { id: 'mind-reading', user: '선생님이면 사람 마음도 영어 지문처럼 다 읽히겠네요?' },
@@ -62,7 +62,7 @@ async function capture(modules, scene) {
   Object.assign(process.env, { OPENAI_API_KEY: 'mock-key', SUPABASE_URL: 'https://db.test', SUPABASE_ANON_KEY: 'mock-anon', SUPABASE_SERVICE_ROLE_KEY: 'mock-service', APP_ORIGIN: 'https://app.test', LOUNGE_ANALYZER: 'off', LOUNGE_DIRECTOR: 'off', LOUNGE_KNOWLEDGE: 'off', LOUNGE_LONG_MEMORY: 'off', LOUNGE_MESSENGER: 'on', LOUNGE_EXTENDED_COMPANION_REPLIES: 'on' });
   const config = modules.relationship.getRelationshipConfig('teacher');
   const relationship = { user_id: 'synthetic-user', character_id: 'teacher', stage: config.stages[0].id, scores: { ...config.initial }, recent_events: [], memories: [], turn_count: 12, meaningful_turns: 2, pending: { direction: null, turns: 0 }, version: 1, last_interaction_at: new Date().toISOString() };
-  const history = [...(scene.before ?? []), ['human', scene.user]].map(([kind, text], index) => ({ id: index + 1, user_id: kind === 'human' ? 'synthetic-user' : null, nickname: kind === 'human' ? '가상 상대' : '정하린', kind, text, created_at: new Date().toISOString() })).reverse();
+  const history = [...(scene.before ?? []), ['human', scene.user]].map(([kind, text], index) => ({ id: index + 1, user_id: kind === 'human' ? 'synthetic-user' : null, nickname: kind === 'human' ? '가상 상대' : '차유진', kind, text, created_at: new Date().toISOString() })).reverse();
   let request, after;
   globalThis.fetch = async (url, init) => {
     const target = String(url);
@@ -162,7 +162,7 @@ for (const scene of cases) {
     report.push(row);
     console.log(args.includes('--live') ? `
 [${scene.id}] 상대: ${scene.user}
-하린: ${row.result?.answer?.text ?? row.result?.error}
+유진: ${row.result?.answer?.text ?? row.result?.error}
 속마음: ${row.result?.answer?.inner_voice ?? ''}${row.review ? `
 (검토 후 고침: ${row.review.rewritten})` : ''}` : JSON.stringify(row));
   }

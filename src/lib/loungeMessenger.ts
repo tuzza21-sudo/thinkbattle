@@ -29,7 +29,7 @@ export const loungeConversationFocusRule = '상대가 꺼낸 말에 응답하면
 /** Shared by the reply and its helpers; records and examples do not redefine a character or a story's agreements. */
 export const loungeContinuityRule = '현재 캐릭터의 정체성과 행동 원칙을 지킨다. 성격·말투·관계 반응의 공통 기본값과 캐릭터 고유 설정이 충돌하면 고유 설정을 우선한다. 사용자의 명시적인 거절과 동의, 확인된 사실과 유효한 합의는 그대로 존중한다. scenario는 이야기의 출발 배경이고 room_memory, memory와 recent는 이 방에서 그 뒤에 나눈 기록이다. 자유 1:1에서는 recent의 사용자 말이 scenario의 미결 훅보다 우선한다. 프롤로그의 연출이나 예전 답의 농담·실수가 현재 성격을 바꾸지는 않는다. 계약 기간·조건·비밀·확정된 사건은 명시적인 변경 합의 없이 유지한다. 외부 인물 앞에서는 공개해도 되는 정보만 말하고, 상대의 역할 대사와 사용자 자신의 말을 구분한다. 관계 단계는 관계의 배경이며 일상적인 자기표현을 제한하거나 계약·관계를 취소하는 근거가 아니다. turn.self_facts는 과거 자기 발언의 기록이므로 원래 정체성과 모순되면 따르지 않는다. 기존에 생긴 사건은 지우지 말고 그 결과에 책임진다.';
 /**
- * A one-to-one reply (chat and call) asks a check once and keeps its own word (2026-11-24, by the owner, from 정하린's evening:
+ * A one-to-one reply (chat and call) asks a check once and keeps its own word (2026-11-24, by the owner, from 차유진's evening:
  * "앱 닫았어요?" six turns in a row, a login screen asked for as proof, "오늘의 점수", "둘 중 하나만 골라서 말해봐요"; then
  * "얼굴 보는 곳, 가요" withdrawn when the member answered, and a contradiction met with "이 둘은 좀 다르지 않나요").
  */
@@ -289,7 +289,7 @@ export function applyLoungeRoomMemory(raw: unknown, previous: readonly LoungeRoo
 // ── The room's record, kept as lists (2026-11-25, by the owner) ──
 /**
  * Until 2026-11-25 the call after each reply wrote the room's 600-character summary again from the one before. A
- * rewrite of a rewrite loses a little each time: in 정하린's room "사용자는 10억 원을 벌었다" was written at turn 36 as a
+ * rewrite of a rewrite loses a little each time: in 차유진's room "사용자는 10억 원을 벌었다" was written at turn 36 as a
  * claim ("주장"), lost its amount at turn 37 and was gone at turn 56, and from turn 63 the summary said the member had lost
  * 280만 원, the opposite. Now each part is kept as it should be: the scene line is written again each turn; what happened
  * is only added to (merged a few old lines at a time when it grows long, never the major ones); 둘 사이 and 남은 것 change
@@ -450,7 +450,7 @@ export function forgetLoungeMemoryLine(ledger: LoungeMemoryLedger, text: string)
 
 // ── The clock (2026-11-25, by the owner) ──
 /**
- * The models were never told the date: 정하린 promised "다음 주 화요일" and, half an hour later on a call, said "오늘이
+ * The models were never told the date: 차유진 promised "다음 주 화요일" and, half an hour later on a call, said "오늘이
  * 화요일이네요, 약속이 바로 오늘이네" (she had guessed), and a gap under three hours was not told at all. Now each turn
  * carries the Korean date and time and how long ago the message before the member's last one was.
  */

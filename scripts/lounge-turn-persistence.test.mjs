@@ -168,7 +168,7 @@ test('a chat saves through the durable turn store: a beta account starts at the 
   // A stored row is the member's own, whatever the flag says.
   const row = { user_id: 'u', character_id: 'teacher', scores: { empathy: 40, romance: 25, tension: 30 }, stage: stages[0].id, pending: { direction: null, turns: 0 }, recent_events: [], memories: [], meaningful_turns: 0, turn_count: 1, last_interaction_at: null, version: 1 };
   assert.equal(turns.reduceLoungeTurn('room', teacher, { ...snapshot, relationship: row }, job({ closestStart: true })).commit.relationship.stage, stages[0].id);
-  // Four turns of "crossing a line" took a stage 4 chat down to 2 (a 정하린 chat, adult05): in adult mode at the closest step they are not scored.
+  // Four turns of "crossing a line" took a stage 4 chat down to 2 (a 차유진 chat, adult05): in adult mode at the closest step they are not scored.
   let record = relationship.createClosestRelationship(teacher);
   const violates = [{ type: 'VIOLATES_BOUNDARY', confidence: 0.95, note: '' }];
   let current = { ...snapshot, relationship: { ...row, scores: record.scores, stage: record.stage, version: 1 } };
@@ -183,10 +183,10 @@ test('a chat saves through the durable turn store: a beta account starts at the 
 
 test('a chat turn answered by the fallback model for the adult model writes no summary, no agreement and nothing on her mind (2026-11-18)', () => {
   const teacher = relationship.getRelationshipConfig('teacher');
-  const job = payload => ({ room_id: 'room', turn: 1, user_text: '안녕하세요.', reply: '미안해요, 방금 장면은 제가 너무 앞서 갔어요. 속도를 늦출게요.', status: 'ready', payload: { companion: true, answer: { memory: '하린이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기' }, ...payload }, created_at: '2026-11-18T00:00:00.000Z', updated_at: '2026-11-18T00:00:00.000Z' });
+  const job = payload => ({ room_id: 'room', turn: 1, user_text: '안녕하세요.', reply: '미안해요, 방금 장면은 제가 너무 앞서 갔어요. 속도를 늦출게요.', status: 'ready', payload: { companion: true, answer: { memory: '유진이 정한 범위를 지키는 것', events: [], lingering: '멈춰 달라는 말을 지켜 주길 바람', next_intent: '접촉을 멈추게 하기' }, ...payload }, created_at: '2026-11-18T00:00:00.000Z', updated_at: '2026-11-18T00:00:00.000Z' });
   const snapshot = { relationship: null, state: null, stateVersion: 0, mood: {} };
   const normal = turns.reduceLoungeTurn('room', teacher, snapshot, job({}));
-  assert.equal(normal.commit.memory, '하린이 정한 범위를 지키는 것'); assert.equal(normal.commit.state.lingering?.what, '멈춰 달라는 말을 지켜 주길 바람');
+  assert.equal(normal.commit.memory, '유진이 정한 범위를 지키는 것'); assert.equal(normal.commit.state.lingering?.what, '멈춰 달라는 말을 지켜 주길 바람');
   const braked = turns.reduceLoungeTurn('room', teacher, snapshot, job({ braked: true }));
   assert.equal(braked.commit.memory, null, 'the summary is not rewritten');
   assert.equal(braked.commit.state.lingering, undefined); assert.equal(braked.commit.state.next_intent, undefined);
@@ -194,10 +194,10 @@ test('a chat turn answered by the fallback model for the adult model writes no s
 });
 
 test('the room\'s record as lists: taken apart once, added to, merged only where ordinary, and written back as one item a line (2026-11-25)', () => {
-  const ledger = m.loungeMemoryLedgerFromSummary('지금 장면: 와인바, 밤\n둘 사이: 해요체를 쓴다. 서로 농담을 주고받는다.\n있었던 일: 사용자는 10억 원을 벌었다. 하린이 축하했다.\n남은 것: 저녁 약속.\n줄거리 없는 한 줄');
+  const ledger = m.loungeMemoryLedgerFromSummary('지금 장면: 와인바, 밤\n둘 사이: 해요체를 쓴다. 서로 농담을 주고받는다.\n있었던 일: 사용자는 10억 원을 벌었다. 유진이 축하했다.\n남은 것: 저녁 약속.\n줄거리 없는 한 줄');
   assert.equal(ledger.scene, '지금 장면: 와인바, 밤');
   assert.deepEqual(ledger.between.map(item => item.id), ['bs0', 'bs1']);
-  assert.deepEqual(ledger.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '하린이 축하했다.']);
+  assert.deepEqual(ledger.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '유진이 축하했다.']);
   assert.deepEqual(ledger.pending.map(item => item.text), ['저녁 약속.', '줄거리 없는 한 줄'], 'an unlabelled line follows the part before it');
   const text = m.loungeMemoryText(ledger);
   assert.deepEqual(text.split('\n').slice(0, 2), ['지금 장면: 와인바, 밤', '둘 사이: 해요체를 쓴다.']);
@@ -207,9 +207,9 @@ test('the room\'s record as lists: taken apart once, added to, merged only where
   const third = m.applyLoungeMemoryLedger(ledger, ops([
     { op: 'add', section: 'events', ref: '', text: '하나', major: false, quote: '' }, { op: 'add', section: 'events', ref: '', text: '둘', major: false, quote: '' },
     { op: 'add', section: 'events', ref: '', text: '셋', major: false, quote: '' }, { op: 'remove', section: 'events', ref: 'es0', text: '', major: false, quote: '' },
-    { op: 'add', section: 'events', ref: '', text: '하린이 축하했다.', major: false, quote: '' },
+    { op: 'add', section: 'events', ref: '', text: '유진이 축하했다.', major: false, quote: '' },
   ]), 7);
-  assert.deepEqual(third.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '하린이 축하했다.', '하나', '둘'], 'two new lines a turn at most, none removed, none twice');
+  assert.deepEqual(third.events.map(item => item.text), ['사용자는 10억 원을 벌었다.', '유진이 축하했다.', '하나', '둘'], 'two new lines a turn at most, none removed, none twice');
   assert.equal(ledger.events.length, 2, 'the lists before are not changed');
 
   const facts = m.applyLoungeMemoryLedger(ledger, ops([
