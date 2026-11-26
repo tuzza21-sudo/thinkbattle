@@ -73,5 +73,21 @@
       "file": "host-interpreter-work-v2.webp",
       "prompt": "{{common}} He gives a one-to-one English lesson at a bright modern hotel lounge cafe in the afternoon: seated at a small marble table, a laptop half open and a notebook with no readable writing, a cup of coffee, leaning forward slightly with a warm encouraging smile. Soft ivory knit over a white shirt collar, a thin silver watch. Nothing readable on any screen, page or sign."
     }
+  },
+  "explorer": {
+    "portrait": {
+      "file": "host-explorer-v1.webp",
+      "prompt": "{{common}} a strikingly beautiful, sexy and magnetic fictional Korean woman, 35, athletic toned 172cm figure with a balanced, feminine silhouette, healthy sun-kissed golden skin with a natural glow, collarbone-length dark brown hair loosely tied back with a few wind-blown strands across her face, vivid confident almond eyes, a short teasing half-smile, full natural lips, a very faint thin scar at the tip of her right eyebrow. She wears a fitted olive-green technical shirt with the top buttons open at the collarbone and sleeves rolled up, under an open, well-worn cobalt-blue windbreaker. Behind her, softly out of focus, a turquoise glacial lake and jagged granite peaks of Patagonia in warm late-afternoon light, the wind lifting her loose hair. She looks straight into the camera like she is about to dare you to keep up. Soft flattering natural light. Elegant magazine-portrait quality, alluring and confident but tasteful, not provocative."
+    },
+    "full": {
+      "portrait": "host-explorer-v1.webp",
+      "file": "host-explorer-full-v1.webp",
+      "prompt": "{{common}} The same strikingly beautiful Korean woman, exactly the same youthful face as the portrait, stands three-quarter length on a windswept rocky trail above a turquoise lake in Torres del Paine. The cobalt windbreaker is tied around her waist; a fitted olive-green technical shirt, top buttons open at the collarbone and sleeves rolled up, shows her toned athletic figure; fitted dark trekking trousers and worn trekking boots, a small worn backpack strap on one shoulder. One hand pushes wind-blown hair back from her face, weight on one hip, a confident teasing smile straight at the camera. Warm golden-hour light, alluring, sexy and athletic but tasteful."
+    },
+    "work": {
+      "portrait": "host-explorer-v1.webp",
+      "file": "host-explorer-work-v1.webp",
+      "prompt": "{{common}} The same strikingly beautiful Korean woman, exactly the same youthful face as the portrait, at work as an expedition documentary filmmaker at a glacier viewpoint at sunrise: kneeling beside a well-used cinema camera on a tripod, she has just looked up from the viewfinder and turns her face toward the camera with a delighted, teasing grin, a pencil and a small weathered field notebook in one hand. Same fitted olive shirt open at the collarbone, cobalt windbreaker, hair loosely tied with strands blowing in the wind. Ice and peaks glowing pink behind her. Nothing readable on any sign or paper."
+    }
   }
 }

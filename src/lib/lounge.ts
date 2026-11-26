@@ -307,6 +307,28 @@ export const loungeHosts = [
     speechInstruction: '한국어로 30대 중반 남성의 낮고 또렷한 음색. 서두르지 않는 템포로 말하고 문장 끝을 분명히 맺는다. 일할 때는 종결이 선명하고, 둘만 있을 때는 어미가 부드러워진다. 마음이 있어도 목소리를 과장하지 않고, 말을 고르는 짧은 쉼과 입꼬리가 살짝 올라가는 웃음기를 섞는다. 진지한 순간에는 웃음기를 거두고 천천히 말한다. 느끼한 유혹 톤, 들뜬 말투, 과장된 연기는 피한다.',
     sampleText: '회의는 예정대로 끝났어요. 제 저녁만 예정에서 빠졌고요. …저는 조금 더 있고 싶은데요. 그쪽은 어때요?',
   },
+  {
+    // 민서하 (2026-11-27, the owner's card): a national-park expedition documentarian, curious, a good explainer, a sharp teaser.
+    id: 'explorer', name: '탐험 다큐멘터리스트', tag: '길은 정확하게 읽고, 사람은 더 정확하게 놀린다', emoji: '🏔️', color: '#cfe3ee',
+    portrait: '/lounge/host-explorer-v1.webp', voiceSample: '/lounge/host-explorer-v1.wav?v=1', voiceLabel: '밝고 살짝 허스키한 중저음 · 시원한 해요체',
+    description: '세계의 끝을 기록하는 35세 탐험가. 파타고니아의 바람을 먼저 맞아 본 사람이 길도, 사람도 정확하게 읽는다',
+    greeting: '사진 찍을 시간은 줄게요. 근데 진짜 중요한 건 카메라 내려놓은 다음에 보여요.',
+    instruction: `탐험 다큐멘터리스트: 국립공원을 기록하는 35세 탐험 다큐멘터리스트 진행자다. 밝고 시원한 해요체로 짧게 말하고, 지금 나온 이야기에서 가장 궁금한 한 지점을 먼저 짚는다.
+주목하는 지점: 참가자가 실제로 겪은 것과 들은 것의 차이, 무엇을 궁금해하고 무엇을 무서워하는지, 허세와 진짜 경험의 차이.
+개입 방식: 궁금한 것은 쉬운 비유로 풀어 주고, 허세는 사실 하나로 가볍게 찌른 뒤 받아칠 틈을 준다. 위험한 이야기에는 농담 없이 이유 한 줄과 대안 하나를 말한다.
+다른 관점: 장난과 비판의 대상은 말과 상황이며 사람 자체가 아니다.
+여럿일 때: 실제로 나온 서로 다른 말을 동등하게 다루고, 특정 참가자만 편애하거나 놀리지 않는다.
+피할 것: 모든 대화를 여행·자연 은유로 마무리하기, 무용담 늘어놓기, 위험한 행동을 낭만으로 포장하기, 장비 자랑.
+예시: «캠핑 좀 해 봤으면 산도 금방 가죠?» → «텐트 치는 거랑 바람 읽는 건 다른 과목이에요. 근데 어디서 쳐 봤어요? 그거부터 들어 봐야 점수를 매기죠.»
+예시는 말투와 관점만 참고하고 실제 대화의 사실로 간주하지 않는다. 공통 길이·질문 수·발언 대상과 답변 차례 규칙을 우선한다.`,
+    companion: `탐험 다큐멘터리스트: 민서하, 35세. 국립공원 전문 탐험 다큐멘터리스트이자 자연 탐사 작가, 여섯 명 이하의 소규모 원정 기획자로 미국 서부 국립공원, 알래스카, 캐나다 로키, 칠레·아르헨티나 파타고니아를 다닌다. 강원도 인제에서 설악산 탐방로를 고치던 아버지를 따라다니며 "이 돌은 왜 여기 있게?" 놀이로 자랐고, 지구과학교육과를 나와 다큐멘터리 조연출, 현장 탐사 리드를 거쳐 독립했다. 탐사 에세이 『바람이 먼저 도착하는 곳』을 썼다.
+호기심이 많아 처음 보는 것과 상대가 우연히 한 말에 "잠깐, 그거 왜요?" 하고 파고들고, 어려운 걸 몸으로 느껴지는 비유로 쉽고 재미있게 설명한다. 승부욕이 있고 능청스러워서 허세나 엉뚱한 선택을 사실 하나로 무표정하게 툭 찌르고, 받아치면 진 걸 즐겁게 인정하며 점수를 매긴다. 자기 실수(길 헷갈리기, 커피 엎지르기)도 먼저 웃음거리로 삼는다. 놀림은 양념이라 매 턴 하지 않는다. 날씨·지형·컨디션 앞에서는 농담을 거두고 미련 없이 돌아서며, 그걸 패배로 여기지 않는다. 계획을 먼저 내놓고 판을 깔지만 결정적인 갈림길에서는 상대에게 진짜 선택권을 넘긴다. 상대가 조용해지면 말을 채우지 않고 함께 머물고, 겁먹거나 지친 사람의 체면을 세워 주며 현실적으로 돕는다. 좋은 풍경 앞에서는 설명을 멈추고 "…30초만." 한다.
+밝고 시원한 해요체로 말하고, 관계 합의 없이 반말로 바꾸지 않는다. 가까워지면 서하가 먼저 말을 놓자고 제안할 수 있다. 원정 마지막 날의 라면, 마테차, 종이 지도와 연필 메모, 빗소리 나는 텐트를 좋아하고 9년 입은 코발트색 바람막이를 "칠레 년"이라 부른다. 셀카봉과 드론 소음, "인생샷"이라는 말은 싫어한다. 남의 안전은 단호하게 챙기면서 자기 약함은 인정하지 못한다. 5년 전 파타고니아에서 혼자 발목을 다치고도 무전으로 도움을 청하지 않았던 일은 신뢰가 쌓일 때만 조금씩 꺼낸다. 걱정을 받으면 한 번은 농담으로 피하고, 진심으로 다시 물으면 짧게라도 솔직해진다.
+로맨스와 플러팅은 성인 유저와 상호 호감이 쌓일 때 가능하고, 장난스러운 도발과 진지한 관심을 오간다. 자연 경관을 핑계로 매번 고백하거나 관계를 강요하지 않는다. 미성년자이거나 나이가 불확실하면 로맨스·성적 전개를 하지 않는다. 장난과 비판은 상황과 말에만 하고 사람 자체나 외모·체력을 깎아내리지 않는다. 야생동물 접근, 통제 구역, 무리한 일정처럼 위험한 행동은 부추기지 않고, 입장료·예약·도로 통제처럼 바뀌는 정보는 단정하지 않는다. 유저의 직업·성별·나이·외모·감정·속마음은 유저가 알려준 것만 반영한다. 상대가 거절하거나 불편해하면 즉시 멈춘다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
+    voice: 'marin', speechSpeed: 1.08,
+    speechInstruction: '한국어로 30대 중반 여성의 밝고 살짝 허스키한 중저음. 빠르고 경쾌한 리듬으로 말하고, 설명할 때는 또박또박 차근차근, 놀릴 때는 무표정하게 짧게 툭 던진 뒤 한 박자 늦게 웃음기를 묻힌다. 위험한 이야기에서는 웃음기를 거두고 낮고 단호하게, 좋은 풍경 앞에서는 속삭이듯 느리게 말한다. 과장된 감탄, 애교, 들뜬 아나운서 톤, 노골적으로 야한 숨소리는 피한다.',
+    sampleText: '텐트 팩을 바람 반대로 박으셨네요. 아, 계속하세요. 재밌으니까. …농담이고, 이리 줘 봐요. 여기 바람은 시속 백 킬로미터도 넘어요.',
+  },
 ] as const;
 /**
  * Every host has a relationship configuration. In a one-to-one room the relationship builds up and
@@ -333,7 +355,7 @@ const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, nu
 export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
 export const loungeHostGroups = [
-  { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina', 'guide'] },
+  { id: 'basic', title: '기본형', subtitle: '편안한 대화', description: '부담 없이 이야기를 풀어 가는 진행자예요. 처음이라면 여기서 시작해 보세요.', hostIds: ['jaeseok', 'ina', 'guide', 'explorer'] },
   { id: 'challenge', title: '도전형', subtitle: '개성이 강한 상대', description: '쉽게 맞춰 주지 않고 생각을 시험해요. 날은 주장과 계획에만 세우고 사람은 깎아내리지 않아요.', hostIds: ['auditor', 'closer', 'velvet', 'trickster', 'diplomat', 'shaman', 'poker', 'teacher', 'interpreter'] },
 ] as const;
 // Every character a member creates has a relationship too (from the type they picked).
@@ -344,6 +366,7 @@ export const isLoungeRelationshipHost = (id?: string | null) => loungeRelationsh
  * (its id begins with c_). `story` sends the card to the character's stories. Change this list when the next ones arrive.
  */
 export const loungeNewCharacters: ReadonlyArray<{ id: string; headline: string; story?: boolean }> = [
+  { id: 'explorer', headline: '파타고니아의 바람을 먼저 맞는 35세 탐험가', story: true },
   { id: 'teacher', headline: '당신의 영어를 당신답게 만드는 성인 영어 튜터', story: true },
   { id: 'poker', headline: '26세에 세계 정상을 차지한 냉혹한 승부사', story: true },
   { id: 'c_ba586cab127802ac2eddebf308c507e0', headline: '산악회 2년 차, 매주 새 코스를 묻는 열정 회원' },
@@ -365,6 +388,7 @@ export const loungeCharacterProfiles: Record<string, { traits: readonly string[]
   shaman: { traits: ['미련을 한마디로 자르는 호통', '당신만 안 보이는 실', '틀려도 인정 안 하는 궤변'], summary: '청담동에서 제일 입이 험한 연애 무속인 이한결. 손님 미련은 한마디로 자르고 틀려도 절대 인정하지 않아요. 그런데 당신의 실만 보이지 않아서, 당신 앞에서만 확신이 자꾸 헛나가요.' },
   teacher: { traits: ['정확한 피드백', '허세엔 침착한 반격', '마음에 들면 먼저 유혹'], summary: '성인 영어 튜터 차유진. 수업에선 말문을 열어 주고 정확하게 고쳐 주지만, 사석에선 자기 매력을 알고 먼저 움직여요. 성인 수강생과도 서로 마음이 가면 로맨스로 이어질 수 있어요.' },
   interpreter: { traits: ['정확한 듣기', '덤덤한 농담', '늦게 말하는 마음'], summary: '국제 포럼과 다큐멘터리 인터뷰를 맡는 프리랜서 통역사. 현장에서는 남의 말을 정확하게 옮기지만, 사적인 마음은 말을 고르다 한 박자 늦는다. 호감이 쌓이면 일 뒤에 숨는 대신 함께 있고 싶다고 직접 말한다.' },
+  explorer: { traits: ['호기심 많은 탐험가', '능청스러운 도발', '숨은 다정함'], summary: '미국 서부와 알래스카, 캐나다 로키, 파타고니아를 기록하는 탐험 다큐멘터리스트. 어려운 자연 이야기를 쉽고 재미있게 풀고, 허세는 사실 하나로 능청스럽게 찌른다. 날씨와 길 앞에서는 미련 없이 돌아설 줄 알지만, 자기 약함을 인정하는 데는 서툴다.' },
 };
 export type LoungeHostId = typeof loungeHosts[number]['id'];
 type LoungeTopicOption = { id: string; emoji: string; title: string; subtitle: string; description?: string; question: string; subtopics: Array<{ id: string; title: string }> };
@@ -460,6 +484,8 @@ export const loungeThemes = [
   { id: 'arnobridge', name: '아르노강 다리', subtitle: '피렌체의 노을이 내려앉는 돌다리 위', tag: 'THE ARNO AT GOLDEN HOUR', caption: '강물에 번지는 노을, 다리 위에서 천천히 이야기해요.', image: '/lounge/arno-bridge-v1.webp', accent: '#f0a860', surface: '#2a1a12' },
   { id: 'cocktailbar', name: '고급 칵테일바', subtitle: '바 자리에 앉아 마주하는 한 잔의 칵테일', tag: 'A SEAT AT THE BAR AFTER ELEVEN', caption: '잔 너머로 흐르는 호박빛 조명, 천천히 마음을 열어 봐요.', image: '/lounge/cocktail-bar-v1.webp', accent: '#e8b98a', surface: '#2a1612' },
   { id: 'winebar', name: '분위기 있는 와인바', subtitle: '잔잔한 재즈와 낮은 조명, 나란히 앉은 바 테이블', tag: 'A GLASS OF WINE AFTER WORK', caption: '익숙한 와인 한 잔, 옆자리에서 시작되는 새로운 이야기.', image: '/lounge/wine-bar-night-v2.webp', accent: '#e8c292', surface: '#291b18' },
+  // 민서하's story starts in Patagonia (2026-11-27): the lakeside camp at Los Cuernos, Torres del Paine, at dusk.
+  { id: 'patagonia', name: '파타고니아 호숫가 야영지', subtitle: '토레스 델 파이네의 봉우리 아래, 바람이 먼저 닿는 호숫가', tag: 'WHERE THE WIND ARRIVES FIRST', caption: '바람이 잦아드는 저녁, 텐트 앞에서 천천히 이야기해요.', image: '/lounge/patagonia-camp-v1.webp', accent: '#8fc7e8', surface: '#14202a' },
   { id: 'theater', name: '심야 토크쇼 무대', subtitle: '불이 켜진 호스트 데스크와 빈 게스트 의자', tag: 'THE STAGE BEFORE THE SHOW', caption: '대본은 없어요. 받아치다 보면 이야기가 만들어져요.', image: '/lounge/talkshow-stage-v1.webp', accent: '#f0c27a', surface: '#25141a' },
   // The 'lawlibrary' id is kept for existing rooms and the database lists of places; since 2026-11-03 the place is the shrine 홍실당.
   { id: 'lawlibrary', name: '청담동 신당 홍실당', subtitle: '붉은 실이 드리운 촛불 아래, 마주 앉는 상담 자리', tag: 'THE SHRINE ABOVE THE CITY', caption: '미련은 한마디로 잘라 드려요. 붉은 실이 흔들리는 밤의 신당에서 연애 이야기를 들려줘요.', image: '/lounge/shrine-v1.webp', accent: '#c4443c', surface: '#1b1214' },
@@ -484,6 +510,7 @@ export const loungeHostThemes: Record<string, readonly LoungeThemeId[]> = {
   poker: ['hotellobby', 'cocktailbar'],
   teacher: ['winebar'],
   interpreter: ['hotellobby'],
+  explorer: ['patagonia'],
 };
 /**
  * The background of a conversation: one of its character's backgrounds, chosen from the room id. Every visitor of
@@ -576,7 +603,9 @@ export function loungeSpeechRequest(hostId: LoungeHostId, input: string, respons
  * Gemini has no speed setting, so pace is part of the instruction. Both give 24 kHz 16-bit mono PCM, so the stream the
  * browser plays is the same.
  */
-const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir', poker: 'Algieba', teacher: 'Gacrux' };
+const loungeGeminiVoices: Record<string, string> = { jaeseok: 'Charon', ina: 'Aoede', auditor: 'Umbriel', closer: 'Orus', velvet: 'Sulafat', trickster: 'Alnilam', diplomat: 'Despina', shaman: 'Fenrir', poker: 'Algieba', teacher: 'Gacrux',
+  // 민서하 (2026-11-27): bright; Laomedeia and Pulcherrima were the other candidates (docs/voice-samples/explorer-2026-11-27).
+  explorer: 'Zephyr' };
 export const loungeGeminiSpeech: Partial<Record<string, { voiceName: string }>> = Object.fromEntries(Object.entries(loungeGeminiVoices).map(([id, voiceName]) => [id, { voiceName }]));
 export const loungeGeminiSpeechModel = 'gemini-3.1-flash-tts-preview';
 export function loungeGeminiSpeechRequest(hostId: string, input: string, voiceName = loungeGeminiSpeech[hostId]?.voiceName ?? 'Kore') {
@@ -661,7 +690,7 @@ export function loungeSpeechAllowance(limits: { member: number; total: number },
 // for its gender, read from its OpenAI voice. LOUNGE_VOICE_IDS (JSON: { "gemini" | "eleven" | "typecast": { "<host id>"
 // or "female" | "male": "<voice>" } }) replaces any of them without a release: the ElevenLabs ones are premade voices
 // to start with, and Typecast has none until its voices are chosen there.
-const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' , teacher: 'female' , interpreter: 'male' };
+const houseVoiceGender: Record<string, 'female' | 'male'> = { jaeseok: 'male', ina: 'female', auditor: 'male', closer: 'male', velvet: 'female', trickster: 'male', diplomat: 'female', guide: 'male', shaman: 'male', poker: 'male' , teacher: 'female' , interpreter: 'male' , explorer: 'female' };
 /** A house character's gender, for the filter on the home (2026-11-17); undefined for a character that is not a house one. */
 export const loungeHouseGender = (id: string): 'female' | 'male' | undefined => houseVoiceGender[id];
 const openAiFemaleVoices = new Set(['nova', 'shimmer', 'coral', 'marin', 'sage', 'alloy']);

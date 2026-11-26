@@ -41,6 +41,11 @@ const scenes = {
     file: 'museum-gallery-v1.webp',
     prompt: `${common} A quiet modern art museum gallery after closing: tall white walls and a polished pale wooden floor, a long upholstered viewing bench in the middle of the room, framed paintings hung far apart and slightly out of focus with no readable labels, soft gallery spotlights from a high ceiling, a doorway opening to the next gallery room, calm and contemplative.`,
   },
+  // 민서하's story starts in Patagonia (2026-11-27): a lakeside camp under the Cuernos del Paine at dusk. Outdoors, so not the interior wording.
+  patagonia: {
+    file: 'patagonia-camp-v1.webp',
+    prompt: 'Use case: photorealistic-natural. Asset type: wide 3:2 background photograph for a voice conversation app, an empty, inviting outdoor scene with no people. Premium editorial travel photography, natural light, realistic textures, shallow depth of field with the foreground softly out of focus. A small lakeside campsite in Torres del Paine, Patagonia, at dusk: in the foreground a weathered olive-green two-person tent with its door open, a small camping stove and two enamel mugs on a flat stone, a coiled rope; beyond it the turquoise glacial lake Nordenskjold with wind-ruffled water, and the dramatic dark-capped granite horns of the Cuernos del Paine glowing pink and gold in the last sun, long streaming lenticular clouds, low windswept shrubs and grass bent by the wind. Calm, wild and intimate, no campfire, no text, no logos, no people.',
+  },
   arnobridge: {
     file: 'arno-bridge-v1.webp',
     prompt: `${common} The Arno river in Florence at golden hour, seen from an old stone arch bridge: a worn stone parapet in the foreground, the calm river reflecting a warm orange and pink sky, terracotta-roofed buildings and a distant medieval bridge with small shops along the water, a few swallows in the sky, soft haze. Warm, peaceful, no people, no cars. Nothing readable on any sign.`,
