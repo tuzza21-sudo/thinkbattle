@@ -4,7 +4,7 @@ import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdu
 import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeOpenrouterAnswersAdult, loungeOpenrouterModelFor, loungeRaccoonUrl, loungeRoomChatModelId } from '../src/lib/loungeModels';
-import { loungeClock, loungeClockRule, loungeMemoryLedgerFromSummary, loungeMemoryLedgerForRecorder, loungeMemoryLedgerInstructions, loungeMemoryLedgerSchema, loungeMemoryLedgerFields, loungeMemoryText, applyLoungeMemoryLedger, forgetLoungeMemoryLine, loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeOwnWordsRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
+import { loungePracticeRecent, loungePracticeReplySchema, loungePracticeRules, loungeClock, loungeClockRule, loungeMemoryLedgerFromSummary, loungeMemoryLedgerForRecorder, loungeMemoryLedgerInstructions, loungeMemoryLedgerSchema, loungeMemoryLedgerFields, loungeMemoryText, applyLoungeMemoryLedger, forgetLoungeMemoryLine, loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomMemoryInstructions, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeOwnWordsRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate } from '../src/lib/loungeMessenger';
 import { loungeScenarioCasualStart, loungeScenarioRelationshipContext, normalizeLoungeRoomScenario } from '../src/lib/loungeScenarios';
 import { advanceLoungeConsult, isLoungeConsultRoom, loungeConsultFormInput, loungeConsultRules, loungeConsultSajuInput, loungeInterpreterRequest, loungeReadingSchema, readLoungeConsultState, readLoungeReading, withLoungeReading, type LoungeConsultState } from '../src/lib/loungeConsult';
 import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLoungeZodiac } from '../src/lib/loungeSaju';
@@ -17,7 +17,7 @@ import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNeg
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
-import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
+import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonPlanOrder, loungeLessonHintText, loungeLessonSkipText, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
 /** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
@@ -1192,6 +1192,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       fetchTimed(`${url}/rest/v1/lounge_english_profiles?user_id=eq.${encodeURIComponent(user.id)}&select=*`, { headers: serviceHeaders })
         .then(async response => readLoungeLessonProfile(response.ok ? (await readJson<unknown[]>(response, 'lounge'))[0] : undefined)),
     ]).catch(() => undefined) : undefined;
+    // A lesson, a training or a class: its content comes from code, so the character's knowledge is not looked up.
+    const practiceHost = !room.space_id && (isLoungeTutor(room.host_persona) || isLoungeTrainer(room.host_persona) || isLoungeClass(room.host_persona));
     // A one-to-one chat: replies are text only, so no speech is made.
     const chat = isLoungeChatRoom(room);
     // Enable the larger private-chat limit only after its database migration. Older databases keep accepting replies.
@@ -1205,7 +1207,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     // and a slow or failing lookup is dropped after a short wait so it can never hold the reply back.
     let knowledgeAttempted = false;
     const knowledgeRead = (async (): Promise<LoungeKnowledgeEntry[]> => {
-      if (callTurn) return [];
+      if (callTurn || practiceHost) return [];
       const query = await lookupQuery;
       if (!query || !serviceHeaders || process.env.LOUNGE_KNOWLEDGE === 'off') return [];
       const started = performance.now();
@@ -1442,7 +1444,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     if (adultMode && typeof relationshipSteady.intimacy === 'string') relationshipSteady.intimacy = relationshipAdultModeText(relationshipSteady.intimacy);
     if (companionState && loungeRoomSpeechLevel(companionState)) Object.assign(relationshipSteady, { speech_level: loungeRoomSpeechLevel(companionState) });
     const relationshipChanging = { metrics: relationshipMetricsNow, mood: relationshipMoodNow, memories: relationshipMemoriesNow };
-    const contextRecent = solo && chat ? recent.slice(-memoryLimits.recent) : recent;
+    const contextRecent = solo && chat ? recent.slice(-(practiceRoom ? loungePracticeRecent : memoryLimits.recent)) : recent;
     // A one-to-one chat keeps six recent messages in full and up to 1,000 characters of older ones; a shared room keeps 300.
     const olderLimit = solo && chat ? 1000 : 300;
     const turnMessages = loungeTurnMessages(contextRecent.map(message => ({ kind: message.kind, text: message.kind === 'host' ? splitLoungeInnerVoice(message.text).reply : message.text })));
@@ -1605,17 +1607,19 @@ ${photoRule}`;
       const now = new Date(), today = loungeLessonDay(now);
       const prior = readLoungeLessonState(room.story_state);
       const plan: string[] = [];
-      if (!prior || prior.day !== today) {
-        // A new day: reviews due and the member's new expressions first, then the tutor's own ones of the member's level.
+      if (!prior || prior.day !== today || prior.order !== loungeLessonPlanOrder) {
+        // A new day (or the rest of one planned the older way): the marked ones, the member's own not practised yet by
+        // priority, then the tutor's own of the member's level, and one or two reviews last (2026-11-27, by the owner).
         const planned = planLoungeLesson(items, now);
-        plan.push(...planned.queue);
+        plan.push(...planned.queue.filter(id => !planned.reviews.includes(id)));
         const added = loungeLessonPackFor(level, items, planned.pack);
         if (added.length) {
           const response = await fetchTimed(`${url}/rest/v1/lounge_english_items?on_conflict=user_id,expression_key`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=ignore-duplicates,return=representation' },
             body: JSON.stringify(added.map(entry => ({ user_id: user.id, expression: entry.expression, meaning: entry.meaning, level: entry.level, source: 'tutor', pack_id: entry.id }))) }).catch(() => undefined);
-          const rows = response?.ok ? await readJson<LoungeLessonItem[]>(response, 'lounge') : [];
+          const rows = response?.ok ? await readJson<LoungeLessonItem[] | null>(response, 'lounge') ?? [] : [];
           items.push(...rows); plan.push(...rows.map(row => row.id));
         }
+        plan.push(...planned.reviews);
       }
       const opening = body.reason === 'opening' && !lastHuman;
       const current = prior?.day === today ? prior.current : undefined;
@@ -1625,7 +1629,9 @@ ${photoRule}`;
       const today_ = new Set([...(prior?.day === today ? [...prior.queue, ...prior.done.map(done => done.id)] : []), ...plan]);
       const others = items.filter(item => today_.has(item.id) || item.stage >= 3);
       const graded = performance.now();
-      const grade = !opening && lastHuman ? await (async () => {
+      // The task card's buttons send fixed words: what they mean is known, so the grader is not asked (about 2 s a turn).
+      const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : undefined;
+      const grade = !opening && lastHuman ? button ? { target: 'not_used' as const, intent: button, free_used: [], errors: [], better: '', polished: '', keep: '', keep_meaning: '' } : await (async () => {
         try {
           const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
             model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 2000 : 800, store: false, prompt_cache_key: 'lounge-lesson-grade',
@@ -1830,12 +1836,13 @@ ${photoRule}`;
       instructions: [
         // Stable cache prefix: identical every turn for the same character, inner-voice setting, room mode and adult flag.
         `${persona ? `${persona}\n${solo ? loungeOneToOneCharacterRules : loungeCharacterRules}\n` : '한국어 소규모 음성 대화방에서 이야기하는 캐릭터다. '}실제 유명인 본인인 척하거나 실제 목소리를 흉내 내지 않는다. ${solo ? '사람의 가치나 인격은 평가하지 않는다.' : relationship ? '사람의 가치나 인격은 평가하지 않는다. 주장·논리·전략·행동은 캐릭터의 방식대로 평가하고 반박할 수 있다.' : '참가자를 평가하지 않는다.'}`,
-        ...(solo ? [loungeContinuityRule, loungeOwnWordsRule, loungeClockRule] : []),
+        // A practice room grades and sets conditions by design: the companion's "no conditions, no scores" rule is not its.
+        ...(solo ? [loungeContinuityRule, ...(practiceRoom ? [] : [loungeOwnWordsRule]), loungeClockRule] : []),
         ...(story || messenger ? [] : solo ? topicRoom ? [topicRules] : [] : [reactionRules, topicRules]), closingRules,
         story ? `memory는 지금까지의 이야기 기록이다. 첫 줄의 '지금 장면'에서 이어 가고, '둘 사이'의 마음과 줄거리를 기억해 이야기를 앞으로 움직인다.`
           : split ? `memory는 지금까지 나눈 대화의 요약이다. 첫 줄이 '지금 장면: '으로 시작하면 그 상황극 장면이 이어지는 중이다.` : memoryRules,
         relationship ? (text => adultMode ? relationshipAdultModeText(text) : text)((split ? relationshipReplyInstructionsFor : relationshipResponseInstructionsFor)(relationship.config)) : '',
-        messenger ? messengerInstruction : story ? [storyInstruction, soloInputFieldRules, loungeStoryEpisodeInstructions].join('\n')
+        messenger ? practiceRoom ? `${loungePracticeRules}\n${loungeMemberPersonaRule}` : messengerInstruction : story ? [storyInstruction, soloInputFieldRules, loungeStoryEpisodeInstructions].join('\n')
           : [roleInstruction, ...(solo && !room.space_id ? [soloInputFieldRules] : [])].filter(Boolean).join('\n'),
         consultRoom ? loungeConsultRules : '',
         lessonRoom ? loungeLessonRules : '',
@@ -1849,7 +1856,7 @@ ${photoRule}`;
       // Without the split, relationship characters classify the user's latest behaviour in this same call.
       // Finish a companion's context with what was actually said, rather than an older intention or a retrieved card.
       input: JSON.stringify({ ...(split && chat ? { photos: chatPhotos } : {}), ...(messenger && memberName ? { member_name: memberName } : {}), ...context, ...(lessonPrompt ? { lesson: lessonPrompt } : {}), ...(trainingTurn ? { training: trainingTurn.prompt } : {}), ...(classTurn ? { class: classTurn.prompt } : {}), ...(replyTo ? { reply_to: replyTo } : {}), ...(analysis ? { reading: loungeReading(analysis) } : {}), ...(turnConditions ? { turn: turnConditions } : adultCallText ? { turn: { intimacy: { explicit: adultCallText } } } : {}), ...(direction && !consulting ? { direction } : {}), ...(consult ? { consult: consult.turn } : {}), ...(knowledgeText ? { character_knowledge: knowledgeText } : {}), ...(messenger ? { ...(voiceExamples.length ? { voice_examples: voiceExamples } : {}), latest: context.recent.at(-1) } : {}) }), text: { format: { type: 'json_schema', name: 'lounge_host', strict: true, schema: messenger
-        ? loungeCompanionReplySchema
+        ? practiceRoom ? loungePracticeReplySchema : loungeCompanionReplySchema
         : split ? { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false }
         : relationship
           ? writesMemory
@@ -2480,7 +2487,10 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
                 response_format: router && chatModel.id === 'claude-haiku' ? { type: 'json_schema', json_schema: { name: modelRequest.text.format.name, strict: true, schema: modelRequest.text.format.schema } } : { type: 'json_object' },
                 max_tokens: modelRequest.max_output_tokens,
                 messages: [
-                  { role: 'system', content: `${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}` },
+                  { role: 'system', content: (system => router && chatModel.id === 'claude-haiku'
+                    // 하이쿠 read its whole prompt anew every turn (2026-11-27: about 24,000 tokens, none cached): Claude keeps a
+                    // prompt only where it is marked, so the system prompt, the same every turn of a room, is marked.
+                    ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system)(`${modelRequest.instructions}${note ? `\n${note}` : ''}\n답은 이 JSON 스키마를 따르는 json 객체 하나로만 쓴다: ${JSON.stringify(modelRequest.text.format.schema)}`) },
                   { role: 'user', content: adultReply ? loungeAdultModelInput(modelRequest.input) : modelRequest.input },
                 ],
               }),
