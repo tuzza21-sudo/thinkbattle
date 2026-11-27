@@ -45,6 +45,74 @@ test('agreements require evidence from both speakers; fabricated evidence never 
   assert.equal(m.loungeRoomSpeechLevel({ room_memory: next }), 'polite');
   assert.equal(next.filter(item => item.status === 'active' && item.speech_level).length, 1);
 });
+
+test('a character boundary survives pressure and only its owner can change it with fresh evidence', () => {
+  const boundary = { op: 'add', ref: '', kind: 'boundary', summary: '지안은 아직 사귀는 관계를 정하지 않겠다고 했다', human_quote: '', character_quote: '난 아직 친구 다음을 정한 적은 없어.', speech_level: '' };
+  const saved = m.applyLoungeRoomMemory([boundary], [], 1, '그냥 사귀자.', boundary.character_quote);
+  assert.equal(saved.length, 1);
+  const pressure = { ...boundary, op: 'resolve', ref: saved[0].id, human_quote: '그냥 사귀자니까.', character_quote: '' };
+  const held = m.applyLoungeRoomMemory([pressure], saved, 2, pressure.human_quote, '내 생각은 그대로야.');
+  assert.equal(held[0].status, 'active');
+  const staleAcceptance = m.applyLoungeRoomMemory([{ ...pressure, human_quote: '', character_quote: boundary.character_quote }], saved, 2, '빨리 답해.', '오늘은 여기까지야.', [{ kind: 'host', text: boundary.character_quote }]);
+  assert.equal(staleAcceptance[0].status, 'active', 'a quote from an earlier turn cannot change its owner’s current boundary');
+  const accepted = m.applyLoungeRoomMemory([{ ...pressure, human_quote: '', character_quote: '이젠 나도 너랑 사귀고 싶어.' }], held, 3, '생각해 봤어?', '이젠 나도 너랑 사귀고 싶어.');
+  assert.equal(accepted[0].status, 'resolved');
+  assert.deepEqual(m.applyLoungeRoomMemory([{ ...boundary, character_quote: '없는 대사' }], [], 1, '안녕', '반가워'), []);
+});
+
+test('new relationship agreements need both speakers and do not open physical intimacy or raise the stage', () => {
+  const agreement = { ...op(), summary: '서로 사귀기로 합의했다', human_quote: '사귀자.', character_quote: '나도 사귀고 싶어.', speech_level: '' };
+  assert.deepEqual(m.applyLoungeRoomMemory([{ ...agreement, character_quote: '' }], [], 1, '사귀자.', '아직은 생각할게.'), []);
+  const diplomat = relationship.getRelationshipConfig('diplomat');
+  const { commit } = turns.reduceLoungeTurn('room', diplomat, { state: null, stateVersion: 0, relationship: null, mood: {} }, {
+    room_id: 'room', turn: 1, user_text: '사귀자.', reply: '나도 사귀고 싶어.', status: 'ready', created_at: '2026-11-27T00:00:00Z',
+    payload: { answer: { room_memory_ops: [agreement], events: [] } },
+  });
+  assert.equal(commit.state.room_memory[0].summary, agreement.summary);
+  assert.equal(commit.relationship.stage, 'FIRST_IMPRESSION');
+  assert.equal(commit.state.intimacy_boost, undefined);
+});
+
+test('a corrected visit replaces the old pending plan, survives an unrelated turn, and scores no playful victory', () => {
+  const closer = relationship.getRelationshipConfig('closer');
+  const previous = { room_id: 'room', source_turn: 8, memory_ledger: { scene: '지금 장면: 사무실', events: [], member: [], between: [{ id: 'b', text: '6개월 계약에 서명했다', turn: 1 }], pending: [{ id: 'p', text: '무진이 집 앞으로 데리러 간다', turn: 6 }] } };
+  const human = '아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.';
+  const reply = '내가 잘못 말했네요. 당신 집으로 갈게요.';
+  const summary = '지금 장면: 사무실\n둘 사이: 6개월 계약에 서명했다\n있었던 일: 무진이 방문하는 것으로 정정했다\n남은 것: 무진이 사용자 집으로 가족 식사에 간다';
+  const { commit } = turns.reduceLoungeTurn('room', closer, { state: previous, stateVersion: 8, relationship: null, mood: {} }, {
+    room_id: 'room', turn: 9, user_text: human, reply, status: 'ready', created_at: '2026-11-27T00:00:00Z',
+    payload: { analysis: { is_repair_request: true }, answer: { memory: summary, events: [{ type: 'ADMITS_ERROR', confidence: 0.95, note: '캐릭터의 오류 인정을 사용자 행동으로 착각' }, { type: 'MAKES_WITTY_RESPONSE', confidence: 0.95, note: '받아침' }, { type: 'FLIRTS_PLAYFULLY', confidence: 0.95, note: '호감' }],
+      room_memory_ops: [{ ...op(), kind: 'correction', summary: '무진이 사용자를 데리러 가는 것이 아니라 사용자 집으로 방문한다', human_quote: human, character_quote: reply, speech_level: '' }] } },
+  });
+  assert.deepEqual(commit.relationship.scores, closer.initial);
+  assert.deepEqual(commit.state.memory_ledger.between, previous.memory_ledger.between, 'unchanged contract facts keep their identity');
+  assert.match(commit.state.memory_ledger.pending[0].text, /사용자 집으로/);
+  assert.doesNotMatch(JSON.stringify(commit.state.memory_ledger), /데리러/);
+  assert.equal(m.loungeRoomMemoryForPrompt(commit.state.room_memory)[0].kind, 'correction');
+  const next = m.nextLoungeCompanionState({ state: m.normalizeLoungeCompanionState(commit.state, 'room'), turn: 10, decision: { progress: 'stay' }, reply: '그래요.', inner: '', userText: '차 마셔요.', update: {} });
+  assert.deepEqual(next.memory_ledger, commit.state.memory_ledger, 'missing recording does not erase the structured memory');
+  const done = m.nextLoungeCompanionState({ state: next, turn: 11, decision: { progress: 'stay' }, reply: '식사 잘했어요.', inner: '', userText: '오늘 식사 끝났어요.', update: { memory: '지금 장면: 집 앞\n둘 사이: 6개월 계약에 서명했다\n있었던 일: 가족 식사를 마쳤다\n남은 것: 없음' } });
+  assert.deepEqual(done.memory_ledger.pending, [], 'a finished plan does not survive as an old pending row');
+  assert.equal(m.normalizeLoungeCompanionState(done, 'new-room').memory_ledger, undefined);
+});
+
+test('forgetting a structured summary entry prevents it from returning through legacy state', () => {
+  const raw = { room_id: 'room', memory_ledger: { scene: '지금 장면: 카페', events: [], member: [], between: [{ id: 'b', text: '같이 영화를 봤다', turn: 1 }], pending: [] }, forgotten: ['둘 사이: 같이 영화를 봤다'] };
+  assert.deepEqual(m.normalizeLoungeCompanionState(raw, 'room').memory_ledger.between, []);
+});
+
+test('an unanswered shared invitation cannot become a pending task, while a real mutual plan is retained', () => {
+  const memory = '지금 장면: 집 앞 차 안\n둘 사이: 사귀기로 합의했다\n있었던 일: 오늘부터 1일이라고 확인했다\n남은 것: 첫 데이트 메뉴 정하기';
+  assert.match(m.loungeSummaryWithGroundedPlans({ memory, plans: [], human: '오늘부터 1일이야?', reply: '응. 차에서 내려 메뉴나 정하자.' }), /남은 것: 없음$/);
+  const fake = [{ ref: '', summary: '함께 메뉴를 정하기', human_quote: '좋아. 메뉴 정하자.', character_quote: '메뉴 정하자.' }];
+  assert.match(m.loungeSummaryWithGroundedPlans({ memory, plans: fake, human: '오늘부터 1일이야?', reply: '메뉴 정하자.' }), /남은 것: 없음$/);
+  const plan = { ref: '', summary: '내일 저녁 사용자 집에서 가족과 식사한다', human_quote: '내일 우리 집에서 저녁 먹어요.', character_quote: '좋아요. 내일 저녁 당신 집으로 갈게요.' };
+  const saved = m.loungeSummaryWithGroundedPlans({ memory, plans: [plan], human: plan.human_quote, reply: plan.character_quote });
+  assert.match(saved, /남은 것: 내일 저녁 사용자 집에서 가족과 식사한다$/);
+  assert.doesNotMatch(saved, /메뉴 정하기/);
+  const previous = { scene: '', events: [], between: [], member: [], pending: [{ id: 'p', text: plan.summary, turn: 1 }] };
+  assert.match(m.loungeSummaryWithGroundedPlans({ memory: saved, plans: [{ ref: 'p', summary: plan.summary, human_quote: '', character_quote: '' }], previous, human: '차 마셔요', reply: '좋아요.' }), /남은 것: 내일 저녁 사용자 집에서 가족과 식사한다$/);
+});
 test('an earlier proposal may be accepted now, and a resolved hurt feeling keeps the agreement', () => {
   const agreement = m.applyLoungeRoomMemory([op()], [], 2, '좋아요', '좋아. 반말하자.', [{ kind: 'human', text: '우리 반말하자' }]);
   assert.equal(agreement.length, 1);

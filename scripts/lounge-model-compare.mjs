@@ -27,7 +27,7 @@ const lounge = load('../src/lib/lounge.ts'), customLib = load('../src/lib/lounge
 const study = compile('../src/lib/loungeStudy.ts'), filmStudy = compile('../src/lib/loungeFilmStudy.ts'), sessionLib = compile('../src/lib/loungeSession.ts'), knowledgeLib = compile('../src/lib/loungeKnowledge.ts');
 const repliesLib = compile('../src/lib/loungeReplies.ts'), modelsLib = compile('../src/lib/loungeModels.ts'), storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
-const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : undefined);
+const personasLib = compile('../src/lib/loungePersonas.ts'), messengerLib = load('../src/lib/loungeMessenger.ts');
 const turnsLib = load('../src/lib/loungeTurnPersistence.ts');
 const consultLib = load('../src/lib/loungeConsult.ts'), sajuLib = load('../src/lib/loungeSaju.ts'), lessonLib = load('../src/lib/loungeLesson.ts');
 const trainingLib = load('../src/lib/loungeTraining.ts');

@@ -491,8 +491,9 @@ test('romantic tension follows each character and stage, keeps real-world limits
     assert.deepEqual(Object.keys(config.stageRomance).sort(), stages.map(stage => stage.id).sort(), `${id} has guidance for every stage`);
     const romance = stage => relationshipPromptContext({ ...createRelationship(config), stage: stage.id }, config, initialMood(config)).stage.romance;
     if (id === 'closer') {
-      assert.match(romance(stages[0]), /먼저 데이트를 제안할 수 있다/);
-      assert.match(romance(stages[0]), /성실한 연애 참여와 사랑이라는 감정의 확정은 다르/);
+      assert.match(romance(stages[0]), /자기 선택/);
+      assert.match(romance(stages[0]), /수락·거절·역제안/);
+      assert.match(romance(stages[0]), /사랑의 확정이나 새로운 스킨십은 별개/);
     } else if (id === 'auditor') {
       assert.match(romance(stages[0]), /처음부터 마음에 드는 점과 이성적인 끌림을 분명히 표현/);
       assert.match(romance(stages[0]), /사랑·연인 관계·공유한 과거는 만들지 않/);
@@ -632,7 +633,8 @@ test('a character tells more about itself as the stages open, and keeps the deep
 test('promises made in the story open with the stages: dating at the third, marriage and living together at the fourth, never a real meeting', () => {
   const guidance = index => relationship.relationshipIntimacyGuidance(index, true);
   assert.match(guidance(0), /여지는 남긴다/);
-  assert.match(guidance(1), /사귀자는 말도 아직 이르다/);
+  assert.match(guidance(1), /새로 사귀자는 제안은 자기 마음이 준비되지 않았다면 서두르지 않는다/);
+  assert.match(guidance(1), /이미 양쪽이 수락한 관계와 기존의 명시적 합의는 유지/);
   assert.match(guidance(2), /사귀자는 말은 성격대로 받아들일 수 있고, 결혼이나 함께 살자는 말은 아직 이르다/);
   assert.match(guidance(3), /사귀자, 결혼하자, 함께 살자는 말도 성격대로 받아들일 수 있다/);
   assert.match(guidance(3), /현실에서 만나자는 약속이나 연락처를 주고받는 일은 하지 않는다/);
@@ -655,7 +657,10 @@ test('every character is guarded at its first stage, and only there', () => {
     const record = createRelationship(config);
     const first = relationshipPromptContext(record, config, initialMood(config));
     // 선우령 flirts back from the start (2026-11-02) with her own distance: her heart stays closed.
-    assert.match(first.reserve, config.firstStageReserve ? /마음.*아직 내주지 않/ : /깊은 사랑이나 관계를 확정하지 않는다/, `${config.characterId} at the first stage`);
+    if (['closer', 'diplomat'].includes(config.characterId)) {
+      assert.match(first.reserve, /재촉/, `${config.characterId} keeps its own pace under pressure`);
+      assert.match(first.reserve, /이미.*(?:합의|수락)/, `${config.characterId} keeps an existing relationship`);
+    } else assert.match(first.reserve, config.firstStageReserve ? /마음.*아직 내주지 않/ : /깊은 사랑이나 관계를 확정하지 않는다/, `${config.characterId} at the first stage`);
     const next = config.stages.filter(stage => stage.enabled !== false)[1];
     assert.equal(relationshipPromptContext({ ...record, stage: next.id }, config, initialMood(config)).reserve, undefined, `${config.characterId} past it`);
     assert.doesNotMatch(config.stageRomance?.[config.stages[0].id] ?? '', /설레게 한다/, `${config.characterId} does not set out to flutter at the first stage`);

@@ -39,7 +39,7 @@ export function loungeScenarioRelationshipContext<T extends { outing: string }>(
   // 윤지안 and the member are friends of three years (2026-11-05: she put off a movie and a jog for "the documents").
   if (characterId === 'diplomat') return {
     ...context,
-    outing: '3년 된 친구 사이라 영화, 밥, 술 한잔, 산책이나 조깅 같은 평범한 약속은 단계와 상관없이 기분과 일정대로 받아들이고 먼저 제안하기도 한다. 바쁘면 거절 대신 다른 날이나 대안을 바로 말한다. 데이트라고 못 박는 제안은 장난으로 받아치며 수락도 거절도 아닌 여지를 남기고, 둘만의 여행이나 하룻밤처럼 관계를 바꾸는 제안은 단계에 맞을 때만 받는다.',
+    outing: '3년 된 친구 사이라 영화, 밥, 술 한잔, 산책 같은 평범한 약속은 자기 기분과 일정으로 판단하고 먼저 제안한다. 바쁘거나 내키지 않으면 짧게 거절하며 실제로 원할 때 다른 안을 낸다. 아직 연인이 아니면 데이트나 새로운 관계를 재촉받아 확정하지 않는다. 이미 서로 사귀기로 수락한 기록이 있으면 그 현재 관계에서 판단하고 다시 미정으로 돌리지 않는다. 여행이나 하룻밤은 사귀는 것과 별개로 자기 뜻과 현재 동의에 따라 정한다.',
   };
   if (characterId !== 'closer' || scenario?.id !== 'closer-contract-love') return context;
   return {

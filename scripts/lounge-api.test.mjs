@@ -25,8 +25,7 @@ const modelsLib = compile('../src/lib/loungeModels.ts');
 const storyLib = compile('../src/lib/loungeStory.ts');
 const scenariosLib = compile('../src/lib/loungeScenarios.ts', path => path.endsWith('loungeStory.js') ? storyLib : undefined);
 const personasLib = compile('../src/lib/loungePersonas.ts');
-const scenePlaceLib = compile('../src/lib/loungeScenePlace.ts');
-const messengerLib = compile('../src/lib/loungeMessenger.ts', path => path.endsWith('loungeCharacters') ? charactersLib : path.endsWith('lounge.js') ? lounge : path.endsWith('loungeScenePlace.js') ? scenePlaceLib : undefined);
+const messengerLib = loadTs(fileURLToPath(new URL('../src/lib/loungeMessenger.ts', import.meta.url)));
 // The analyzer is a call of its own before each one-to-one chat reply (engine v4, 2026-11-02); the tests that fake the
 // model answer one call per turn, so it is off here except in its own tests.
 process.env.LOUNGE_ANALYZER ??= 'off';
@@ -4944,6 +4943,41 @@ test('a failed DeepSeek Dohyun reply uses one GPT repair while a healthy reply k
   }
 });
 
+test('closer and diplomat save one corrected GPT reply after a DeepSeek delegation or refusal loop', async () => {
+  const previousKey = process.env.DEEPSEEK_API_KEY;
+  process.env.DEEPSEEK_API_KEY = 'mock-deepseek';
+  try {
+    for (const scene of [
+      { character: 'closer', human: '평소 모습대로 알아서 잘 해요.', bad: '사무실의 나와 사석의 나, 어느 쪽을 원하세요?', fixed: '그럼 내 방식대로 하죠. 내일은 인사부터 제대로 할게요.' },
+      { character: 'diplomat', human: '그럼 아예 오지 마. 됐어.', bad: '방금 그거 다시 말해 봐. 그 톤은 좀 아니지 않나?', fixed: '알겠어. 오늘은 안 갈게. 난 여기서 조금 더 있다 갈래.' },
+    ]) {
+      let generated = 0, rewritten = 0, saved;
+      await run(async (url, init) => {
+        if (url.includes('/auth/')) return result({ id: 'host' });
+        if (url.includes('claim_voice_lounge_host')) return result('ticket');
+        if (url.includes('voice_lounge_rooms?')) return result([{ topic: '대화', host_persona: scene.character, memory: '', capacity: 1, space_id: null, voice_on: false, ai_turns: 8, ai_model: 'deepseek-flash' }]);
+        if (url.includes('voice_lounge_messages?')) return result([{ id: 1, user_id: 'host', nickname: '나', kind: 'human', text: scene.human }]);
+        if (url.includes('voice_lounge_members?')) return result([]);
+        if (url === 'https://api.deepseek.com/chat/completions') {
+          generated++;
+          return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ text: scene.bad, inner_voice: '' }) }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        if (url.endsWith('/responses') && isAfterReply(init)) return modelAnswer({ memory: '' });
+        if (url.endsWith('/responses')) { rewritten++; assert.equal(JSON.parse(init.body).model, 'gpt-6-luna'); return modelAnswer({ text: scene.fixed, inner_voice: '' }); }
+        if (url.includes('finish_voice_lounge_reply')) { saved = JSON.parse(init.body); return result(true); }
+        if (url.includes('save_voice_lounge_room_memory')) return result(true);
+        throw new Error(`Unexpected ${url}`);
+      }, async () => { await (await handler(request({ action: 'host', roomId, reason: 'followup', stream: true }))).text(); });
+      assert.equal(generated, 1);
+      assert.equal(rewritten, 1);
+      assert.equal(saved.p_text, scene.fixed);
+    }
+  } finally {
+    if (previousKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = previousKey;
+  }
+});
+
 test('the recent changes of a relationship are listed newest first, with their direction', () => {
   const config = relationshipLib.getRelationshipConfig('auditor');
   const scored = Object.entries(config.events).find(([, effect]) => Object.values(effect.deltas).some(Boolean));
@@ -5023,7 +5057,8 @@ test('the real reply pipeline shares story constraints with helpers and prioriti
       assert.match(input.relationship.character_core.join(' '), /계약과 비밀/);
       assert.ok(input.voice_examples.length <= 2, 'only relevant eligible examples reach the reply');
       assert.ok(input.voice_examples.every(example => example.stage <= input.turn.stage));
-      assert.match(input.relationship.reserve, /가벼운 플러팅을 숨기거나 차갑게 튕길 필요는 없다/);
+      assert.match(input.relationship.reserve, /먼저 데이트를 제안하고 능청스럽게 받아칠 수 있/);
+      assert.match(input.relationship.reserve, /재촉·놀림·떠나겠다는 말만으로 그 판단을 뒤집지 않는다/);
       for (const call of calls) {
         const body = JSON.parse(call.input);
         const outing = call.text.format.name === 'lounge_turn_analysis' ? body.outing : body.relationship.outing;
@@ -5465,7 +5500,8 @@ data: [DONE]
   assert.equal(next.lingering, undefined); assert.equal(next.next_intent, undefined); assert.equal(next.fallback_replies?.length, 1);
   assert.equal(messengerLib.nextLoungeCompanionState({ state, update: { lingering: '남은 마음' }, decision: { progress: 'stay' }, turn: 3, reply: '평범한 답이에요, 길게 쓴 답', inner: '' }).lingering?.what, '남은 마음');
   assert.match(messengerLib.loungeRoomMemoryInstructions, /캐릭터가 스스로 정한 속도·허용 범위·멈춤.*기록하지 않는다/);
-  assert.match(messengerLib.loungeCompanionUpdateInstructions, /캐릭터가 접촉을 멈추게 하거나 자기가 정한 범위를 지키려는 뜻은/);
+  assert.match(messengerLib.loungeCompanionUpdateInstructions, /각자의 명시적인 선택·거절·속도는 room_memory_ops 지침으로 기록/);
+  for (const id of ['closer', 'diplomat']) assert.match(messengerLib.loungeRoomMemoryInstructionsFor(id), /boundary/);
   assert.match(messengerLib.loungeForgottenInstruction, /사용자가 이 방의 기억에서 지운 내용/);
   assert.deepEqual(messengerLib.normalizeLoungeCompanionState({ room_id: roomId, forgotten: ['a'.repeat(200), 3], fallback_replies: ['b'] }, roomId).forgotten, ['a'.repeat(120)]);
 });

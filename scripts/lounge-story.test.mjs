@@ -29,7 +29,8 @@ test('contract dates use the agreed story while other characters, stories and ph
   assert.equal(loungeScenarioRelationshipContext(original, contract, 'trickster'), original);
   // 윤지안 and the member are friends of three years: ordinary plans are open from the start (2026-11-05).
   const friends = loungeScenarioRelationshipContext(original, { id: 'diplomat-old-friend-fling' }, 'diplomat');
-  assert.match(friends.outing, /영화, 밥, 술 한잔, 산책이나 조깅 같은 평범한 약속은 단계와 상관없이/);
+  assert.match(friends.outing, /평범한 약속은 자기 기분과 일정으로 판단하고 먼저 제안/);
+  assert.match(friends.outing, /현재 관계에서 판단하고 다시 미정으로 돌리지 않는다/);
   assert.deepEqual({ ...friends, outing: original.outing }, original, 'only the outing changes');
 });
 

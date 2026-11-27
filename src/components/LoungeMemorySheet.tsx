@@ -53,7 +53,7 @@ export function LoungeMemorySheet({ characterId, characterName, onClose, sample,
   };
   const roomRows = roomBook ? [
     ...roomBook.summary.map(line => ({ key: `summary-${line.id}`, label: '대화 요약', text: line.text, target: 'summary' as const, id: line.id })),
-    ...roomBook.items.map(item => ({ key: `item-${item.id}`, label: ({ agreement: '합의', feeling: '감정의 원인', promise: '약속', fact: '함께한 이야기' } as Record<string, string>)[item.kind] ?? '이야기', text: item.summary, target: 'item' as const, id: item.id })),
+    ...roomBook.items.map(item => ({ key: `item-${item.id}`, label: ({ agreement: '합의', feeling: '감정의 원인', promise: '약속', fact: '함께한 이야기', boundary: '각자의 선택', correction: '바로잡은 내용' } as Record<string, string>)[item.kind] ?? '이야기', text: item.summary, target: 'item' as const, id: item.id })),
     ...(roomBook.lingering ? [{ key: 'lingering', label: '마음에 남은 것', text: roomBook.lingering, target: 'lingering' as const, id: undefined }] : []),
     ...(roomBook.next_intent ? [{ key: 'next_intent', label: '다음에 하려던 것', text: roomBook.next_intent, target: 'next_intent' as const, id: undefined }] : []),
   ] : [];

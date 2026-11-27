@@ -1,5 +1,6 @@
 import { alignLoungeProposalEvents, loungeMemoryText, nextLoungeCompanionState, normalizeLoungeCompanionState, type LoungeAnalysis, type LoungeCompanionState, type LoungeCompanionUpdate, type LoungeSceneDecision, type LoungeTurnMessage } from './loungeMessenger';
 import { splitLoungeInnerVoice } from './lounge';
+import { loungeSummaryWithGroundedPlans } from './loungeRoomLedger';
 import { applyDecay, describeRelationship, describeTurnChange, moodFromRoom, normalizeMemoryOps, processTurn, relationshipFromRow, relationshipState, type MemoryOp, type MemoryRow, type RelationshipConfig, type RelationshipRow, type RelationshipView, type RelationshipChange } from './relationship';
 
 export type LoungeTurnAnswer = LoungeCompanionUpdate & { memory?: string; events?: unknown; memory_ops?: unknown };
@@ -43,9 +44,12 @@ export type LoungeTurnStore = {
 
 /** Always reduce on the last committed state, never on the snapshot captured before the reply. */
 export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | undefined, snapshot: LoungeTurnSnapshot, job: LoungePendingTurn) {
-  const payload = job.payload, answer = payload.answer;
+  const payload = job.payload;
   const { reply, inner } = splitLoungeInnerVoice(job.reply);
   const state = normalizeLoungeCompanionState(snapshot.state, roomId);
+  const answer = !payload.ledger && payload.answer && typeof payload.answer.memory === 'string' ? { ...payload.answer, memory: loungeSummaryWithGroundedPlans({
+    memory: payload.answer.memory, plans: payload.answer.pending_plans, previous: state.memory_ledger, human: job.user_text, reply, recent: payload.recent,
+  }) } : payload.answer;
   const nextState = nextLoungeCompanionState({ state, update: payload.character_life ? { ...answer, character_life: payload.character_life } : answer, decision: payload.decision ?? { progress: 'stay' },
     turn: job.turn, reply, inner, userText: job.user_text, recent: payload.recent,
     boldMove: payload.boldMove, braked: payload.braked, sexual: payload.analysis?.sexual_scene, analyzerSkipped: payload.analyzerSkipped, emotional: payload.analysis?.is_emotional_moment === true, now: Number.isFinite(Date.parse(job.created_at)) ? Date.parse(job.created_at) : undefined, ...(payload.ledger ? { ledger: payload.ledger } : {}) });
@@ -56,6 +60,9 @@ export function reduceLoungeTurn(roomId: string, config: RelationshipConfig | un
     const now = new Date(job.created_at);
     const record = applyDecay(relationshipFromRow(config, snapshot.relationship, { closest: payload.closestStart }), config, now);
     let events = answer?.events;
+    if (payload.analysis?.is_repair_request && Array.isArray(events)) {
+      events = events.filter(event => !['ADMITS_ERROR', 'MAKES_WITTY_RESPONSE', 'CHALLENGES_CHARACTER', 'CALLS_BLUFF', 'COUNTER_THREAT', 'STANDS_GROUND', 'MAKES_CHARACTER_ADMIT', 'FLIRTS_PLAYFULLY'].includes(event?.type));
+    }
     if (payload.analysis?.is_sincere_refusal && Array.isArray(events)) {
       events = events.filter(event => !['FOLDS_EASILY', 'WAFFLES'].includes(event?.type));
     }
