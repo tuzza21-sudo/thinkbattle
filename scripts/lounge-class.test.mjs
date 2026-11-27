@@ -110,10 +110,15 @@ test('a culture-trip site has viewing points with pictures; going to one changes
 });
 
 test("세계 국립공원 탐험 (2026-11-27): 민서하's trip of the travel class, twelve parks in four regions with viewing points, picked only in her room", () => {
+  // 2026-11-28, by the owner: twenty-five in six tabs, by mountain range and region (the Alps are left to 한지오's Europe).
   assert.equal(classes.loungeClassTrip('explorerclass'), 'parks');
   assert.equal(classes.loungeClassTrip('guideclass'), 'italy');
   const parks = classes.loungeClassSites.filter(site => site.trip === 'parks');
-  assert.equal(parks.length, 12);
+  assert.equal(parks.length, 25);
+  assert.deepEqual(classes.loungeTravelTrips.parks.tabs.map(tab => tab.name), ['미국 서부', '알래스카·하와이', '로키 산맥', '안데스 산맥', '동유럽', '러시아']);
+  assert.equal(parks.find(site => site.id === 'glacier').city, '로키 산맥', 'Glacier is in the Rockies tab');
+  assert.ok(!parks.some(site => /알프스|돌로미티|몽블랑/.test(site.name + site.local)), 'no Alps in her board');
+  for (const site of parks.filter(site => site.city === '러시아')) assert.match(site.tip, /외교부/, `${site.id} sends the member to the travel advisory`);
   assert.deepEqual([...new Set(parks.map(site => site.city))], classes.loungeTravelTrips.parks.tabs.map(tab => tab.name));
   for (const site of parks) {
     assert.ok(site.image, `${site.id} has a picture`);

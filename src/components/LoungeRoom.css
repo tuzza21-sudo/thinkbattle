@@ -1135,6 +1135,9 @@
 .lounge-memory-sheet { gap:10px; }
 .lounge-memory-tabs { display:flex; gap:6px; }
 .lounge-memory-tabs button { flex:1; padding:8px 6px; border:1px solid #ffffff24; border-radius:999px; background:transparent; color:#fff5e8; font-size:13px; cursor:pointer; }
+/* The national-park board has six tabs (2026-11-28): three to a row, never squeezed into one. */
+.lounge-class-tabs { flex-wrap:wrap; }
+.lounge-class-tabs button { flex:1 1 30%; white-space:nowrap; }
 .lounge-memory-tabs button.active { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; font-weight:700; }
 .lounge-memory-panel { display:grid; gap:10px; }
 .lounge-memory-note,.lounge-memory-fine,.lounge-memory-empty { margin:0; font-size:12px; line-height:1.6; opacity:.75; }

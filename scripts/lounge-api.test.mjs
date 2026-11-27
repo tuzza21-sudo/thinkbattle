@@ -301,6 +301,8 @@ test('a question about the field of the character brings the closest knowledge a
         if (url.includes('voice_lounge_rooms?')) return result([{ topic: '자유 대화', host_persona: host, memory: '', capacity: 1, ai_turns: 3, ...(call ? {} : { voice_on: false }) }]);
         if (url.includes('voice_lounge_messages?')) return result(text ? [{ id: 1, user_id: 'user-1', nickname: '나', kind: 'human', text }] : []);
         if (url.includes('voice_lounge_members?')) return result(members);
+        // The lookup by a tag the member wrote (2026-11-28) is its own request; no entry here is named.
+        if (url.includes('/rest/v1/lounge_character_knowledge?') && url.includes('tags=ov.')) return result([]);
         if (url.includes('/rest/v1/lounge_character_knowledge?')) { calls.presence++; assert.ok(url.includes(`character_id=eq.${host}`) && url.includes('limit=1')); assert.equal(init.headers.Authorization, 'Bearer service'); return presence === 'error' ? result({ message: 'denied' }, 403) : result(presence === 'none' ? [] : [{ id: 'k1' }]); }
         if (url.endsWith('/embeddings')) { calls.embeddings++; const delay = Array.isArray(embeddingDelay) ? embeddingDelay[calls.embeddings - 1] ?? 0 : embeddingDelay; if (delay) await new Promise(resolve => setTimeout(resolve, delay)); const body = JSON.parse(init.body); assert.equal(body.dimensions, 256); assert.equal(body.model, 'text-embedding-3-small'); assert.ok(body.input.includes('증거능력')); return embeddingStatus === 200 ? result({ data: [{ embedding: unit.map(value => value * 3) }] }) : result({ error: { message: 'x' } }, embeddingStatus); }
         if (url.includes('pick_lounge_character_knowledge')) {

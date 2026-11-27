@@ -1,7 +1,7 @@
 import { drainLoungeTurns, type LoungePendingTurn, type LoungeTurnPayload, type LoungeTurnStore } from '../src/lib/loungeTurnPersistence';
 import { loungeMemberPersonaRule, loungePersonaStoryRule, loungePersonaStoryScenario, loungePersonaStoryScenarioId, loungeRoomPersona, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../src/lib/loungePersonas';
 import { getLoungeCharacter, loungeAdultDepth, loungeAdultSceneSpeech, loungeAdultVoiceNote, loungeCharacterRules, loungeDefaultAdultMode, loungeBiblePrompt, loungeCompanionPersonaPrompt, loungeCompanionVoiceExamples, loungeOneToOneCharacterRules, loungePersonaPrompt } from '../src/lib/loungeCharacters';
-import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
+import { loungeEmbeddingModel, loungeKnowledgeDimensions, loungeKnowledgeNamed, loungeKnowledgeNameTokens, loungeKnowledgePrompt, loungeKnowledgeQuery, normalizeLoungeEmbedding, type LoungeKnowledgeEntry } from '../src/lib/loungeKnowledge';
 import { loungeCustomPortraitUrl, registerLoungeCustomCharacterRow, type LoungeCustomCharacterRow } from '../src/lib/loungeCustomCharacters';
 import { getLoungeChatModel, loungeAdultChatModel, loungeAdultChatUrl, loungeEmptyWord, loungeGeminiChatModels, loungeOpenrouterAnswersAdult, loungeOpenrouterModelFor, loungeRaccoonUrl, loungeRoomChatModelId } from '../src/lib/loungeModels';
 import { loungePracticeRecent, loungePracticeReplySchema, loungePracticeRules, loungeClock, loungeClockRule, loungeMemoryLedgerFromSummary, loungeMemoryLedgerForRecorder, loungeMemoryLedgerInstructions, loungeMemoryLedgerSchema, loungeMemoryLedgerFields, loungeMemoryText, applyLoungeMemoryLedger, forgetLoungeMemoryLine, loungeForgottenInstruction, loungeSkipsAnalyzer, alignLoungeProposalEvents, cleanLoungeCompanionReply, cleanLoungeInnerVoice, loungeEnglishReply, loungeLanguageNote, loungeNotKorean, withoutStrayHan, decideLoungeScene, loungeCarry, loungeAnalyzerInput, loungeTurnAnalyzerInstructions, loungeTurnAnalysisSchema, loungeTurnMessages, loungeRoomMemoryForPrompt, loungeRoomSpeechLevel, loungeSelfStoriesForPrompt, loungeSelfStoriesForRecorder, loungeCharacterLifeForPrompt, normalizeLoungeCharacterLife, loungeCompanionReplyLimit, loungeCompanionOutputTokens, loungeRecentFullMessages, loungeCompanionReplySchema, loungeCompanionReplyReview, loungeCompanionRules, loungeCompanionUpdateFields, loungeCompanionUpdateInstructions, loungeCompanionUpdateSchema, loungeConversationFocusRule, loungeContinuityRule, loungeOwnWordsRule, loungeDirectionRule, loungeInstructionsCacheBreakpoint, loungeReading, loungeScenarioDistanceRule, loungeMessengerChat, loungeTurnConditions, nextLoungeCompanionState, normalizeLoungeCompanionState, readLoungeTurnAnalysis, type LoungeCompanionUpdate, loungeRoomMemoryInstructionsFor, loungePacingMemoryRule, loungeRoomSummarySnapshotRule, loungePendingPlansSchema, loungePendingPlansInstructions, loungeRecordsPendingPlans, loungeSummaryWithGroundedPlans } from '../src/lib/loungeMessenger';
@@ -1245,7 +1245,24 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
         // Giving up cancels the lookup, so a slow one does not keep sending requests after the reply has gone ahead.
         const giveUp = new AbortController();
         lookupGiveUp.signal.addEventListener('abort', () => giveUp.abort(), { once: true });
-        const find = async () => {
+        // An entry whose tag the member wrote (a place's name) is looked up beside the embedding and comes first (2026-11-28).
+        const nameTokens = loungeKnowledgeNameTokens(query);
+        const namedRead = (nameTokens.length ? (async () => {
+          const base = `${url}/rest/v1/lounge_character_knowledge?character_id=eq.${encodeURIComponent(host.id)}&active=eq.true&kind=eq.knowledge`;
+          const listed = await fetchTimed(`${base}&tags=ov.${encodeURIComponent(`{${nameTokens.join(',')}}`)}&select=id,tags&limit=60`, { signal: giveUp.signal, headers: serviceHeaders });
+          const ids = listed.ok ? loungeKnowledgeNamed(await readJson<Array<{ id: string; tags: string[] | null }>>(listed, 'lounge'), nameTokens) : [];
+          if (!ids.length) return [];
+          const full = await fetchTimed(`${base}&id=in.(${ids.join(',')})&select=id,kind,title,content,lesson,category,as_of,time_sensitive`, { signal: giveUp.signal, headers: serviceHeaders });
+          const rows = full.ok ? await readJson<Array<LoungeKnowledgeEntry>>(full, 'lounge') : [];
+          return ids.flatMap(id => rows.filter(row => row.id === id)).map(row => ({ ...row, retold: false, score: 1 }));
+        })() : Promise.resolve([])).catch(() => [] as LoungeKnowledgeEntry[]);
+        const withNamed = async (rows: LoungeKnowledgeEntry[]) => {
+          const named = await namedRead;
+          if (!named.length) return rows;
+          const knowledge = [...named, ...rows.filter(row => row.kind === 'knowledge' && !named.some(entry => entry.id === row.id))].slice(0, 2);
+          return [...knowledge, ...rows.filter(row => row.kind === 'experience')];
+        };
+        const find = async () => withNamed(await (async () => {
           const vector = await queryEmbedding;
           if (!vector || giveUp.signal.aborted) return [];
           const dbStarted = performance.now();
@@ -1254,7 +1271,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
           if (!response.ok) return [];
           const rows = await readJson<Array<LoungeKnowledgeEntry>>(response, 'lounge');
           return rows.filter(row => row.kind === 'knowledge' || row.kind === 'experience');
-        };
+        })());
         let timedOut = false;
         const found = await Promise.race([find(), new Promise<LoungeKnowledgeEntry[]>(resolve => setTimeout(() => { timedOut = true; giveUp.abort(); resolve([]); }, loungeKnowledgeWaitMs))]);
         return done(found, timedOut ? 'timedOut' : undefined);

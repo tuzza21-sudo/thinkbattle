@@ -285,5 +285,285 @@
     "license": "CC BY-SA 4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Towers_of_Paine_-_Torres_del_Paine_National_Park_13.jpg",
     "title": "File:Towers of Paine - Torres del Paine National Park 13.jpg"
+  },
+  "rockymountain": {
+    "src": "/lounge/class/parks/rockymountain.webp",
+    "credit": "MichaelKirsh",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Rocky_Mountain_National_Park_Tundra_Skyline.jpg",
+    "title": "File:Rocky Mountain National Park Tundra Skyline.jpg"
+  },
+  "trail-ridge": {
+    "src": "/lounge/class/parks/spots/trail-ridge.webp",
+    "credit": "DXR",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Trail_Ridge_Road,_Rocky_Mountains_National_Park_20110824_1.jpg",
+    "title": "File:Trail Ridge Road, Rocky Mountains National Park 20110824 1.jpg"
+  },
+  "bear-lake": {
+    "src": "/lounge/class/parks/spots/bear-lake.webp",
+    "credit": "JERRYE AND ROY KLOTZ MD",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:BEAR_LAKE,_ROCKY_MOUNTAIN_NATIONAL_PARK,_COLORADO.jpg",
+    "title": "File:BEAR LAKE, ROCKY MOUNTAIN NATIONAL PARK, COLORADO.jpg"
+  },
+  "grandteton": {
+    "src": "/lounge/class/parks/grandteton.webp",
+    "credit": "Michael Gäbler",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Oxbow_Bend_outlook_in_the_Grand_Teton_National_Park.jpg",
+    "title": "File:Oxbow Bend outlook in the Grand Teton National Park.jpg"
+  },
+  "mormon-row": {
+    "src": "/lounge/class/parks/spots/mormon-row.webp",
+    "credit": "Jon Sullivan, PD Photo.",
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Barns_grand_tetons.jpg",
+    "title": "File:Barns grand tetons.jpg"
+  },
+  "snake-river-overlook": {
+    "src": "/lounge/class/parks/spots/snake-river-overlook.webp",
+    "credit": "Frank Kovalchek",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Grand_Teton_from_the_Snake_River_Overlook.jpg",
+    "title": "File:Grand Teton from the Snake River Overlook.jpg"
+  },
+  "jenny-lake": {
+    "src": "/lounge/class/parks/spots/jenny-lake.webp",
+    "credit": "Stickel",
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Jenny_Lake_Tetons.JPG",
+    "title": "File:Jenny Lake Tetons.JPG"
+  },
+  "aconcagua": {
+    "src": "/lounge/class/parks/aconcagua.webp",
+    "credit": "Bernard Gagnon",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Aconcagua_Provincial_Park_04.jpg",
+    "title": "File:Aconcagua Provincial Park 04.jpg"
+  },
+  "puente-del-inca": {
+    "src": "/lounge/class/parks/spots/puente-del-inca.webp",
+    "credit": "Bernard Gagnon",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Puente_del_Inca_01.jpg",
+    "title": "File:Puente del Inca 01.jpg"
+  },
+  "huascaran": {
+    "src": "/lounge/class/parks/huascaran.webp",
+    "credit": "SolcitoAndino",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Vista_del_Huascar%C3%A1n_desde_el_Paso_de_Zorro.jpg",
+    "title": "File:Vista del Huascarán desde el Paso de Zorro.jpg"
+  },
+  "laguna-69": {
+    "src": "/lounge/class/parks/spots/laguna-69.webp",
+    "credit": "Renata Maria Cristina",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Laguna_69,_no_desfiladeiro_Demanda_do_Parque_Nacional_Huascar%C3%A1n_06,_raposa.jpg",
+    "title": "File:Laguna 69, no desfiladeiro Demanda do Parque Nacional Huascarán 06, raposa.jpg"
+  },
+  "llanganuco": {
+    "src": "/lounge/class/parks/spots/llanganuco.webp",
+    "credit": "PsamatheM",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Lagunas_Llanganuco-nX-4.jpg",
+    "title": "File:Lagunas Llanganuco-nX-4.jpg"
+  },
+  "machupicchu": {
+    "src": "/lounge/class/parks/machupicchu.webp",
+    "credit": "Martin St-Amant (S23678)",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:80_-_Machu_Picchu_-_Juin_2009_-_edit.jpg",
+    "title": "File:80 - Machu Picchu - Juin 2009 - edit.jpg"
+  },
+  "huayna-picchu": {
+    "src": "/lounge/class/parks/spots/huayna-picchu.webp",
+    "credit": "Diego Delso",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Machu_Picchu,_Per%C3%BA,_2015-07-30,_DD_47.JPG",
+    "title": "File:Machu Picchu, Perú, 2015-07-30, DD 47.JPG"
+  },
+  "plitvice": {
+    "src": "/lounge/class/parks/plitvice.webp",
+    "credit": "Berthold Werner",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Plitvice_Lakes_National_Park_BW_2014-10-13_13-07-14.jpg",
+    "title": "File:Plitvice Lakes National Park BW 2014-10-13 13-07-14.jpg"
+  },
+  "veliki-slap": {
+    "src": "/lounge/class/parks/spots/veliki-slap.webp",
+    "credit": "Tomasz Chralowicz",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Veliki_Slap,_the_tallest_waterfall_in_Croatia,_Plitvice_Lakes_(IMG_5284).jpg",
+    "title": "File:Veliki Slap, the tallest waterfall in Croatia, Plitvice Lakes (IMG 5284).jpg"
+  },
+  "plitvice-boardwalk": {
+    "src": "/lounge/class/parks/spots/plitvice-boardwalk.webp",
+    "credit": "Someone35",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:A_bridge_in_Plitvice_lakes_national_park,_Croatia.jpg",
+    "title": "File:A bridge in Plitvice lakes national park, Croatia.jpg"
+  },
+  "tatra": {
+    "src": "/lounge/class/parks/tatra.webp",
+    "credit": "This Photo was taken by Miha Peče. Feel free to use my photos, but please mention me as the author. I would much appreciate if you send me an email pc.osx.linux@gmail.com or write on my talk page, for my information. Please do not upload an edited image here without consulting me. I would like to make corrections only at my own source to ensure that the changes improve the image and are preserved.Otherwise you may upload an edited image with a new name. Please use one of the templates derivative or extract.",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:High_Tatra_Mountains_from_%C5%A0trba.jpg",
+    "title": "File:High Tatra Mountains from Štrba.jpg"
+  },
+  "morskie-oko": {
+    "src": "/lounge/class/parks/spots/morskie-oko.webp",
+    "credit": "kallerna",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Frozen_Morskie_Oko_2019.jpg",
+    "title": "File:Frozen Morskie Oko 2019.jpg"
+  },
+  "strbske-pleso": {
+    "src": "/lounge/class/parks/spots/strbske-pleso.webp",
+    "credit": "Adrian Tync",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%C5%A0trbsk%C3%A9_pleso_%26_Hotel_Patria_2022.jpg",
+    "title": "File:Štrbské pleso & Hotel Patria 2022.jpg"
+  },
+  "bialowieza": {
+    "src": "/lounge/class/parks/bialowieza.webp",
+    "credit": "Jacek Karczmarz",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Bialowieza_National_Park_in_Poland0012.JPG",
+    "title": "File:Bialowieza National Park in Poland0012.JPG"
+  },
+  "bialowieza-forest": {
+    "src": "/lounge/class/parks/spots/bialowieza-forest.webp",
+    "credit": "Bouke ten Cate",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Bialowieza_strikte_reservaat_-_Bielowieza_strict_reserve_-_daslook_-_ramsons_-_Allium_ursinum.jpg",
+    "title": "File:Bialowieza strikte reservaat - Bielowieza strict reserve - daslook - ramsons - Allium ursinum.jpg"
+  },
+  "european-bison": {
+    "src": "/lounge/class/parks/spots/european-bison.webp",
+    "credit": "Charles J. Sharp",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:European_bison_(Bison_bonasus)_male_Bia%C5%82owieza.jpg",
+    "title": "File:European bison (Bison bonasus) male Białowieza.jpg"
+  },
+  "durmitor": {
+    "src": "/lounge/class/parks/durmitor.webp",
+    "credit": "Pudelek",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Durmitor_mountains_(by_Pudelek)_01.jpg",
+    "title": "File:Durmitor mountains (by Pudelek) 01.jpg"
+  },
+  "black-lake": {
+    "src": "/lounge/class/parks/spots/black-lake.webp",
+    "credit": "Ingo Mehling",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Crno_jezero_-_3.jpg",
+    "title": "File:Crno jezero - 3.jpg"
+  },
+  "tara-bridge": {
+    "src": "/lounge/class/parks/spots/tara-bridge.webp",
+    "credit": "Pudelek (Marcin Szala)",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%C4%90ur%C4%91evi%C4%87a_Tara_Bridge_(by_Pudelek).JPG",
+    "title": "File:Đurđevića Tara Bridge (by Pudelek).JPG"
+  },
+  "kamchatka": {
+    "src": "/lounge/class/parks/kamchatka.webp",
+    "credit": "Козинцев",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%D0%9A%D0%BE%D1%80%D1%8F%D0%BA%D1%81%D0%BA%D0%B8%D0%B9,_%D0%90%D0%B2%D0%B0%D1%87%D0%B8%D0%BD%D1%81%D0%BA%D0%B8%D0%B9,_%D0%9A%D0%BE%D0%B7%D0%B5%D0%BB%D1%8C%D1%81%D0%BA%D0%B8%D0%B9.jpg",
+    "title": "File:Корякский, Авачинский, Козельский.jpg"
+  },
+  "valley-of-geysers": {
+    "src": "/lounge/class/parks/spots/valley-of-geysers.webp",
+    "credit": "Rubin16",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Valley_of_Geysers_(Kamchatka,_2020)-1.jpg",
+    "title": "File:Valley of Geysers (Kamchatka, 2020)-1.jpg"
+  },
+  "klyuchevskaya": {
+    "src": "/lounge/class/parks/spots/klyuchevskaya.webp",
+    "credit": "Aysa t",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%D0%9A%D0%B0%D0%BC%D0%B5%D0%BD%D1%8C_%D0%B8_%D0%9A%D0%BB%D1%8E%D1%87%D0%B5%D0%B2%D1%81%D0%BA%D0%B0%D1%8F.jpg",
+    "title": "File:Камень и Ключевская.jpg"
+  },
+  "baikal": {
+    "src": "/lounge/class/parks/baikal.webp",
+    "credit": "Victor Gleim",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ice_Hummocks_near_Listvyanka.jpg",
+    "title": "File:Ice Hummocks near Listvyanka.jpg"
+  },
+  "shaman-rock": {
+    "src": "/lounge/class/parks/spots/shaman-rock.webp",
+    "credit": "Vyacheslav Argenberg",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Baikal,_Cape_Burhan,_Olkhon_Island,_Lake_Baikal,_Russia.jpg",
+    "title": "File:Baikal, Cape Burhan, Olkhon Island, Lake Baikal, Russia.jpg"
+  },
+  "altai": {
+    "src": "/lounge/class/parks/altai.webp",
+    "credit": "Instaler",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Beluha_Akkem.jpg",
+    "title": "File:Beluha Akkem.jpg"
+  },
+  "belukha": {
+    "src": "/lounge/class/parks/spots/belukha.webp",
+    "credit": "N 3 14 15 92 65",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%D0%9E%D1%82%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5_%D0%91%D0%B5%D0%BB%D1%83%D1%85%D0%B8_%D0%B2_%D0%90%D0%BA%D0%BA%D0%B5%D0%BC%D1%81%D0%BA%D0%BE%D0%BC_%D0%BE%D0%B7%D0%B5%D1%80%D0%B5..jpg",
+    "title": "File:Отражение Белухи в Аккемском озере..jpg"
+  },
+  "teletskoye": {
+    "src": "/lounge/class/parks/spots/teletskoye.webp",
+    "credit": "Александр Байдуков",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Teletskoye_lake._Dawn_in_the_village_of_Artybash_at_the_source_of_the_Biya.jpg",
+    "title": "File:Teletskoye lake. Dawn in the village of Artybash at the source of the Biya.jpg"
+  },
+  "elbrus": {
+    "src": "/lounge/class/parks/elbrus.webp",
+    "credit": "Ted.ns",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%D0%92%D0%B8%D0%B4_%D0%BD%D0%B0_%D0%AD%D0%BB%D1%8C%D0%B1%D1%80%D1%83%D1%81_%D0%BF%D0%BE_%D0%BF%D1%83%D1%82%D0%B8_%D0%B2_%D0%94%D0%B6%D0%B8%D0%BB%D1%8B-%D0%A1%D1%83.jpg",
+    "title": "File:Вид на Эльбрус по пути в Джилы-Су.jpg"
+  },
+  "caucasus-view": {
+    "src": "/lounge/class/parks/spots/caucasus-view.webp",
+    "credit": "Александр Байдуков",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:National_Park_of_Elbrus_region._View_from_the_foot_of_Elbrus_from_the_altitude_of_4000_meters.jpg",
+    "title": "File:National Park of Elbrus region. View from the foot of Elbrus from the altitude of 4000 meters.jpg"
+  },
+  "elbrus-summits": {
+    "src": "/lounge/class/parks/spots/elbrus-summits.webp",
+    "credit": "Александр Байдуков",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Glaciers_of_the_south-eastern_slope_of_Elbrus.jpg",
+    "title": "File:Glaciers of the south-eastern slope of Elbrus.jpg"
+  },
+  "penitentes": {
+    "src": "/lounge/class/parks/spots/penitentes.webp",
+    "credit": "Lucash",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Penitentes_Plaza_Francia_Aconcagua.jpg",
+    "title": "File:Penitentes Plaza Francia Aconcagua.jpg"
+  },
+  "machu-picchu-terraces": {
+    "src": "/lounge/class/parks/spots/machu-picchu-terraces.webp",
+    "credit": "Antón Jáuregui antonjau",
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Llama_on_Machu_Picchu%27s_terraces_(Unsplash).jpg",
+    "title": "File:Llama on Machu Picchu's terraces (Unsplash).jpg"
+  },
+  "olkhon-ice-cave": {
+    "src": "/lounge/class/parks/spots/olkhon-ice-cave.webp",
+    "credit": "Sergey Pesterev",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ice_cave_on_Olkhon_island.jpg",
+    "title": "File:Ice cave on Olkhon island.jpg"
   }
 }

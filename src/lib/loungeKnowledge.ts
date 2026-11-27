@@ -100,6 +100,33 @@ export function loungeKnowledgeQuery(humanTexts: readonly string[]) {
   return query.length >= 6 ? query : '';
 }
 
+/**
+ * Places and names the member wrote, for finding an entry by its tag (2026-11-28): a Korean spelling of a foreign name
+ * ("마추픽추", "플리트비체") is a weak signal in the 256-dimension embedding, and 민서하's entry on Machu Picchu scored 0.22
+ * against "마추픽추 가려면 어떻게 해요?", under the 0.33 an entry needs. The words of the text, each also without its particle.
+ */
+const nameParticles = /(?:에서는|에서|에게|까지|부터|이랑|하고|으로|에는|에도|이에요|예요|은|는|이|가|을|를|도|만|로|에|의|와|과|랑|요)$/;
+export function loungeKnowledgeNameTokens(text: string) {
+  const tokens = new Set<string>();
+  for (const word of text.match(/[가-힣A-Za-z]{2,20}/g) ?? []) {
+    tokens.add(word);
+    // twice, for "바이칼에서는요"
+    const bare = word.replace(nameParticles, '').replace(nameParticles, '');
+    if (bare.length >= 2) tokens.add(bare);
+  }
+  return [...tokens].slice(0, 24);
+}
+/**
+ * The entries a tag the member wrote names on its own: a word that is the tag of one or two entries picks them, a word
+ * shared by more ("러시아", "피렌체") says nothing about which and is left to the embedding. Ids, most matched first.
+ */
+export function loungeKnowledgeNamed(rows: ReadonlyArray<{ id: string; tags?: string[] | null }>, tokens: readonly string[], max = 2) {
+  const tagged = (row: { tags?: string[] | null }, token: string) => row.tags?.includes(token) === true;
+  const specific = tokens.filter(token => { const count = rows.filter(row => tagged(row, token)).length; return count >= 1 && count <= max; });
+  return rows.map(row => ({ id: row.id, matched: specific.filter(token => tagged(row, token)).length })).filter(row => row.matched > 0)
+    .sort((a, b) => b.matched - a.matched).slice(0, max).map(row => row.id);
+}
+
 const dayMs = 86_400_000;
 /** A fact that can go out of date, with the date it holds from; one more than a year old says so. */
 const factNote = (entry: LoungeKnowledgeEntry, now: number) => {
