@@ -1262,6 +1262,12 @@
 .lounge-lesson-preview > ul:not(.lounge-memory-list) { display:grid; gap:3px; margin:0; padding-left:18px; font-size:13px; }
 .lounge-lesson-preview > div { display:flex; gap:8px; justify-content:flex-end; }
 .lounge-lesson-preview small, .lounge-lesson-where { font-size:12px; opacity:.75; line-height:1.5; }
+.lounge-lesson-situation-edit { display:grid; gap:6px; margin:4px 0; }
+.lounge-lesson-situation-edit textarea { width:100%; padding:7px 9px; border:1px solid #ffffff2e; border-radius:9px; background:#0000002e; color:inherit; font:inherit; font-size:12.5px; line-height:1.5; resize:vertical; }
+.lounge-lesson-situation-edit div { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+.lounge-lesson-situation-edit button { display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border:1px solid #ffffff2e; border-radius:8px; background:transparent; color:inherit; font:inherit; font-size:12px; cursor:pointer; }
+.lounge-lesson-situation-edit button.primary { border-color:var(--lounge-accent,#ead0a3); background:#ffffff14; }
+.lounge-lesson-situation-edit button:disabled { opacity:.5; cursor:default; }
 
 /* 영어 수업 학습 보드 (2026-11-26): the day's progress and the task card above the composer, the feedback under the
    member's words, and the learning board's list with its marks, importance and difficulty. */

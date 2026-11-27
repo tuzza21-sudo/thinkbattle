@@ -289,6 +289,8 @@ export const requestLoungeClassPick = (roomId: string, item: string) => apiReque
 /** 문화기행: the viewing point of the current site the member went to. */
 export const requestLoungeClassSpot = (roomId: string, spot: string) => apiRequest({ action: 'class-pick', roomId, spot }) as Promise<{ state: unknown }>;
 export const startLoungeTraining = (roomId: string, setup: Record<string, unknown>) => apiRequest({ action: 'training-start', roomId, setup }) as Promise<{ state: unknown }>;
+/** 영어 수업 학습 보드: an expression's situation written over, or taken off with an empty one. */
+export const requestLoungeLessonSituationEdit = (roomId: string, itemId: string, situation: string) => apiRequest({ action: 'lesson-situation-edit', roomId, itemId, situation }) as Promise<{ ok: boolean }>;
 export const requestLoungeLessonEnrich = (roomId: string) => apiRequest({ action: 'lesson-enrich', roomId }) as Promise<{ updated: number }>;
 export const suggestLoungeReplies = (roomId: string) => apiRequest({ action: 'replies', roomId }) as Promise<{ replies?: string[] }>;
 /**

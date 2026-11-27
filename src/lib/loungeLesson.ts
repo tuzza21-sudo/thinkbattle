@@ -117,12 +117,26 @@ export const readLoungeLessonLevel = (value: unknown): LoungeLessonLevel => valu
 /** What the member learns for and wants to talk about, chosen at a session's start (lounge_english_profiles, migration 20270120000000). */
 export const loungeLessonPurposes = ['일상 회화', '업무·회의', '이직·면접', '여행', '유학·시험', '발표·프레젠테이션', '해외 생활'] as const;
 export const loungeLessonTopics = ['일상', '연애', '취미', '취업', '회의', '여행', '영화·드라마', '음식', '운동·건강', '테크·IT', '경제·재테크', '가족·육아'] as const;
-export type LoungeLessonProfile = { level: LoungeLessonLevel; purpose: string; topics: string[] };
+/**
+ * purposes: one or more (2026-11-27, by the owner), kept in the one purpose column a line each (no migration); purpose
+ * is them joined, as the tutor reads it. The goal stays as it was saved until the member changes it.
+ */
+export type LoungeLessonProfile = { level: LoungeLessonLevel; purpose: string; purposes: string[]; topics: string[] };
+export const loungeLessonMaxPurposes = 4;
+export const loungeLessonMaxTopics = 6;
+const goalWords = (list: unknown[], max: number, length: number) => [...new Set(list.filter((entry): entry is string => typeof entry === 'string').map(entry => entry.replace(/\s+/g, ' ').trim().slice(0, length)).filter(Boolean))].slice(0, max);
 export function readLoungeLessonProfile(row: unknown): LoungeLessonProfile {
   const value = row && typeof row === 'object' ? row as Record<string, unknown> : {};
-  const topics = Array.isArray(value.topics) ? [...new Set(value.topics.filter((topic): topic is string => typeof topic === 'string').map(topic => topic.replace(/\s+/g, ' ').trim().slice(0, 30)).filter(Boolean))].slice(0, 8) : [];
-  return { level: readLoungeLessonLevel(value.level), purpose: typeof value.purpose === 'string' ? value.purpose.replace(/\s+/g, ' ').trim().slice(0, 200) : '', topics };
+  const topics = Array.isArray(value.topics) ? goalWords(value.topics, 8, 30) : [];
+  const purposes = typeof value.purpose === 'string' ? goalWords(value.purpose.split('\n'), loungeLessonMaxPurposes, 200) : [];
+  return { level: readLoungeLessonLevel(value.level), purpose: purposes.join(', '), purposes, topics };
 }
+/** The purposes as the purpose column keeps them (at most 200 characters). */
+export const loungeLessonPurposeColumn = (purposes: readonly string[]) => {
+  const kept: string[] = [];
+  for (const entry of goalWords([...purposes], loungeLessonMaxPurposes, 200)) if ([...kept, entry].join('\n').length <= 200) kept.push(entry);
+  return kept.join('\n');
+};
 /**
  * Each tutor's own way when the member chose no topic (2026-11-26, by the owner): 문정우 leads with formal settings,
  * 차유진 with everyday talk where the member says what they think and feel, fully and honestly.

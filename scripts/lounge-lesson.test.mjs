@@ -351,8 +351,8 @@ test('the session goal: three levels, the member purpose and topics, and each tu
   assert.equal(lesson.readLoungeLessonLevel('A2'), 'A2'); assert.equal(lesson.readLoungeLessonLevel('x'), 'B1');
   assert.deepEqual(lesson.loungeLessonFeedbackLabels('A2'), { better: 'B1 표현', polished: 'B2 · 더 자연스럽게' });
   assert.ok(lesson.loungeLessonPackFor('A2', [], 3).every(entry => entry.level === 'B2'), 'a B1 goal takes the B2 list');
-  assert.deepEqual(lesson.readLoungeLessonProfile({ level: 'A2', purpose: '  업무·회의 ', topics: ['여행', '여행', ' K-pop ', 3] }), { level: 'A2', purpose: '업무·회의', topics: ['여행', 'K-pop'] });
-  assert.deepEqual(lesson.readLoungeLessonProfile(undefined), { level: 'B1', purpose: '', topics: [] });
+  assert.deepEqual(lesson.readLoungeLessonProfile({ level: 'A2', purpose: '  업무·회의 ', topics: ['여행', '여행', ' K-pop ', 3] }), { level: 'A2', purpose: '업무·회의', purposes: ['업무·회의'], topics: ['여행', 'K-pop'] });
+  assert.deepEqual(lesson.readLoungeLessonProfile(undefined), { level: 'B1', purpose: '', purposes: [], topics: [] });
   const turn = lesson.advanceLoungeLesson({ items: [item('a')], plan: ['a'], now, said: 'hi', grade: grade() });
   const formal = lesson.loungeLessonForPrompt(turn, 'B2', undefined, 'interpretertutor');
   assert.match(formal.session.tutor_style, /회의, 협상, 발표/); assert.equal(formal.session.topics, undefined);
@@ -375,4 +375,23 @@ test("a day planned the older way (reviews first) is planned again for what is l
   const again = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'ok', grade: grade({ intent: 'question' }) });
   assert.deepEqual(again.state.queue, turn.state.queue, 'planned once');
   assert.equal(lesson.readLoungeLessonState(turn.state).order, lesson.loungeLessonPlanOrder);
+});
+
+test('several purposes are kept in the one purpose column, a line each, and read back as the member chose them (2026-11-27)', () => {
+  const column = lesson.loungeLessonPurposeColumn(['업무·회의', ' 여행 ', '업무·회의', '해외 바이어 미팅', '이직·면접', '유학·시험']);
+  assert.equal(column, ['업무·회의', '여행', '해외 바이어 미팅', '이직·면접'].join('\n'), 'no repeats, at most four');
+  const read = lesson.readLoungeLessonProfile({ level: 'B2', purpose: column, topics: ['회의'] });
+  assert.deepEqual(read.purposes, ['업무·회의', '여행', '해외 바이어 미팅', '이직·면접']);
+  assert.equal(read.purpose, '업무·회의, 여행, 해외 바이어 미팅, 이직·면접', 'the tutor reads them joined');
+  assert.ok(lesson.loungeLessonPurposeColumn(Array.from({ length: 4 }, (_, index) => `${index}${'가'.repeat(59)}`)).length <= 200, 'the column keeps its 200 characters');
+  assert.equal(lesson.loungeLessonPurposeColumn([]), '');
+});
+
+test('the board writes an expression situation over only through the server, on the member own row (2026-11-27)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  const edit = api.slice(api.indexOf("body.action === 'lesson-situation-edit'"), api.indexOf("body.action === 'lesson-enrich'"));
+  assert.match(edit, /host_id !== user\.id \|\| !isLoungeTutor/);
+  assert.match(edit, /lounge_english_items\?id=eq\.\$\{encodeURIComponent\(itemId\)\}&user_id=eq\.\$\{encodeURIComponent\(user\.id\)\}/);
+  assert.match(edit, /situation: situation \|\| null/);
 });

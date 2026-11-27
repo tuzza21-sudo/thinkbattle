@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
-import { loungeLessonLevel, parseLoungeLessonWords, readLoungeLessonProfile, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonProfile } from './loungeLesson';
-import { requestLoungeLessonEnrich, requestLoungeLessonSituation } from './loungeApi';
+import { loungeLessonLevel, loungeLessonPurposeColumn, parseLoungeLessonWords, readLoungeLessonProfile, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonProfile } from './loungeLesson';
+import { requestLoungeLessonEnrich, requestLoungeLessonSituation, requestLoungeLessonSituationEdit } from './loungeApi';
 
 /** A correction from a lesson (lounge_english_attempts): what the member said and how it reads better. */
 export type LoungeLessonNote = { id: number; said: string; better: string; polished: string; why: string; verdict: string; created_at: string; item_id: string | null };
-export type LoungeLessonBook = { items: LoungeLessonItem[]; notes: LoungeLessonNote[]; level: LoungeLessonLevel; profile: LoungeLessonProfile };
+/** goalSaved: the member has saved a goal once; a new day's lesson then starts on it without asking again. */
+export type LoungeLessonBook = { items: LoungeLessonItem[]; notes: LoungeLessonNote[]; level: LoungeLessonLevel; profile: LoungeLessonProfile; goalSaved: boolean };
 /** What a lesson made of one thing the member said (rows of lounge_english_attempts with the same words). */
 export type LoungeLessonAttempt = LoungeLessonNote & { room_id: string | null };
 
@@ -27,7 +28,7 @@ export async function loadLoungeLessonBook(): Promise<LoungeLessonBook> {
   ]);
   failed(items.error); failed(notes.error);
   const read = readLoungeLessonProfile(profile.data);
-  return { items: (items.data ?? []) as LoungeLessonItem[], notes: (notes.data ?? []) as LoungeLessonNote[], level: read.level, profile: read };
+  return { items: (items.data ?? []) as LoungeLessonItem[], notes: (notes.data ?? []) as LoungeLessonNote[], level: read.level, profile: read, goalSaved: Boolean(profile.data) };
 }
 
 /** Adds the member's own expressions (one a line, "expression - 뜻"); one they already have is left as it is. Returns how many were new. */
@@ -50,20 +51,19 @@ export async function deleteLoungeLessonItem(id: string) {
 }
 
 /** The session's goal, purpose and topics (migration 20270120000000; before it only the two older levels are kept). */
-export async function setLoungeLessonProfile(profile: LoungeLessonProfile) {
+export async function setLoungeLessonProfile(profile: Pick<LoungeLessonProfile, 'level' | 'purposes' | 'topics'>) {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('로그인이 필요해요.');
-  const { error } = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level: profile.level, purpose: profile.purpose || null, topics: profile.topics, updated_at: new Date().toISOString() });
+  const purpose = loungeLessonPurposeColumn(profile.purposes);
+  const { error } = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level: profile.level, purpose: purpose || null, topics: profile.topics, updated_at: new Date().toISOString() });
   if (!error) return;
   if (profile.level !== 'A2') { const older = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level: profile.level, updated_at: new Date().toISOString() }); if (!older.error) return; }
   throw new Error('수업 목표 저장은 곧 열려요. 오늘은 고른 목표로 그대로 수업할게요.');
 }
 
-export async function setLoungeLessonLevel(level: LoungeLessonLevel) {
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('로그인이 필요해요.');
-  const { error } = await supabase.from('lounge_english_profiles').upsert({ user_id: user.user.id, level, updated_at: new Date().toISOString() });
-  failed(error);
+/** The moment an expression is used, as the member wrote it over; empty takes it off (the tutor then makes one up). */
+export async function setLoungeLessonSituation(roomId: string, id: string, situation: string) {
+  await requestLoungeLessonSituationEdit(roomId, id, situation.replace(/\s+/g, ' ').trim().slice(0, 300));
 }
 
 /**
