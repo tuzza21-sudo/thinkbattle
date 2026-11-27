@@ -407,3 +407,20 @@ test('reviews come three days later, then a week later, and only once due; the s
   assert.deepEqual(lesson.planLoungeLesson(items, now).reviews, ['due'], 'one not due yet waits for its day');
   assert.deepEqual(['unprompted', 'hinted', 'given', 'missed', 'free'].filter(lesson.loungeLessonFocusDone), ['unprompted', 'hinted']);
 });
+
+test('계속 학습: after the day is done another round of three comes, planned the same way, until the day has thirty (2026-11-27)', () => {
+  const items = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].map((id, index) => item(id, { importance: index === 9 ? 3 : 2 }));
+  const day = lesson.loungeLessonDay(now);
+  const prior = { kind: 'lesson', day, phase: 'free', queue: [], done: ['a', 'b', 'c', 'd', 'e', 'f'].map(id => ({ id, verdict: 'unprompted' })), kept: 0, turns: 12, since: now.toISOString(), order: lesson.loungeLessonPlanOrder };
+  const more = lesson.planLoungeLessonMore(items, prior, now);
+  assert.deepEqual(more.queue, ['j', 'g', 'h'], 'not what the day took; the more important first');
+  assert.equal(more.pack, 0);
+  assert.equal(lesson.planLoungeLessonMore([], prior, now).pack, 3, 'with none left, three of the tutor own');
+  const turn = lesson.advanceLoungeLesson({ state: prior, items, plan: [], now, said: lesson.loungeLessonMoreText, grade: grade({ intent: 'chat' }), more: more.queue });
+  assert.equal(turn.step, 'ask'); assert.equal(turn.target.id, 'j');
+  assert.deepEqual(turn.state.queue, ['g', 'h']);
+  assert.equal(lesson.loungeLessonTask(turn.state, items, now).progress.total, 9, 'the day now counts nine');
+  const full = { ...prior, done: Array.from({ length: 30 }, (_, index) => ({ id: `x${index}`, verdict: 'missed' })) };
+  assert.deepEqual(lesson.planLoungeLessonMore(items, full, now), { queue: [], reviews: [], pack: 0 }, 'a day takes at most thirty');
+  assert.equal(lesson.readLoungeLessonState(full).done.length, 30, 'a longer day is read whole');
+});

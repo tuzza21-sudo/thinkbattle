@@ -17,7 +17,7 @@ import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNeg
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
-import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonFocusDone, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonPlanOrder, loungeLessonHintText, loungeLessonSkipText, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
+import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonFocusDone, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonPlanOrder, loungeLessonHintText, loungeLessonMoreText, loungeLessonSkipText, loungeLessonRules, planLoungeLesson, planLoungeLessonMore, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
 /** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
@@ -1624,21 +1624,25 @@ ${photoRule}`;
       const items = [...stored];
       const now = new Date(), today = loungeLessonDay(now);
       const prior = readLoungeLessonState(room.story_state);
-      const plan: string[] = [];
-      if (!prior || prior.day !== today || prior.order !== loungeLessonPlanOrder) {
-        // A new day (or the rest of one planned the older way): the marked ones, the member's own not practised yet by
-        // priority, then the tutor's own of the member's level, and one or two reviews last (2026-11-27, by the owner).
-        const planned = planLoungeLesson(items, now);
-        plan.push(...planned.queue.filter(id => !planned.reviews.includes(id)));
+      const plan: string[] = [], more: string[] = [];
+      // The plan's ids in order: the planned ones, then the tutor's own added for what is missing, then the reviews.
+      const fill = async (planned: ReturnType<typeof planLoungeLesson>, into: string[]) => {
+        into.push(...planned.queue.filter(id => !planned.reviews.includes(id)));
         const added = loungeLessonPackFor(level, items, planned.pack);
         if (added.length) {
           const response = await fetchTimed(`${url}/rest/v1/lounge_english_items?on_conflict=user_id,expression_key`, { method: 'POST', headers: { ...serviceHeaders, Prefer: 'resolution=ignore-duplicates,return=representation' },
             body: JSON.stringify(added.map(entry => ({ user_id: user.id, expression: entry.expression, meaning: entry.meaning, level: entry.level, source: 'tutor', pack_id: entry.id }))) }).catch(() => undefined);
           const rows = response?.ok ? await readJson<LoungeLessonItem[] | null>(response, 'lounge') ?? [] : [];
-          items.push(...rows); plan.push(...rows.map(row => row.id));
+          items.push(...rows); into.push(...rows.map(row => row.id));
         }
-        plan.push(...planned.reviews);
-      }
+        into.push(...planned.reviews);
+      };
+      // A new day (or the rest of one planned the older way): the marked ones, the member's own not practised yet by
+      // priority, then the tutor's own of the member's level, and one or two reviews last (2026-11-27, by the owner).
+      if (!prior || prior.day !== today || prior.order !== loungeLessonPlanOrder) await fill(planLoungeLesson(items, now), plan);
+      // 계속 학습 (the free-talk card's button): another round of three, planned the same way.
+      const moreAsked = lastHuman.trim() === loungeLessonMoreText;
+      if (moreAsked && prior?.day === today && prior.order === loungeLessonPlanOrder) await fill(planLoungeLessonMore(items, prior, now), more);
       const opening = body.reason === 'opening' && !lastHuman;
       const current = prior?.day === today ? prior.current : undefined;
       const target = current && !current.retell ? items.find(item => item.id === current.id) : undefined;
@@ -1648,7 +1652,7 @@ ${photoRule}`;
       const others = items.filter(item => today_.has(item.id) || item.stage >= 3);
       const graded = performance.now();
       // The task card's buttons send fixed words: what they mean is known, so the grader is not asked (about 2 s a turn).
-      const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : undefined;
+      const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : moreAsked ? 'chat' as const : undefined;
       const grade = !opening && lastHuman ? button ? { target: 'not_used' as const, intent: button, free_used: [], errors: [], better: '', polished: '', keep: '', keep_meaning: '' } : await (async () => {
         try {
           const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
@@ -1665,7 +1669,7 @@ ${photoRule}`;
         try { items.push(...(await makeLessonExpressions(user.id, lastHuman, level, items, !chat)).rows); }
         catch (error) { console.warn('[Lounge lesson] situation not made', error instanceof LoungeUpstreamError ? error.code : error instanceof Error ? error.name : 'error'); }
       }
-      const turn = advanceLoungeLesson({ state: prior, items, plan, now, said: lastHuman, grade, opening });
+      const turn = advanceLoungeLesson({ state: prior, items, plan, now, said: lastHuman, grade, opening, more });
       const keep = loungeLessonKeep(turn.state, grade, items);
       if (keep) turn.state.kept++;
       const write = (path: string, init: RequestInit) => fetchTimed(`${url}/rest/v1/${path}`, { ...init, headers: { ...serviceHeaders, Prefer: 'return=minimal', ...(init.headers as Record<string, string> | undefined) } })

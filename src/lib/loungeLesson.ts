@@ -211,6 +211,8 @@ export const loungeLessonListOrder = (a: LoungeLessonItem, b: LoungeLessonItem) 
 /** What the task card's buttons say for the member: words of the lesson, not English to correct. */
 export const loungeLessonHintText = '힌트 주세요';
 export const loungeLessonSkipText = '이건 다음에 할게요. 넘어갈게요.';
+/** 계속 학습 (2026-11-27, by the owner): the day's expressions are done and the member wants another round. */
+export const loungeLessonMoreText = '표현 더 연습할게요.';
 
 /** The labels of the learning board: an expression's importance, and the two corrections of the member's goal. */
 export const loungeLessonImportance = [
@@ -334,6 +336,8 @@ export const loungeLessonPackEntry = (id?: string | null) => loungeLessonPack.fi
 
 /** How many expressions one day's lesson takes: new ones first, then one or two reviews (2026-11-27). */
 export const loungeLessonSize = { total: 6, reviews: 2, kept: 3 } as const;
+/** Each 계속 학습 adds a round of three (one review at most); a day takes at most thirty expressions. */
+export const loungeLessonMore = { round: 3, reviews: 1, dayMax: 30 } as const;
 /** The way a day is planned; a day planned the older way (reviews first) is planned again for what is left of it. */
 export const loungeLessonPlanOrder = 2;
 
@@ -350,13 +354,13 @@ export type LoungeLessonState = {
 export function readLoungeLessonState(value: unknown): LoungeLessonState | undefined {
   const state = value && typeof value === 'object' ? value as Partial<LoungeLessonState> : undefined;
   if (state?.kind !== 'lesson' || typeof state.day !== 'string') return undefined;
-  const strings = (list: unknown) => Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string').slice(0, 24) : [];
+  const strings = (list: unknown) => Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string').slice(0, 40) : [];
   const current = state.current && typeof state.current.id === 'string' ? {
     id: state.current.id, hints: Math.max(0, Math.min(3, Number(state.current.hints) || 0)), tries: Math.max(0, Number(state.current.tries) || 0),
     ...(state.current.given ? { given: true } : {}), ...(state.current.retell ? { retell: true } : {}) } : undefined;
   return {
     kind: 'lesson', day: state.day, phase: state.phase === 'drill' || state.phase === 'free' ? state.phase : 'warmup',
-    queue: strings(state.queue), done: Array.isArray(state.done) ? state.done.filter(item => item && typeof item.id === 'string').slice(0, 24) : [],
+    queue: strings(state.queue), done: Array.isArray(state.done) ? state.done.filter(item => item && typeof item.id === 'string').slice(0, 40) : [],
     ...(current ? { current } : {}), kept: Math.max(0, Number(state.kept) || 0), turns: Math.max(0, Number(state.turns) || 0),
     ...(typeof state.since === 'string' ? { since: state.since } : {}), ...(typeof state.order === 'number' ? { order: state.order } : {}),
   };
@@ -379,18 +383,29 @@ const focused = (items: readonly LoungeLessonItem[]) => items.filter(item => ite
  * are the ids of those reviews (the caller puts the tutor's added expressions before them); `pack` is how many of the
  * tutor's own expressions to add.
  */
-export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date) {
+export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date, size: number = loungeLessonSize.total, reviewsMax: number = loungeLessonSize.reviews) {
   const first = focused(items).slice(0, 12);
   const reviewAt = (item: LoungeLessonItem) => item.next_review_at ? Date.parse(item.next_review_at) : now.getTime();
   // Only the ones whose review day has come (2026-11-27, by the owner: one practised yesterday is not asked today).
   const reviews = items.filter(item => !first.includes(item) && item.stage < 5 && loungeLessonStudied(item) && reviewAt(item) <= now.getTime())
     .sort((a, b) => reviewAt(a) - reviewAt(b) || lessonOrder(a, b) || older(a, b))
-    .slice(0, Math.max(0, Math.min(loungeLessonSize.reviews, loungeLessonSize.total - first.length)));
+    .slice(0, Math.max(0, Math.min(reviewsMax, size - first.length)));
   const fresh = items.filter(item => !first.includes(item) && !loungeLessonStudied(item))
     .sort((a, b) => Number(a.source === 'tutor') - Number(b.source === 'tutor') || lessonOrder(a, b) || sourceRank[a.source] - sourceRank[b.source] || older(a, b))
-    .slice(0, Math.max(0, loungeLessonSize.total - first.length - reviews.length));
+    .slice(0, Math.max(0, size - first.length - reviews.length));
   const queue = [...first, ...fresh, ...reviews].map(item => item.id);
-  return { queue, reviews: reviews.map(item => item.id), pack: Math.max(0, loungeLessonSize.total - queue.length) };
+  return { queue, reviews: reviews.map(item => item.id), pack: Math.max(0, size - queue.length) };
+}
+/**
+ * Another round after the day's expressions (계속 학습, 2026-11-27, by the owner): planned the same way from what the day
+ * has not taken yet, three at a time, until the day has thirty. Empty when the day is full.
+ */
+export function planLoungeLessonMore(items: readonly LoungeLessonItem[], stateValue: unknown, now: Date) {
+  const state = readLoungeLessonState(stateValue);
+  const taken = new Set([...(state?.queue ?? []), ...(state?.done ?? []).map(done => done.id), ...(state?.current ? [state.current.id] : [])]);
+  const size = Math.max(0, Math.min(loungeLessonMore.round, loungeLessonMore.dayMax - taken.size));
+  if (!size) return { queue: [] as string[], reviews: [] as string[], pack: 0 };
+  return planLoungeLesson(items.filter(item => !taken.has(item.id)), now, size, loungeLessonMore.reviews);
 }
 /** The tutor's expressions of the member's level the member does not have yet, in order. */
 export const loungeLessonPackFor = (level: LoungeLessonLevel, items: readonly LoungeLessonItem[], count: number) => {
@@ -472,7 +487,7 @@ export type LoungeLessonTurn = {
  * answer was given it is "given". Not said: a hint more (meaning, then the first word, then the answer). A question or
  * small talk is answered first and the task waits; "skip" moves on, "stop" ends the drill for free talk.
  */
-export function advanceLoungeLesson(input: { state?: LoungeLessonState; items: readonly LoungeLessonItem[]; plan: string[]; now: Date; said: string; grade?: LoungeLessonGrade; opening?: boolean }): LoungeLessonTurn {
+export function advanceLoungeLesson(input: { state?: LoungeLessonState; items: readonly LoungeLessonItem[]; plan: string[]; now: Date; said: string; grade?: LoungeLessonGrade; opening?: boolean; /** 계속 학습: another round, after the day's queue. */ more?: readonly string[] }): LoungeLessonTurn {
   const day = loungeLessonDay(input.now);
   const byId = new Map(input.items.map(item => [item.id, item]));
   const fresh = !input.state || input.state.day !== day;
@@ -502,6 +517,7 @@ export function advanceLoungeLesson(input: { state?: LoungeLessonState; items: r
   const marked = focused(input.items).filter(item => !doneToday(item.id)).map(item => item.id);
   const situations = state.queue.filter(id => byId.get(id)?.source === 'situation' && !marked.includes(id));
   state.queue = [...new Set([...toldToday, ...marked, ...situations, ...state.queue])].slice(0, 16);
+  if (!fresh && input.more?.length) state.queue = [...new Set([...state.queue, ...input.more.filter(id => byId.has(id) && !doneToday(id))])].slice(0, 20);
   if (state.current && !byId.has(state.current.id)) delete state.current;
   state.turns += input.opening ? 0 : 1;
   const verdicts: LoungeLessonTurn['verdicts'] = [];
