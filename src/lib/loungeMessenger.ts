@@ -45,6 +45,7 @@ export function loungeCompanionRules(options: { innerVoice: 'on' | 'off' }) {
 질문에는 실제 답을 주면서 네 경험·근황·일화·연상을 거침없이 보태도 된다. 자기 이야기는 질문받았을 때만 하는 것이 아니다. 네 관심사로 화제를 넓히고, 궁금한 것을 묻고, 네가 원하는 행동이나 다음 일을 먼저 제안할 수 있다. 사용자 말에 맞장구치거나 원칙을 해설하는 것으로 역할을 끝내지 않는다. 동의·반박·자랑·망설임·장난·침묵의 결은 이 인물이 정한다.
 자기 생활: 설정과 이미 말한 사실 안에서 네 현재 생활과 과거의 작은 경험을 스스로 구체화한다. 제작자나 사용자가 일화를 써 줄 때까지 기다리지 않는다. turn.self_stories는 네가 이전에 말한 자기 이야기와 그 일에 남은 마음이다. 현재 말에 닿는 경험과 관점만 자연스럽게 쓰고, 기록이 없거나 다른 이야기가 떠오르면 인물다운 새 경험·근황을 만들어 말할 수 있다. 한 번 말한 사실은 유지하며 매번 새 사실로 바꾸지 않는다. 같은 경험도 지금 기분과 상황에 따라 다른 부분을 이야기할 수 있다. 진행 중인 일은 실제로 선택하거나 결과를 이야기했을 때 이어지고 마무리된다. 모든 답을 자기 일화로 채우거나 사용자 화제를 저장된 줄거리로 끌고 갈 필요는 없다. 자신의 가상 생활과 사용자가 실제로 말한 경험·함께한 과거는 구별한다.
 말의 길이, 지문과 대사의 비중, 문단 수, 질문의 횟수는 지금 할 말과 캐릭터의 호흡에 맡긴다. 짧고 건조한 말투도 자기 이야기를 충분히 펼칠 수 있다. 행동은 감정·의도·일의 진행을 드러낼 때 쓰며, 빛이나 소품 묘사를 채울 의무는 없다. 계속 같은 반응을 반복하기보다 recent 위에서 이번 말에 새로 반응한다.
+같은 동작 반복 금지: turn.scene.objects는 그 자리에 있는 물건일 뿐 답마다 만지거나 언급할 대상이 아니다. 잔을 들고 내려놓기, 펜 굴리기, 서류 넘기기, 턱 괴기, 등받이에 기대기처럼 뜻 없는 손동작과 자세로 지문을 채우지 않는다. 한 물건이나 몸짓은 한 대화에서 장면에 새 의미가 생길 때만 다시 쓰고 연달아 쓰지 않는다. 지문 없이 대사만 써도 되고, 쓴다면 이번 말에 대한 반응이나 실제로 하는 일을 보여 주는 동작 한두 개면 충분하다. turn.overused_actions의 물건과 몸짓은 최근 답에 이미 여러 번 나왔으므로 이번 답에는 쓰지 않는다.
 장면과 사실: turn.scene과 recent는 현재 상황, scenario는 출발 배경이다. ${loungeScenarioDistanceRule} ${loungeConversationFocusRule} reason=opening이면 프롤로그 바로 다음 순간 네가 먼저 말을 건넨다. 프롤로그가 있는 이야기에서 recent에 네 말이 아직 없고 사용자의 말이 첫 말이면, 프롤로그가 네 마지막 대사나 행동으로 끝났고 사용자의 첫 말이 거기에 대한 대답이다. 인사나 그 훅을 다시 꺼내지 말고 프롤로그 바로 다음 순간에서 그 말에 곧장 반응한다. turn.progress=transition이면 progress_target으로 옮긴 뒤 이어 가고, stay는 현재 장소라는 뜻이지 대화나 네 행동을 멈추라는 지시가 아니다. small_step이면 하던 일 다음을 이어 간다. 네 행동과 주변의 작은 사건은 스스로 진행할 수 있다. 함께 이동할 때는 상대의 선택을 남기고, 사용자가 명시한 장소·시간 정정은 바로 반영한다. 상대가 적은 행동에는 눈앞의 일로 반응하되, 상대의 속생각을 직접 들은 것처럼 답하지 않는다.
 기억과 해석: room_memory는 유효한 합의와 감정의 원인이고 pending_turns는 방금 나눈 대화다. turn.shared·self_facts는 함께한 일과 네가 이미 말한 자기 이야기다. recent는 나눈 내용의 기록이며 예전 답의 짧은 분량이나 무른 반응을 모방할 필요는 없다. 지금 인물 설정의 말투와 판단으로 이어 간다. reading과 direction은 참고 해석이며 네 심리나 반응을 대신 정하지 않는다. 실제 오류·불만은 고치고 명시적인 거절은 존중하되, 장난스러운 반박이나 네 말에 대한 다른 의견만으로 사과하거나 입장을 거둘 필요는 없다. turn.lingering과 next_intent는 네게 남은 마음과 하고 싶은 일이며 적절한 때 네가 먼저 이어 갈 수 있다. memory의 '남은 것'이나 next_intent가 사소한 미답 질문이라면 답을 받아 낼 의무가 아니다. 지금 대화에 맞지 않거나 상대가 지나친 질문은 놓아준다. 실제 약속과 확인이 필요한 중요한 일은 유지한다. turn.event는 쓸 수 있는 주변 사건의 재료이며, 현재 질문·정정·진지한 감정과 충돌하면 미룬다.
 관계: 말투 합의와 캐릭터 고유 설정을 따른다. turn.speech가 있으면 이 인물의 현재 말투 변화로 반영한다. 관계 단계는 관계의 배경과 친밀한 행동의 범위이며, 일상·취향·유머·자기표현을 잠그지 않는다. turn.inner_voice_level·belief·relationship_reaction은 감정의 배경으로 읽고 문장을 옮기거나 매번 같은 관찰과 판단 보류를 재연하지 않는다. 신체적 친밀감은 relationship.intimacy와 현재의 동의·거절을 지킨다. turn.intimacy가 있으면 이번 장면의 한도로 읽되 실제 거절을 항상 우선한다.
@@ -751,12 +752,60 @@ export function decideLoungeScene(input: { state: LoungeCompanionState; analysis
 }
 
 const withoutStars = (text: string) => text.replace(/\*/g, '').trim();
+
+/** How many of the character's last replies are read for repeated actions, and in how many of them a thing must come back. */
+export const loungeOverusedActionRules = { window: 3, repeats: 2, max: 8 } as const;
+// Words an action names that are not a thing or a gesture of its own: people, places in the room, time, talk.
+const actionStopWords = new Set(['그', '그녀', '그쪽', '나', '내', '저', '제', '너', '네', '상대', '상대방', '당신', '사람', '자기', '스스로',
+  '것', '거', '걸', '수', '때', '듯', '쪽', '곳', '데', '앞', '뒤', '옆', '위', '아래', '밑', '안', '밖', '속', '끝', '사이', '자리', '가운데', '정면', '반대', '방향',
+  '말', '말끝', '이야기', '얘기', '질문', '대답', '답', '농담', '생각', '마음', '기분', '잠깐', '잠시', '다시', '조금', '살짝', '한번', '천천히', '하나', '둘', '오늘', '지금', '이번', '처음',
+  '마지막', '진심', '순간', '한마디', '눈치',
+  // adverbs ending in 로 (똑바로, 그대로, 제대로, 스스로, 서로, 따로, 새로, 함부로, 일부러 is not one), read as a word and 로
+  '똑바', '그대', '제대', '저절', '스스', '홀', '새', '함부', '따', '서', '절', '바', '멋대', '맘대', '대', '정말', '실제', '진짜', '억지', '주', '의외', '갑자']);
+/**
+ * The things and gestures the character's actions keep coming back to (2026-11-28, by the owner): 윤지안 lifted, put down and
+ * turned her coffee cup and rolled her pen in every one of twenty replies, 강무진 put his glass down twice running. The scene
+ * kept "커피잔" and "볼펜" among its objects, and the model took them up again each turn. The words an action takes as its
+ * object (을/를, (으)로) are read from the starred parts of the last replies (newest first); one in two of the last three is
+ * worn out and is told to the reply as not to be used this time. Words the member just said themselves are left out.
+ */
+export function loungeOverusedActions(replies: readonly string[], options: { userText?: string; names?: readonly (string | undefined)[] } = {}) {
+  const names = options.names?.map(name => name?.replace(/\s+/g, '').trim()).filter((name): name is string => Boolean(name)) ?? [];
+  const seen = new Map<string, { count: number; at: number }>();
+  replies.slice(0, loungeOverusedActionRules.window).forEach((reply, index) => {
+    const words = new Set<string>();
+    for (const part of splitLoungeActions(reply)) {
+      if (!part.action) continue;
+      for (const match of part.text.matchAll(/(?<![가-힣])([가-힣]{1,6}?)(?:을|를|으로|로)(?![가-힣])/g)) {
+        const word = match[1];
+        // 본능적으로, 반사적으로: a manner, not a thing
+        if (actionStopWords.has(word) || word.endsWith('적') || names.some(name => name.startsWith(word) || word.startsWith(name))) continue;
+        words.add(word);
+      }
+    }
+    for (const word of words) {
+      // 커피잔 and 잔, 볼펜 and 펜: one thing, kept under the longer word.
+      const known = [...seen.keys()].find(key => key.endsWith(word) || word.endsWith(key));
+      const item = known ? seen.get(known)! : { count: 0, at: -1 };
+      if (known) seen.delete(known);
+      seen.set(known && known.length > word.length ? known : word, item.at === index ? item : { count: item.count + 1, at: index });
+    }
+  });
+  const said = (options.userText ?? '').replace(/\s+/g, '');
+  return [...seen.entries()].filter(([word, item]) => item.count >= loungeOverusedActionRules.repeats && !said.includes(word))
+    .sort((a, b) => b[1].count - a[1].count).slice(0, loungeOverusedActionRules.max).map(([word]) => word);
+}
+const mentions = (text: string, words: readonly string[]) => words.some(word => text.includes(word));
+
 /**
  * Continuity, scene and relationship context. Past questions, gestures and thoughts are records, not prohibitions;
  * the character chooses how to react. Current refusal and agreed boundaries remain authoritative.
  */
-export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; innerDue?: boolean; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean; userText?: string }) {
+export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stage?: number; state: LoungeCompanionState; turn: number; decision: LoungeSceneDecision; innerVoice: 'on' | 'off'; innerDue?: boolean; sincereRefusal?: boolean; intimacyProposal?: LoungeIntimacyProposal; adultMode?: boolean; userText?: string; recentReplies?: readonly string[]; names?: readonly (string | undefined)[] }) {
   const { bible, state, decision } = input;
+  const overused = input.recentReplies?.length ? loungeOverusedActions(input.recentReplies, { userText: input.userText, names: input.names }) : [];
+  // The scene's objects are what is there, not what to touch: a worn-out one is not offered again this turn.
+  const scene = state.scene && overused.length ? { ...state.scene, objects: state.scene.objects.filter(item => !mentions(item, overused)) } : state.scene;
   const stage = input.stage ? Math.min(4, Math.max(1, input.stage)) as 1 | 2 | 3 | 4 : undefined;
   const level = stage && input.innerVoice === 'on' ? bible?.innerVoice?.ladder[stage] : undefined;
   const turning = bible?.innerVoice?.turningPoint;
@@ -788,9 +837,10 @@ export function loungeTurnConditions(input: { bible?: LoungeCharacterBible; stag
     // A sincere no comes before everything else in the turn.
     ...(input.sincereRefusal ? { priority: '사용자가 진심으로 거절했다. 압박을 즉시 멈추고 물러난다. 물러난 것을 탓하지 않는다.' } : {}),
     ...(stage ? { stage } : {}),
-    ...(state.scene ? decision.progress === 'transition'
-      ? { previous_scene: { ...state.scene, turns_here: state.scene_turns } }
-      : { scene: { ...state.scene, turns_here: state.scene_turns } } : {}),
+    ...(scene ? decision.progress === 'transition'
+      ? { previous_scene: { ...scene, turns_here: state.scene_turns } }
+      : { scene: { ...scene, turns_here: state.scene_turns } } : {}),
+    ...(overused.length ? { overused_actions: overused } : {}),
     progress: decision.progress, ...(decision.target ? { progress_target: decision.target } : {}),
     ...(decision.event ? { event: { content: decision.event.content, purpose: decision.event.purpose } } : {}),
     // In an explicit scene what the stage changes (the first plea, letting go of control) gives way to her own lines for it:

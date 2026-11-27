@@ -326,7 +326,7 @@ async function sceneBackground(context: Context, userId: string, roomId: string,
     const [stateRow] = stateRows?.ok ? await stateRows.json() as Array<{ state: unknown }> : [];
     const engine = readEngineScene(stateRow?.state);
     const now = Date.now();
-    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory) || scenario?.place, sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), story: Boolean(scenario), manual: Boolean(hand), pickedAt, now });
+    const decision = decideSceneFollow({ scene: engine.scene, memoryLine: loungeSceneFromMemory(room.memory) || scenario?.place, sceneTurns: engine.scene ? engine.sceneTurns : 99, change: engine.change, follow: readSceneFollow(room.background?.follow), story: Boolean(scenario), storyPlace: scenario?.place, manual: Boolean(hand), pickedAt, now });
     if (decision.action === 'keep') return json({ background: null });
     followNote = { key: decision.key, at: now, place: decision.place };
     scene = sceneForMatch(engine.scene, decision.place);

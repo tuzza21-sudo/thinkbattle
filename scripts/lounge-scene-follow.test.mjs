@@ -257,3 +257,50 @@ test('every place the background picker shows can be picked: the last definition
   const missing = loungeThemes.filter(theme => !list.includes(`'${theme.id}'`)).map(theme => theme.id);
   assert.deepEqual(missing, [], `${last} does not list: ${missing.join(', ')}`);
 });
+
+test('a story starts from its own place, not the engine\'s wording of it (2026-11-28: 강무진\'s boardroom became his office)', () => {
+  const storyPlace = '계약서에 서명한 날 오전, 고층 빌딩에 있는 그의 자문사 중역 회의실(협상장). 긴 월넛 테이블 위에 서명한 합의서가 놓여 있다.';
+  const start = decide({ story: true, storyPlace, scene: scene('강무진의 사무실', '회사'), sceneTurns: 2, change: { turn: 1, at: now - 2 * minute, explicit: false } });
+  assert.equal(start.action, 'apply'); assert.equal(start.reason, 'first');
+  assert.match(start.place, /중역 회의실/);
+  // once the start is set, the engine's other wording of the same room keeps it
+  const set = { key: start.key, at: now - 60 * minute, place: start.place };
+  assert.equal(decide({ story: true, storyPlace, scene: scene('강무진의 사무실', '회사'), sceneTurns: 9, follow: set }).reason, 'story_stays');
+  // an explicit move at the start is still followed
+  const moved = decide({ story: true, storyPlace, scene: scene('한남동 와인바', '바'), sceneTurns: 0, change: { turn: 3, at: now - minute, explicit: true } });
+  assert.equal(moved.place, '한남동 와인바');
+  // a chat that is not a story is not touched
+  assert.equal(decide({ storyPlace, scene: scene('집 거실', '집') }).place, '집 거실');
+});
+
+// The last replies of 윤지안 (2026-11-27), newest first: a coffee cup and a pen in every one of them.
+const jianReplies = [
+  '*커피잔을 내려놓고 살짝 웃는다.* 집착이라고 하면 좀 억울하네요. *볼펜을 손끝으로 한 바퀴 돌리다가 멈춘다.* 성실한 건 기본이고요.',
+  '*볼펜을 손끝에서 한 바퀴 돌리다가 입꼬리를 살짝 올린다.* 칭찬으로 들려서 고마워요. *고개를 살짝 기울인다.* *커피잔을 밀어 놓고 지수를 똑바로 본다.*',
+  '*볼펜을 내려놓고 지수를 똑바로 본다.* 이혼남인 것 자체는 괜찮아요. *커피잔을 손끝으로 천천히 돌린다.*',
+  '*식은 커피잔을 옆으로 밀고 팔을 테이블에 걸친다.* 오래된 얘기예요.',
+];
+
+test('the things a character\'s actions keep coming back to are found in its last replies (2026-11-28)', () => {
+  const worn = messenger.loungeOverusedActions(jianReplies, { names: ['지수', '윤지안'] });
+  assert.deepEqual(worn.slice(0, 2).sort(), ['볼펜', '커피잔']);
+  assert.ok(worn.includes('손끝'), 'the same hand on the cup and the pen');
+  assert.ok(!worn.includes('지수'), 'the member\'s name is not a gesture');
+  assert.ok(!worn.includes('고개'), 'once in three is not worn out');
+  // what the member just brought up themselves is theirs to bring up
+  assert.ok(!messenger.loungeOverusedActions(jianReplies, { userText: '커피 한 잔 더 하실래요? 그 커피잔 비었네요' }).includes('커피잔'));
+  // a glass and a coffee glass are one thing; the dialogue outside the stars is not read
+  assert.deepEqual(messenger.loungeOverusedActions(['*잔을 내려놓는다.* 볼펜은 왜요?', '*커피잔을 든다.* 볼펜을 주세요.']), ['커피잔']);
+  assert.deepEqual(messenger.loungeOverusedActions([]), []);
+});
+
+test('the reply is told the worn-out actions, and the scene no longer offers those objects', () => {
+  const state = messenger.normalizeLoungeCompanionState({ room_id: 'r1', scene: { location: '신문사 사옥 옥상 정원', scene_type: '기타', activity: '마주 앉아 이야기', time_of_day: '오후', season: '', objects: ['기획 기사', '포럼 발표문', '커피잔', '사원증', '볼펜'] } }, 'r1');
+  const turn = messenger.loungeTurnConditions({ state, turn: 21, decision: { progress: 'stay' }, innerVoice: 'off', userText: '최근 연애는요?', recentReplies: jianReplies, names: ['지수'] });
+  assert.ok(turn.overused_actions.includes('커피잔') && turn.overused_actions.includes('볼펜'));
+  assert.deepEqual(turn.scene.objects, ['기획 기사', '포럼 발표문', '사원증']);
+  const fresh = messenger.loungeTurnConditions({ state, turn: 2, decision: { progress: 'stay' }, innerVoice: 'off', recentReplies: ['*발표문을 넘긴다.* 왔어요?'] });
+  assert.equal(fresh.overused_actions, undefined);
+  assert.equal(fresh.scene.objects.length, 5);
+  assert.match(messenger.loungeCompanionRules({ innerVoice: 'off' }), /turn\.overused_actions/);
+});

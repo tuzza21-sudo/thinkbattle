@@ -3331,7 +3331,7 @@ export function loungeCompanionSheetPrompt(character: LoungeCharacter | undefine
     ...(bible.voice?.length ? [`분량과 말버릇 참고(고정 문장 수나 상한이 아니다): ${bible.voice.length}`] : []),
     ...(bible.voice?.rhythm ? [`대화 호흡: ${bible.voice.rhythm}`] : []),
     ...(bible.voice?.signature ? [`말의 결: ${bible.voice.signature}`] : []),
-    ...(bible.actionAnchors?.length ? [`행동의 예(인물의 의도와 감정에 맞게 자유롭게 움직인다. 이 목록을 순서대로 재현하거나 소품을 반드시 쓸 필요는 없다): ${bible.actionAnchors.join(' / ')}`] : []),
+    ...(bible.actionAnchors?.length ? [`행동의 예(인물의 의도와 감정에 맞게 자유롭게 움직인다. 이 목록을 순서대로 재현하거나 소품을 반드시 쓸 필요는 없고, 한 대화에서 같은 행동을 되풀이하지 않는다): ${bible.actionAnchors.join(' / ')}`] : []),
     ...(bible.innerVoice && innerVoice === 'on' ? [`속마음의 말투: ${bible.innerVoice.style}${bible.innerVoice.favoriteTypes?.length ? ` 자주 보이는 결: ${bible.innerVoice.favoriteTypes.join(', ')}.` : ''}`] : []),
     ...(leaks.length ? [`속마음은 대사와 행동에 이렇게 새어 나온다(방식만 따르고 문장은 옮기지 않는다):${newline}${leaks.map(line => `- ${line}`).join(newline)}`] : []),
     ...(bible.exceptionFormula ? [`예외 공식(baseline과 specialToMe의 대비를 드러내는 말): ${bible.exceptionFormula.rule}${bible.exceptionFormula.example ? ` 예: ${bible.exceptionFormula.example}(결만 참고하고 그대로 쓰지 않는다)` : ''}`] : []),
