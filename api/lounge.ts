@@ -516,7 +516,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-enrich', 'training-start', 'class-pick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-situation-edit', 'lesson-enrich', 'training-start', 'class-pick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -777,6 +777,24 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!made.rows.length) return json({ error: '이 상황에 맞는 표현을 만들지 못했어요. 영어로 말해야 하는 장면을 조금 더 구체적으로 적어 주세요.' }, 422);
       console.info('[Lounge lesson]', JSON.stringify({ situation: true, made: made.rows.length }));
       return json({ title: made.title, items: made.rows });
+    }
+
+    // 영어 수업 학습 보드: the member writes an expression's situation over or takes it off (2026-11-27, by the owner). The
+    // board may not change the row itself (only focus is granted), so it is done here, for the member's own row only.
+    if (body.action === 'lesson-situation-edit') {
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
+      const itemId = typeof body.itemId === 'string' && /^[a-f0-9-]{36}$/.test(body.itemId) ? body.itemId : '';
+      if (!itemId) return json({ error: '어떤 표현인지 알 수 없어요.' }, 400);
+      const situation = typeof body.situation === 'string' ? body.situation.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id || !isLoungeTutor(mine.host_persona)) return json({ error: '영어 수업에서만 쓸 수 있어요.' }, 403);
+      const response = await fetchTimed(`${url}/rest/v1/lounge_english_items?id=eq.${encodeURIComponent(itemId)}&user_id=eq.${encodeURIComponent(user.id)}&select=id`, { method: 'PATCH',
+        headers: { ...serviceHeaders, Prefer: 'return=representation' }, body: JSON.stringify({ situation: situation || null, updated_at: new Date().toISOString() }) });
+      const rows = response.ok ? await readJson<Array<{ id: string }>>(response, 'lounge') : [];
+      if (!rows.length) return json({ error: '상황을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.' }, response.ok ? 404 : 502);
+      return json({ ok: true });
     }
 
     // 영어 수업 학습 보드: each expression's importance (1-3), difficulty (CEFR) and, where it has none, a situation where it
