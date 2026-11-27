@@ -96,6 +96,28 @@ test('character-specific prompt choices preserve autonomy without compulsory com
   assert.doesNotMatch(reporter.bible.sceneEvents.map(event => event.content + event.purpose).join(' '), /그의 휴대폰|둘 다 펄쩍|아직도 안 사귀어/);
 });
 
+test('Jian shares one ambitious profile between the character page, persona and reply instructions', () => {
+  const character = loungeCharacters.find(item => item.id === 'diplomat');
+  const host = loungeHosts.find(item => item.id === 'diplomat');
+  const publicCopy = [character.tagline, ...character.story, ...character.personality.map(item => item.text), character.tastes, loungeCharacterProfiles.diplomat.summary].join('\n');
+  const prompt = [loungePersonaPrompt(character), loungeBiblePrompt(character), loungeCompanionSheetPrompt(character, 'on'), host.companion].join('\n');
+  for (const copy of [publicCopy, prompt]) {
+    assert.match(copy, /정치|정계/);
+    assert.match(copy, /명예/);
+    assert.match(copy, /야망/);
+    assert.match(copy, /실행/);
+    assert.match(copy, /반년 전/);
+    assert.doesNotMatch(copy, /3년|삼 년|오래된 우정|우정을 잃|친구 이상의|서운해 물러서면/);
+  }
+  assert.ok(character.wins.some(move => move.event === 'FOLLOWS_THROUGH'));
+  assert.ok(character.wins.some(move => move.event === 'KEEPS_PROMISE'));
+  const config = relationshipConfigs.diplomat;
+  assert.ok(config.events.FOLLOWS_THROUGH.deltas.banter > config.events.MAKES_WITTY_RESPONSE.deltas.banter);
+  assert.equal(config.events.FOLLOWS_THROUGH.deltas.romance, undefined, 'professional competence does not itself accept romance');
+  assert.equal(config.uniqueMetrics[0].id, 'banter', 'stored recognition scores keep their existing key');
+  assert.match(prompt, /기존.*관계|방의 기록/);
+});
+
 test('her flirtation and dominance are written down with their limits, and nobody else is given them', () => {
   const { loungeHosts } = loadTs(fileURLToPath(new URL('../src/lib/lounge.ts', import.meta.url)));
   const velvet = loungeHosts.find(host => host.id === 'velvet');

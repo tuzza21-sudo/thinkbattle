@@ -21,7 +21,7 @@ function run(config, turns, start = createRelationship(config)) {
 }
 const withScores = (config, scores, stage) => ({ ...createRelationship(config), scores: { ...createRelationship(config).scores, ...scores }, ...(stage ? { stage } : {}) });
 
-const uniqueMetricOf = { closer: ['nerve', '배짱'], diplomat: ['banter', '티키타카'], auditor: ['candor', '솔직함'], trickster: ['mental', '멘탈'],
+const uniqueMetricOf = { closer: ['nerve', '배짱'], diplomat: ['banter', '인정'], auditor: ['candor', '솔직함'], trickster: ['mental', '멘탈'],
   velvet: ['boldness', '대담함'], ina: ['banter', '티키타카'], jaeseok: ['viewpoint', '시선'], guide: ['pace', '발걸음'], shaman: ['banter', '기싸움'], poker: ['judgment', '맞수'], teacher: ['tension', '긴장감'], interpreter: ['clarity', '분명함'], explorer: ['rope', '자일'] };
 const retiredNow = ['PLAYS_ALONG', 'SHOWS_CURIOSITY', 'ASKS_GOOD_QUESTION', 'ANSWERS_DIRECTLY', 'CORRECTS_UNDERSTANDING', 'SHOWS_COMPOSURE', 'SHOWS_DECISIVENESS', 'ACKNOWLEDGES_OTHER_VIEW', 'REFRAMES_CONSTRUCTIVELY', 'MAKES_CREATIVE_JOKE'];
 const warm = [['SHARES_FEELING'], ['SHOWS_CARE'], [], ['REMEMBERS_DETAIL'], ['FLIRTS_PLAYFULLY'], [], ['KEEPS_PROMISE'], ['SHOWS_VULNERABILITY'], [], ['APPRECIATES_SINCERELY'], ['BUILDS_ON_INSIDE_JOKE'], []];
@@ -43,7 +43,7 @@ test('every shipped character is scored on three metrics (empathy, romance and o
     assert.deepEqual([configs[id].uniqueMetrics[0].id, configs[id].uniqueMetrics[0].name], [metric, name], id);
   }
   assert.equal(createRelationship(configs.velvet).scores.boldness, 40);
-  assert.equal(createRelationship(configs.diplomat).scores.empathy, 55, 'three years of friendship');
+  assert.equal(createRelationship(configs.diplomat).scores.empathy, 35, 'a new acquaintance, without years of assumed friendship');
   // Interest, respect, comfort, openness and trust are gone.
   for (const config of Object.values(configs)) for (const metric of ['interest', 'respect', 'comfort', 'openness', 'trust']) assert.equal(metric in createRelationship(config).scores, false, `${config.characterId} ${metric}`);
 });
@@ -58,7 +58,7 @@ test('2. the same event produces different deltas for each character', () => {
   assert.notDeepEqual(run(configs.ina, [[event('MAKES_WITTY_RESPONSE')]]).logs[0].delta, run(configs.diplomat, [[event('MAKES_WITTY_RESPONSE')]]).logs[0].delta);
   const boundary = run(configs.velvet, [[event('VIOLATES_BOUNDARY')]]).logs[0].delta;
   assert.deepEqual(boundary, { empathy: -12, romance: -8 }, 'severe loss is limited only by the current score');
-  assert.deepEqual(run(configs.diplomat, [[event('MAKES_WITTY_RESPONSE')]]).logs[0].delta, { banter: 4 });
+  assert.deepEqual(run(configs.diplomat, [[event('MAKES_WITTY_RESPONSE')]]).logs[0].delta, { banter: 2 });
   assert.deepEqual(run(configs.closer, [[event('MAKES_WITTY_RESPONSE')]]).logs[0].delta, {}, 'a joke is no help with a man who is won by nerve');
 });
 
@@ -265,7 +265,8 @@ test('each character grows by its own metric, and the situations that fit it hav
     assert.ok(relationship.relationshipEventLabels[type].length > 0, type);
   }
   assert.deepEqual(delta('diplomat', 'PLANS_TOGETHER'), {});
-  for (const id of ['shaman', 'diplomat']) assert.deepEqual(configs[id].stages.map(stage => relationshipPromptContext({ ...createRelationship(configs[id]), stage: stage.id }, configs[id], initialMood(configs[id])).speech_level), configs[id].stages.map(() => 'casual'));
+  assert.deepEqual(configs.shaman.stages.map(stage => relationshipPromptContext({ ...createRelationship(configs.shaman), stage: stage.id }, configs.shaman, initialMood(configs.shaman)).speech_level), configs.shaman.stages.map(() => 'casual'));
+  assert.deepEqual(configs.diplomat.stages.map(stage => relationshipPromptContext({ ...createRelationship(configs.diplomat), stage: stage.id }, configs.diplomat, initialMood(configs.diplomat)).speech_level), ['polite', 'polite', 'casual', 'casual']);
   assert.equal(configs.trickster.casualFromStart, true);
 });
 
@@ -379,7 +380,7 @@ test('pace: closeness comes from what is said, not from talking; the second stag
   const own = {
     closer: [['NEGOTIATES_BOLDLY'], ['CALLS_BLUFF'], [], ['STANDS_GROUND'], ['FLIRTS_PLAYFULLY'], [], ['SHARES_FEELING'], ['RAISES_STAKES'], [], ['SHOWS_CARE'], ['CHALLENGES_CHARACTER'], []],
     velvet: [['STANDS_GROUND'], ['MAKES_BOLD_MOVE'], [], ['FLIRTS_PLAYFULLY'], ['CHALLENGES_CHARACTER'], ['KEEPS_PROMISE'], [], ['SHARES_FEELING'], ['APPRECIATES_SINCERELY'], ['FLIRTS_PLAYFULLY']],
-    diplomat: [['MAKES_WITTY_RESPONSE'], ['TAKES_JOKE_WELL'], ['FLIRTS_PLAYFULLY'], [], ['BUILDS_ON_INSIDE_JOKE'], ['REMEMBERS_DETAIL'], [], ['CREATES_RUNNING_JOKE'], ['SHARES_FEELING'], ['FLIRTS_PLAYFULLY']],
+    diplomat: [['FOLLOWS_THROUGH'], ['KEEPS_PROMISE'], ['FLIRTS_PLAYFULLY'], [], ['BOUNCES_BACK'], ['REMEMBERS_DETAIL'], [], ['CHALLENGES_CHARACTER'], ['SHARES_FEELING'], ['FLIRTS_PLAYFULLY']],
     trickster: [['BOUNCES_BACK'], ['STANDS_GROUND'], [], ['TAKES_JOKE_WELL'], ['CALLS_BLUFF'], ['SHARES_FEELING'], [], ['FLIRTS_PLAYFULLY'], ['SHOWS_CARE'], ['FLIRTS_PLAYFULLY']],
     ina: [['MAKES_WITTY_RESPONSE'], ['CALLS_BLUFF'], [], ['BUILDS_ON_INSIDE_JOKE'], ['FLIRTS_PLAYFULLY'], ['CREATES_RUNNING_JOKE'], [], ['SHARES_FEELING'], ['TAKES_JOKE_WELL'], ['FLIRTS_PLAYFULLY']],
     jaeseok: [['SHARES_VIEW'], ['CALLS_BLUFF'], [], ['SHARES_FEELING'], ['APPRECIATES_SINCERELY'], ['FLIRTS_PLAYFULLY'], [], ['BUILDS_ON_INSIDE_JOKE'], ['MAKES_CHARACTER_ADMIT'], ['FLIRTS_PLAYFULLY']],
@@ -400,7 +401,7 @@ test('one-to-one speech starts polite for everyone; every character that turns c
   }
   assert.equal(fromTemplates.filter(config => config.casualFromStage).length, 4, 'every template turns casual too');
   assert.deepEqual(Object.values(configs).filter(config => !config.casualFromStage && !config.casualFromStart).map(config => config.characterId), ['auditor', 'closer', 'velvet', 'poker', 'teacher', 'interpreter'], 'the characters whose sheets keep polite speech');
-  // 윤지안 and the member are friends of three years: 반말 from the start (2026-11-02), checked in her own test.
+  // Existing story-specific speech agreements are handled separately from a new relationship's default.
   for (const config of Object.values(configs).filter(item => !item.casualFromStart)) {
     assert.equal(relationshipPromptContext(createRelationship(config), config, initialMood(config)).speech_level, 'polite', `${config.characterId} starts polite`);
     const stageIds = config.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);

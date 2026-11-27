@@ -8,6 +8,22 @@ import { checkStory } from './upsert-lounge-story.mjs';
 const story = loadTs(fileURLToPath(new URL('../src/lib/loungeStory.ts', import.meta.url)));
 const relationship = loadTs(fileURLToPath(new URL('../src/lib/relationship/index.ts', import.meta.url)));
 const blackRose = JSON.parse(readFileSync(new URL('../docs/stories/velvet-black-rose.json', import.meta.url), 'utf8'));
+
+test('Jian starts from the corrected byline story without replacing existing room snapshots', () => {
+  const scenario = JSON.parse(readFileSync(new URL('../docs/stories/diplomat-byline.json', import.meta.url), 'utf8'));
+  assert.deepEqual(checkStory(scenario), []);
+  assert.equal(scenario.character_id, 'diplomat');
+  assert.equal(scenario.theme, 'embassy');
+  assert.match(scenario.relationship, /반년 전/);
+  assert.doesNotMatch(JSON.stringify(scenario), /3년|남사친|이미.*좋아했|A군/);
+  const { loungeScenarioCasualStart } = loadTs(fileURLToPath(new URL('../src/lib/loungeScenarios.ts', import.meta.url)));
+  assert.equal(loungeScenarioCasualStart.has(scenario.id), false, 'the new acquaintance starts politely');
+  assert.equal(loungeScenarioCasualStart.has('diplomat-old-friend-fling'), true, 'an existing friendship story keeps its speech agreement');
+  const migration = readFileSync(new URL('../supabase/migrations/20270126000000_lounge_diplomat_byline.sql', import.meta.url), 'utf8');
+  assert.match(migration, /ON CONFLICT \(id\) DO UPDATE/);
+  assert.match(migration, /SET active=false/);
+  assert.doesNotMatch(migration, /(?:DELETE FROM|UPDATE) public\.voice_lounge_(?:rooms|relationships|companion_state)/i);
+});
 const episodes = story.normalizeLoungeStoryEpisodes(blackRose.episodes);
 const velvetStages = relationship.relationshipConfigs.velvet.stages.filter(stage => stage.enabled !== false).map(stage => stage.id);
 
@@ -27,10 +43,11 @@ test('contract dates use the agreed story while other characters, stories and ph
   assert.equal(loungeScenarioRelationshipContext(original, undefined, 'closer'), original);
   assert.equal(loungeScenarioRelationshipContext(original, { id: 'another-story' }, 'closer'), original);
   assert.equal(loungeScenarioRelationshipContext(original, contract, 'trickster'), original);
-  // 윤지안 and the member are friends of three years: ordinary plans are open from the start (2026-11-05).
-  const friends = loungeScenarioRelationshipContext(original, { id: 'diplomat-old-friend-fling' }, 'diplomat');
+  // A new acquaintance can make ordinary plans without finishing a case or proving their ability.
+  const friends = loungeScenarioRelationshipContext(original, { id: 'diplomat-byline' }, 'diplomat');
   assert.match(friends.outing, /평범한 약속은 자기 기분과 일정으로 판단하고 먼저 제안/);
   assert.match(friends.outing, /현재 관계에서 판단하고 다시 미정으로 돌리지 않는다/);
+  assert.doesNotMatch(friends.outing, /3년|오랜 친구/);
   assert.deepEqual({ ...friends, outing: original.outing }, original, 'only the outing changes');
 });
 

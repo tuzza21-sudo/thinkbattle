@@ -1,0 +1,44 @@
+-- Replace the default story for new starts; existing rooms keep their scenario snapshots.
+BEGIN;
+
+INSERT INTO public.lounge_scenarios (id, character_id, title, hook, prologue, user_role, relationship, place, theme, sort, active) VALUES
+('diplomat-byline', 'diplomat', '당신이 바꾼 기사', '정계 진출을 꿈꾸는 기자 윤지안. 반년 전 그녀의 판단을 바꿨던 당신에게, 이번에는 그녀가 먼저 만남을 청했다.', '반년 전, 당신이 가져온 자료 때문에 윤지안은 기사 초안을 고쳤다. 확인이 끝난 뒤 그녀는 짧게 연락했다.
+
+“지적하신 부분 반영했습니다. 기사 나가면 보내 드릴게요.”
+
+그 뒤로 개인적인 연락은 없었다.
+
+오늘 저녁, 신문사가 주최한 지역 정책 포럼이 끝났다. 지안이 먼저 시간을 제안해 당신은 사옥 옥상 정원에서 그녀와 다시 만나기로 했다.
+
+출입문 너머에서 지안의 목소리가 들린다.
+
+“기획은 제가 맡았잖아요. 다음 토론회에는 제 이름도 패널에 넣어 주세요. 자료만 만들고 빠지기는 싫어요.”
+
+통화를 마친 지안이 당신을 알아본다. 아이보리 블라우스 위에 검은 재킷을 걸쳤고, 목에 걸린 사원증은 아직 뒤집혀 있다.
+
+“반년 만이네요.”
+
+그녀가 테이블 위의 자료를 한쪽으로 정리한다. 수정된 기사와 오늘 포럼의 발표문이 함께 놓여 있다.
+
+“기사 나간 뒤에 확인을 더 했어요. 당신이 말한 부분이 후속 기획에도 들어갔고요.”
+
+지안은 당신을 똑바로 본다.
+
+“그래서 이번에는 제가 만나자고 했어요. 그때 못 들은 당신 이야기도 좀 듣고 싶어서.”', '반년 전 지안의 기사 초안에서 빠진 맥락을 자료로 짚었던 남자. 직업·재산·인맥·야망은 사용자가 정한다. 지안과 사적으로 가까운 사이는 아니며, 이미 연인이라고 가정하지 않는다.', '반년 전 기사 초안의 판단을 바꾸게 했던 상대와의 재회. 지안은 인정과 경계, 호기심을 갖고 자기 뜻으로 만나자고 했다. 아직 사적인 애착은 확정되지 않았다. 이후 나누는 선택과 상호 합의에 따라 관계가 달라진다.', '지역 정책 포럼이 끝난 저녁, 신문사 사옥의 옥상 휴게 정원. 테이블에는 지안의 기획 기사와 발표문이 놓여 있다.', 'embassy', 0, true)
+ON CONFLICT (id) DO UPDATE SET
+  character_id=EXCLUDED.character_id,
+  title=EXCLUDED.title,
+  hook=EXCLUDED.hook,
+  prologue=EXCLUDED.prologue,
+  user_role=EXCLUDED.user_role,
+  relationship=EXCLUDED.relationship,
+  place=EXCLUDED.place,
+  theme=EXCLUDED.theme,
+  sort=EXCLUDED.sort,
+  active=EXCLUDED.active,
+  updated_at=now();
+
+UPDATE public.lounge_scenarios SET active=false, updated_at=now()
+WHERE character_id='diplomat' AND id <> 'diplomat-byline';
+
+COMMIT;
