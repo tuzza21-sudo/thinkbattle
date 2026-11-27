@@ -1368,6 +1368,10 @@
 .lounge-lesson-list li.studied { opacity:.78; }
 .lounge-lesson-badge.studied { border-color:#9fd8a880; color:#9fd8a8; }
 .lounge-lesson-badge.fresh { border-color:#ffffff33; opacity:.75; }
+.lounge-lesson-status { font-weight:700; }
+.lounge-lesson-status.new { border-color:#ffffff33; opacity:.75; }
+.lounge-lesson-status.studied { border-color:#9fd8a880; color:#9fd8a8; }
+.lounge-lesson-status.mine { border-color:#ffd27a80; color:#ffd27a; }
 .lounge-lesson-badge.importance-3 { border-color:#ffd27a; color:#ffd27a; }
 .lounge-lesson-badge.importance-2 { border-color:#ffffff55; }
 .lounge-lesson-badge.importance-1 { opacity:.7; }

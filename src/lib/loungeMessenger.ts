@@ -1049,3 +1049,25 @@ export function readLoungeTurnAnalysis(raw: unknown): { analysis?: LoungeAnalysi
     ...(analysis.is_sincere_refusal ? { reaction: '진지하게 듣기' as const, goal: '압박을 멈추고 사용자의 거절을 존중한다' }
       : analysis.is_repair_request ? { goal: '지적된 사실이나 불편함을 바로잡고 반응의 말투와 감정은 인물답게 이어 간다' } : {}) } } : {}) };
 }
+
+// ── A practice room (lesson, class, training) ──
+/**
+ * A practice room's chat reply (2026-11-27, by the owner: "체험학습에서는 관계 필요 없으니 간소하게"): an English lesson,
+ * a class or a training is not the chat engine's scene. Its reply gets only what it needs: who the character is, who
+ * the member is (their persona), the mode's own rules and this turn's task. It gets none of the companion's life, scene,
+ * room record, photos or relationship. Its JSON has only the text (and an empty inner voice), so the first words come
+ * at once: the companion reply writes `character_life` before its text.
+ */
+export const loungePracticeRules = `이 방은 실전 체험(영어 수업·클래스·실전 훈련)이다. 일상 장면이나 연애 이야기가 아니고 관계 점수나 단계도 없다. 너는 위 인물 그대로의 성격·말투·유머로 이 체험을 이끈다.
+이번 턴에 할 일은 입력의 lesson·class·training에 있고 코드가 이미 정했다. 그대로 따르고, 그 안의 단계·점수·판정 이름은 대사로 읽지 않는다.
+recent는 지금까지 나눈 대화이고 memory는 그 요약이다. recent의 마지막 사용자 말에 먼저 답한다. 같은 설명이나 칭찬을 되풀이하지 않는다.
+room_memory가 있으면 이 방에서 정한 합의(말투 등)이고 명시적으로 바꾸기 전까지 유지한다. member_name은 상대를 부를 이름이다.
+행동 묘사는 꼭 필요할 때만 *별표 한 쌍* 안에 짧게 쓰고, 체험은 말로 진행한다. 사용자의 말·행동·선택을 대신 쓰지 않는다.
+reply_char_limit는 text 글자 수의 상한이며 채울 필요는 없다. 출력은 JSON 객체 하나다. text에 네 말을 쓰고, inner_voice는 빈 문자열이다.`;
+
+export const loungePracticeReplySchema = {
+  type: 'object', properties: { text: { type: 'string' }, inner_voice: { type: 'string' } }, required: ['text', 'inner_voice'], additionalProperties: false,
+} as const;
+
+/** How many recent messages a practice room's reply reads (a companion chat reads twenty). */
+export const loungePracticeRecent = 10;

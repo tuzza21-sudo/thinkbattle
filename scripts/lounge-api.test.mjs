@@ -5909,7 +5909,7 @@ test('a one-to-one reply asks a check once and keeps its own word, on a chat and
   const rule = messengerLib.loungeOwnWordsRule;
   for (const part of ['한 번 묻는다', '같은 확인을 다시 묻거나 증거를 보여 달라고 하지 않고', '점수·합격·자격을 매기지 않으며', '가볍게 거두지 않는다', '짧게 인정한 뒤', '안전 규칙을 따른다']) assert.ok(rule.includes(part), part);
   const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
-  assert.ok(api.includes('...(solo ? [loungeContinuityRule, loungeOwnWordsRule, loungeClockRule] : []),'), 'every one-to-one reply instruction carries it, before the chat and call branches');
+  assert.ok(api.includes('...(solo ? [loungeContinuityRule, ...(practiceRoom ? [] : [loungeOwnWordsRule]), loungeClockRule] : []),'), 'every one-to-one reply instruction carries it, before the chat and call branches; a practice room grades by design (2026-11-27)');
   const harin = charactersLib.getLoungeCharacter('teacher');
   assert.ok(!harin.bible.hidden.includes('평가를 방패로'));
   assert.ok(harin.bible.humorExamples.bad.some(line => line.includes('되묻거나 증거')));
@@ -6020,7 +6020,7 @@ test('an English lesson: the member\'s words are graded first, code moves the ex
     { id: 'i-2', user_id: 'user-1', expression: 'come up with', meaning: '생각해 내다', level: 'B2', source: 'mine', stage: 0, days: [], free_used: false, next_review_at: null, attempts: 0, created_at: '2026-11-24T00:00:00Z' },
   ];
   const day = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
-  const storyState = { kind: 'lesson', day, phase: 'drill', queue: ['i-2'], done: [], current: { id: 'i-1', hints: 0, tries: 0 }, kept: 0, turns: 1 };
+  const storyState = { kind: 'lesson', day, phase: 'drill', queue: ['i-2'], done: [], current: { id: 'i-1', hints: 0, tries: 0 }, kept: 0, turns: 1, order: 2 };
   const writes = [], graders = [], writers = [];
   let analyzerCalls = 0;
   await withServiceKey(() => run(async (url, init = {}) => {
@@ -6075,6 +6075,12 @@ test('an English lesson: the member\'s words are graded first, code moves the ex
   assert.match(input.lesson.feedback.better, /a bit more time/);
   assert.match(writer.instructions, /영어 수업: 이 방은 사용자와의 1:1 영어 수업이다/);
   assert.equal(input.relationship, undefined, 'no relationship in a lesson');
+  // A practice room's reply gets only what it needs (2026-11-27): no companion life, scene or photo rules, text first.
+  assert.match(writer.instructions, /이 방은 실전 체험/);
+  for (const banned of ['자기 생활:', 'turn.character_life는', '사진은 채팅에서']) assert.ok(!writer.instructions.includes(banned), banned);
+  assert.equal(writer.text.format.schema.properties.character_life, undefined, 'no character_life before the text');
+  assert.deepEqual(Object.keys(writer.text.format.schema.properties), ['text', 'inner_voice']);
+  assert.equal(input.character_knowledge, undefined, 'no knowledge lookup in a lesson');
   const room = writes.find(entry => entry[0] === 'room')[1].story_state;
   assert.equal(room.current.id, 'i-2'); assert.deepEqual(room.done, [{ id: 'i-1', verdict: 'unprompted' }]); assert.equal(room.kept, 1);
   const item = writes.find(entry => entry[0] === 'item');
@@ -6082,4 +6088,12 @@ test('an English lesson: the member\'s words are graded first, code moves the ex
   const [attempt] = writes.find(entry => entry[0] === 'attempts')[1];
   assert.equal(attempt.verdict, 'unprompted'); assert.match(attempt.better, /a bit more time/); assert.match(attempt.polished, /take your point/);
   assert.deepEqual(writes.find(entry => entry[0] === 'keep')[1], { user_id: 'user-1', expression: 'a bit more time', meaning: '조금 더 시간', level: 'B2', source: 'upgrade' });
+});
+
+test("a lesson's hint and skip buttons are not graded by a model, and Haiku on OpenRouter caches its system prompt (2026-11-27)", () => {
+  const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
+  assert.ok(api.includes("const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : undefined;"));
+  assert.ok(api.includes("? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system)"));
+  assert.ok(api.includes('if (callTurn || practiceHost) return [];'));
+  assert.ok(api.includes('recent.slice(-(practiceRoom ? loungePracticeRecent : memoryLimits.recent))'));
 });

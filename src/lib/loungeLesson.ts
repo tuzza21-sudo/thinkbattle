@@ -142,7 +142,11 @@ export const loungeLessonStages = [
   { stage: 4, label: '다른 날도 말함' },
   { stage: 5, label: '내 것' },
 ] as const;
-export const loungeLessonStageLabel = (stage: number) => loungeLessonStages[Math.max(0, Math.min(5, Math.round(stage)))].label;
+/**
+ * What the member sees (2026-11-27, by the owner): three steps, 새 표현 → 학습함 → 내 것. The stages above stay for the
+ * lesson's own steps and review days; on the board every stage between the first and the last is 학습함.
+ */
+export const loungeLessonStageLabel = (stage: number) => { const at = Math.max(0, Math.min(5, Math.round(stage))); return at === 0 ? '새 표현' : at === 5 ? '내 것' : '학습함'; };
 /** Days to the next review after a turn that left the expression at this stage. */
 const reviewDays = [0, 1, 1, 3, 7, 21];
 
@@ -177,6 +181,8 @@ export const loungeLessonConfusionTutor = 'interpretertutor';
  */
 export const loungeLessonDayOf = (createdAt?: string | null) => createdAt && Number.isFinite(Date.parse(createdAt)) ? loungeLessonDay(new Date(createdAt)) : '';
 export const loungeLessonStudied = (item: Pick<LoungeLessonItem, 'attempts' | 'stage'>) => (item.attempts ?? 0) > 0 || item.stage > 0;
+/** The board's one mark for an expression: 새 표현 (never practised), 학습함 (practised, skipped included) or 내 것. */
+export const loungeLessonStatus = (item: Pick<LoungeLessonItem, 'attempts' | 'stage'>) => item.stage >= 5 ? { id: 'mine' as const, label: '내 것' } : loungeLessonStudied(item) ? { id: 'studied' as const, label: '학습함' } : { id: 'new' as const, label: '새 표현' };
 export const loungeLessonPriority = (importance?: number | null) => importance === 3 ? { rank: 1, label: '1순위' } : importance === 1 ? { rank: 3, label: '3순위' } : { rank: 2, label: '2순위' };
 const levelWords: Record<string, string> = { A2: '기초', B1: '쉬움', B2: '보통', C1: '어려움', C2: '최상급' };
 export const loungeLessonLevelLabel = (difficulty?: string | null) => difficulty && levelWords[difficulty] ? `${difficulty} · ${levelWords[difficulty]}` : '';
@@ -221,10 +227,12 @@ export function applyLoungeLessonVerdict(item: LoungeLessonItem, verdict: Lounge
     if (!days.includes(day)) days = [...days, day].slice(-6);
     if (verdict === 'free') free = true;
     stage = Math.max(stage, 3);
-    if (days.length >= 2) stage = Math.max(stage, free ? 5 : 4);
+    // Said unasked on two days: 내 것 (2026-11-27, by the owner: 새 표현 → 학습함 → 내 것; free talk was needed for it before).
+    if (days.length >= 2) stage = 5;
   } else if (verdict === 'hinted') stage = stage >= 3 ? Math.max(2, stage - 1) : Math.max(stage, 2);
   else if (verdict === 'given') stage = stage >= 3 ? 2 : Math.max(stage, 1);
-  else stage = stage >= 3 ? stage - 1 : stage;
+  // Missed or skipped: practised all the same, so at least 학습함 (2026-11-27: five skipped ones stayed 새 표현).
+  else stage = stage >= 3 ? stage - 1 : Math.max(stage, 1);
   const failed = verdict === 'missed' || verdict === 'given';
   const next = new Date(now.getTime() + (failed ? 1 : reviewDays[stage] || 1) * 86_400_000);
   return { stage, days, free_used: free, next_review_at: next.toISOString(), attempts: (item.attempts ?? 0) + 1 };
@@ -304,8 +312,10 @@ export const loungeLessonPackEntry = (id?: string | null) => loungeLessonPack.fi
 
 // ── A day's lesson ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** How many expressions one day's lesson takes: reviews first, then new ones. */
-export const loungeLessonSize = { total: 6, reviews: 4, kept: 3 } as const;
+/** How many expressions one day's lesson takes: new ones first, then one or two reviews (2026-11-27). */
+export const loungeLessonSize = { total: 6, reviews: 2, kept: 3 } as const;
+/** The way a day is planned; a day planned the older way (reviews first) is planned again for what is left of it. */
+export const loungeLessonPlanOrder = 2;
 
 export type LoungeLessonState = {
   kind: 'lesson'; day: string; phase: 'warmup' | 'drill' | 'free';
@@ -314,6 +324,8 @@ export type LoungeLessonState = {
   kept: number; turns: number;
   /** When the day's lesson was planned: only what the member makes for a situation after it joins the day (2026-11-26). */
   since?: string;
+  /** loungeLessonPlanOrder when the day was planned. */
+  order?: number;
 };
 export function readLoungeLessonState(value: unknown): LoungeLessonState | undefined {
   const state = value && typeof value === 'object' ? value as Partial<LoungeLessonState> : undefined;
@@ -326,15 +338,10 @@ export function readLoungeLessonState(value: unknown): LoungeLessonState | undef
     kind: 'lesson', day: state.day, phase: state.phase === 'drill' || state.phase === 'free' ? state.phase : 'warmup',
     queue: strings(state.queue), done: Array.isArray(state.done) ? state.done.filter(item => item && typeof item.id === 'string').slice(0, 24) : [],
     ...(current ? { current } : {}), kept: Math.max(0, Number(state.kept) || 0), turns: Math.max(0, Number(state.turns) || 0),
-    ...(typeof state.since === 'string' ? { since: state.since } : {}),
+    ...(typeof state.since === 'string' ? { since: state.since } : {}), ...(typeof state.order === 'number' ? { order: state.order } : {}),
   };
 }
 
-/**
- * What a new day's lesson takes from the member's expressions: those due for review (oldest due first, at most four),
- * then the member's own new ones, then the new corrections kept from earlier lessons; `pack` is how many of the tutor's
- * own expressions to add when that is not six (the caller adds them as the member's, so they have stages too).
- */
 const sourceRank: Record<LoungeLessonSource, number> = { situation: 0, mine: 1, upgrade: 2, tutor: 3 };
 /**
  * The order the member asked for (2026-11-26): the more important first, then the easier (lower CEFR level), then the
@@ -345,16 +352,24 @@ const lessonOrder = (a: LoungeLessonItem, b: LoungeLessonItem) => (b.importance 
 const older = (a: LoungeLessonItem, b: LoungeLessonItem) => Date.parse(a.created_at ?? '') - Date.parse(b.created_at ?? '');
 /** The expressions the member marked to learn first (the learning board), in that order: all of them come before the day's others. */
 const focused = (items: readonly LoungeLessonItem[]) => items.filter(item => item.focus && item.stage < 5).sort((a, b) => lessonOrder(a, b) || older(a, b));
+/**
+ * A new day's lesson (2026-11-27, by the owner): the marked ones, then the member's expressions not practised yet (the
+ * more important first, then the easier level, then the older; the tutor's own only after the member's), then one or
+ * two practised ones that are not theirs yet, the one due longest first. One already theirs is never asked. `reviews`
+ * are the ids of those reviews (the caller puts the tutor's added expressions before them); `pack` is how many of the
+ * tutor's own expressions to add.
+ */
 export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date) {
   const first = focused(items).slice(0, 12);
-  const due = items.filter(item => !first.includes(item) && item.stage > 0 && item.next_review_at && Date.parse(item.next_review_at) <= now.getTime())
-    .sort((a, b) => Date.parse(a.next_review_at!) - Date.parse(b.next_review_at!)).slice(0, Math.max(0, Math.min(loungeLessonSize.reviews, loungeLessonSize.total - first.length)));
-  // New ones: those made for the member's situation first, then the more important and the easier, then the member's own before the tutor's.
-  const fresh = items.filter(item => item.stage === 0 && !first.includes(item) && !due.includes(item))
-    .sort((a, b) => Number(b.source === 'situation') - Number(a.source === 'situation') || lessonOrder(a, b) || sourceRank[a.source] - sourceRank[b.source] || older(a, b))
-    .slice(0, Math.max(0, loungeLessonSize.total - first.length - due.length));
-  const queue = [...first, ...due, ...fresh].map(item => item.id);
-  return { queue, pack: Math.max(0, loungeLessonSize.total - queue.length) };
+  const reviewAt = (item: LoungeLessonItem) => item.next_review_at ? Date.parse(item.next_review_at) : now.getTime();
+  const reviews = items.filter(item => !first.includes(item) && item.stage < 5 && loungeLessonStudied(item))
+    .sort((a, b) => reviewAt(a) - reviewAt(b) || lessonOrder(a, b) || older(a, b))
+    .slice(0, Math.max(0, Math.min(loungeLessonSize.reviews, loungeLessonSize.total - first.length)));
+  const fresh = items.filter(item => !first.includes(item) && !loungeLessonStudied(item))
+    .sort((a, b) => Number(a.source === 'tutor') - Number(b.source === 'tutor') || lessonOrder(a, b) || sourceRank[a.source] - sourceRank[b.source] || older(a, b))
+    .slice(0, Math.max(0, loungeLessonSize.total - first.length - reviews.length));
+  const queue = [...first, ...fresh, ...reviews].map(item => item.id);
+  return { queue, reviews: reviews.map(item => item.id), pack: Math.max(0, loungeLessonSize.total - queue.length) };
 }
 /** The tutor's expressions of the member's level the member does not have yet, in order. */
 export const loungeLessonPackFor = (level: LoungeLessonLevel, items: readonly LoungeLessonItem[], count: number) => {
@@ -444,6 +459,12 @@ export function advanceLoungeLesson(input: { state?: LoungeLessonState; items: r
     ? { kind: 'lesson', day, phase: 'warmup', queue: input.plan.filter(id => byId.has(id)), done: [], kept: 0, turns: 0, since: input.now.toISOString() }
     : { ...input.state!, queue: input.state!.queue.filter(id => byId.has(id)), done: [...input.state!.done] };
   const doneToday = (id: string) => state.done.some(done => done.id === id) || state.current?.id === id;
+  if (fresh) state.order = loungeLessonPlanOrder;
+  else if (state.order !== loungeLessonPlanOrder && input.plan.length) {
+    // Planned the older way (reviews first): what is left of the day is planned again, without what was done today.
+    state.queue = input.plan.filter(id => byId.has(id) && !doneToday(id)).slice(0, Math.max(0, loungeLessonSize.total - state.done.length - (state.current ? 1 : 0)));
+    state.order = loungeLessonPlanOrder; state.since ??= input.now.toISOString();
+  }
   if (!state.since) {
     // A day planned before 2026-11-26 took in every new expression of the member's as each one was done, so it kept
     // growing (1/16, then 6/21): it is cut back to the day's size, the marked ones kept, in the member's order.

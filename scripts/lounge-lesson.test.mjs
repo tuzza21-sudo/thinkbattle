@@ -49,27 +49,37 @@ test('an expression is the member\'s only when it comes out unasked on another d
   assert.equal(state.stage, 3, 'the same day again is not another day');
   assert.equal(state.next_review_at, '2026-11-28T03:00:00.000Z');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'unprompted', day2) };
-  assert.equal(state.stage, 4, 'another day');
+  assert.equal(state.stage, 5, 'said unasked on another day: 내 것 (2026-11-27)');
+  assert.equal(state.next_review_at, '2026-12-18T03:00:00.000Z');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'free', day3) };
   assert.equal(state.stage, 5, 'used unasked in free talk');
   assert.equal(state.next_review_at, '2026-12-25T03:00:00.000Z');
   assert.equal(lesson.applyLoungeLessonVerdict(state, 'hinted', day3).stage, 4);
   assert.equal(lesson.applyLoungeLessonVerdict(state, 'given', day3).stage, 2);
   assert.equal(lesson.applyLoungeLessonVerdict(item('b'), 'given', day1).stage, 1);
-  assert.equal(lesson.applyLoungeLessonVerdict(item('b'), 'missed', day1).stage, 0);
+  assert.equal(lesson.applyLoungeLessonVerdict(item('b'), 'missed', day1).stage, 1, 'skipped or missed: practised all the same, 학습함');
   assert.equal(lesson.loungeLessonDay(new Date('2026-11-25T16:00:00Z')), '2026-11-26', 'days are Korean days');
   assert.equal(lesson.loungeLessonStageLabel(5), '내 것');
+  // The board shows three steps (2026-11-27, by the owner): 새 표현 → 학습함 → 내 것.
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(lesson.loungeLessonStageLabel), ['새 표현', '학습함', '학습함', '학습함', '학습함', '내 것']);
+  assert.equal(lesson.loungeLessonStatus(item('n')).label, '새 표현');
+  assert.equal(lesson.loungeLessonStatus(item('s', { attempts: 2 })).label, '학습함', 'skipped before the fix: stage 0 but practised');
+  assert.equal(lesson.loungeLessonStatus(item('m', { stage: 5, attempts: 3 })).label, '내 것');
 });
 
-test('a day\'s lesson takes reviews first, then the member\'s own new expressions, then the tutor\'s of the member\'s level', () => {
+test('a day\'s lesson takes the member\'s new expressions by priority, the tutor\'s after them, then one or two reviews; never one already theirs (2026-11-27)', () => {
   const items = [
-    item('due-old', { stage: 3, next_review_at: '2026-11-20T00:00:00Z' }), item('due-new', { stage: 2, next_review_at: '2026-11-24T00:00:00Z' }),
-    item('later', { stage: 4, next_review_at: '2026-12-01T00:00:00Z' }), item('tutor-new', { source: 'tutor', pack_id: 'b2-it-depends' }),
-    item('mine-new', { created_at: '2026-11-24T00:00:00Z' }), item('kept', { source: 'upgrade' }),
+    item('due-old', { stage: 3, attempts: 2, next_review_at: '2026-11-20T00:00:00Z' }), item('due-new', { stage: 2, attempts: 1, next_review_at: '2026-11-24T00:00:00Z' }),
+    item('later', { stage: 4, attempts: 3, next_review_at: '2026-12-01T00:00:00Z' }), item('tutor-new', { source: 'tutor', pack_id: 'b2-it-depends', importance: 3 }),
+    item('mine-new', { created_at: '2026-11-24T00:00:00Z' }), item('kept', { source: 'upgrade' }), item('mine-key', { importance: 3, difficulty: 'C1' }),
+    item('skipped', { stage: 0, attempts: 1, next_review_at: '2026-11-26T00:00:00Z' }), item('theirs', { stage: 5, attempts: 4 }),
   ];
   const plan = lesson.planLoungeLesson(items, now);
-  assert.deepEqual(plan.queue, ['due-old', 'due-new', 'mine-new', 'kept', 'tutor-new']);
-  assert.equal(plan.pack, 1);
+  assert.deepEqual(plan.queue, ['mine-key', 'mine-new', 'kept', 'tutor-new', 'due-old', 'due-new'], 'the member\'s first even when the tutor\'s is rated higher');
+  assert.deepEqual(plan.reviews, ['due-old', 'due-new'], 'two reviews, the one due longest first');
+  assert.ok(!plan.queue.includes('theirs') && !plan.queue.includes('skipped'), 'nothing already theirs; a third review waits');
+  assert.equal(plan.pack, 0);
+  assert.equal(lesson.planLoungeLesson([item('only-new')], now).pack, 5);
   const pack = lesson.loungeLessonPackFor('B1', items, 3);
   assert.equal(pack.length, 3);
   assert.ok(pack.every(entry => entry.level === 'B2' && entry.id !== 'b2-it-depends'));
@@ -352,4 +362,17 @@ test('the session goal: three levels, the member purpose and topics, and each tu
   assert.match(lesson.loungeLessonRules, /session\.purpose와 topics/);
   assert.equal(characters.getLoungeCharacter('interpretertutor').job, '국제회의 동시통역사');
   assert.match(lounge.getLoungeHost('interpretertutor').companion, /동시통역사/);
+});
+
+test("a day planned the older way (reviews first) is planned again for what is left of it, without what was done (2026-11-27)", () => {
+  const items = [item('done1'), item('rev', { stage: 2, attempts: 1, next_review_at: '2026-11-20T00:00:00Z' }), item('key', { importance: 3 }), item('low', { importance: 1 }), item('cur')];
+  const old = { kind: 'lesson', day: lesson.loungeLessonDay(now), phase: 'drill', queue: ['rev', 'low'], done: [{ id: 'done1', verdict: 'missed' }], current: { id: 'cur', hints: 0, tries: 0 }, kept: 0, turns: 4, since: now.toISOString() };
+  const plan = lesson.planLoungeLesson(items, now);
+  const turn = lesson.advanceLoungeLesson({ state: old, items, plan: plan.queue, now, said: 'hmm', grade: grade({ intent: 'question' }) });
+  assert.equal(turn.state.order, lesson.loungeLessonPlanOrder);
+  assert.deepEqual(turn.state.queue, ['key', 'low', 'rev'], 'the new ones by priority, the review last; neither the done one nor the one being asked');
+  assert.equal(turn.state.current.id, 'cur');
+  const again = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'ok', grade: grade({ intent: 'question' }) });
+  assert.deepEqual(again.state.queue, turn.state.queue, 'planned once');
+  assert.equal(lesson.readLoungeLessonState(turn.state).order, lesson.loungeLessonPlanOrder);
 });
