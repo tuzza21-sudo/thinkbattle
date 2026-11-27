@@ -50,9 +50,10 @@ const loungeReplyStallMs = () => Number(process.env.LOUNGE_REPLY_STALL_MS) || 15
 /**
  * How long a Gemini reply may go without any reply text before it is given up and the next model answers (2026-11-24): a
  * finished Flash reply took at most 18 s in chat and 9 s on a call, its first text sooner. Pro thinks first, so it waits longer.
+ * The clock runs until the reply's text field starts (2026-11-27), so Flash gets 15 s for character_life and the first words.
  * LOUNGE_GEMINI_FIRST_TEXT_MS changes Flash's.
  */
-const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 12_000;
+const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 15_000;
 /** Added to a reply asked again after an empty or refused one. */
 const loungeInCharacterRetryRule = '직전 시도에서 답을 쓰지 못했다. 이번에는 반드시 text에 캐릭터의 답을 쓴다. 상대의 말이 노골적이었다면 그 단어를 되풀이하거나 묘사하지 않고, 지금 관계 단계에 맞는 은근한 반응(설렘, 도발, 장난스럽게 혼내기, 다가가기, 장면 전환)으로 같은 장면 안에서 대화를 이어 간다. 대화를 끝내거나 침묵하지 않는다.';
 /**
@@ -2436,7 +2437,9 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
               const event = raw as unknown as GeminiEvent, candidate = event.candidates?.[0];
               if (event.promptFeedback?.blockReason) blocked = true;
               output += (candidate?.content?.parts ?? []).filter(part => !part.thought).map(part => part.text ?? '').join('');
-              if (output.trim()) begun = true;
+              // The reply's own text, not the first JSON: character_life comes first, and on 2026-11-27 Flash wrote it at once and
+              // then held 차유진's text for 40-98 s, so the guard had already stood down and the member waited.
+              if (replyTextPartial(output)?.trim()) begun = true;
               sendPartial(output);
               if (!found) { const early = replyTextSoFar(output); if (early !== undefined) { found = true; resolveText(early); } }
               if (candidate?.finishReason) finish = candidate.finishReason;
