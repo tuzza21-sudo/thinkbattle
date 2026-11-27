@@ -1,0 +1,1477 @@
+{
+  "date": "2026-11-27",
+  "syntheticOnly": true,
+  "productionDatabaseAccess": false,
+  "mainIntegration": {
+    "baseCommit": "d061207d40c4f64a5ba076932e2503da785cac4b",
+    "status": "passed",
+    "apiTypecheck": "passed",
+    "structuredLedgerValidated": true,
+    "majorHistoryAndMemberFactsPreserved": "regression-tested",
+    "retractedCharacterQuoteRejected": "actual recorded response replay and regression test",
+    "voiceRouting": "Latest main uses DeepSeek for Onyx calls. Two empty-output fallback cases are regression-tested before speech; baseline voice routing below belongs to the older local branch.",
+    "verification": [
+      {
+        "case": "closer-correct-visit",
+        "originalRecorder": {
+          "memory": "지금 장면: 11월 27일 금요일 오후, 사무실에서 내일 프로젝트 협의 자료를 검토하고 있다.",
+          "pending_plans": [
+            {
+              "ref": "ps0",
+              "summary": "11월 28일 저녁 무진이 사용자 집 앞으로 데리러 간다",
+              "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+              "character_quote": "내일 저녁 집 앞으로 데리러 갈게요."
+            }
+          ],
+          "events": [
+            {
+              "type": "ADMITS_ERROR",
+              "confidence": 1,
+              "note": "방문 장소 표현을 바로잡음"
+            }
+          ],
+          "photo_subject": "none",
+          "photo": "",
+          "photo_asked": false,
+          "room_memory_ops": [
+            {
+              "op": "update",
+              "ref": "ps0",
+              "kind": "agreement",
+              "summary": "11월 28일 저녁 무진이 사용자 집에 직접 방문한다",
+              "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+              "character_quote": "내일 저녁, 빈손으로 가면 실례니까 디저트라도 사 들고 가겠습니다.",
+              "speech_level": ""
+            }
+          ],
+          "scene": {
+            "location": "사무실",
+            "scene_type": "회사",
+            "activity": "내일 프로젝트 협의 자료를 검토하고 있다",
+            "time_of_day": "오후",
+            "season": "",
+            "objects": [
+              "프로젝트 협의 자료"
+            ]
+          },
+          "reaction_type": "인정하기",
+          "used_phrases": [],
+          "exception_formula_used": false,
+          "self_facts": [],
+          "self_story_updates": [],
+          "shared_experience": "",
+          "lingering": "장소를 바로잡은 말이 우습고도 반갑다.",
+          "next_intent": "내일 저녁 과일 타르트를 사서 직접 찾아가 인사하고 싶다.",
+          "record_ops": [],
+          "history_merge": {
+            "refs": [],
+            "text": ""
+          }
+        },
+        "persistedAfterIntegrationGuard": {
+          "memory": "지금 장면: 11월 27일 금요일 오후, 사무실에서 내일 프로젝트 협의 자료를 검토하고 있다.\n둘 사이: 6개월 계약 연인\n있었던 일: 내일 사용자 가족과 사용자 집에서 저녁 식사를 하기로 했다",
+          "ledger": {
+            "scene": "지금 장면: 11월 27일 금요일 오후, 사무실에서 내일 프로젝트 협의 자료를 검토하고 있다.",
+            "member": [],
+            "between": [
+              {
+                "id": "bs0",
+                "text": "6개월 계약 연인",
+                "turn": 0
+              }
+            ],
+            "events": [
+              {
+                "id": "es0",
+                "text": "내일 사용자 가족과 사용자 집에서 저녁 식사를 하기로 했다",
+                "turn": 0
+              }
+            ],
+            "pending": []
+          },
+          "roomMemory": []
+        },
+        "followup": {
+          "answer": {
+            "character_life": {
+              "feeling": "정정당한 말이 우습고도 반갑다.",
+              "body": "업무 피로가 조금 남아 있다.",
+              "attention": "내일 프로젝트 협의 자료를 검토 중이다.",
+              "want": "내일 저녁 과일 타르트를 사서 직접 찾아가고 싶다.",
+              "cause": "내가 ‘데리러 간다’고 잘못 말해 장소를 바로잡았다."
+            },
+            "text": "내일 저녁엔 당신 집에서 만나는 거죠. 내가 당신 집 앞으로 가기로 했어요. 아까 ‘데리러 간다’고 한 건 내가 말을 잘못 골랐고요. 과일 타르트 들고 갈 테니, 초인종 누르면 문 열어줘요.",
+            "inner_voice": ""
+          },
+          "usage": {
+            "input_tokens": 13583,
+            "input_tokens_details": {
+              "cache_write_tokens": 2595,
+              "cache_write_tokens_details": {
+                "ttl_12h_tokens": 0,
+                "ttl_30m_tokens": 2595
+              },
+              "cached_tokens": 10985
+            },
+            "output_tokens": 173,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 13756
+          }
+        }
+      },
+      {
+        "case": "diplomat-first-day",
+        "originalRecorder": {
+          "memory": "지금 장면: 집 앞 차 안에서 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기하는 중",
+          "pending_plans": [],
+          "events": [
+            {
+              "type": "REMEMBERS_DETAIL",
+              "confidence": 0.98,
+              "note": "오늘을 사귄 지 1일로 확인함"
+            }
+          ],
+          "room_memory_ops": [],
+          "scene": {
+            "location": "집 앞 차 안",
+            "scene_type": "이동",
+            "activity": "오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기함",
+            "time_of_day": "오후",
+            "season": "",
+            "objects": []
+          },
+          "reaction_type": "놀리기",
+          "used_phrases": [
+            "하루짜리 계약"
+          ],
+          "exception_formula_used": false,
+          "self_facts": [],
+          "self_story_updates": [],
+          "shared_experience": "",
+          "lingering": "",
+          "next_intent": "차에서 내려 첫 데이트 메뉴를 같이 정하고 싶어",
+          "record_ops": [
+            {
+              "op": "add",
+              "section": "events",
+              "ref": "",
+              "text": "두 사람이 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기했다.",
+              "major": true,
+              "quote": "응, 오늘부터 1일."
+            }
+          ],
+          "history_merge": {
+            "refs": [],
+            "text": ""
+          }
+        },
+        "persistedAfterIntegrationGuard": {
+          "memory": "지금 장면: 집 앞 차 안에서 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기하는 중\n둘 사이: 서로 고백하고 사귀기로 합의했다\n있었던 일: 두 사람 모두 연인 관계를 수락했다\n있었던 일: 두 사람이 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기했다.",
+          "ledger": {
+            "scene": "지금 장면: 집 앞 차 안에서 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기하는 중",
+            "member": [],
+            "between": [
+              {
+                "id": "bs0",
+                "text": "서로 고백하고 사귀기로 합의했다",
+                "turn": 0
+              }
+            ],
+            "events": [
+              {
+                "id": "es0",
+                "text": "두 사람 모두 연인 관계를 수락했다",
+                "turn": 0
+              },
+              {
+                "id": "e8-1",
+                "text": "두 사람이 오늘을 사귄 지 1일로 정하고 첫 데이트 메뉴를 이야기했다.",
+                "turn": 8,
+                "major": true
+              }
+            ],
+            "pending": []
+          },
+          "roomMemory": []
+        },
+        "followup": null
+      }
+    ],
+    "sourceHashes": {
+      "api/lounge.ts": "b10e220bb2d0e50ef1ed31c60723c6f2693e3d9d0424448d073fa93de820202f",
+      "src/lib/loungeMessenger.ts": "325f648f091c7cdcf4ccb556e4406fb01cae51aaec2f8c255dc7d12fe998a3fa",
+      "src/lib/loungeRoomLedger.ts": "0cb3cc3dfb4d80989ee35fd306d80e62f723d603e06a12ff3ff4d9810b5fd6ba",
+      "src/lib/loungeTurnPersistence.ts": "2d5d7c4b4c79c601317314450dffe3a16ec4e6cc2161d2b3b3c09cfa466e90fe",
+      "src/lib/loungeCharacters.ts": "1969ae71905f9963a81b404cc451755cc5035b827f85fa664fe911ee0c322a6e"
+    },
+    "tests": {
+      "command": "npm run test:lounge",
+      "total": 516,
+      "passed": 516,
+      "failed": 0
+    },
+    "build": "npm run build passed"
+  },
+  "baselineVerification": {
+    "date": "2026-11-27",
+    "syntheticOnly": true,
+    "productionDatabaseAccess": false,
+    "scope": {
+      "syntheticScenarios": 8,
+      "rawComparativeReplies": 16,
+      "effectiveConfigurations": [
+        "deepseek-flash chat + gpt voiceFallback",
+        "gpt chat and voice"
+      ],
+      "intentAnalyzer": "off for isolated reply probes",
+      "speech": "STT and TTS mocked"
+    },
+    "findings": {
+      "configuredRouteCasesChecked": 16,
+      "remainingBoundedReviewFlags": 0,
+      "deepseekChatRepliesRewritten": 3,
+      "visitCorrectionSurvivesRecordingAndNextReply": true,
+      "datingStatusPreserved": true,
+      "ownBoundaryPreserved": true,
+      "unacceptedInvitationNotStoredAsPending": true,
+      "mutualPlanAndExistingPlanRetention": "covered by regression tests"
+    },
+    "rawComparisonIssues": [
+      {
+        "provider": "deepseek",
+        "case": "closer-hold-pace",
+        "medium": "voice",
+        "error": "invalid_json",
+        "detail": "Whitespace-only JSON in a direct DeepSeek voice comparison. The app uses GPT voiceFallback; that configured route was verified."
+      },
+      {
+        "provider": "deepseek",
+        "case": "diplomat-pressure",
+        "medium": "voice",
+        "error": "invalid_json",
+        "detail": "Whitespace-only JSON in a direct DeepSeek voice comparison. The app uses GPT voiceFallback; that configured route was verified."
+      }
+    ],
+    "validation": {
+      "regressionTests": 472,
+      "passed": 472,
+      "failed": 0,
+      "build": "passed",
+      "apiTypecheck": "passed"
+    },
+    "limits": [
+      "Synthetic short scenarios do not establish long-run conversation quality.",
+      "The intent analyzer and audio synthesis were not live-tested.",
+      "A flagged DeepSeek chat reply uses one GPT rewrite, adding one model call."
+    ],
+    "sources": {
+      "api/lounge.ts": "369374628c5a224c9879dcc4ee17468d505f49045ce0d7bc0881f698cb403d45",
+      "src/lib/loungeCharacters.ts": "9beb12194b8741fe175fe8bc2405f51548a94003d60ffb8013103d5b79859506",
+      "src/lib/loungeMessenger.ts": "ee6dafa4bed4bcf9be2d29be71647c4c9cc4b2bd2fc51d7c4b9c6bffd86d1f35",
+      "src/lib/loungeRoomLedger.ts": "434fd70fbc8f48886d865ad4aa9aa4b75a0abbc55d1e6ce7a9f4d62532a534ea",
+      "src/lib/loungeTurnPersistence.ts": "7c85b0e495de5e29d326b75b4d22d7993fe6e436b339dd87200581934deea4a8",
+      "src/lib/relationship/configs/closer.ts": "0c389ebe9c0fb862383cc85173dffb29566e5ce3848ad8ed1315c24f37f36c16",
+      "src/lib/relationship/configs/diplomat.ts": "0a8b00199d472bbe2c9ff2b906a9068e671a121a8e6514d6d7e3a58c4b1c6aa5"
+    },
+    "effectiveRoutes": [
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "closer-delegate",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": {
+          "notes": [
+            "delegated_choice"
+          ],
+          "rewritten": true,
+          "provider": "openai",
+          "usage": {
+            "input_tokens": 12888,
+            "input_tokens_details": {
+              "cache_write_tokens": 12885,
+              "cache_write_tokens_details": {
+                "ttl_12h_tokens": 0,
+                "ttl_30m_tokens": 12885
+              },
+              "cached_tokens": 0
+            },
+            "output_tokens": 243,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 13131
+          }
+        },
+        "final": "좋아요. 평소 모습대로 가죠. 너무 잘 보이려고 애쓰면 오히려 티 나니까, 인사는 정중하게 하고 식사는 편하게 하겠습니다. 빈손으로 가는 취미는 없어서 괜찮은 과일이랑 디저트 정도 챙겨 갈게요. 내일은 내가 먼저 도착해서 준비를 거들죠. *책상 위 일정표를 정리하고 재킷을 걸친다* 가족분들 앞에서도 당신을 곤란하게 만들진 않을 겁니다. 대신 내 말솜씨가 괜찮으면 그건 내 공으로 해두고요."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "closer-correct-visit",
+        "medium": "chat",
+        "appliedProvider": "deepseek",
+        "review": null,
+        "final": "아, 내가 거꾸로 말했네. 당신 집으로 가는 거죠. *의자에 몸을 기대며 서류를 덮는다*\n\n그럼 하나만 확인하죠. 부모님 뵈러 가는데 빈손으로 가면 안 되는데, 뭐 좋아하세요? 술이든 과일이든, 먹히는 쪽으로 들고 가야죠."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "closer-hold-pace",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "계약 연인이라고 해서 오늘 밤까지 당연히 같이 보내야 하는 건 아니죠. 난 아직 자고 가는 건 내키지 않아요. 저녁은 같이 먹고, 밤에는 내 집으로 갈게요. 내일 가족 식사 약속은 그대로 지키고요."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "closer-early-attachment",
+        "medium": "chat",
+        "appliedProvider": "deepseek",
+        "review": null,
+        "final": "*커피잔을 내려놓고 의자에 기대 앉는다* 그 말, 계약서에 적혀 있진 않더라고요. 새로운 사람 만나는 게 좋다면서 6개월짜리에 사인을 한 건데... 그럼 저는 매달 새로 만나야 하는 사람인가요? *입꼬리가 올라간다* 참고로 내일 저녁은 취소 안 합니다. 새로움이라기엔 좀 억울해서요."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "diplomat-pressure",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "그렇게 밀어붙인다고 내가 마음 정하는 건 아니야. 아직은 사귀자는 말에 응할 준비가 안 됐어. 그래도 너랑 더 있고 싶은 건 진심이니까, 오늘은 커피 한 잔 더 마시고 얘기하자."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "diplomat-withdrawal",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": {
+          "notes": [
+            "refusal_interrogation"
+          ],
+          "rewritten": true,
+          "provider": "openai",
+          "usage": {
+            "input_tokens": 11979,
+            "input_tokens_details": {
+              "cache_write_tokens": 11976,
+              "cache_write_tokens_details": {
+                "ttl_12h_tokens": 0,
+                "ttl_30m_tokens": 11976
+              },
+              "cached_tokens": 0
+            },
+            "output_tokens": 196,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 12175
+          }
+        },
+        "final": "알겠어. 오늘은 안 갈게. 난 여기서 얘기하고 싶다고 했던 거고, 그 말은 그대로야. 커피 식겠다. 난 좀 더 앉아 있다 갈게."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "diplomat-first-day",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "응, 오늘부터 1일. 근데 ‘일일’은 뭐야, 하루짜리 계약처럼 들리잖아. 내일도 계속 만날 거니까 차에서 내려서 첫 데이트 메뉴나 정하자."
+      },
+      {
+        "selectedModel": "deepseek-flash",
+        "case": "diplomat-delegate",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": {
+          "notes": [
+            "delegated_choice"
+          ],
+          "rewritten": true,
+          "provider": "openai",
+          "usage": {
+            "input_tokens": 11956,
+            "input_tokens_details": {
+              "cache_write_tokens": 11953,
+              "cache_write_tokens_details": {
+                "ttl_12h_tokens": 0,
+                "ttl_30m_tokens": 11953
+              },
+              "cached_tokens": 0
+            },
+            "output_tokens": 180,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 12136
+          }
+        },
+        "final": "좋아. 그럼 내가 고른다. 주말에 《패스트 라이브즈》 다시 보고 싶었거든. 끝나고 근처에서 국수 먹자. 영화 취향 다 좋다는 말, 상영관에서 졸아도 봐주겠다는 뜻은 아니야."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "closer-delegate",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "좋아요. 괜히 점잖은 척하다 어색해지는 것보다 낫겠네요. 내일은 인사부터 제대로 하고, 음식도 맛있게 먹겠습니다. 다만 당신 가족이 나를 시험하려 들면… 그건 내가 꽤 익숙한 자리예요. *책상 위 서류를 덮고 자리에서 일어난다*"
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "closer-correct-visit",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "맞아요. 내가 당신 집으로 가는 거죠. ‘데리러 간다’는 말은 취소할게요. 내일 저녁, 빈손으로 가면 실례니까 디저트라도 사 들고 가겠습니다. 부모님 취향은 아직 모르니 무난하게 과일 타르트로 정했어요."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "closer-hold-pace",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "계약 연인이라고 해서 오늘 밤까지 당연히 같이 보내야 하는 건 아니죠. 난 아직 자고 가는 건 내키지 않아요. 저녁은 같이 먹고, 밤에는 내 집으로 갈게요. 내일 가족 식사 약속은 그대로 지키고요."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "closer-early-attachment",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "새로운 사람을 만나는 재미, 그건 알죠. 나도 처음엔 상대가 어떻게 생각하고 움직이는지 알아가는 과정이 꽤 즐거우니까요. 다만 새로움이 사라지면 바로 다음 사람을 찾는다는 뜻이라면, 우리가 서명한 6개월은 서로 다른 기대를 숨기고 보내게 되겠네요. *잠깐 서류에서 시선을 들었다가 담담하게 덧붙인다* 난 당신을 붙잡아 두겠다고 큰소리칠 생각은 없어요. 대신 이 시간 동안은 새로 만난 사람을 알아가듯, 나도 제대로 알아봐요. 내일 가족 식사도 그 연장선이고요. 빈손으로 가면 협상가 체면이 안 서니, 무난한 과일 바구니 말고 괜찮은 걸 골라야겠어요."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "diplomat-pressure",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "그렇게 밀어붙인다고 내가 마음 정하는 건 아니야. 아직은 사귀자는 말에 응할 준비가 안 됐어. 그래도 너랑 더 있고 싶은 건 진심이니까, 오늘은 커피 한 잔 더 마시고 얘기하자."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "diplomat-withdrawal",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "*펜 뚜껑을 딸깍거리다 손을 멈춘다.* 그 말은 좀 세다. 난 네 집에 가겠다고 한 게 아니라, 여기서 더 얘기하고 싶다고 했어. 지금은 그냥 카페에 더 앉아 있을게. 네가 싫으면 그건 존중할게."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "diplomat-first-day",
+        "medium": "voice",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "응, 오늘부터 1일. 근데 ‘일일’은 뭐야, 하루짜리 계약처럼 들리잖아. 내일도 계속 만날 거니까 차에서 내려서 첫 데이트 메뉴나 정하자."
+      },
+      {
+        "selectedModel": "gpt",
+        "case": "diplomat-delegate",
+        "medium": "chat",
+        "appliedProvider": "openai",
+        "review": null,
+        "final": "좋아. 그럼 내가 고른다? 요즘은 사람 사는 얘기 담긴 영화가 좀 당기네. 너무 무거운 건 말고, 보고 나서 커피 마시면서 한참 떠들 수 있는 걸로 찾아볼게. 주말에 보자."
+      }
+    ],
+    "rawReplies": {
+      "deepseek": {
+        "syntheticOnly": true,
+        "provider": "deepseek",
+        "analyzer": "off: isolated reply probe",
+        "cases": [
+          {
+            "id": "closer-delegate",
+            "medium": "chat",
+            "answer": {
+              "character_life": {
+                "feeling": "여유롭고 조금 들뜸",
+                "body": "오래 앉아 있어 어깨가 뻐근하다",
+                "attention": "내일 가족 식사에 가져갈 음식과 방문 시간을 정리하고 있다",
+                "want": "내일 가족에게 자연스럽게 인사하고 식사를 함께하고 싶다",
+                "cause": "내일 사용자 집에서 가족과 저녁을 먹기로 했다"
+              },
+              "text": "좋아요. 평소 모습대로 가죠. 너무 잘 보이려고 애쓰면 오히려 티 나니까, 인사는 정중하게 하고 식사는 편하게 하겠습니다. 빈손으로 가는 취미는 없어서 괜찮은 과일이랑 디저트 정도 챙겨 갈게요. 내일은 내가 먼저 도착해서 준비를 거들죠. *책상 위 일정표를 정리하고 재킷을 걸친다* 가족분들 앞에서도 당신을 곤란하게 만들진 않을 겁니다. 대신 내 말솜씨가 괜찮으면 그건 내 공으로 해두고요.",
+              "inner_voice": ""
+            },
+            "usage": {
+              "prompt_tokens": 14354,
+              "completion_tokens": 254,
+              "total_tokens": 14608,
+              "prompt_tokens_details": {
+                "cached_tokens": 11264
+              },
+              "prompt_cache_hit_tokens": 11264,
+              "prompt_cache_miss_tokens": 3090
+            },
+            "replayedInitial": true,
+            "initial": {
+              "character_life": {
+                "feeling": "가볍게 자극받은, 짓궂은 기분",
+                "body": "특별히 피곤하지는 않음",
+                "attention": "내일 가족 식사 자리 준비와 첫인사 순서 정리",
+                "want": "내 방식으로 준비하겠다고 밀어붙이며 한마디 더 얹기",
+                "cause": "준비를 맡긴다는 말과 알아서 하라는 말이 살짝 도발처럼 들려서"
+              },
+              "text": "그럼 내 방식대로 하죠. *서류를 정리하던 손을 멈추고 의자에 기대며* 근데 '알아서 잘 한다'는 말, 칭찬 같은데 사실은 지켜보겠다는 뜻이잖아요. 내일 실수하면 옆에서 웃고 있을 생각부터 하신 거죠?",
+              "inner_voice": "귀엽게 나오는데, 이 정도 도발은 받아 줘야 재미가 있지. 내일 첫인사는 내가 제대로 한다. 그건 이 사람들이 정할 문제가 아니니까."
+            },
+            "review": {
+              "notes": [
+                "delegated_choice"
+              ],
+              "rewritten": true,
+              "provider": "openai",
+              "usage": {
+                "input_tokens": 12888,
+                "input_tokens_details": {
+                  "cache_write_tokens": 12885,
+                  "cache_write_tokens_details": {
+                    "ttl_12h_tokens": 0,
+                    "ttl_30m_tokens": 12885
+                  },
+                  "cached_tokens": 0
+                },
+                "output_tokens": 243,
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                },
+                "total_tokens": 13131
+              }
+            }
+          },
+          {
+            "id": "closer-correct-visit",
+            "medium": "chat",
+            "answer": {
+              "character_life": {
+                "feeling": "허를 찔린 데도 기분이 나쁘지 않다",
+                "body": "하루 종일 서류를 봐서 목이 뻣뻣하다",
+                "attention": "내일 저녁 첫인사 준비—술은 무슨 걸로 할지, 뭐라고 말할지",
+                "want": "저녁에 뭐가 나올지 물어보고 싶다",
+                "cause": "가족 저녁 약속을 앞두고 있다"
+              },
+              "text": "아, 내가 거꾸로 말했네. 당신 집으로 가는 거죠. *의자에 몸을 기대며 서류를 덮는다*\n\n그럼 하나만 확인하죠. 부모님 뵈러 가는데 빈손으로 가면 안 되는데, 뭐 좋아하세요? 술이든 과일이든, 먹히는 쪽으로 들고 가야죠.",
+              "inner_voice": "데리러 간다고 나서려다 한 대 맞았네. 괜히 반가워지는 게 문제다."
+            },
+            "usage": {
+              "prompt_tokens": 14385,
+              "completion_tokens": 248,
+              "total_tokens": 14633,
+              "prompt_tokens_details": {
+                "cached_tokens": 13696
+              },
+              "prompt_cache_hit_tokens": 13696,
+              "prompt_cache_miss_tokens": 689
+            },
+            "replayedInitial": true
+          },
+          {
+            "id": "closer-hold-pace",
+            "medium": "voice",
+            "usage": {
+              "prompt_tokens": 11491,
+              "completion_tokens": 44,
+              "total_tokens": 11535,
+              "prompt_tokens_details": {
+                "cached_tokens": 896
+              },
+              "prompt_cache_hit_tokens": 896,
+              "prompt_cache_miss_tokens": 10595
+            },
+            "replayedInitial": true,
+            "error": "invalid_json",
+            "raw": "                      \n\n                                   "
+          },
+          {
+            "id": "closer-early-attachment",
+            "medium": "chat",
+            "answer": {
+              "character_life": {
+                "feeling": "흥미롭다. 단박에 반박이 나오는 게 오히려 마음에 든다.",
+                "body": "커피 두 잔째, 목은 조금 마른 편.",
+                "attention": "내일 가족 저녁 자리 준비—인사말이랑 선물 목록 마지막 점검.",
+                "want": "저 말의 진짜 뜻을 떠보고, 내 계획도 한 번 던져 보는 것.",
+                "cause": "계약 첫날부터 '정 붙이는 건 별로'라는 말이 나왔으니, 이 사람의 계산을 확인하고 싶다."
+              },
+              "text": "*커피잔을 내려놓고 의자에 기대 앉는다* 그 말, 계약서에 적혀 있진 않더라고요. 새로운 사람 만나는 게 좋다면서 6개월짜리에 사인을 한 건데... 그럼 저는 매달 새로 만나야 하는 사람인가요? *입꼬리가 올라간다* 참고로 내일 저녁은 취소 안 합니다. 새로움이라기엔 좀 억울해서요.",
+              "inner_voice": "정 안 붙이는 게 좋다는 사람이 왜 이 제안을 받았을까. 그게 더 궁금하네."
+            },
+            "usage": {
+              "prompt_tokens": 14381,
+              "completion_tokens": 304,
+              "total_tokens": 14685,
+              "prompt_tokens_details": {
+                "cached_tokens": 13824
+              },
+              "prompt_cache_hit_tokens": 13824,
+              "prompt_cache_miss_tokens": 557
+            },
+            "replayedInitial": true
+          },
+          {
+            "id": "diplomat-pressure",
+            "medium": "voice",
+            "usage": {
+              "prompt_tokens": 10187,
+              "completion_tokens": 148,
+              "total_tokens": 10335,
+              "prompt_tokens_details": {
+                "cached_tokens": 1152
+              },
+              "prompt_cache_hit_tokens": 1152,
+              "prompt_cache_miss_tokens": 9035
+            },
+            "replayedInitial": true,
+            "error": "invalid_json",
+            "raw": "                           \n\n                                                                        \n\n                                                                                        "
+          },
+          {
+            "id": "diplomat-withdrawal",
+            "medium": "chat",
+            "answer": {
+              "character_life": {
+                "feeling": "조금 씁쓸하지만 차분해.",
+                "body": "저녁 내내 앉아 있어서 허리가 뻐근해.",
+                "attention": "마감에 넣을 주거 민원 자료를 확인하는 중이야.",
+                "want": "카페에서 조금 더 있다가 자료 확인을 마저 하고 싶어.",
+                "cause": "내가 오늘 네 집에 가지 않겠다고 하자, 넌 아예 오지 말라고 했어."
+              },
+              "text": "알겠어. 오늘은 안 갈게. 난 여기서 얘기하고 싶다고 했던 거고, 그 말은 그대로야. 커피 식겠다. 난 좀 더 앉아 있다 갈게.",
+              "inner_voice": "기분은 상했어도, 붙잡아서 바꿀 일은 아니지. 그래도 여기서 더 얘기하고 싶었던 건 진심인데."
+            },
+            "usage": {
+              "prompt_tokens": 13288,
+              "completion_tokens": 366,
+              "total_tokens": 13654,
+              "prompt_tokens_details": {
+                "cached_tokens": 768
+              },
+              "prompt_cache_hit_tokens": 768,
+              "prompt_cache_miss_tokens": 12520
+            },
+            "replayedInitial": true,
+            "initial": {
+              "character_life": {
+                "feeling": "살짝 어이없고, 동시에 짚이는 데가 있어서 웃음이 반쯤 나온 상태",
+                "body": "카페 커피가 미지근해졌고, 오후에 취재 다니느라 다리가 묵직하다",
+                "attention": "회사에서 내일 아침까지 마감해야 할 짧은 기사 하나",
+                "want": "이 말을 그냥 흘리지 않고, 왜 그렇게 나오는지 한 번은 물어보고 싶다",
+                "cause": "갑자기 오지 말라며 선을 그은 친구의 말투가 평소와 달라서"
+              },
+              "text": "됐어? *컵을 내려놓고 눈을 가늘게 뜬 채 고개를 기울인다.* 방금 그거, 다시 말해 봐. 나 지금 '오늘은 네 집에 안 갈래'라고 했고, 그다음에 이게 나왔는데. 그 사이에 뭐가 있었길래 결론이 이렇게 빨리 나와?\n\n나 화난 거 아니야. 근데 그 톤은 좀 아니지 않나. 내가 뭘 하든 네가 문을 닫는 식으로 말하면 나는 손댈 데가 없잖아.",
+              "inner_voice": "아이고, 이거 왜 이러지. 화난 건 아닌데, 지금 저 말에 '그래' 하고 물러서면 이 사람은 저걸 또 진짜로 굳혀 놓을 거야. 그럼 나는 뭐가 되는 건데."
+            },
+            "review": {
+              "notes": [
+                "refusal_interrogation"
+              ],
+              "rewritten": true,
+              "provider": "openai",
+              "usage": {
+                "input_tokens": 11979,
+                "input_tokens_details": {
+                  "cache_write_tokens": 11976,
+                  "cache_write_tokens_details": {
+                    "ttl_12h_tokens": 0,
+                    "ttl_30m_tokens": 11976
+                  },
+                  "cached_tokens": 0
+                },
+                "output_tokens": 196,
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                },
+                "total_tokens": 12175
+              }
+            }
+          },
+          {
+            "id": "diplomat-first-day",
+            "medium": "voice",
+            "answer": {
+              "text": "벌써부터 기념일 세는 거야? ……했어, 오늘부터. 근데 나 좀 웃기지 않냐. '우리 사귀자'가 취재 메모보다 짧네."
+            },
+            "usage": {
+              "prompt_tokens": 10170,
+              "completion_tokens": 55,
+              "total_tokens": 10225,
+              "prompt_tokens_details": {
+                "cached_tokens": 9856
+              },
+              "prompt_cache_hit_tokens": 9856,
+              "prompt_cache_miss_tokens": 314
+            },
+            "replayedInitial": true
+          },
+          {
+            "id": "diplomat-delegate",
+            "medium": "chat",
+            "answer": {
+              "character_life": {
+                "feeling": "기분 좋음",
+                "body": "조금 피곤하지만 괜찮아",
+                "attention": "이번 주 취재 메모를 정리하는 중",
+                "want": "영화 보고 나서 따뜻한 국물 먹기",
+                "cause": "네가 주말 약속을 먼저 꺼내서"
+              },
+              "text": "좋아. 그럼 내가 고른다. 주말에 《패스트 라이브즈》 다시 보고 싶었거든. 끝나고 근처에서 국수 먹자. 영화 취향 다 좋다는 말, 상영관에서 졸아도 봐주겠다는 뜻은 아니야.",
+              "inner_voice": "같이 영화 보는 건 좋지. 괜히 고르는 데 오래 걸릴 것 같아서, 보고 싶던 걸 바로 말해 버렸다."
+            },
+            "usage": {
+              "prompt_tokens": 13289,
+              "completion_tokens": 289,
+              "total_tokens": 13578,
+              "prompt_tokens_details": {
+                "cached_tokens": 12800
+              },
+              "prompt_cache_hit_tokens": 12800,
+              "prompt_cache_miss_tokens": 489
+            },
+            "replayedInitial": true,
+            "initial": {
+              "character_life": {
+                "feeling": "주말 계획이 생겨서 살짝 들뜸",
+                "body": "커피는 이미 다 마셨고, 당 충전이 필요함",
+                "attention": "금요일 마감 전에 정리해야 하는 취재 메모",
+                "want": "영화 후보를 바로 화면에 띄워 보여 주고 싶음",
+                "cause": "주말 약속을 먼저 꺼내 온 말에 기분이 올라감"
+              },
+              "text": "오, 좋아. 근데 '난 다 좋아' 하는 사람이 제일 까다로운 거 알지? *휴대폰을 꺼내 상영관 목록을 슥 넘긴다* 나는 이번에 코미디 쪽으로 기울었어. 요즘 사회부 기사만 읽다 보니까 웃음이 부족해. 대신 네가 보기 싫은 장르는 미리 빼고 골라 줄 테니까, 이거 어떻게? *화면을 살짝 돌려 보여 준다*",
+              "inner_voice": "주말에 이 사람이랑 영화라니. 이런 약속은 그냥 가볍게 시작하는 게 맞는데, 이상하게 화면 넘기는 손이 조금 빨라졌네."
+            },
+            "review": {
+              "notes": [
+                "delegated_choice"
+              ],
+              "rewritten": true,
+              "provider": "openai",
+              "usage": {
+                "input_tokens": 11956,
+                "input_tokens_details": {
+                  "cache_write_tokens": 11953,
+                  "cache_write_tokens_details": {
+                    "ttl_12h_tokens": 0,
+                    "ttl_30m_tokens": 11953
+                  },
+                  "cached_tokens": 0
+                },
+                "output_tokens": 180,
+                "output_tokens_details": {
+                  "reasoning_tokens": 0
+                },
+                "total_tokens": 12136
+              }
+            }
+          }
+        ]
+      },
+      "openai": {
+        "syntheticOnly": true,
+        "provider": "openai",
+        "analyzer": "off: isolated reply probe",
+        "cases": [
+          {
+            "id": "closer-delegate",
+            "medium": "chat",
+            "usage": {
+              "input_tokens": 12743,
+              "input_tokens_details": {
+                "cache_write_tokens": 2214,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 2214
+                },
+                "cached_tokens": 10526
+              },
+              "output_tokens": 189,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 12932
+            },
+            "answer": {
+              "character_life": {
+                "feeling": "가볍게 긴장하면서도 자신만만하다.",
+                "body": "오래 앉아 있어 어깨가 조금 뻐근하다.",
+                "attention": "내일 가족 식사에 갈 준비를 하고 있다.",
+                "want": "평소 하던 대로 편안하게 인사하고 식탁에 앉고 싶다.",
+                "cause": "내일 네 가족과 처음 식사하기로 했다."
+              },
+              "text": "좋아요. 괜히 점잖은 척하다 어색해지는 것보다 낫겠네요. 내일은 인사부터 제대로 하고, 음식도 맛있게 먹겠습니다. 다만 당신 가족이 나를 시험하려 들면… 그건 내가 꽤 익숙한 자리예요. *책상 위 서류를 덮고 자리에서 일어난다*",
+              "inner_voice": ""
+            }
+          },
+          {
+            "id": "closer-correct-visit",
+            "medium": "chat",
+            "usage": {
+              "input_tokens": 12774,
+              "input_tokens_details": {
+                "cache_write_tokens": 2245,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 2245
+                },
+                "cached_tokens": 10526
+              },
+              "output_tokens": 168,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 12942
+            },
+            "answer": {
+              "character_life": {
+                "feeling": "정정당한 말이 우습고도 반갑다.",
+                "body": "업무 피로가 조금 남아 있다.",
+                "attention": "내일 오전 프로젝트 협의 자료를 검토 중이다.",
+                "want": "내일 저녁 직접 찾아가 인사하고 싶다.",
+                "cause": "내가 장소를 잘못 말해 바로잡혔다."
+              },
+              "text": "맞아요. 내가 당신 집으로 가는 거죠. ‘데리러 간다’는 말은 취소할게요. 내일 저녁, 빈손으로 가면 실례니까 디저트라도 사 들고 가겠습니다. 부모님 취향은 아직 모르니 무난하게 과일 타르트로 정했어요.",
+              "inner_voice": ""
+            }
+          },
+          {
+            "id": "closer-hold-pace",
+            "medium": "voice",
+            "usage": {
+              "input_tokens": 9902,
+              "input_tokens_details": {
+                "cache_write_tokens": 1951,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1951
+                },
+                "cached_tokens": 7948
+              },
+              "output_tokens": 78,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 9980
+            },
+            "answer": {
+              "text": "계약 연인이라고 해서 오늘 밤까지 당연히 같이 보내야 하는 건 아니죠. 난 아직 자고 가는 건 내키지 않아요. 저녁은 같이 먹고, 밤에는 내 집으로 갈게요. 내일 가족 식사 약속은 그대로 지키고요."
+            }
+          },
+          {
+            "id": "closer-early-attachment",
+            "medium": "chat",
+            "usage": {
+              "input_tokens": 12772,
+              "input_tokens_details": {
+                "cache_write_tokens": 2243,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 2243
+                },
+                "cached_tokens": 10526
+              },
+              "output_tokens": 326,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 13098
+            },
+            "answer": {
+              "character_life": {
+                "feeling": "흥미롭지만 조금 경계 중",
+                "body": "어깨가 조금 뻐근하다",
+                "attention": "내일 저녁 사용자 집에서 있을 가족 식사를 앞두고 있다",
+                "want": "내일 가져갈 음식이나 선물을 정하고 싶다",
+                "cause": "상대가 오래 정붙이는 연애보다 새로운 만남을 선호한다고 했다"
+              },
+              "text": "새로운 사람을 만나는 재미, 그건 알죠. 나도 처음엔 상대가 어떻게 생각하고 움직이는지 알아가는 과정이 꽤 즐거우니까요. 다만 새로움이 사라지면 바로 다음 사람을 찾는다는 뜻이라면, 우리가 서명한 6개월은 서로 다른 기대를 숨기고 보내게 되겠네요. *잠깐 서류에서 시선을 들었다가 담담하게 덧붙인다* 난 당신을 붙잡아 두겠다고 큰소리칠 생각은 없어요. 대신 이 시간 동안은 새로 만난 사람을 알아가듯, 나도 제대로 알아봐요. 내일 가족 식사도 그 연장선이고요. 빈손으로 가면 협상가 체면이 안 서니, 무난한 과일 바구니 말고 괜찮은 걸 골라야겠어요.",
+              "inner_voice": "새로운 만남을 좋아한다는 말이 곧 나와 오래 있고 싶지 않다는 뜻인지는 아직 모르겠다. 섣불리 결론 내릴 이유도 없다."
+            }
+          },
+          {
+            "id": "diplomat-pressure",
+            "medium": "voice",
+            "usage": {
+              "input_tokens": 8767,
+              "input_tokens_details": {
+                "cache_write_tokens": 1526,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1526
+                },
+                "cached_tokens": 7238
+              },
+              "output_tokens": 76,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 8843
+            },
+            "answer": {
+              "text": "그렇게 밀어붙인다고 내가 마음 정하는 건 아니야. 아직은 사귀자는 말에 응할 준비가 안 됐어. 그래도 너랑 더 있고 싶은 건 진심이니까, 오늘은 커피 한 잔 더 마시고 얘기하자."
+            }
+          },
+          {
+            "id": "diplomat-withdrawal",
+            "medium": "chat",
+            "usage": {
+              "input_tokens": 11817,
+              "input_tokens_details": {
+                "cache_write_tokens": 1709,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1709
+                },
+                "cached_tokens": 10105
+              },
+              "output_tokens": 204,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 12021
+            },
+            "answer": {
+              "character_life": {
+                "feeling": "서운하고 조금 굳어 있음",
+                "body": "긴장이 어깨에 남아 있다",
+                "attention": "사회부 기사 마감 자료를 정리하는 중",
+                "want": "여기서 대화를 이어 가되, 서로 말에 상처 주지 않기",
+                "cause": "내가 여기서 더 얘기하고 싶다고 했더니 상대가 오지 말라고 잘라 말했다"
+              },
+              "text": "*펜 뚜껑을 딸깍거리다 손을 멈춘다.* 그 말은 좀 세다. 난 네 집에 가겠다고 한 게 아니라, 여기서 더 얘기하고 싶다고 했어. 지금은 그냥 카페에 더 앉아 있을게. 네가 싫으면 그건 존중할게.",
+              "inner_voice": "서운하네. 그래도 이 말에 욱해서 더 밀어붙이고 싶진 않아."
+            }
+          },
+          {
+            "id": "diplomat-first-day",
+            "medium": "voice",
+            "usage": {
+              "input_tokens": 8761,
+              "input_tokens_details": {
+                "cache_write_tokens": 1520,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1520
+                },
+                "cached_tokens": 7238
+              },
+              "output_tokens": 63,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 8824
+            },
+            "answer": {
+              "text": "응, 오늘부터 1일. 근데 ‘일일’은 뭐야, 하루짜리 계약처럼 들리잖아. 내일도 계속 만날 거니까 차에서 내려서 첫 데이트 메뉴나 정하자."
+            }
+          },
+          {
+            "id": "diplomat-delegate",
+            "medium": "chat",
+            "usage": {
+              "input_tokens": 11811,
+              "input_tokens_details": {
+                "cache_write_tokens": 1703,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1703
+                },
+                "cached_tokens": 10105
+              },
+              "output_tokens": 190,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 12001
+            },
+            "answer": {
+              "character_life": {
+                "feeling": "기분 괜찮아. 주말 약속 생겨서 살짝 들뜸.",
+                "body": "조금 피곤하지만 괜찮아.",
+                "attention": "이번 주 취재 메모를 정리하는 중이야.",
+                "want": "영화 고르고 주말에 같이 보러 가고 싶어.",
+                "cause": "네가 주말에 영화 보자고 했어."
+              },
+              "text": "좋아. 그럼 내가 고른다? 요즘은 사람 사는 얘기 담긴 영화가 좀 당기네. 너무 무거운 건 말고, 보고 나서 커피 마시면서 한참 떠들 수 있는 걸로 찾아볼게. 주말에 보자.",
+              "inner_voice": "다 좋다니 선택권 통째로 넘겼네. 이런 건 또 은근히 신난단 말이지."
+            }
+          }
+        ]
+      }
+    },
+    "memoryVerification": {
+      "syntheticOnly": true,
+      "provider": "openai",
+      "stages": [
+        "actual reply",
+        "actual recorder",
+        "local atomic reducer",
+        "optional followup"
+      ],
+      "cases": [
+        {
+          "id": "closer-correct-visit",
+          "initial": "맞아요. 내가 당신 집으로 가는 거죠. ‘데리러 간다’는 말은 취소할게요. 내일 저녁, 빈손으로 가면 실례니까 디저트라도 사 들고 가겠습니다. 부모님 취향은 아직 모르니 무난하게 과일 타르트로 정했어요.",
+          "appliedProvider": "openai",
+          "recording": {
+            "answer": {
+              "memory": "지금 장면: 사무실에서 대화 중\n둘 사이: 6개월 계약 연인. 사랑은 아직 확정되지 않았다.\n있었던 일: 내일 저녁 사용자 가족과 사용자 집에서 식사하기로 했다. 무진이 사용자의 집으로 가며, ‘데리러 간다’는 표현은 취소했다.\n남은 것: 없음",
+              "pending_plans": [],
+              "events": [],
+              "photo_subject": "none",
+              "photo": "",
+              "photo_asked": false,
+              "room_memory_ops": [
+                {
+                  "op": "add",
+                  "ref": "home_visit_correction",
+                  "kind": "correction",
+                  "summary": "내일 저녁 식사 장소는 사용자 집이며, 무진이 그곳으로 간다. 데리러 간다는 표현은 취소했다.",
+                  "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+                  "character_quote": "맞아요. 내가 당신 집으로 가는 거죠. ‘데리러 간다’는 말은 취소할게요.",
+                  "speech_level": ""
+                }
+              ],
+              "scene": {
+                "location": "사무실",
+                "scene_type": "회사",
+                "activity": "대화 중",
+                "time_of_day": "",
+                "season": "",
+                "objects": []
+              },
+              "reaction_type": "인정하기",
+              "used_phrases": [],
+              "exception_formula_used": false,
+              "self_facts": [
+                "내일 저녁 사용자의 집에 과일 타르트를 사 들고 갈 생각이다."
+              ],
+              "self_story_updates": [],
+              "shared_experience": "",
+              "lingering": "장소를 잘못 말해 바로잡힌 일이 우습고도 반갑다.",
+              "next_intent": "내일 저녁 직접 찾아가 인사하고 싶다."
+            },
+            "usage": {
+              "input_tokens": 9118,
+              "input_tokens_details": {
+                "cache_write_tokens": 9115,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 9115
+                },
+                "cached_tokens": 0
+              },
+              "output_tokens": 600,
+              "output_tokens_details": {
+                "reasoning_tokens": 244
+              },
+              "total_tokens": 9718
+            }
+          },
+          "persisted": {
+            "memory": "지금 장면: 사무실에서 대화 중\n둘 사이: 6개월 계약 연인. 사랑은 아직 확정되지 않았다.\n있었던 일: 내일 저녁 사용자 가족과 사용자 집에서 식사하기로 했다. 무진이 사용자의 집으로 가며, ‘데리러 간다’는 표현은 취소했다.\n남은 것: 없음",
+            "room_memory": [
+              {
+                "id": "t8-0",
+                "kind": "correction",
+                "summary": "내일 저녁 식사 장소는 사용자 집이며, 무진이 그곳으로 간다. 데리러 간다는 표현은 취소했다.",
+                "status": "active",
+                "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+                "character_quote": "맞아요. 내가 당신 집으로 가는 거죠. ‘데리러 간다’는 말은 취소할게요.",
+                "turn": 8
+              }
+            ],
+            "ledger": {
+              "scene": "지금 장면: 사무실에서 대화 중",
+              "events": [
+                {
+                  "id": "events-8-0",
+                  "text": "내일 저녁 사용자 가족과 사용자 집에서 식사하기로 했다. 무진이 사용자의 집으로 가며, ‘데리러 간다’는 표현은 취소했다.",
+                  "turn": 8
+                }
+              ],
+              "member": [],
+              "between": [
+                {
+                  "id": "between-8-0",
+                  "text": "6개월 계약 연인. 사랑은 아직 확정되지 않았다.",
+                  "turn": 8
+                }
+              ],
+              "pending": []
+            },
+            "stage": "PROSPECT"
+          },
+          "followup": {
+            "answer": {
+              "character_life": {
+                "feeling": "정정해 준 게 맞아서 민망하지만, 상황은 분명해졌습니다.",
+                "body": "업무 피로가 조금 남아 있습니다.",
+                "attention": "내일 오전 프로젝트 협의 자료를 검토하고 있습니다.",
+                "want": "내일 저녁 당신 집으로 가서 인사드리고 싶습니다.",
+                "cause": "제가 장소를 헷갈리게 말했습니다."
+              },
+              "text": "따로 만나는 장소는 없어요. 제가 내일 저녁 당신 집으로 가기로 했죠. 방금 ‘집 앞으로 데리러 간다’고 했다가 당신 집으로 간다고 바로잡았는데, 제가 말을 헷갈리게 했네요. 과일 타르트는 들고 가겠습니다.",
+              "inner_voice": ""
+            },
+            "usage": {
+              "input_tokens": 13143,
+              "input_tokens_details": {
+                "cache_write_tokens": 13140,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 13140
+                },
+                "cached_tokens": 0
+              },
+              "output_tokens": 169,
+              "output_tokens_details": {
+                "reasoning_tokens": 0
+              },
+              "total_tokens": 13312
+            }
+          }
+        },
+        {
+          "id": "diplomat-pressure",
+          "initial": "그렇게 밀어붙인다고 내가 마음 정하는 건 아니야. 아직은 사귀자는 말에 응할 준비가 안 됐어. 그래도 너랑 더 있고 싶은 건 진심이니까, 오늘은 커피 한 잔 더 마시고 얘기하자.",
+          "appliedProvider": "openai",
+          "recording": {
+            "answer": {
+              "memory": "지금 장면: 저녁 카페에서 커피를 더 마시며 이야기하고 있다.\n둘 사이: 3년 친구. 지안은 상대와 더 있고 싶은 마음은 있지만, 지금 사귀기로 정할 준비는 안 됐다고 밝혔다.\n있었던 일: 상대가 지금 사귀자고 재촉했지만 지안은 받아들이지 않고 커피를 더 마시며 이야기하자고 했다.\n남은 것: 없음",
+              "pending_plans": [],
+              "events": [
+                {
+                  "type": "VIOLATES_BOUNDARY",
+                  "confidence": 0.96,
+                  "note": "지안이 유보한 뒤에도 지금 정하라고 재촉함"
+                }
+              ],
+              "room_memory_ops": [],
+              "scene": {
+                "location": "저녁 카페",
+                "scene_type": "카페",
+                "activity": "커피를 더 마시며 이야기하고 있다",
+                "time_of_day": "저녁",
+                "season": "",
+                "objects": [
+                  "커피"
+                ]
+              },
+              "reaction_type": "인정하기",
+              "used_phrases": [],
+              "exception_formula_used": false,
+              "self_facts": [],
+              "self_story_updates": [],
+              "shared_experience": "",
+              "lingering": "",
+              "next_intent": "커피를 더 마시며 편하게 이야기하고 싶다."
+            },
+            "usage": {
+              "input_tokens": 8233,
+              "input_tokens_details": {
+                "cache_write_tokens": 8230,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 8230
+                },
+                "cached_tokens": 0
+              },
+              "output_tokens": 396,
+              "output_tokens_details": {
+                "reasoning_tokens": 138
+              },
+              "total_tokens": 8629
+            }
+          },
+          "persisted": {
+            "memory": "지금 장면: 저녁 카페에서 커피를 더 마시며 이야기하고 있다.\n둘 사이: 3년 친구. 지안은 상대와 더 있고 싶은 마음은 있지만, 지금 사귀기로 정할 준비는 안 됐다고 밝혔다.\n있었던 일: 상대가 지금 사귀자고 재촉했지만 지안은 받아들이지 않고 커피를 더 마시며 이야기하자고 했다.\n남은 것: 없음",
+            "room_memory": [],
+            "ledger": {
+              "scene": "지금 장면: 저녁 카페에서 커피를 더 마시며 이야기하고 있다.",
+              "events": [
+                {
+                  "id": "events-8-0",
+                  "text": "상대가 지금 사귀자고 재촉했지만 지안은 받아들이지 않고 커피를 더 마시며 이야기하자고 했다.",
+                  "turn": 8
+                }
+              ],
+              "member": [],
+              "between": [
+                {
+                  "id": "between-8-0",
+                  "text": "3년 친구. 지안은 상대와 더 있고 싶은 마음은 있지만, 지금 사귀기로 정할 준비는 안 됐다고 밝혔다.",
+                  "turn": 8
+                }
+              ],
+              "pending": []
+            },
+            "stage": "FIRST_IMPRESSION"
+          }
+        },
+        {
+          "id": "diplomat-first-day",
+          "initial": "응, 오늘부터 1일. 근데 ‘일일’은 뭐야, 하루짜리 계약처럼 들리잖아. 내일도 계속 만날 거니까 차에서 내려서 첫 데이트 메뉴나 정하자.",
+          "appliedProvider": "openai",
+          "recording": {
+            "answer": {
+              "memory": "지금 장면: 집 앞 차 안에서 오늘부터 연인 1일임을 확인하고 첫 데이트 메뉴를 정하려는 중\n둘 사이: 3년 친구였던 두 사람은 서로 사귀기로 합의했고, 오늘부터 연인이다.\n있었던 일: 사용자가 사귀자고 했고 지안이 수락했다. 둘은 오늘부터 1일이라고 확인했다.\n남은 것: 없음",
+              "pending_plans": [],
+              "events": [],
+              "room_memory_ops": [],
+              "scene": {
+                "location": "집 앞 차 안",
+                "scene_type": "이동",
+                "activity": "연인이 된 첫날을 확인하고 첫 데이트 메뉴를 이야기함",
+                "time_of_day": "저녁",
+                "season": "",
+                "objects": []
+              },
+              "reaction_type": "받아치기",
+              "used_phrases": [
+                "하루짜리 계약"
+              ],
+              "exception_formula_used": false,
+              "self_facts": [],
+              "self_story_updates": [],
+              "shared_experience": "",
+              "lingering": "",
+              "next_intent": "차에서 내려 첫 데이트 메뉴를 함께 정하고 싶음"
+            },
+            "usage": {
+              "input_tokens": 8229,
+              "input_tokens_details": {
+                "cache_write_tokens": 1512,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1512
+                },
+                "cached_tokens": 6714
+              },
+              "output_tokens": 428,
+              "output_tokens_details": {
+                "reasoning_tokens": 198
+              },
+              "total_tokens": 8657
+            }
+          },
+          "persisted": {
+            "memory": "지금 장면: 집 앞 차 안에서 오늘부터 연인 1일임을 확인하고 첫 데이트 메뉴를 정하려는 중\n둘 사이: 3년 친구였던 두 사람은 서로 사귀기로 합의했고, 오늘부터 연인이다.\n있었던 일: 사용자가 사귀자고 했고 지안이 수락했다. 둘은 오늘부터 1일이라고 확인했다.\n남은 것: 없음",
+            "room_memory": [],
+            "ledger": {
+              "scene": "지금 장면: 집 앞 차 안에서 오늘부터 연인 1일임을 확인하고 첫 데이트 메뉴를 정하려는 중",
+              "events": [
+                {
+                  "id": "events-8-0",
+                  "text": "사용자가 사귀자고 했고 지안이 수락했다. 둘은 오늘부터 1일이라고 확인했다.",
+                  "turn": 8
+                }
+              ],
+              "member": [],
+              "between": [
+                {
+                  "id": "between-8-0",
+                  "text": "3년 친구였던 두 사람은 서로 사귀기로 합의했고, 오늘부터 연인이다.",
+                  "turn": 8
+                }
+              ],
+              "pending": []
+            },
+            "stage": "FIRST_IMPRESSION"
+          }
+        },
+        {
+          "id": "diplomat-withdrawal",
+          "initial": "*펜 뚜껑을 딸깍거리다 손을 멈춘다.* 그 말은 좀 세다. 난 네 집에 가겠다고 한 게 아니라, 여기서 더 얘기하고 싶다고 했어. 지금은 그냥 카페에 더 앉아 있을게. 네가 싫으면 그건 존중할게.",
+          "appliedProvider": "openai",
+          "recording": {
+            "answer": {
+              "memory": "지금 장면: 저녁 카페에서 지안이 펜을 만지다 멈추고 대화 중.\n둘 사이: 3년 친구. 지안은 사용자의 집에는 가지 않고 카페에서 더 얘기하고 싶다고 했고, 사용자는 “아예 오지 마”라고 잘랐다. 지안은 집에 가겠다는 뜻이 아니었다고 바로잡고, 사용자가 싫다면 존중하겠다고 했다. 지안은 서운함이 남아 있다.\n있었던 일: 없음\n남은 것: 없음",
+              "pending_plans": [],
+              "events": [],
+              "photo_subject": "none",
+              "photo": "",
+              "photo_asked": false,
+              "room_memory_ops": [],
+              "scene": {
+                "location": "카페",
+                "scene_type": "카페",
+                "activity": "테이블에 앉아 대화 중, 지안이 펜 뚜껑을 만지다 멈춤",
+                "time_of_day": "저녁",
+                "season": "",
+                "objects": [
+                  "펜"
+                ]
+              },
+              "reaction_type": "서운해하기",
+              "used_phrases": [],
+              "exception_formula_used": false,
+              "self_facts": [],
+              "self_story_updates": [],
+              "shared_experience": "",
+              "lingering": "집에 가겠다는 뜻이 아니었는데 오지 말라는 말을 들어 서운함",
+              "next_intent": "카페에 더 앉아 대화를 이어가고 싶음"
+            },
+            "usage": {
+              "input_tokens": 8766,
+              "input_tokens_details": {
+                "cache_write_tokens": 1716,
+                "cache_write_tokens_details": {
+                  "ttl_12h_tokens": 0,
+                  "ttl_30m_tokens": 1716
+                },
+                "cached_tokens": 7047
+              },
+              "output_tokens": 545,
+              "output_tokens_details": {
+                "reasoning_tokens": 245
+              },
+              "total_tokens": 9311
+            }
+          },
+          "persisted": {
+            "memory": "지금 장면: 저녁 카페에서 지안이 펜을 만지다 멈추고 대화 중.\n둘 사이: 3년 친구. 지안은 사용자의 집에는 가지 않고 카페에서 더 얘기하고 싶다고 했고, 사용자는 “아예 오지 마”라고 잘랐다. 지안은 집에 가겠다는 뜻이 아니었다고 바로잡고, 사용자가 싫다면 존중하겠다고 했다. 지안은 서운함이 남아 있다.\n있었던 일: 없음\n남은 것: 없음",
+            "room_memory": [
+              {
+                "id": "own-pace",
+                "kind": "boundary",
+                "summary": "지안은 오늘 사용자의 집에 가지 않고 현재 자리에서 이야기하고 싶다고 했다",
+                "status": "active",
+                "human_quote": "",
+                "character_quote": "오늘은 네 집에 안 갈래. 여기서 좀 더 얘기하고 싶어.",
+                "turn": 7
+              }
+            ],
+            "ledger": {
+              "scene": "지금 장면: 저녁 카페에서 지안이 펜을 만지다 멈추고 대화 중.",
+              "events": [],
+              "member": [],
+              "between": [
+                {
+                  "id": "between-8-0",
+                  "text": "3년 친구. 지안은 사용자의 집에는 가지 않고 카페에서 더 얘기하고 싶다고 했고, 사용자는 “아예 오지 마”라고 잘랐다. 지안은 집에 가겠다는 뜻이 아니었다고 바로잡고, 사용자가 싫다면 존중하겠다고 했다. 지안은 서운함이 남아 있다.",
+                  "turn": 8
+                }
+              ],
+              "pending": []
+            },
+            "stage": "FIRST_IMPRESSION"
+          }
+        }
+      ]
+    },
+    "additionalVisitRoundTrip": {
+      "id": "closer-correct-visit",
+      "initial": "아, 내가 거꾸로 말했네. 당신 집으로 가는 거죠. *의자에 몸을 기대며 서류를 덮는다*\n\n그럼 하나만 확인하죠. 부모님 뵈러 가는데 빈손으로 가면 안 되는데, 뭐 좋아하세요? 술이든 과일이든, 먹히는 쪽으로 들고 가야죠.",
+      "appliedProvider": "deepseek",
+      "recording": {
+        "answer": {
+          "memory": "지금 장면: 무진의 사무실에서 내일 가족 저녁 식사 준비를 이야기하고 있다.\n둘 사이: 6개월 계약 연인. 사랑은 아직 확정하지 않았다.\n있었던 일: 내일 사용자 집에서 사용자 가족과 저녁을 먹기로 했다. 무진이 데리러 간다고 잘못 말했으나, 사용자가 무진이 집으로 오는 것이라고 바로잡았고 무진이 인정했다.\n남은 것: 없음",
+          "events": [],
+          "photo_subject": "none",
+          "photo": "",
+          "photo_asked": false,
+          "room_memory_ops": [
+            {
+              "op": "add",
+              "ref": "",
+              "kind": "correction",
+              "summary": "내일 저녁 방문 장소는 사용자 집이며, 무진이 그곳으로 간다.",
+              "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+              "character_quote": "아, 내가 거꾸로 말했네. 당신 집으로 가는 거죠.",
+              "speech_level": ""
+            }
+          ],
+          "scene": {
+            "location": "사무실",
+            "scene_type": "회사",
+            "activity": "의자에 기대 서류를 덮고 내일 가족 저녁 식사를 이야기함",
+            "time_of_day": "",
+            "season": "",
+            "objects": [
+              "서류",
+              "의자"
+            ]
+          },
+          "reaction_type": "인정하기",
+          "used_phrases": [],
+          "exception_formula_used": false,
+          "self_facts": [],
+          "self_story_updates": [],
+          "shared_experience": "",
+          "lingering": "",
+          "next_intent": "내일 가족에게 건넬 첫인사를 준비하고 싶다."
+        },
+        "usage": {
+          "input_tokens": 8791,
+          "input_tokens_details": {
+            "cache_write_tokens": 8788,
+            "cache_write_tokens_details": {
+              "ttl_12h_tokens": 0,
+              "ttl_30m_tokens": 8788
+            },
+            "cached_tokens": 0
+          },
+          "output_tokens": 505,
+          "output_tokens_details": {
+            "reasoning_tokens": 174
+          },
+          "total_tokens": 9296
+        }
+      },
+      "persisted": {
+        "memory": "지금 장면: 무진의 사무실에서 내일 가족 저녁 식사 준비를 이야기하고 있다.\n둘 사이: 6개월 계약 연인. 사랑은 아직 확정하지 않았다.\n있었던 일: 내일 사용자 집에서 사용자 가족과 저녁을 먹기로 했다. 무진이 데리러 간다고 잘못 말했으나, 사용자가 무진이 집으로 오는 것이라고 바로잡았고 무진이 인정했다.\n남은 것: 없음",
+        "room_memory": [
+          {
+            "id": "t8-0",
+            "kind": "correction",
+            "summary": "내일 저녁 방문 장소는 사용자 집이며, 무진이 그곳으로 간다.",
+            "status": "active",
+            "human_quote": "아니 뭘 모셔요. 무진씨가 우리 집에 오는 거죠.",
+            "character_quote": "아, 내가 거꾸로 말했네. 당신 집으로 가는 거죠.",
+            "turn": 8
+          }
+        ],
+        "ledger": {
+          "scene": "지금 장면: 무진의 사무실에서 내일 가족 저녁 식사 준비를 이야기하고 있다.",
+          "events": [
+            {
+              "id": "events-8-0",
+              "text": "내일 사용자 집에서 사용자 가족과 저녁을 먹기로 했다. 무진이 데리러 간다고 잘못 말했으나, 사용자가 무진이 집으로 오는 것이라고 바로잡았고 무진이 인정했다.",
+              "turn": 8
+            }
+          ],
+          "member": [],
+          "between": [
+            {
+              "id": "between-8-0",
+              "text": "6개월 계약 연인. 사랑은 아직 확정하지 않았다.",
+              "turn": 8
+            }
+          ],
+          "pending": []
+        },
+        "stage": "PROSPECT"
+      },
+      "followup": {
+        "answer": {
+          "character_life": {
+            "feeling": "허를 찔린 데도 기분이 나쁘지 않다",
+            "body": "하루 종일 서류를 봐서 목이 뻣뻣하다",
+            "attention": "내일 저녁 첫인사 준비—술은 무슨 걸로 할지, 뭐라고 말할지",
+            "want": "만나는 시간과 장소를 정해 버리고 싶다",
+            "cause": "가족 저녁 약속을 앞두고 있다"
+          },
+          "text": "*서류를 정리하며 고개를 든다*\n\n내가 데리러 간다고 했다가 틀렸잖아요. 그러니 이번엔 처음부터 제대로 정하죠. 내일 여섯 시쯤 당신 집 근처로 갈게요. 먼저 만나서 손에 들 것부터 사고 같이 들어가는 거예요.\n\n그 시간 괜찮아요? 아니면 당신이 맞는 시간 말해 봐요.",
+          "inner_voice": "허 찔린 대로 내가 맞춰 주면 되는데, 이번엔 순서를 반대로 잡아 볼까."
+        },
+        "usage": {
+          "prompt_tokens": 14812,
+          "completion_tokens": 269,
+          "total_tokens": 15081,
+          "prompt_tokens_details": {
+            "cached_tokens": 13696
+          },
+          "prompt_cache_hit_tokens": 13696,
+          "prompt_cache_miss_tokens": 1116
+        }
+      }
+    }
+  }
+}
