@@ -117,6 +117,8 @@ test("세계 국립공원 탐험 (2026-11-27): 민서하's trip of the travel cl
   assert.equal(parks.length, 25);
   assert.deepEqual(classes.loungeTravelTrips.parks.tabs.map(tab => tab.name), ['미국 서부', '알래스카·하와이', '로키 산맥', '안데스 산맥', '동유럽', '러시아']);
   assert.equal(parks.find(site => site.id === 'glacier').city, '로키 산맥', 'Glacier is in the Rockies tab');
+  assert.equal(parks.find(site => site.id === 'yellowstone').city, '로키 산맥', 'Yellowstone too, beside Grand Teton (2026-11-28)');
+  assert.deepEqual(parks.filter(site => site.city === '미국 서부').map(site => site.id), ['grandcanyon', 'yosemite', 'zion', 'arches']);
   assert.ok(!parks.some(site => /알프스|돌로미티|몽블랑/.test(site.name + site.local)), 'no Alps in her board');
   for (const site of parks.filter(site => site.city === '러시아')) assert.match(site.tip, /외교부/, `${site.id} sends the member to the travel advisory`);
   assert.deepEqual([...new Set(parks.map(site => site.city))], classes.loungeTravelTrips.parks.tabs.map(tab => tab.name));
