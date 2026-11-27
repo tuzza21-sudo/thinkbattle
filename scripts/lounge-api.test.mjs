@@ -5918,10 +5918,10 @@ test('a one-to-one reply asks a check once and keeps its own word, on a chat and
 
 test('a Gemini reply that writes nothing in time is given up, so the next model answers', () => {
   const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
-  assert.ok(api.includes("const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 12_000;"));
+  assert.ok(api.includes("const loungeGeminiFirstTextMs = (pro: boolean) => pro ? 45_000 : Number(process.env.LOUNGE_GEMINI_FIRST_TEXT_MS) || 15_000;"));
   const reply = api.slice(api.indexOf('const geminiReply = async () => {'), api.indexOf('const deepseekReply = async'));
   assert.ok(reply.includes('signal: AbortSignal.any([replyStop, stall.signal])'));
-  assert.ok(reply.includes("if (output.trim()) begun = true;"));
+  assert.ok(reply.includes("if (replyTextPartial(output)?.trim()) begun = true;"));
   assert.ok(reply.includes("'gemini_stalled'") && reply.includes('finally { clearTimeout(stallTimer); }'));
 });
 
