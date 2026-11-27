@@ -6128,7 +6128,7 @@ test('an English lesson: the member\'s words are graded first, code moves the ex
 
 test("a lesson's hint and skip buttons are not graded by a model, and Haiku on OpenRouter caches its system prompt (2026-11-27)", () => {
   const api = readFileSync(new URL('../api/lounge.ts', import.meta.url), 'utf8');
-  assert.ok(api.includes("const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : undefined;"));
+  assert.ok(api.includes("const button = lastHuman.trim() === loungeLessonHintText ? 'meaning' as const : lastHuman.trim() === loungeLessonSkipText ? 'skip' as const : moreAsked ? 'chat' as const : undefined;"));
   assert.ok(api.includes("? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system)"));
   assert.ok(api.includes('if (callTurn || practiceHost) return [];'));
   assert.ok(api.includes('recent.slice(-(practiceRoom ? loungePracticeRecent : memoryLimits.recent))'));

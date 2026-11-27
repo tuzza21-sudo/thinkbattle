@@ -6,7 +6,7 @@ import { startLoungeScenario } from '../lib/loungeApi';
 import { setLoungeLessonProfile, addLoungeLessonWords, deleteLoungeLessonItem, enrichLoungeLessonBook, importLoungeLessonWords, loadLoungeLessonAttempts, loadLoungeLessonBook, makeLoungeLessonSituation, setLoungeLessonFocus, setLoungeLessonSituation, type LoungeLessonAttempt, type LoungeLessonBook } from '../lib/loungeLessonApi';
 import { readLoungeLessonFile } from '../lib/loungeLessonFile';
 import { getLoungeCharacter, koreanSubject } from '../lib/loungeCharacters';
-import { loungeLessonPurposes, loungeLessonTopics, loungeLessonConfusionTutor, loungeLessonDifficulties, loungeLessonDayOf, loungeLessonLevelLabel, loungeLessonListOrder, loungeLessonPriority, loungeLessonStudied, loungeLessonStatus, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonMaxPurposes, loungeLessonMaxTopics, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
+import { loungeLessonPurposes, loungeLessonTopics, loungeLessonConfusionTutor, loungeLessonDifficulties, loungeLessonDayOf, loungeLessonLevelLabel, loungeLessonListOrder, loungeLessonPriority, loungeLessonStudied, loungeLessonStatus, loungeLessonFeedbackLabels, loungeLessonHintText, loungeLessonMore, loungeLessonMoreText, loungeLessonSkipText, loungeLessonImportanceOf, loungeLessonLevels, loungeLessonMaxPurposes, loungeLessonMaxTopics, loungeLessonTask, loungeTutorOf, loungeTutors, type LoungeLessonItem, type LoungeLessonLevel, type LoungeLessonTask } from '../lib/loungeLesson';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const shortDay = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '';
@@ -191,7 +191,10 @@ function ExpressionNotes({ nuance, alternatives, confusion }: { nuance?: string 
 
 function LoungeLessonTaskCard({ task, send, disabled, confusion }: { task: LoungeLessonTask; send?: (text: string) => Promise<void>; disabled?: boolean; confusion?: boolean }) {
   if (task.phase === 'warmup') return <div className="lounge-lesson-task quiet"><p>가볍게 영어로 인사부터 해요. 그다음 오늘의 표현을 하나씩 물어볼게요.</p></div>;
-  if (task.phase !== 'drill' || !('item' in task) || !task.item) return <div className="lounge-lesson-task quiet"><p>오늘 연습할 표현을 다 했어요. 이제 자유롭게 영어로 이야기하면서, 배운 표현을 먼저 써 보세요.</p></div>;
+  if (task.phase !== 'drill' || !('item' in task) || !task.item) return <div className="lounge-lesson-task quiet">
+    <p>오늘 연습할 표현을 다 했어요. 이제 자유롭게 영어로 이야기하면서, 배운 표현을 먼저 써 보세요.</p>
+    {send && task.phase === 'free' && task.progress.total < loungeLessonMore.dayMax && <div className="lounge-lesson-task-actions"><button type="button" disabled={disabled} onClick={() => void send(loungeLessonMoreText)}><Plus size={14} /> 계속 학습 (3개 더)</button></div>}
+  </div>;
   const { item } = task;
   const kind = item.yours ? '내 상황' : item.review ? '복습' : '새 표현';
   return <section className="lounge-lesson-task" aria-label="지금 과제">
@@ -222,7 +225,7 @@ export function LoungeLessonFeedback({ text, attempts, level }: { text: string; 
   const [more, setMore] = useState(false);
   const said = plain(text).slice(0, 600);
   // The task card's buttons are words of the lesson, not English to correct (older lessons corrected them).
-  const lessonWords = said === loungeLessonHintText || said === loungeLessonSkipText;
+  const lessonWords = said === loungeLessonHintText || said === loungeLessonSkipText || said === loungeLessonMoreText;
   const mine = attempts.filter(attempt => { const words = plain(attempt.said); return words === said || (said.length > 20 && (words.startsWith(said) || said.startsWith(words))); });
   if (!mine.length) return null;
   const note = lessonWords ? undefined : mine.find(attempt => attempt.better || attempt.why);
