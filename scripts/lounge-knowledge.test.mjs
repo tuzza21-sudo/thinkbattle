@@ -267,3 +267,17 @@ test('a companion can tell a lived anecdote without a mandatory lesson or a retu
   assert.match(prompt, /기준 2026-10/);
   assert.match(prompt, /실제 사람의 개인정보·비공개 사실을 덧붙이지 않는다/);
 });
+
+test('a place the member names finds its entry by tag, a word many entries share does not (2026-11-28)', () => {
+  const tokens = knowledge.loungeKnowledgeNameTokens('캄차카에 곰 많아요? 바이칼에서는요');
+  assert.ok(tokens.includes('캄차카') && tokens.includes('바이칼'), 'the particle is taken off');
+  assert.ok(!tokens.includes('곰'), 'one letter is not a name');
+  const rows = [
+    { id: 'k', tags: ['러시아', '캄차카'] }, { id: 'b', tags: ['러시아', '바이칼'] }, { id: 'a', tags: ['러시아', '알타이'] },
+    { id: 'm', tags: ['안데스산맥', '마추픽추'] },
+  ];
+  assert.deepEqual(knowledge.loungeKnowledgeNamed(rows, knowledge.loungeKnowledgeNameTokens('캄차카 가 봤어요?')), ['k']);
+  assert.deepEqual(knowledge.loungeKnowledgeNamed(rows, knowledge.loungeKnowledgeNameTokens('러시아 가 봤어요?')), [], 'three entries share 러시아');
+  assert.deepEqual(knowledge.loungeKnowledgeNamed(rows, knowledge.loungeKnowledgeNameTokens('러시아 캄차카랑 마추픽추')).sort(), ['k', 'm']);
+  assert.deepEqual(knowledge.loungeKnowledgeNamed(rows, []), []);
+});

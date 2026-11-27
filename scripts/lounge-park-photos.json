@@ -204,5 +204,205 @@
     "id": "fitz-roy",
     "dir": "parks/spots",
     "query": "Monte Fitz Roy El Chalten"
+  },
+  {
+    "id": "rockymountain",
+    "dir": "parks",
+    "query": "Rocky Mountain National Park Trail Ridge Road tundra view"
+  },
+  {
+    "id": "trail-ridge",
+    "dir": "parks/spots",
+    "query": "Trail Ridge Road Rocky Mountain National Park"
+  },
+  {
+    "id": "bear-lake",
+    "dir": "parks/spots",
+    "query": "Bear Lake Hallett Peak Rocky Mountain National Park"
+  },
+  {
+    "id": "grandteton",
+    "dir": "parks",
+    "query": "Grand Teton Oxbow Bend Mount Moran"
+  },
+  {
+    "id": "mormon-row",
+    "dir": "parks/spots",
+    "query": "Mormon Row barn Grand Teton"
+  },
+  {
+    "id": "snake-river-overlook",
+    "dir": "parks/spots",
+    "query": "Snake River Overlook Grand Teton"
+  },
+  {
+    "id": "jenny-lake",
+    "dir": "parks/spots",
+    "query": "Jenny Lake Teton Range view"
+  },
+  {
+    "id": "aconcagua",
+    "dir": "parks",
+    "query": "Aconcagua mountain Argentina"
+  },
+  {
+    "id": "penitentes",
+    "dir": "parks/spots",
+    "query": "Aconcagua Plaza Francia"
+  },
+  {
+    "id": "puente-del-inca",
+    "dir": "parks/spots",
+    "query": "Puente del Inca Mendoza"
+  },
+  {
+    "id": "huascaran",
+    "dir": "parks",
+    "query": "Huascaran Cordillera Blanca Peru"
+  },
+  {
+    "id": "laguna-69",
+    "dir": "parks/spots",
+    "query": "Laguna 69 Huascaran"
+  },
+  {
+    "id": "llanganuco",
+    "dir": "parks/spots",
+    "query": "Llanganuco lakes Peru"
+  },
+  {
+    "id": "machupicchu",
+    "dir": "parks",
+    "query": "Machu Picchu panorama"
+  },
+  {
+    "id": "machu-picchu-terraces",
+    "dir": "parks/spots",
+    "query": "Machu Picchu terraces ruins"
+  },
+  {
+    "id": "huayna-picchu",
+    "dir": "parks/spots",
+    "query": "Huayna Picchu mountain"
+  },
+  {
+    "id": "plitvice",
+    "dir": "parks",
+    "query": "Plitvice Lakes National Park lakes"
+  },
+  {
+    "id": "veliki-slap",
+    "dir": "parks/spots",
+    "query": "Veliki slap Plitvice waterfall"
+  },
+  {
+    "id": "plitvice-boardwalk",
+    "dir": "parks/spots",
+    "query": "Plitvice Lakes boardwalk"
+  },
+  {
+    "id": "tatra",
+    "dir": "parks",
+    "query": "High Tatras Slovakia"
+  },
+  {
+    "id": "morskie-oko",
+    "dir": "parks/spots",
+    "query": "Morskie Oko lake Tatra"
+  },
+  {
+    "id": "strbske-pleso",
+    "dir": "parks/spots",
+    "query": "Strbske Pleso lake High Tatras"
+  },
+  {
+    "id": "bialowieza",
+    "dir": "parks",
+    "query": "Bialowieza Forest old trees"
+  },
+  {
+    "id": "bialowieza-forest",
+    "dir": "parks/spots",
+    "query": "Bialowieza National Park strict reserve forest"
+  },
+  {
+    "id": "european-bison",
+    "dir": "parks/spots",
+    "query": "European bison Bialowieza"
+  },
+  {
+    "id": "durmitor",
+    "dir": "parks",
+    "query": "Durmitor National Park mountains"
+  },
+  {
+    "id": "black-lake",
+    "dir": "parks/spots",
+    "query": "Crno jezero Durmitor Black Lake"
+  },
+  {
+    "id": "tara-bridge",
+    "dir": "parks/spots",
+    "query": "Durdevica Tara bridge"
+  },
+  {
+    "id": "kamchatka",
+    "dir": "parks",
+    "query": "Koryaksky volcano Petropavlovsk-Kamchatsky"
+  },
+  {
+    "id": "valley-of-geysers",
+    "dir": "parks/spots",
+    "query": "Valley of Geysers Kamchatka"
+  },
+  {
+    "id": "klyuchevskaya",
+    "dir": "parks/spots",
+    "query": "Klyuchevskoy volcano -3D -satellite -SkySat -Sentinel -Landsat"
+  },
+  {
+    "id": "baikal",
+    "dir": "parks",
+    "query": "Listvyanka Baikal"
+  },
+  {
+    "id": "shaman-rock",
+    "dir": "parks/spots",
+    "query": "Shaman Rock Olkhon Baikal"
+  },
+  {
+    "id": "olkhon-ice-cave",
+    "dir": "parks/spots",
+    "query": "Lake Baikal ice"
+  },
+  {
+    "id": "altai",
+    "dir": "parks",
+    "query": "Belukha mountain Altai"
+  },
+  {
+    "id": "belukha",
+    "dir": "parks/spots",
+    "query": "Belukha Akkem lake"
+  },
+  {
+    "id": "teletskoye",
+    "dir": "parks/spots",
+    "query": "Lake Teletskoye Altai"
+  },
+  {
+    "id": "elbrus",
+    "dir": "parks",
+    "query": "Mount Elbrus"
+  },
+  {
+    "id": "elbrus-summits",
+    "dir": "parks/spots",
+    "query": "Glaciers of the south-eastern slope of Elbrus"
+  },
+  {
+    "id": "caucasus-view",
+    "dir": "parks/spots",
+    "query": "National Park of Elbrus region view from the foot of Elbrus 4000 meters"
   }
 ]

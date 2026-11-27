@@ -110,7 +110,7 @@ function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClo
         : work ? <WorkDetail work={work} start={start(work.id, '이 작품 함께 보기')} />
         : exercise ? <ExerciseDetail exercise={exercise} start={start(exercise.id, '이 과제로 쓰기')} />
         : kind === 'travel' ? <div className="lounge-memory-panel">
-          <div className="lounge-memory-tabs" role="tablist">{travel.tabs.map(({ name }) => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
+          <div className="lounge-memory-tabs lounge-class-tabs" role="tablist">{travel.tabs.map(({ name }) => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
           <p className="lounge-memory-note">{travel.tabs.find(tab => tab.name === city)?.note} {travel.stop}를 눌러 배경과 역사, 꼭 볼 것을 보고 탐험을 시작해요.</p>
           <ul className="lounge-class-grid">{loungeClassSites.filter(item => (item.trip ?? 'italy') === trip && item.city === city).map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
             {item.image ? <img src={item.image.src} alt="" loading="lazy" /> : <span className="lounge-class-noimage"><Landmark size={22} /></span>}
