@@ -3,6 +3,8 @@
 # asks the lounge function itself whether it answers; after three misses in a minute it starts a redeploy through the
 # Vercel deploy hook (secret VERCEL_DEPLOY_HOOK) and fails, so GitHub mails the owner. The repository is public, so
 # the runs cost nothing. GitHub may start a scheduled run a few minutes late.
+# 2026-11-27: GitHub actually started these runs only every few hours, so the main watch is now in Supabase
+# (migration 20270125000000_lounge_uptime_watch.sql, every 20 seconds); this one stays as a backup and for test alerts.
 #
 # The owner's phone hears of it through ntfy (the ntfy app subscribed to the topic in secret NTFY_TOPIC): an urgent
 # alert when the site stops, one when it answers again, and a test from a manual run with "test" ticked.
