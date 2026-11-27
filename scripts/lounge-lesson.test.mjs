@@ -42,12 +42,12 @@ test('an expression is the member\'s only when it comes out unasked on another d
   let state = item('a');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'hinted', day1) };
   assert.equal(state.stage, 2);
-  assert.equal(state.next_review_at, '2026-11-26T03:00:00.000Z');
+  assert.equal(state.next_review_at, '2026-11-28T03:00:00.000Z', 'never the next day: three days later');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'unprompted', day1) };
   assert.equal(state.stage, 3, 'said unprompted');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'unprompted', day1) };
   assert.equal(state.stage, 3, 'the same day again is not another day');
-  assert.equal(state.next_review_at, '2026-11-28T03:00:00.000Z');
+  assert.equal(state.next_review_at, '2026-12-02T03:00:00.000Z', 'said alone: a week later');
   state = { ...state, ...lesson.applyLoungeLessonVerdict(state, 'unprompted', day2) };
   assert.equal(state.stage, 5, 'said unasked on another day: 내 것 (2026-11-27)');
   assert.equal(state.next_review_at, '2026-12-18T03:00:00.000Z');
@@ -394,4 +394,16 @@ test('the board writes an expression situation over only through the server, on 
   assert.match(edit, /host_id !== user\.id \|\| !isLoungeTutor/);
   assert.match(edit, /lounge_english_items\?id=eq\.\$\{encodeURIComponent\(itemId\)\}&user_id=eq\.\$\{encodeURIComponent\(user\.id\)\}/);
   assert.match(edit, /situation: situation \|\| null/);
+});
+
+test('reviews come three days later, then a week later, and only once due; the star stays until the member says it (2026-11-27)', () => {
+  const day = new Date('2026-11-25T03:00:00Z');
+  const at = (verdict, extra = {}) => lesson.applyLoungeLessonVerdict(item('r', extra), verdict, day).next_review_at;
+  assert.equal(at('missed'), '2026-11-28T03:00:00.000Z', 'a skipped one is not asked the next day');
+  assert.equal(at('given'), '2026-11-28T03:00:00.000Z');
+  assert.equal(at('hinted'), '2026-11-28T03:00:00.000Z');
+  assert.equal(at('unprompted'), '2026-12-02T03:00:00.000Z');
+  const items = [item('yesterday', { stage: 2, attempts: 1, next_review_at: '2026-11-27T03:00:00Z' }), item('due', { stage: 2, attempts: 1, next_review_at: '2026-11-25T00:00:00Z' })];
+  assert.deepEqual(lesson.planLoungeLesson(items, now).reviews, ['due'], 'one not due yet waits for its day');
+  assert.deepEqual(['unprompted', 'hinted', 'given', 'missed', 'free'].filter(lesson.loungeLessonFocusDone), ['unprompted', 'hinted']);
 });

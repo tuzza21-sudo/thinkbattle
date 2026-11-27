@@ -400,7 +400,7 @@ export function LoungeLessonSheet({ tutorName, roomId, lesson, confusion, onClos
             <span>묶어 보기</span>
             {groupings.map(([id, label]) => <button key={id} type="button" aria-pressed={groupBy === id} className={groupBy === id ? 'active' : ''} onClick={() => setGroupBy(id)}>{label}</button>)}
           </div>
-          <p className="lounge-memory-note">수업 순서: {marks ? '★ 우선 학습 → ' : ''}1순위 → 2순위 → 3순위, 같은 순위면 쉬운 레벨(B1 → B2 → C1)부터. {marks ? '★는 연습하고 나면 풀려요.' : ''}{lesson.enriching && <> <LoaderCircle size={12} className="lounge-spin" /> 순위·레벨을 매기는 중{lesson.enrichLeft ? ` (남은 ${lesson.enrichLeft}개)` : ''}…</>}</p>
+          <p className="lounge-memory-note">수업 순서: {marks ? '★ 우선 학습 → ' : ''}1순위 → 2순위 → 3순위, 같은 순위면 쉬운 레벨(B1 → B2 → C1)부터. {marks ? '★는 수업에서 직접 말하면(힌트 포함) 풀려요. 넘어가거나 답을 보고 말하면 그대로 남아요.' : ''}{lesson.enriching && <> <LoaderCircle size={12} className="lounge-spin" /> 순위·레벨을 매기는 중{lesson.enrichLeft ? ` (남은 ${lesson.enrichLeft}개)` : ''}…</>}</p>
           {shown.length ? <div className="lounge-lesson-days">{days.map(([day, list], index) => {
             const open = dayOpen(day, index), studied = list.filter(loungeLessonStudied).length, first = groupBy === 'priority' ? 0 : list.filter(item => item.importance === 3 && !loungeLessonStudied(item)).length;
             return <section key={day || 'none'} className={`lounge-lesson-day${open ? ' open' : ''}`}>

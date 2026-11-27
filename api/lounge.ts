@@ -17,7 +17,7 @@ import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNeg
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
 import { loungeLessonEnrichInput, loungeLessonEnrichInstructions, loungeLessonEnrichSchema, loungeLessonFeedback, loungeLessonSituationInput, loungeLessonSituationInstructions, loungeLessonSituationSchema, readLoungeLessonEnrich, readLoungeLessonSituation, type LoungeLessonLevel } from '../src/lib/loungeLesson';
 import { readLoungeLessonProfile } from '../src/lib/loungeLesson';
-import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonPlanOrder, loungeLessonHintText, loungeLessonSkipText, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
+import { advanceLoungeLesson, applyLoungeLessonVerdict, isLoungeTutor, loungeLessonFocusDone, loungeLessonCleanGrade, loungeLessonDay, loungeLessonForPrompt, loungeLessonGradeInput, loungeLessonGradeInstructions, loungeLessonGradeSchema, loungeLessonKeep, loungeLessonLevel, loungeLessonPackFor, loungeLessonPlanOrder, loungeLessonHintText, loungeLessonSkipText, loungeLessonRules, planLoungeLesson, readLoungeLessonGrade, readLoungeLessonLevel, readLoungeLessonState, type LoungeLessonItem } from '../src/lib/loungeLesson';
 import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessageVoiceMinutes, loungeMessageVoiceText, loungeMp3Seconds, type LoungeMessageVoiceStatus } from '../src/lib/loungeMessageActions';
 
 /** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
@@ -1680,8 +1680,9 @@ ${photoRule}`;
         write(`voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'PATCH', body: JSON.stringify({ story_state: turn.state }) }),
         ...turn.verdicts.map(({ item, verdict }) => write(`lounge_english_items?id=eq.${encodeURIComponent(item.id)}&user_id=eq.${encodeURIComponent(user.id)}`, { method: 'PATCH',
           body: JSON.stringify({ ...applyLoungeLessonVerdict(item, verdict, now), last_said: lastHuman.slice(0, 300), updated_at: now.toISOString(),
-            // Practised: no longer marked to learn first (sent only when marked, so never before migration 20270118000000).
-            ...(item.focus && verdict !== 'free' ? { focus: false } : {}) }) })),
+            // Said in the lesson (alone or after a hint): no longer marked to learn first. Skipped, missed or said only after
+            // the answer was shown, it stays marked (2026-11-27, by the owner). Sent only when marked (migration 20270118000000).
+            ...(item.focus && loungeLessonFocusDone(verdict) ? { focus: false } : {}) }) })),
         ...(attempts.length ? [write('lounge_english_attempts', { method: 'POST', body: JSON.stringify(attempts) })] : []),
         ...(keep ? [write('lounge_english_items?on_conflict=user_id,expression_key', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
           body: JSON.stringify({ user_id: user.id, expression: keep.expression, meaning: keep.meaning, level: loungeLessonLevel(level).target, source: 'upgrade' }) })] : []),
