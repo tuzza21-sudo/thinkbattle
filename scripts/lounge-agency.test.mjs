@@ -54,6 +54,28 @@ test('empty DeepSeek voice output falls back before speaking and records the app
   }
 });
 
+test('Jian sends the new political ambition and polite reunion into chat and voice while an existing friendship stays casual', async () => {
+  const scene = agencyCases.find(item => item.character === 'diplomat');
+  for (const medium of ['chat', 'voice']) {
+    const { request } = await captureAgencyCase({ ...scene, medium });
+    const input = JSON.parse(request.input);
+    assert.equal(input.scenario.id, 'diplomat-byline');
+    assert.equal(input.relationship.speech_level, 'polite');
+    assert.match(input.relationship.character_core.join(' '), /정계 진출/);
+    assert.match(input.relationship.character_core.join(' '), /경제력·실행력/);
+    assert.match(request.instructions, /명예/);
+    assert.doesNotMatch(request.instructions, /3년|우정을 잃|서운해 물러서면/);
+    assert.doesNotMatch(input.relationship.stage.hint, /3년|편안한 친구/);
+  }
+  const scenario = { id: 'diplomat-old-friend-fling', title: '기존 방의 이야기', place: '차 안', prologue: '기존에 함께 나눈 이야기', user_role: '오랜 친구', relationship: '3년 친구. 이미 서로 사귀기로 합의했다.' };
+  const { request } = await captureAgencyCase({ ...scene, scenario, memory: '둘 사이: 서로 사귀기로 합의했다' });
+  const input = JSON.parse(request.input);
+  assert.equal(input.scenario.id, scenario.id);
+  assert.equal(input.scenario.relationship, scenario.relationship);
+  assert.equal(input.relationship.speech_level, 'casual');
+  assert.match(input.memory, /서로 사귀기로 합의/);
+});
+
 test('a corrected plan cannot cite the old character invitation to restore a canceled pickup', () => {
   const { loungeSummaryWithGroundedPlans } = loadTs(fileURLToPath(new URL('../src/lib/loungeRoomLedger.ts', import.meta.url)));
   const old = '내일 저녁 집 앞으로 데리러 갈게요.';

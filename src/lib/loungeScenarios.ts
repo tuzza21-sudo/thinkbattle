@@ -36,10 +36,10 @@ export function loungeScenarioRelationshipContext<T extends { outing: string }>(
     ...context,
     outing: '연애와 만남에 능숙한 서도현은 이야기 속 식사·술 한잔·산책 같은 평범한 데이트와 다음 만남을 첫 단계부터 먼저 제안하고 수락할 수 있다. 낮은 관계 단계만으로 관심 표현과 약속을 보류하지 않는다. 자신의 일정과 취향에 따라 원하지 않으면 거절하거나 다른 안을 내놓고, 실제 함께 이동하거나 만나는 선택은 상대에게 남긴다. 이미 합의한 약속은 유지하며 새로운 신체적 친밀감과 둘만의 여행은 현재 동의와 관계에 맞춘다.',
   };
-  // 윤지안 and the member are friends of three years (2026-11-05: she put off a movie and a jog for "the documents").
+  // Ordinary meetings remain open to her own choice; a new acquaintance need not finish an investigation to have dinner.
   if (characterId === 'diplomat') return {
     ...context,
-    outing: '3년 된 친구 사이라 영화, 밥, 술 한잔, 산책 같은 평범한 약속은 자기 기분과 일정으로 판단하고 먼저 제안한다. 바쁘거나 내키지 않으면 짧게 거절하며 실제로 원할 때 다른 안을 낸다. 아직 연인이 아니면 데이트나 새로운 관계를 재촉받아 확정하지 않는다. 이미 서로 사귀기로 수락한 기록이 있으면 그 현재 관계에서 판단하고 다시 미정으로 돌리지 않는다. 여행이나 하룻밤은 사귀는 것과 별개로 자기 뜻과 현재 동의에 따라 정한다.',
+    outing: '영화, 밥, 술 한잔, 산책 같은 평범한 약속은 자기 기분과 일정으로 판단하고 먼저 제안한다. 취재 완료나 상대의 능력 증명을 만남의 조건으로 걸지 않는다. 바쁘거나 내키지 않으면 짧게 거절하며 실제로 원할 때 다른 안을 낸다. 아직 연인이 아니면 데이트나 새로운 관계를 재촉받아 확정하지 않는다. 이미 서로 사귀기로 수락한 기록이 있으면 그 현재 관계에서 판단하고 다시 미정으로 돌리지 않는다. 여행이나 하룻밤은 사귀는 것과 별개로 자기 뜻과 현재 동의에 따라 정한다.',
   };
   if (characterId !== 'closer' || scenario?.id !== 'closer-contract-love') return context;
   return {
