@@ -161,8 +161,12 @@ export const loungeLessonStages = [
  * lesson's own steps and review days; on the board every stage between the first and the last is 학습함.
  */
 export const loungeLessonStageLabel = (stage: number) => { const at = Math.max(0, Math.min(5, Math.round(stage))); return at === 0 ? '새 표현' : at === 5 ? '내 것' : '학습함'; };
-/** Days to the next review after a turn that left the expression at this stage. */
-const reviewDays = [0, 1, 1, 3, 7, 21];
+/**
+ * Days to the next review after a turn that left the expression at this stage (2026-11-27, by the owner: never the next
+ * day; at least three days later, then a week later). Not yet said alone, or missed: three days. Said alone: a week.
+ */
+const reviewDays = [3, 3, 3, 7, 7, 21];
+export const loungeLessonRetryDays = 3;
 
 /** mine: put in by the member (typed or from a file); tutor: the tutor's own list; upgrade: kept from a correction; situation: made for a situation the member told. */
 export type LoungeLessonSource = 'mine' | 'tutor' | 'upgrade' | 'situation';
@@ -223,6 +227,8 @@ export const loungeLessonFeedbackLabels = (level: LoungeLessonLevel) => level ==
   ? { better: 'C1 표현', polished: '원어민식으로' }
   : { better: 'B2 표현', polished: 'C1 · 더 세련되게' };
 export type LoungeLessonVerdict = 'unprompted' | 'hinted' | 'given' | 'missed' | 'free';
+/** The verdicts that take the ★ (learn first) off: the member said it when asked, alone or after a hint. */
+export const loungeLessonFocusDone = (verdict: LoungeLessonVerdict) => verdict === 'unprompted' || verdict === 'hinted';
 
 /** The day in Korea (YYYY-MM-DD): a lesson is one day's, and "another day" is counted in Korean days. */
 export const loungeLessonDay = (now: Date) => new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -248,7 +254,7 @@ export function applyLoungeLessonVerdict(item: LoungeLessonItem, verdict: Lounge
   // Missed or skipped: practised all the same, so at least 학습함 (2026-11-27: five skipped ones stayed 새 표현).
   else stage = stage >= 3 ? stage - 1 : Math.max(stage, 1);
   const failed = verdict === 'missed' || verdict === 'given';
-  const next = new Date(now.getTime() + (failed ? 1 : reviewDays[stage] || 1) * 86_400_000);
+  const next = new Date(now.getTime() + (failed ? loungeLessonRetryDays : reviewDays[stage] || loungeLessonRetryDays) * 86_400_000);
   return { stage, days, free_used: free, next_review_at: next.toISOString(), attempts: (item.attempts ?? 0) + 1 };
 }
 
@@ -376,7 +382,8 @@ const focused = (items: readonly LoungeLessonItem[]) => items.filter(item => ite
 export function planLoungeLesson(items: readonly LoungeLessonItem[], now: Date) {
   const first = focused(items).slice(0, 12);
   const reviewAt = (item: LoungeLessonItem) => item.next_review_at ? Date.parse(item.next_review_at) : now.getTime();
-  const reviews = items.filter(item => !first.includes(item) && item.stage < 5 && loungeLessonStudied(item))
+  // Only the ones whose review day has come (2026-11-27, by the owner: one practised yesterday is not asked today).
+  const reviews = items.filter(item => !first.includes(item) && item.stage < 5 && loungeLessonStudied(item) && reviewAt(item) <= now.getTime())
     .sort((a, b) => reviewAt(a) - reviewAt(b) || lessonOrder(a, b) || older(a, b))
     .slice(0, Math.max(0, Math.min(loungeLessonSize.reviews, loungeLessonSize.total - first.length)));
   const fresh = items.filter(item => !first.includes(item) && !loungeLessonStudied(item))
