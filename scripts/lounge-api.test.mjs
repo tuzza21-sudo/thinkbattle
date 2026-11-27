@@ -2400,7 +2400,7 @@ test('a chat started from a story is told as a story; with the voice on it stays
       assert.match(reply.instructions, /scenario.relationship에서 시작하고, relationship\(stage, outing, intimacy\)은 그 위에서 마음을 얼마나 열고 스킨십을 어디까지 받아들일지 정한다/);
       // What the first try showed: the same paragraph order, the same prop, too little dialogue, every advance turned aside.
       assert.match(reply.instructions, /답의 모양을 매번 바꾼다/);
-      assert.match(reply.instructions, /시그니처 동작\(예: 손목시계, 잔\)은 한 대화에서 많아야 두 번/);
+      assert.match(reply.instructions, /시그니처 동작\(예: 손목시계, 잔, 펜, 서류, 턱 괴기\)은 한 대화에서 많아야 두 번 쓰고 연달아 쓰지 않는다\. 뜻 없는 손동작/);
       assert.match(reply.instructions, /대사가 답의 절반 가까이 되게 하고/);
       assert.match(reply.instructions, /매번 말로 비켜 가지 않는다/);
       assert.match(reply.instructions, /질문으로 끝내지 않는다/);

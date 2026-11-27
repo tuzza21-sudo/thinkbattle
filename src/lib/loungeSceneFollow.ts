@@ -60,6 +60,8 @@ export type SceneFollowInput = {
   follow?: SceneFollow;
   /** A chat that began from a story's prologue: its first background stays until the talk moves the two (2026-11-19, by the owner). */
   story?: boolean;
+  /** That story's first place (the scenario's place): the start is set from it, not from the engine's wording of it. */
+  storyPlace?: string;
   now: number;
 };
 export type SceneFollowDecision =
@@ -79,7 +81,11 @@ export const isTransitPlace = (place: string | undefined) => wayPlace.test(place
 export function decideSceneFollow(input: SceneFollowInput): SceneFollowDecision {
   if (input.manual && input.pickedAt === undefined) return { action: 'keep', reason: 'manual' };
   const fromEngine = stateScenePlace(input.scene);
-  const place = fromEngine ?? placeFromSceneLine(input.memoryLine);
+  // A story starts where its prologue left the two (2026-11-28, by the owner): 강무진's story opens in the boardroom, and the
+  // engine's first scene, "강무진의 사무실", took the background to an office. Before any background is set, and unless the
+  // talk explicitly moved them, the story's own place is the one the start is set from.
+  const storyStart = input.story && !input.follow && !input.manual && !input.change?.explicit ? placeFromSceneLine(input.storyPlace) : undefined;
+  const place = storyStart ?? fromEngine ?? placeFromSceneLine(input.memoryLine);
   if (!place) return { action: 'keep', reason: input.manual ? 'manual' : 'no_place' };
   // The way from one place to another is not shown (the owner, 2026-11-09): the background waits for where the two arrive.
   if (isTransitPlace(place)) return { action: 'keep', reason: 'on_the_way' };
