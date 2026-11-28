@@ -17,7 +17,7 @@ import { LoungeChatSettings, LoungeSettingsChoice, type LoungeSettingsItem } fro
 import { LoungeMemorySheet } from './LoungeMemorySheet';
 import { LoungePhotoGallerySheet, LoungePhotoRequestSheet } from './LoungePhotoSheet';
 import { loadLoungePersonaPreference, loungePersonaToApply } from '../lib/loungePersonaPreference';
-import { listMyLoungePersonas, setLoungeRoomPersona, loadEarlierLoungeMessages, loungeHistoryPage, loadLoungeInnerVoice, saveLoungeInnerVoice, loadLoungeMessageVoice, loadLoungeMessageVoiceUsage, rewindLoungeChat, type LoungeMemoryBook, type LoungeMessageVoiceUsage } from '../lib/loungeApi';
+import { dictateLoungeAudio, listMyLoungePersonas, setLoungeRoomPersona, loadEarlierLoungeMessages, loungeHistoryPage, loadLoungeInnerVoice, saveLoungeInnerVoice, loadLoungeMessageVoice, loadLoungeMessageVoiceUsage, rewindLoungeChat, type LoungeMemoryBook, type LoungeMessageVoiceUsage } from '../lib/loungeApi';
 import { loungePersonaStoryScenario, loungeRoomPersonaRow, loungeRoomPersonaStory, type LoungeMemberPersonaRow } from '../lib/loungePersonas';
 import { useLoungeCustomCharacter } from '../lib/loungeCustomClient';
 import { getLoungeChatModel, loungeDefaultChatModelId, loungeLessonChatModels, loungeRoomChatModelId } from '../lib/loungeModels';
@@ -579,7 +579,7 @@ function RoomView(props: RoomViewProps) {
           {solo && !ended && !props.preview && props.classKind && props.roomId && <LoungeClassBar kind={props.classKind} trip={props.classTrip} roomId={props.roomId} storyState={props.lessonState} send={props.replySuggest?.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
           {solo && !ended && !props.preview && props.trainingKind && props.roomId && <LoungeTrainingBar kind={props.trainingKind} roomId={props.roomId} storyState={props.lessonState} send={props.replySuggest?.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
           {solo && !ended && !props.preview && props.lessonTutor && props.lessonRoomId && <LoungeLessonBar tutorName={props.lessonTutor} tutorId={props.hostId} roomId={props.lessonRoomId} lesson={lessonRoom} storyState={props.lessonState} send={props.replySuggest?.send} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} />}
-          {solo && !ended && (!props.preview || props.chat) && props.replySuggest && <LoungeChatComposer onSend={props.replySuggest.send} onNext={() => props.onAsk('topic')} nextDisabled={helpDisabled} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} placeholder={props.chat ? '메시지 입력' : '말하거나 글로 입력해요'} />}
+          {solo && !ended && (!props.preview || props.chat) && props.replySuggest && <LoungeChatComposer onSend={props.replySuggest.send} onDictate={props.roomId ? audio => dictateLoungeAudio(props.roomId!, audio, Boolean(props.lessonTutor)) : undefined} onNext={() => props.onAsk('topic')} nextDisabled={helpDisabled} disabled={props.pending || props.aiSpeaking || restricted || props.status !== 'active'} placeholder={props.chat ? '메시지 입력' : '말하거나 글로 입력해요'} />}
           <div className="lounge-voice-controls"><div className="lounge-room-controls">
             {!sessionProps && !ended && props.topicPicker && <LoungeTopicPicker {...props.topicPicker} disabled={props.topicPicker.disabled || restricted} />}
             {!sessionProps && ((solo && !props.chat) || ended || space) && microphoneControl}

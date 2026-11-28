@@ -107,6 +107,8 @@ async function fetchTimed(url: string, init: RequestInit, timeout = 25_000) {
 // Reply suggestions cost one model call each. A short gap per member and room, and an hourly cap, keep that bounded
 // (kept per server instance, which is enough to stop a button held down).
 const replyCalls = new Map<string, number[]>();
+// 받아쓰기 (2026-11-28): recordings written into the message box, per member on this instance (a guard, not a quota).
+const dictationCalls = new Map<string, number[]>();
 function replyCooldown(key: string) {
   const now = Date.now(), recent = (replyCalls.get(key) ?? []).filter(time => now - time < 3_600_000);
   if (recent.length && now - recent[recent.length - 1] < 4_000) return 4;
@@ -518,7 +520,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     try { body = JSON.parse(raw); } catch { return json({ error: '올바르지 않은 요청이에요.' }, 400); }
     requestAction = String(body.action); requestRoom = typeof body.roomId === 'string' ? body.roomId : '';
     const roomId = typeof body.roomId === 'string' ? body.roomId : '';
-    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-situation-edit', 'lesson-enrich', 'training-start', 'class-pick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
+    if (!/^lounge-[a-f0-9-]{36}$/.test(roomId) || !['transcribe', 'dictate', 'host', 'prepare', 'relationship', 'topics', 'replies', 'speech', 'call-tick', 'room-memory', 'room-memory-forget', 'rewind', 'message-voice', 'lesson-situation', 'lesson-situation-edit', 'lesson-enrich', 'training-start', 'class-pick'].includes(String(body.action))) return json({ error: '올바르지 않은 라운지 요청이에요.' }, 400);
     const auth = await fetchTimed(`${url}/auth/v1/user`, { headers });
     if (!auth.ok) return json({ error: '로그인 세션이 만료되었어요.' }, 401);
 
@@ -565,6 +567,33 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
         await rpc<void>('fail_voice_lounge_study', { p_room: roomId, p_ticket: claim.ticket }, true).catch(() => {});
         throw error;
       }
+    }
+
+    // 받아쓰기 (2026-11-28, by the owner): the mic beside *행동* records as long as the member speaks, and the words come back
+    // into the message box to be read over and sent; nothing is saved here. The browser's own speech recognition stops on
+    // a pause and does not run in the Android app, so the recording is written down by the same model as a call.
+    if (body.action === 'dictate') {
+      const mime = typeof body.mimeType === 'string' ? body.mimeType.split(';')[0] : '';
+      const extensions: Record<string, string> = { 'audio/webm': 'webm', 'audio/mp4': 'mp4', 'audio/ogg': 'ogg' };
+      if (!extensions[mime] || typeof body.audio !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(body.audio)) return json({ error: '지원하지 않는 음성 형식이에요.' }, 400);
+      const binary = atob(body.audio);
+      if (binary.length < 100) return json({ text: '' });
+      // The page sends a long dictation in pieces of a minute or so (cut at a pause), so one piece stays small.
+      if (binary.length > 2_000_000) return json({ error: '녹음이 너무 길어요. 나눠서 말해 주세요.' }, 413);
+      const user = await readJson<{ id: string }>(auth, 'lounge');
+      const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id`, { headers });
+      const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string }>>(roomResponse, 'lounge') : [];
+      if (!mine || mine.host_id !== user.id) return json({ error: '내 대화방에서만 쓸 수 있어요.' }, 403);
+      const now = Date.now(), recent = (dictationCalls.get(user.id) ?? []).filter(at => at > now - 600_000);
+      if (recent.length >= 60) return json({ error: '받아쓰기를 잠시 쉬었다가 다시 해 주세요.' }, 429);
+      dictationCalls.set(user.id, [...recent, now]);
+      const form = new FormData();
+      form.append('file', new Blob([Uint8Array.from(binary, character => character.charCodeAt(0))], { type: mime }), `speech.${extensions[mime]}`);
+      form.append('model', 'gpt-4o-mini-transcribe'); if (body.language !== 'auto') form.append('language', 'ko');
+      const result = await hedged(async attemptSignal => readJson<{ text: string }>(await openai('audio/transcriptions', form, AbortSignal.any([req.signal, attemptSignal]), 60_000), 'openai'),
+        loungeTranscriptionHedgeMs(binary.length) + 4000, transientUpstream);
+      if (typeof result?.text !== 'string') throw new LoungeUpstreamError('받아쓰기 결과를 받지 못했어요. 잠시 뒤 다시 시도해 주세요.', 502, 'openai_invalid_response', true, 10);
+      return json({ text: result.text.trim().slice(0, 1200) });
     }
 
     if (body.action === 'transcribe') {

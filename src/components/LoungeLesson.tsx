@@ -152,7 +152,10 @@ function LoungeLessonGoalCard({ lesson, tutorId, start, send, disabled, onDone }
   </section>;
   const style = tutorId === 'interpretertutor' ? '주제를 고르지 않으면 회의·협상·발표 같은 격식 있는 자리의 영어로 수업해요.' : '주제를 고르지 않으면 일상 대화에서 내 생각과 느낌을 풍부하게 말하는 연습으로 수업해요.';
   return <section className="lounge-lesson-task lounge-lesson-goal" aria-label="수업 목표">
-    <header><b>{start ? '오늘 수업 목표' : '수업 목표 바꾸기'}</b>{close}</header>
+    {/* Save sits at the top (2026-11-28, by the owner: on a phone the card's bottom could not be scrolled to). */}
+    <header><b>{start ? '오늘 수업 목표' : '수업 목표 바꾸기'}</b><span className="lounge-lesson-goal-tools">
+      <button type="button" className="lounge-lesson-goal-save" disabled={busy || disabled} onClick={() => void save()}>{busy ? <LoaderCircle size={14} className="lounge-spin" /> : <GraduationCap size={14} />} {start ? '저장하고 시작' : '저장'}</button>{close}</span></header>
+    {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}
     <div className="lounge-lesson-goal-levels" role="radiogroup" aria-label="목표 레벨">
       {loungeLessonLevels.map(item => <button key={item.id} type="button" role="radio" aria-checked={level === item.id} className={level === item.id ? 'active' : ''} onClick={() => setLevel(item.id)}>
         <b>{item.label}</b><small>{item.note}</small>
@@ -161,10 +164,6 @@ function LoungeLessonGoalCard({ lesson, tutorId, start, send, disabled, onDone }
     <GoalChips label="학습 목표" presets={loungeLessonPurposes} picked={purposes} max={loungeLessonMaxPurposes} onChange={setPurposes} placeholder="직접 입력: 예) 해외 바이어 미팅, 유치원 상담" />
     <GoalChips label="대화하고 싶은 주제" presets={loungeLessonTopics} picked={topics} max={loungeLessonMaxTopics} onChange={setTopics} placeholder="직접 입력: 예) 반려견 산책, K-pop, 와인, 캠핑" />
     <p className="lounge-lesson-reveal muted">{style} 저장한 목표는 직접 바꾸기 전까지 다음 수업에도 그대로 써요.</p>
-    {error && <p className="lounge-creator-notice error" role="alert">{error}</p>}
-    <div className="lounge-lesson-task-actions">
-      <button type="button" className="primary" disabled={busy || disabled} onClick={() => void save()}>{busy ? <LoaderCircle size={14} className="lounge-spin" /> : <GraduationCap size={14} />} {start ? '저장하고 수업 시작' : '저장'}</button>
-    </div>
   </section>;
 }
 
