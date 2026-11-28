@@ -71,8 +71,8 @@ BEGIN
     WHERE n.nspname='public' AND p.prokind='f'
   LOOP
     def := pg_get_functiondef(f.oid);
-    IF position('''rooftop''' IN def)>0 AND position('''patagonia''' IN def)=0 THEN
-      revised := regexp_replace(def, '(''arnobridge''[[:space:]]*,[[:space:]]*''winebar'')', '\1,''patagonia''', 'g');
+    IF position('''patagonia''' IN def)>0 AND position('''inebay''' IN def)=0 THEN
+      revised := regexp_replace(def, '(''winebar''[[:space:]]*,[[:space:]]*''patagonia'')', '\1,''inebay''', 'g');
       IF revised<>def THEN EXECUTE revised; END IF;
     END IF;
   END LOOP;
