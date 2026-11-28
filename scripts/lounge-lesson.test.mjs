@@ -428,3 +428,16 @@ test('계속 학습: after the day is done another round of three comes, planned
   assert.deepEqual(lesson.planLoungeLessonMore(items, full, now), { queue: [], reviews: [], pack: 0 }, 'a day takes at most thirty');
   assert.equal(lesson.readLoungeLessonState(full).done.length, 30, 'a longer day is read whole');
 });
+
+test('a single word in its nuance is said as "이 표현" instead of losing the nuance (2026-11-28)', () => {
+  const items = [{ id: 'a', expression: 'afford', meaning: '', level: 'B1' }, { id: 'b', expression: 'reliable', meaning: '', level: 'B2' }, { id: 'c', expression: 'mitigate', meaning: '', level: 'C1' }];
+  const rows = lesson.readLoungeLessonEnrich({ items: [
+    { id: 'a', importance: 3, difficulty: 'B1', situation: '', nuance: 'Afford는 돈·시간 여유를 담담히 말하는 중립적 표현', alternatives: [], confusion: '' },
+    { id: 'b', importance: 2, difficulty: 'B2', situation: '', nuance: '‘reliable’로 칭찬하면 믿음직하다는 평가', alternatives: [], confusion: '' },
+    { id: 'c', importance: 1, difficulty: 'C1', situation: '', nuance: '"mitigate"', alternatives: [], confusion: '' },
+  ] }, items);
+  assert.equal(rows[0].nuance, '이 표현은 돈·시간 여유를 담담히 말하는 중립적 표현');
+  assert.equal(rows[1].nuance, '이 표현으로 칭찬하면 믿음직하다는 평가');
+  assert.equal(rows[2].nuance, undefined, 'nothing but the word: no nuance');
+  assert.match(lesson.loungeLessonEnrichInstructions, /단어 하나짜리 표현도 그 단어를 쓰지 말고/);
+});
