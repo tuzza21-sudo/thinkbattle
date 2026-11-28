@@ -65,9 +65,15 @@ export const loungeFreeCallMinutesDefault = 5;
 export const loungeTesterCallMinutesDefault = 30;
 /** A member from before the limit began, without a plan: 60 minutes a month since 2026-11-17 (LOUNGE_LEGACY_CALL_MINUTES); they were unlimited before. */
 export const loungeLegacyCallMinutesDefault = 60;
-export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>, tester = false, legacy = false) {
+/** Beta testers with minutes of their own (2026-11-28, by the owner: the accounts 06 and 07 have 20 minutes); the others have LOUNGE_TESTER_CALL_MINUTES. */
+export const loungeTesterCallMinutesByAccount: Readonly<Record<string, number>> = {
+  'beta06@saseok.kr': 20, 'beta07@saseok.kr': 20, 'adult06@saseok.kr': 20, 'adult07@saseok.kr': 20,
+};
+export function loungeCallLimitMinutes(plan: unknown, env: Record<string, string | undefined>, tester = false, legacy = false, email?: string) {
   if (plan === 'plus' || plan === 'pro') return loungeCallMinutes[plan];
   if (tester) {
+    const own = email ? loungeTesterCallMinutesByAccount[email.trim().toLowerCase()] : undefined;
+    if (own !== undefined) return own;
     const value = Number(env.LOUNGE_TESTER_CALL_MINUTES);
     return env.LOUNGE_TESTER_CALL_MINUTES?.trim() && Number.isFinite(value) && value >= 0 ? Math.floor(value) : loungeTesterCallMinutesDefault;
   }

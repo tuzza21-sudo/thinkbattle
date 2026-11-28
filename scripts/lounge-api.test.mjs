@@ -4217,6 +4217,10 @@ test('voice calls are timed by the server in minutes, shown against the plan, st
   const tester = await tick({ state: { seconds: 31 * 60, plan: null, tester: true } });
   assert.deepEqual(tester.body.call, { usedSeconds: 1860, limitMinutes: 30, plan: null, tester: true, enforced: true, exhausted: true }, 'a beta tester has 30 minutes a month, not unlimited');
   assert.equal((await tick({ state: { seconds: 29 * 60, plan: null, tester: true } })).body.call.exhausted, false, 'one minute of the 30 is left');
+  // 2026-11-28: the beta accounts 06 and 07 have 20 minutes of their own; other testers keep the testers' minutes.
+  const own = await tick({ user: { id: 'user-1', email: 'Adult06@saseok.kr' }, state: { seconds: 21 * 60, plan: null, tester: true } });
+  assert.equal(own.body.call.limitMinutes, 20); assert.equal(own.body.call.exhausted, true);
+  assert.equal((await tick({ user: { id: 'user-1', email: 'beta05@saseok.kr' }, state: { seconds: 0, plan: null, tester: true } })).body.call.limitMinutes, 30);
   assert.equal((await tick({ state: { seconds: 0, plan: 'pro', tester: true } })).body.call.limitMinutes, 100, 'a tester with a plan has the plan\'s minutes');
   const legacyMember = await tick({ state: { seconds: 61 * 60, plan: null, legacy: true } });
   assert.deepEqual(legacyMember.body.call, { usedSeconds: 3660, limitMinutes: 60, plan: null, tester: false, legacy: true, enforced: true, exhausted: true }, 'a member from before the limit has 60 minutes a month since 2026-11-17, not unlimited');

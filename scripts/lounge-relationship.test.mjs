@@ -685,6 +685,9 @@ test('a beta account that tests the closest stage starts every character there, 
   }
   assert.equal(relationship.startsAtClosestStage({ id: 'x', email: 'Adult05@Saseok.kr' }), true);
   assert.equal(relationship.startsAtClosestStage({ id: 'x', email: 'beta05@saseok.kr' }), false);
+  // 2026-11-28: adult06 and adult07 start there too; beta06 and beta07 do not.
+  for (const email of ['adult06@saseok.kr', 'ADULT07@saseok.kr']) assert.equal(relationship.startsAtClosestStage({ id: 'x', email }), true, email);
+  for (const email of ['beta06@saseok.kr', 'beta07@saseok.kr']) assert.equal(relationship.startsAtClosestStage({ id: 'x', email }), false, email);
   assert.equal(relationship.startsAtClosestStage({ id: 'abc', email: 'other@example.com' }, { LOUNGE_CLOSEST_START_USERS: 'ABC, nobody@x.y' }), true, 'more accounts by the environment');
   assert.equal(relationship.startsAtClosestStage(undefined), false);
 });
