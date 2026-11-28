@@ -288,7 +288,7 @@ export function readLoungeWritingCritique(value: unknown, kind: LoungeClassKind,
 /** The class field of the reply's input: the chosen item's facts, and the critique when the member sent writing. */
 export function loungeClassForPrompt(state: LoungeClassState, step: 'pick' | 'start' | 'spot' | 'continue', critique?: LoungeWritingCritique) {
   const item = loungeClassItem(state.class, state.item);
-  const facts = !item ? undefined : state.class === 'travel' ? (({ image, ...site }) => site)(item as LoungeTravelSite)
+  const facts = !item ? undefined : state.class === 'travel' ? (({ image, geo, ...site }) => site)(item as LoungeTravelSite)
     : state.class === 'art' ? (({ image, museum, ...work }) => ({ ...work, has_picture: Boolean(image) }))(item as LoungeArtWork)
     : item;
   return {

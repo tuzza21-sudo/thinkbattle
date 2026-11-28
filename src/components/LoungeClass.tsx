@@ -6,11 +6,22 @@ import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } f
 import { getLoungeCharacter } from '../lib/loungeCharacters';
 import { isLoungeTravelCompanion, loungeClasses, loungeClassTrip, loungeTravelTrips, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
 import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeTravelSpot, LoungeTravelTripId, LoungeWritingExercise } from '../lib/loungeClassContent';
+import { loungeJapanMap, loungeJapanMapPoint } from '../lib/loungeJapanContent';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
 const titleOf = (kind: LoungeClassKind, id?: string) => { const item = loungeClassItem(kind, id); return item ? ('name' in item ? item.name : item.title) : ''; };
 const boardName = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => kind === 'travel' ? loungeTravelTrips[trip].board : kind === 'art' ? '작품 갤러리' : '글쓰기 과제';
+
+/** Where a place is in Japan (2026-11-28, by the owner): a small map with a dot, under 크게 보기 and in the place's guide. */
+function TripMap({ site }: { site: LoungeTravelSite }) {
+  if (site.trip !== 'japan' || !site.geo) return null;
+  const { left, top } = loungeJapanMapPoint(site.geo);
+  return <figure className="lounge-class-map" aria-label={`${site.name}의 위치`}>
+    <div><img src={loungeJapanMap.src} alt="일본 지도" /><span className="lounge-class-map-dot" style={{ left: `${left}%`, top: `${top}%` }} /></div>
+    <figcaption><b>{site.name}</b><small>{site.local}</small></figcaption>
+  </figure>;
+}
 
 function Credit({ image }: { image: LoungeClassImage }) {
   return <small className="lounge-class-credit">사진 {image.credit} · <a href={image.source} target="_blank" rel="noopener noreferrer">{image.license} · Wikimedia Commons</a></small>;
@@ -54,7 +65,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
     <div className="lounge-lesson-head">
       <Icon size={16} />
       <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind, trip)}</b></span>
-      {kind === 'travel' && item && <button type="button" className="lounge-lesson-button" onClick={() => setIntro(true)}><Info size={15} /> {loungeTravelTrips[trip].stop} 안내</button>}
+      {kind === 'travel' && item && <button type="button" className="lounge-lesson-button" onClick={() => setIntro(true)}><Info size={15} /> 이 {loungeTravelTrips[trip].stop} 안내</button>}
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind, trip)}</button>
     </div>
     {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
@@ -67,6 +78,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
         <p className="lounge-lesson-scene"><span>{spot ? '지금 보는 것' : 'city' in item ? item.city : item.year}</span>{spot ? `${spot.name} · ${spot.note}` : 'city' in item ? item.summary : `${item.artist} · ${item.movement}`}</p>
         <button type="button" className="lounge-class-view-zoom" onClick={() => setLarge(scene)}><Maximize2 size={14} /> 크게 보기</button>
       </div>
+      {'city' in item && <TripMap site={item} />}
       {spots.length > 0 && <div className="lounge-class-spots" role="group" aria-label="꼭 봐야 할 곳">
         <button type="button" className={!spot ? 'active' : ''} disabled={busySpot !== null || disabled} onClick={() => setStateOverride({ ...state, spot: undefined })}>
           {image && <img src={image.src} alt="" loading="lazy" />}<small>{titleOf(kind, state.item).split(' (')[0]}</small></button>
@@ -161,6 +173,7 @@ function TownIntro({ site, trip, spots, current, busy, disabled, onVisit, onClos
       <div className="lounge-memory-panel lounge-class-detail">
         {site.image && <figure><img src={site.image.src} alt={site.name} /><figcaption><Credit image={site.image} /></figcaption></figure>}
         <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
+        <TripMap site={site} />
         <p className="lounge-class-lead">{site.summary}</p>
         <h4>배경과 역사</h4><p>{site.history}</p>
         <h4>{heritageTitle(site)}</h4><p>{site.heritage}</p>

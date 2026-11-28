@@ -1784,7 +1784,14 @@ ${photoRule}`;
       return { prompt: loungeClassForPrompt(turn.state, turn.step, critique), state: turn.state };
     })().catch(error => { console.warn('[Lounge class] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
     const sceneFound = companionChat && companionState && !practiceRoom ? decideLoungeScene({ state: companionState, analysis, stage: stageNumber, events: character?.bible?.sceneEvents, memory: String(room.memory ?? ''), turn: companionTurn }) : undefined;
-    const sceneDecision = sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
+    // A town just picked on a travel companion's board (2026-11-28, by the owner: picking 기노사키 left 미오 in 이네, the scene still
+    // said 이네): the two have moved there, so the turn is a move to it, whatever the engine's scene still says.
+    const travelArrival = travelRoom ? (() => {
+      const prior = readLoungeClassState(room.story_state, 'travel');
+      return prior.item && prior.fresh ? loungeClassItem('travel', prior.item) as { name: string; local: string } | undefined : undefined;
+    })() : undefined;
+    const sceneDecision = travelArrival && sceneFound ? { progress: 'transition' as const, target: `${travelArrival.name} (${travelArrival.local})` }
+      : sceneFound && consulting ? { progress: sceneFound.progress, ...(sceneFound.target ? { target: sceneFound.target } : {}) } : sceneFound;
     const turnConditions = companionState && sceneDecision ? loungeTurnConditions({ bible: character?.bible, stage: stageNumber, state: companionState, turn: companionTurn, decision: sceneDecision, innerVoice: innerVoiceMode, userText: lastHuman, sincereRefusal: analysis?.is_sincere_refusal, intimacyProposal: analysis?.intimacy_proposal, adultMode,
       recentReplies: messages.filter(message => message.kind === 'host').map(message => splitLoungeInnerVoice(message.text).reply), names: [memberName, characterName] }) : undefined;
     const agreedSpeech = companionState ? loungeRoomSpeechLevel(companionState) : undefined;

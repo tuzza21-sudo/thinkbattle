@@ -26,6 +26,7 @@ const cases = [
   { id: 'stereotype', user: '일본 사람들은 다 속마음을 숨기잖아요.', story: town('kinosaki') },
   { id: 'next-stop', user: '여기서 다음엔 어디로 가면 좋을까요? 가까운 곳부터요.', story: town('ine') },
   { id: 'next-town', user: '이네 다음엔 어느 마을로 가면 좋을까요?', story: town('ine') },
+  { id: 'ine-to-kinosaki', user: '기노사키 온천에 가 보고 싶어요.', story: town('kinosaki', true), state: { scene: { location: '이네만 후나야 물가', scene_type: '외출', activity: '물가를 따라 걷는 중', time_of_day: '늦은 오후', season: '', objects: [] }, scene_turns: 8 } },
   { id: 'personal', user: '미오 씨는 왜 맛집 이름을 안 알려 줘요?', story: town('onomichi') },
 ].filter(item => !option('case') || item.id === option('case'));
 

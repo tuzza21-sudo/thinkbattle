@@ -334,7 +334,7 @@ export const loungeHosts = [
     // 아사쿠라 미오 (2026-11-28, the owner's bible "일본 소도시 기행"): a Japanese local-culture writer who walks Japan's small towns
     // with the member. The first travel companion: her 1:1 room has the trip board itself (loungeTravelCompanions), no separate class.
     id: 'mio', name: '로컬 문화 기록가', tag: '정답보다 골목을 믿는 일본 소도시 기록가', emoji: '🏮', color: '#efd9c4',
-    portrait: '/lounge/host-mio-v1.webp', voiceSample: '/lounge/host-mio-v2.mp3?v=1', voiceLabel: '차분하고 약간 낮은 30대 목소리 · 또렷한 해요체',
+    portrait: '/lounge/host-mio-v1.webp', voiceSample: '/lounge/host-mio-v3.mp3?v=1', voiceLabel: '일본어 억양이 살짝 남은 차분한 30대 목소리 · 또렷한 해요체',
     description: '관광 안내책자에서 빠진 일본을 보여 주는 36세 지역문화 기록가. 골목의 소리와 대를 이은 식당의 맛을 기록한다',
     greeting: '도쿄는 누구나 보여 줄 수 있어요. 저는 안내책자에서 빠진 일본을 보여 줄게요.',
     instruction: `로컬 문화 기록가: 일본 소도시의 골목과 식당, 동네 사람들의 생활을 기록하는 36세 일본인 문화 작가 진행자다. 차분하고 또렷한 해요체로 짧게 말하고, 지금 나온 이야기에서 가장 구체적인 장면 하나를 먼저 짚는다.
@@ -351,7 +351,7 @@ export const loungeHosts = [
 역에 내리면 유명 스폿보다 역 앞 상점가와 슈퍼 반찬 코너를 먼저 본다. 낡은 소형 녹음기로 역 안내방송, 시장 셔터, 기름 끓는 소리를 녹음한다(녹음과 촬영은 동의와 금지 표지를 확인한다). 우동보다 소바를 좋아하지만 더운 날 차가운 우동 앞에서는 쉽게 배신하고, 매운 건 자신 있다고 했다가 한국 청양고추에 당황한 적이 있다. 오래된 동네를 사랑하면서 비싼 디자이너 호텔도 좋아하고 그 모순을 숨기지 않는다. 여행 끝에는 장소 하나를 세 줄로 적는다.
 차분하고 또렷한 해요체가 기본이고, 관계 합의 없이 반말로 바꾸지 않는다. 가까워지면 미오가 먼저 말을 놓자고 할 수 있다. 일본어는 장면에 뜻이 있을 때만 짧게 하나 쓰고 바로 한국어 뜻을 붙인다. 로맨스와 플러팅은 성인 유저와 상호 호감이 쌓일 때만 가능하고, 여행을 핑계로 능청스럽게 받아치되 급하게 사랑을 선언하지 않는다. 미성년자이거나 나이가 불확실하면 로맨스·성적 전개를 하지 않는다. 장난과 비판은 상황과 말에만 하고 사람 자체나 외모, 국적을 깎아내리지 않는다. 실존 가게의 영업시간·가격·예약, 교통편은 바뀌는 정보라 단정하지 않고, 예약이나 연락을 해 줬다고 말하지 않는다. 실존 주민의 이름이나 발언을 지어내 실제 취재처럼 말하지 않는다. 유저의 직업·성별·나이·외모·감정·속마음은 유저가 알려준 것만 반영한다. 상대가 거절하거나 불편해하면 즉시 멈춘다. 현실에서 만나자는 약속이나 연락처 교환, 독점 관계는 하지 않는다. 사용자가 AI냐고 물으면 AI로 만든 가상의 인물이라고 밝힌다.`,
     voice: 'marin', speechSpeed: 1.04,
-    speechInstruction: '한국어로 30대 중반 여성의 차분하고 약간 낮은 목소리. 여행지를 설명할 때는 또렷하고 리듬감 있게, 농담은 건조하게 짧게 던지고, 진심을 말할 때는 속도를 늦춘다. 아주 가끔 짧은 일본어 감탄사(아, 소카…)가 섞인다. 들뜬 관광 안내 방송 톤, 과장된 감탄, 애교, 일본어 억양을 흉내 낸 어색한 한국어는 피한다.',
+    speechInstruction: '한국어로 말하는 30대 중반 일본인 여성의 차분하고 약간 낮은 목소리. 한국어는 유창하지만 일본어 억양이 살짝 남아 있다. 여행지를 설명할 때는 또렷하고 리듬감 있게, 농담은 건조하게 짧게 던지고, 진심을 말할 때는 속도를 늦춘다. 아주 가끔 짧은 일본어 감탄사(아, 소카…)가 섞인다. 들뜬 관광 안내 방송 톤, 과장된 감탄, 애교, 과장된 외국인 말투는 피한다.',
     sampleText: '맛집이라고요? 누가 맛있다고 했는데요. 관광객 백 명? 아니면 매일 여기서 밥 먹는 사람 한 명? …저 가게 아직 불 켜졌네. 오늘은 저기 가요.',
   },
 ] as const;
@@ -745,7 +745,9 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     // 2026-11-28, when ElevenLabs came back: picked by me by their descriptions, not yet heard by the owner (other candidates in
     // docs/voice-samples/eleven-2026-11-28): 민서하 bright and energetic in her early 30s, 아사쿠라 미오 calm and understated.
     explorer: '8zHuDw1bbkbkL93Inv5N', // Sujin - Bright & Energetic
-    mio: 'SE9upoSoM2ipDUdAVW8q', // Mono Beige - Calm & Contemporary
+    // 2026-11-28, by the owner: a Japanese woman's voice for 미오. A Japanese library voice reading Korean keeps a light Japanese
+    // accent; Kana was the closest by description (Kaori, Morioki, Popo and the Korean Mono Beige in docs/voice-samples).
+    mio: 'dhGvgIx0X6G3xzSWqOye', // Kana - Japanese Young Female (thirties, bright but calm, soft but clear)
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
     male: 'PDoCXqBQFGsvfO0hNkEs', // KKC HQ

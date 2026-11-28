@@ -179,4 +179,12 @@ test('일본 소도시 기행 (2026-11-28): 아사쿠라 미오 walks the trip i
   // Picking a town first gives its guide (food, life, what to see first), and the next stop is suggested from the board (2026-11-28).
   assert.match(rules, /첫 안내/); assert.match(rules, /대표 음식과 특산품/); assert.match(rules, /간사이 — 이네, 기노사키 온천/);
   assert.equal(characters.getLoungeCharacter('mio').place, 'inebay');
+  // Every town has its place on the Japan map (2026-11-28), inside the map's frame.
+  const japan = load('../src/lib/loungeJapanContent.ts');
+  for (const site of towns) {
+    assert.ok(site.geo, `${site.id} has coordinates`);
+    const { left, top } = japan.loungeJapanMapPoint(site.geo);
+    assert.ok(left > 2 && left < 98 && top > 2 && top < 98, `${site.id} falls inside the map (${left.toFixed(1)}, ${top.toFixed(1)})`);
+  }
+  assert.equal(classes.loungeClassForPrompt(picked, 'start').item.geo, undefined, 'the coordinates are not sent to the reply');
 });

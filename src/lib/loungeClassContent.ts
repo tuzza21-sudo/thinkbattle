@@ -57,6 +57,8 @@ export type LoungeTravelSite = {
   summary: string; history: string; heritage: string; mustSee: readonly string[]; experience: readonly string[]; tip: string;
   /** A town of the Japanese trip: what is eaten there, how people live with the visitors, a line its guide might start from. */
   food?: readonly string[]; life?: string; hook?: string;
+  /** [lat, lon], for the locator map under the place (the Japanese trip, 2026-11-28). */
+  geo?: readonly [number, number];
   image?: LoungeClassImage;
 };
 
