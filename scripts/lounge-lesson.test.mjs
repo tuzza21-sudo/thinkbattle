@@ -440,4 +440,6 @@ test('a single word in its nuance is said as "이 표현" instead of losing the 
   assert.equal(rows[1].nuance, '이 표현으로 칭찬하면 믿음직하다는 평가');
   assert.equal(rows[2].nuance, undefined, 'nothing but the word: no nuance');
   assert.match(lesson.loungeLessonEnrichInstructions, /단어 하나짜리 표현도 그 단어를 쓰지 말고/);
+  // A batch of fifteen came back with every nuance empty until the instruction asked for one on every item.
+  assert.match(lesson.loungeLessonEnrichInstructions, /모든 항목에 반드시 쓰고 빈 문자열로 두지 않는다/);
 });
