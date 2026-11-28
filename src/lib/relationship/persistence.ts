@@ -9,7 +9,7 @@ export type RelationshipRow = {
 };
 
 /** Accounts that start every character at the closest stage when they have no relationship yet (the adult-mode beta tester), plus LOUNGE_CLOSEST_START_USERS (emails or user ids). */
-export const relationshipClosestStartAccounts = ['adult05@saseok.kr'];
+export const relationshipClosestStartAccounts = ['adult05@saseok.kr', 'adult06@saseok.kr', 'adult07@saseok.kr'];
 export function startsAtClosestStage(user: { id?: string; email?: string } | undefined, env: Record<string, string | undefined> = {}) {
   const listed = [...relationshipClosestStartAccounts, ...(env.LOUNGE_CLOSEST_START_USERS || '').split(',')].map(value => value.trim().toLowerCase()).filter(Boolean);
   return Boolean(user && (listed.includes((user.id ?? '').toLowerCase()) || (user.email && listed.includes(user.email.toLowerCase()))));

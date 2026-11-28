@@ -679,7 +679,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     };
     // This month's seconds of calls and the member's plan (the database counts them, see tick_lounge_call), with what the
     // plan allows. The limit is applied unless LOUNGE_CALL_LIMITS=off (then calls are timed and shown, never stopped).
-    const callService = async (name: 'lounge_call_status' | 'tick_lounge_call', params: Record<string, unknown>) => {
+    const callService = async (name: 'lounge_call_status' | 'tick_lounge_call', params: Record<string, unknown>, email?: string) => {
       if (!serviceHeaders) return null;
       const response = await fetchTimed(`${url}/rest/v1/rpc/${name}`, { method: 'POST', headers: serviceHeaders, body: JSON.stringify(params) }, 4_000);
       if (!response.ok) { console.warn('[Lounge call] usage not read', name, response.status); return null; }
@@ -687,7 +687,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       const enforced = loungeCallLimitsOn(process.env);
       // No limit for the super admin (lounge_call_exempt; before 2026-11-17 also a member from before the limit began, who now has 60 minutes: legacy); a beta tester has 30 minutes.
       if (state.exempt) return { usedSeconds: state.seconds, limitMinutes: null, plan: state.plan, enforced, exhausted: false, unlimited: true };
-      const limitMinutes = loungeCallLimitMinutes(state.plan, process.env, Boolean(state.tester), Boolean(state.legacy));
+      const limitMinutes = loungeCallLimitMinutes(state.plan, process.env, Boolean(state.tester), Boolean(state.legacy), email);
       return { usedSeconds: state.seconds, limitMinutes, plan: state.plan, tester: Boolean(state.tester), legacy: state.legacy ? true : undefined, enforced, exhausted: enforced && state.seconds >= limitMinutes * 60 };
     };
     // Whether a photo the character sent first was made for this member lately (the moments other than a step closer wait).
@@ -731,10 +731,10 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
 
     // The premium voice engines and what the member has left of each (the voice picker).
     if (body.action === 'speech') {
-      const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
+      const user = await readJson<{ id: string; email?: string; is_anonymous?: boolean }>(auth, 'lounge');
       const engines = Object.keys(loungePremiumSpeech) as LoungePremiumSpeechEngine[];
       const status = await Promise.all(engines.map(engine => readSpeechAllowance(engine, user).catch(() => ({ available: false, member: !user.is_anonymous, allowed: false, used: 0, left: 0, limit: 0, unavailable: true }))));
-      const call = user.is_anonymous ? null : await callService('lounge_call_status', { p_user: user.id }).catch(() => null);
+      const call = user.is_anonymous ? null : await callService('lounge_call_status', { p_user: user.id }, user.email).catch(() => null);
       return json({ engines: Object.fromEntries(engines.map((engine, index) => [engine, status[index]])), call });
     }
 
@@ -912,7 +912,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     }
 
     if (body.action === 'call-tick') {
-      const user = await readJson<{ id: string; is_anonymous?: boolean }>(auth, 'lounge');
+      const user = await readJson<{ id: string; email?: string; is_anonymous?: boolean }>(auth, 'lounge');
       if (user.is_anonymous) return json({ call: null });
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,capacity,space_id,status,voice_on`, { headers });
       if (!roomResponse.ok) throw new Error('대화방을 확인하지 못했어요.');
@@ -920,7 +920,7 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!room || room.host_id !== user.id || room.capacity !== 1 || room.space_id || room.status !== 'active' || room.voice_on === false) return json({ call: null });
       // English lessons are free while they are tried out (2026-11-25, by the owner): their calls are not counted.
       if (isLoungeTutor(room.host_persona) || isLoungeTrainer(room.host_persona) || isLoungeClass(room.host_persona)) return json({ call: null });
-      return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }).catch(() => null) });
+      return json({ call: await callService('tick_lounge_call', { p_user: user.id, p_start: body.start === true }, user.email).catch(() => null) });
     }
 
     if (body.action === 'relationship') {
@@ -2244,7 +2244,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
       : Promise.resolve();
     // Past the month's minutes of calls (unless LOUNGE_CALL_LIMITS=off) the call's replies stay text, the same way a used premium voice does.
     const callGate: Promise<void> | undefined = phoneCall && !practiceRoom && loungeCallLimitsOn(process.env) && !user.is_anonymous
-      ? callService('lounge_call_status', { p_user: user.id }).then(state => {
+      ? callService('lounge_call_status', { p_user: user.id }, user.email).then(state => {
         if (state?.exhausted && !speechRefused) speechRefused = new LoungeUpstreamError(state.plan ? '이번 달 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.tester ? '이번 달 베타테스터 통화 시간을 다 썼어요. 대화는 글로 이어 갈게요.' : state.legacy ? '이번 달 통화 시간을 다 썼어요. 다음 달에 다시 쓸 수 있어요. 대화는 글로 이어 갈게요.' : '무료 통화 시간을 다 썼어요. Plus·Pro 이용권으로 더 쓸 수 있어요. 대화는 글로 이어 갈게요.', 403, 'lounge_speech_allowance', false, 60);
       }).catch(() => { console.warn('[Lounge call] allowance not read, speaking anyway'); })
       : undefined;
@@ -2872,7 +2872,7 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
             const askedPhoto = answer?.photo_asked === true;
             const moment = chatPhotos && !photo ? loungeFirstPhotoMoment(relationshipSaved?.change) : undefined;
             if (chatPhotos && ((photo && !askedPhoto) || moment)) {
-              const plan = isLoungeSuperAdmin(user) ? 'admin' : (await callService('lounge_call_status', { p_user: user.id }).catch(() => null))?.plan;
+              const plan = isLoungeSuperAdmin(user) ? 'admin' : (await callService('lounge_call_status', { p_user: user.id }, user.email).catch(() => null))?.plan;
               if (plan) {
                 if (photo) send({ type: 'photo', scene: photo, asked: false });
                 else if (moment === 'stage' || !(await firstPhotoRecently(user.id))) send({ type: 'photo', scene: loungeFirstPhotoRequest[moment!], asked: false });
