@@ -128,7 +128,7 @@ export function LoungeIntroduction() {
       <div className="lounge-intro-story-grid">
         {programs.map(program => { const host = getLoungeHost(program.id); return <Link key={program.id} className="lounge-intro-story reveal" to={`/lounge/characters/${program.id}`} style={{ ['--tint' as string]: host.color }}>
           <img src={host.portrait} alt={`${nameOf(program.id)}, 가상의 AI 캐릭터`} loading="lazy" />
-          <div><span><program.icon size={12} aria-hidden="true" /> {program.field} · {nameOf(program.id)}</span><h3>{program.title}</h3><p>{program.text}</p><b>{['ina', 'diplomat', 'guide', 'velvet'].includes(program.id) ? '1:1 클래스' : '1:1 실전 훈련'} <ArrowRight size={14} /></b></div>
+          <div><span><program.icon size={12} aria-hidden="true" /> {program.field} · {nameOf(program.id)}</span><h3>{program.title}</h3><p>{program.text}</p><b>{['guide', 'explorer', 'mio'].includes(program.id) ? '함께 여행' : ['ina', 'diplomat', 'velvet'].includes(program.id) ? '1:1 클래스' : '1:1 실전 훈련'} <ArrowRight size={14} /></b></div>
         </Link>; })}
       </div>
     </section>

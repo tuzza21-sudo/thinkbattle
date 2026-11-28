@@ -150,7 +150,13 @@ test('일본 소도시 기행 (2026-11-28): 아사쿠라 미오 walks the trip i
   assert.equal(classes.isLoungeTravelCompanion('mio'), true);
   assert.equal(classes.loungeClassKindOf('mio'), 'travel');
   assert.equal(classes.loungeClassTrip('mio'), 'japan');
-  assert.equal(classes.isLoungeTravelCompanion('explorer'), false);
+  // 한지오 and 민서하 walk their trips in their own rooms too (2026-11-28), with the parks' safety in 민서하's rules.
+  assert.equal(classes.isLoungeTravelCompanion('explorer'), true);
+  assert.equal(classes.isLoungeTravelCompanion('guide'), true);
+  assert.equal(classes.loungeClassTrip('explorer'), 'parks');
+  assert.equal(classes.loungeClassTrip('guide'), 'italy');
+  assert.match(classes.loungeTravelCompanionRules('parks'), /야생동물/);
+  assert.doesNotMatch(classes.loungeTravelCompanionRules('japan'), /야생동물/);
   const towns = classes.loungeClassSites.filter(site => site.trip === 'japan');
   assert.equal(towns.length, 26);
   assert.deepEqual([...new Set(towns.map(site => site.city))], classes.loungeTravelTrips.japan.tabs.map(tab => tab.name));
