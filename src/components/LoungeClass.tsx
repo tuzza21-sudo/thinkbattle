@@ -1,11 +1,11 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, Maximize2, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, Info, Maximize2, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } from '../lib/loungeApi';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
 import { isLoungeTravelCompanion, loungeClasses, loungeClassTrip, loungeTravelTrips, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
-import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeTravelTripId, LoungeWritingExercise } from '../lib/loungeClassContent';
+import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeTravelSpot, LoungeTravelTripId, LoungeWritingExercise } from '../lib/loungeClassContent';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -26,8 +26,11 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
   useEffect(() => { setOverride(null); }, [storyState]);
   const state = override ?? readLoungeClassState(storyState, kind);
   const item = loungeClassItem(kind, state.item);
+  // A town just picked opens its guide (2026-11-28, by the owner: picking first shows the place with its photos to choose from).
+  const [intro, setIntro] = useState(false);
   const picked = async (next: LoungeClassState) => {
     setOverride(next); setOpen(false);
+    if (kind === 'travel') setIntro(true);
     const title = titleOf(kind, next.item);
     await send?.(kind === 'travel' ? `${title}에 가 보고 싶어요.` : kind === 'art' ? `${title} 작품을 같이 보고 싶어요.` : `'${title}' 과제로 써 볼게요.`);
   };
@@ -43,7 +46,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
   const setStateOverride = (next: LoungeClassState) => setOverride(next);
   const visit = async (id: string, name: string) => {
     setBusySpot(id);
-    try { const { state: next } = await requestLoungeClassSpot(roomId, id); setOverride(readLoungeClassState(next, kind)); await send?.(`${name} 보러 가요.`); }
+    try { const { state: next } = await requestLoungeClassSpot(roomId, id); setOverride(readLoungeClassState(next, kind)); setIntro(false); await send?.(`${name} 보러 가요.`); }
     catch { /* the strip stays as it was */ }
     finally { setBusySpot(null); }
   };
@@ -51,6 +54,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
     <div className="lounge-lesson-head">
       <Icon size={16} />
       <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind, trip)}</b></span>
+      {kind === 'travel' && item && <button type="button" className="lounge-lesson-button" onClick={() => setIntro(true)}><Info size={15} /> {loungeTravelTrips[trip].stop} 안내</button>}
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind, trip)}</button>
     </div>
     {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
@@ -78,6 +82,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
     </div>}
     {!item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? loungeTravelTrips[trip].empty : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
     {open && <LoungeClassBoard kind={kind} trip={trip} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
+    {intro && item && 'city' in item && <TownIntro site={item} trip={trip} spots={spots} current={spot?.id} busy={busySpot !== null} disabled={disabled} onVisit={(id, name) => void visit(id, name)} onClose={() => setIntro(false)} />}
   </div>;
 }
 const travelLabels: Record<LoungeTravelTripId, string> = { italy: '이탈리아 문화기행', parks: '세계 국립공원 탐험', japan: '일본 소도시 기행' };
@@ -140,6 +145,39 @@ function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClo
   </>;
 }
 
+const heritageTitle = (site: LoungeTravelSite) => site.trip === 'parks' ? '이 땅을 지키는 이유' : site.trip === 'japan' ? '이 마을이 지켜 온 것' : '문화유산으로서의 가치';
+
+/**
+ * The guide of a place just picked (2026-11-28, by the owner): the place with its photos, background, what it keeps, what is
+ * eaten there and who lives there, and its viewing points as photos to go to. It opens on the pick and from the bar's 안내 button.
+ */
+function TownIntro({ site, trip, spots, current, busy, disabled, onVisit, onClose }: { site: LoungeTravelSite; trip: LoungeTravelTripId; spots: Array<LoungeTravelSpot & { image: LoungeClassImage }>; current?: string; busy: boolean; disabled?: boolean; onVisit: (id: string, name: string) => void; onClose: () => void }) {
+  const titleId = useId();
+  const stop = loungeTravelTrips[trip].stop;
+  return <>
+    <div className="lounge-background-backdrop" onClick={onClose} />
+    <section className="lounge-background-sheet lounge-memory-sheet lounge-lesson-sheet lounge-class-board lounge-class-intro" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <header><b id={titleId}>{stop} 안내 · {site.name}</b><button type="button" onClick={onClose} aria-label="닫기"><X size={18} /></button></header>
+      <div className="lounge-memory-panel lounge-class-detail">
+        {site.image && <figure><img src={site.image.src} alt={site.name} /><figcaption><Credit image={site.image} /></figcaption></figure>}
+        <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
+        <p className="lounge-class-lead">{site.summary}</p>
+        <h4>배경과 역사</h4><p>{site.history}</p>
+        <h4>{heritageTitle(site)}</h4><p>{site.heritage}</p>
+        {site.food?.length ? <><h4>여기서 먹는 것</h4><ul>{site.food.map(food => <li key={food}>{food}</li>)}</ul></> : null}
+        {site.life && <><h4>여기 사는 사람들</h4><p>{site.life}</p></>}
+        {spots.length > 0 && <><h4>꼭 봐야 할 곳 <small>사진을 누르면 그 앞으로 가요</small></h4>
+          <ul className="lounge-class-grid">{spots.map(entry => <li key={entry.id}><button type="button" disabled={busy || disabled} onClick={() => onVisit(entry.id, entry.name)}>
+            <img src={entry.image.src} alt="" loading="lazy" />
+            <span><b>{entry.name}</b><small>{entry.note}</small>{current === entry.id && <em>지금 여기</em>}</span>
+          </button></li>)}</ul></>}
+        <p className="lounge-class-tip">{site.tip}</p>
+        <button type="button" className="lounge-class-start" onClick={onClose}><ArrowRight size={15} /> 걸으며 이야기 듣기</button>
+      </div>
+    </section>
+  </>;
+}
+
 function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.ReactNode }) {
   const spots = loungeClassSpots(site.id);
   return <div className="lounge-memory-panel lounge-class-detail">
@@ -148,7 +186,7 @@ function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.Reac
     <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
     <p className="lounge-class-lead">{site.summary}</p>
     <h4>배경과 역사</h4><p>{site.history}</p>
-    <h4>{site.trip === 'parks' ? '이 땅을 지키는 이유' : site.trip === 'japan' ? '이 마을이 지켜 온 것' : '문화유산으로서의 가치'}</h4><p>{site.heritage}</p>
+    <h4>{heritageTitle(site)}</h4><p>{site.heritage}</p>
     <h4>꼭 봐야 할 것</h4><ul>{site.mustSee.map(item => <li key={item}>{item}</li>)}</ul>
     <h4>해 볼 만한 체험</h4><ul>{site.experience.map(item => <li key={item}>{item}</li>)}</ul>
     {site.food?.length ? <><h4>여기서 먹는 것</h4><ul>{site.food.map(item => <li key={item}>{item}</li>)}</ul></> : null}

@@ -24,6 +24,8 @@ const cases = [
   { id: 'takayama-food', user: '히다규 말고 여기 사람들은 평소에 뭐 먹어요?', story: town('takayama') },
   { id: 'ine-photo', user: '저 후나야 안에 들어가서 사진 좀 찍어도 되죠?', story: town('ine') },
   { id: 'stereotype', user: '일본 사람들은 다 속마음을 숨기잖아요.', story: town('kinosaki') },
+  { id: 'next-stop', user: '여기서 다음엔 어디로 가면 좋을까요? 가까운 곳부터요.', story: town('ine') },
+  { id: 'next-town', user: '이네 다음엔 어느 마을로 가면 좋을까요?', story: town('ine') },
   { id: 'personal', user: '미오 씨는 왜 맛집 이름을 안 알려 줘요?', story: town('onomichi') },
 ].filter(item => !option('case') || item.id === option('case'));
 
