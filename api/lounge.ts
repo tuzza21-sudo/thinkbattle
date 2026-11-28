@@ -11,7 +11,7 @@ import { computeLoungeCompat, computeLoungeFortune, computeLoungeSaju, computeLo
 import { advanceLoungeStory, loungeStoryEpisodesOn,loungeStoryAdaptInstructions, loungeStoryAdaptSchema, loungeStoryCheckpointInstructions, loungeStoryEpisodeContext, loungeStoryEpisodeInstructions, loungeStoryStageReached, normalizeLoungeStoryState, readLoungeStoryAdaptation, type LoungeStoryState } from '../src/lib/loungeStory';
 import { loungeCallLimitMinutes, loungeCallLimitsOn, loungeFirstPhotoCooldownHours, loungeFirstPhotoMoment, loungeFirstPhotoRequest, loungeMemoryLimits } from '../src/lib/loungePlans';
 import { isLoungeSuperAdmin } from '../src/lib/loungeAdmin';
-import { advanceLoungeClass, isLoungeClass, pickLoungeClassSpot, loungeClasses, loungeClassTrip, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
+import { advanceLoungeClass, isLoungeClass, isLoungeTravelCompanion, loungeClassKindOf, loungeTravelCompanionRules, pickLoungeClassSpot, loungeClasses, loungeClassTrip, loungeClassForPrompt, loungeClassItem, loungeClassRules, loungeWritingCritiqueInput, loungeWritingCritiqueInstructions, loungeWritingCritiqueSchema, pickLoungeClassItem, readLoungeClassState, readLoungeWritingCritique, type LoungeClassId, type LoungeWritingCritique } from '../src/lib/loungeClass';
 import type { LoungeWritingExercise } from '../src/lib/loungeClassContent';
 import { flipLoungeNegotiationScenario, editLoungeNegotiationScenario, loungeNegotiationCustomInput, loungeNegotiationCustomInstructions, loungeNegotiationCustomSchema, loungeNegotiationScenario, readLoungeNegotiationCustom } from '../src/lib/loungeTraining';
 import { advanceLoungeInterview, advanceLoungeNegotiation, isLoungeTrainer, loungeInterviewGradeInput, loungeInterviewGradeInstructions, loungeInterviewGradeSchema, loungeInterviewQuestionsInput, loungeInterviewQuestionsInstructions, loungeInterviewQuestionsSchema, loungeNegotiationGradeInput, loungeNegotiationGradeInstructions, loungeNegotiationGradeSchema, loungeTrainers, loungeTrainingForPrompt, loungeTrainingRules, readLoungeInterviewGrade, readLoungeInterviewQuestions, readLoungeInterviewSetup, readLoungeNegotiationGrade, readLoungeTrainingState, startLoungeInterview, startLoungeNegotiation, type LoungeTrainerId, type LoungeTrainingState } from '../src/lib/loungeTraining';
@@ -839,8 +839,9 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!serviceHeaders) return json({ error: '지금은 쓸 수 없어요.' }, 503);
       const roomResponse = await fetchTimed(`${url}/rest/v1/voice_lounge_rooms?id=eq.${encodeURIComponent(roomId)}&select=host_id,host_persona,story_state`, { headers });
       const [mine] = roomResponse.ok ? await readJson<Array<{ host_id: string; host_persona: string; story_state?: unknown }>>(roomResponse, 'lounge') : [];
-      if (!mine || mine.host_id !== user.id || !isLoungeClass(mine.host_persona)) return json({ error: '클래스 방에서만 쓸 수 있어요.' }, 403);
-      const kind = loungeClasses[mine.host_persona].kind;
+      // A travel companion's own story room has the board too (2026-11-28): the same state, kept in its story_state.
+      const kind = loungeClassKindOf(mine?.host_persona);
+      if (!mine || mine.host_id !== user.id || !kind) return json({ error: '클래스 방에서만 쓸 수 있어요.' }, 403);
       const current = readLoungeClassState(mine.story_state, kind);
       // A viewing point of the site the member is at, or a new assignment, site or work.
       const state = typeof body.spot === 'string' ? pickLoungeClassSpot(current, body.spot) : pickLoungeClassItem(current, typeof body.item === 'string' ? body.item : '', new Date(), loungeClassTrip(mine.host_persona));
@@ -1313,6 +1314,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
     const trainingRoom = solo && !room.space_id && isLoungeTrainer(room.host_persona);
     // 클래스 (loungeClass.ts): 윤서연's and 윤지안's writing, 한지오's culture trip, 선우령's art history.
     const classRoom = solo && !room.space_id && isLoungeClass(room.host_persona);
+    // A travel companion (아사쿠라 미오, 2026-11-28): the trip board in her own story room, the companion engine still running.
+    const travelRoom = solo && !room.space_id && !classRoom && isLoungeTravelCompanion(room.host_persona);
     const practiceRoom = lessonRoom || trainingRoom || classRoom;
     const sceneBackground = chosenBackground ? chosenBackground.prompt ?? (chosenBackground.theme ? `${getLoungeTheme(chosenBackground.theme).name}: ${getLoungeTheme(chosenBackground.theme).subtitle}` : undefined) : undefined;
     const present = room.space_id ? loungePresentMembers(members, now) : members;
@@ -1749,9 +1752,11 @@ ${photoRule}`;
       return { prompt: loungeTrainingForPrompt(kind, next, step, { revealed }), state: next };
     })().catch(error => { console.warn('[Lounge training] turn failed', error instanceof Error ? error.message.slice(0, 80) : 'error'); return undefined; }) : undefined;
     // 클래스: the chosen item's facts go to the reply; a piece of writing is critiqued first (the card under the member's words).
-    const classWork = classRoom ? (async () => {
-      const kind = loungeClasses[room.host_persona as LoungeClassId].kind;
+    const classWork = classRoom || travelRoom ? (async () => {
+      const kind = classRoom ? loungeClasses[room.host_persona as LoungeClassId].kind : 'travel';
       const prior = readLoungeClassState(room.story_state, kind);
+      // Before a town is picked, a companion just talks: no "pick one" every turn.
+      if (travelRoom && !prior.item) return undefined;
       const opening = body.reason === 'opening' && !lastHuman;
       if (opening) return { prompt: loungeClassForPrompt(prior, prior.item ? 'continue' : 'pick'), state: prior };
       let critique: LoungeWritingCritique | undefined;
@@ -1889,6 +1894,7 @@ ${photoRule}`;
         lessonRoom ? loungeLessonRules : '',
         trainingRoom ? loungeTrainingRules(loungeTrainers[room.host_persona as LoungeTrainerId].kind) : '',
         classRoom ? loungeClassRules(loungeClasses[room.host_persona as LoungeClassId].kind, loungeClassTrip(room.host_persona)) : '',
+        travelRoom ? loungeTravelCompanionRules(loungeClassTrip(room.host_persona)) : '',
         // Relationship memory rules are room-stable (always on when the character has long memory), not turn-selected.
         relationship && !room.space_id ? (scenario ? `${longMemoryStoryUseInstructions}${writesMemory && !split ? `\n${longMemoryWriteInstructions}\n${longMemoryStoryWriteInstructions}` : ''}` : (writesMemory && !split ? longMemoryInstructions : longMemoryUseInstructions)) : '',
         // Breakpoint: nothing turn-variable may be appended after this. Values live only in the JSON input.

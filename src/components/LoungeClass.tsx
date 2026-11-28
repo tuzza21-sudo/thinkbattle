@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } from '../lib/loungeApi';
 import { getLoungeCharacter } from '../lib/loungeCharacters';
-import { loungeClasses, loungeClassTrip, loungeTravelTrips, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
+import { isLoungeTravelCompanion, loungeClasses, loungeClassTrip, loungeTravelTrips, loungeClassScene, loungeClassSpots, loungeClassExercises, loungeClassItem, loungeClassOf, loungeClassSites, loungeClassWorks, readLoungeClassState, type LoungeClassKind, type LoungeClassState } from '../lib/loungeClass';
 import type { LoungeArtWork, LoungeClassImage, LoungeTravelSite, LoungeTravelTripId, LoungeWritingExercise } from '../lib/loungeClassContent';
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : '잠시 연결이 어려워요. 다시 시도해 주세요.';
@@ -50,7 +50,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
   return <div className="lounge-lesson-bar lounge-class-bar">
     <div className="lounge-lesson-head">
       <Icon size={16} />
-      <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind)}</b></span>
+      <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind, trip)}</b></span>
       <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind, trip)}</button>
     </div>
     {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
@@ -80,7 +80,8 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
     {open && <LoungeClassBoard kind={kind} trip={trip} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
   </div>;
 }
-export const loungeClassLabel = (kind: LoungeClassKind) => Object.values(loungeClasses).find(entry => entry.kind === kind)?.label ?? '클래스';
+const travelLabels: Record<LoungeTravelTripId, string> = { italy: '이탈리아 문화기행', parks: '세계 국립공원 탐험', japan: '일본 소도시 기행' };
+export const loungeClassLabel = (kind: LoungeClassKind, trip?: LoungeTravelTripId) => kind === 'travel' && trip ? travelLabels[trip] : Object.values(loungeClasses).find(entry => entry.kind === kind)?.label ?? '클래스';
 
 /** The board: the assignments, the sites of Florence and Venice, or the works; each opens on its own page with the start button. */
 function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClose, disabled }: { kind: LoungeClassKind; trip?: LoungeTravelTripId; roomId: string; state: LoungeClassState; onPicked: (state: LoungeClassState) => void; onClose: () => void; disabled?: boolean }) {
@@ -147,9 +148,11 @@ function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.Reac
     <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
     <p className="lounge-class-lead">{site.summary}</p>
     <h4>배경과 역사</h4><p>{site.history}</p>
-    <h4>{site.trip === 'parks' ? '이 땅을 지키는 이유' : '문화유산으로서의 가치'}</h4><p>{site.heritage}</p>
+    <h4>{site.trip === 'parks' ? '이 땅을 지키는 이유' : site.trip === 'japan' ? '이 마을이 지켜 온 것' : '문화유산으로서의 가치'}</h4><p>{site.heritage}</p>
     <h4>꼭 봐야 할 것</h4><ul>{site.mustSee.map(item => <li key={item}>{item}</li>)}</ul>
     <h4>해 볼 만한 체험</h4><ul>{site.experience.map(item => <li key={item}>{item}</li>)}</ul>
+    {site.food?.length ? <><h4>여기서 먹는 것</h4><ul>{site.food.map(item => <li key={item}>{item}</li>)}</ul></> : null}
+    {site.life && <><h4>여기 사는 사람들</h4><p>{site.life}</p></>}
     <p className="lounge-class-tip">{site.tip}</p>
     {start}
   </div>;
@@ -204,9 +207,18 @@ export function LoungeClassStart({ characterId, user }: { characterId: string; u
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const id = loungeClassOf(characterId);
+  const name = getLoungeCharacter(characterId)?.name ?? '';
+  // A travel companion has no class of its own (2026-11-28): its trip is in its story, started just above.
+  if (!id && isLoungeTravelCompanion(characterId)) {
+    const trip = loungeTravelTrips[loungeClassTrip(characterId)];
+    return <div className="lounge-lesson-start">
+      <div className="lounge-lesson-start-head"><MapPin size={18} /><b>{name}와 함께하는 {loungeClassLabel('travel', loungeClassTrip(characterId))}</b><span>이야기 안에서</span></div>
+      <ul>{trip.points.map(point => <li key={point}>{point}</li>)}</ul>
+      <small>위의 이야기로 시작하면 대화 중에 입력창 위 '{trip.board}'에서 {trip.stop}을 골라 함께 걸어요. 따로 여는 수업이 아니라, 대화와 관계가 그대로 이어지는 여행이에요.</small>
+    </div>;
+  }
   if (!id) return null;
   const entry = loungeClasses[id];
-  const name = getLoungeCharacter(characterId)?.name ?? '';
   const start = async () => {
     if (!user || busy) return;
     setBusy(true); setError('');

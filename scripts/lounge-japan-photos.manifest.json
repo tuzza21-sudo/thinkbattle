@@ -1,0 +1,555 @@
+{
+  "nikko": {
+    "src": "/lounge/class/japan/nikko.webp",
+    "credit": "DXR",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kamijinko,_T%C5%8Dsh%C5%8D-g%C5%AB,_Nikko,_Southwest_view_20190423_1.jpg",
+    "title": "File:Kamijinko, Tōshō-gū, Nikko, Southwest view 20190423 1.jpg"
+  },
+  "hiraizumi": {
+    "src": "/lounge/class/japan/hiraizumi.webp",
+    "credit": "Unknown",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Konjikido_at_Chuson-ji.jpg",
+    "title": "File:Konjikido at Chuson-ji.jpg"
+  },
+  "kakunodate": {
+    "src": "/lounge/class/japan/kakunodate.webp",
+    "credit": "Kmhkmh",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kakunodate_488.jpg",
+    "title": "File:Kakunodate 488.jpg"
+  },
+  "ginzan": {
+    "src": "/lounge/class/japan/ginzan.webp",
+    "credit": "ブルーノ・プラス",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ginzan_Onsen_Takimi_Bridge.jpg",
+    "title": "File:Ginzan Onsen Takimi Bridge.jpg"
+  },
+  "ouchijuku": {
+    "src": "/lounge/class/japan/ouchijuku.webp",
+    "credit": "Bernie Ongewe",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%C5%8Cuchi-juku.jpg",
+    "title": "File:Ōuchi-juku.jpg"
+  },
+  "shirakawago": {
+    "src": "/lounge/class/japan/shirakawago.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Ogi_Shirakawa-g%C5%8D,_Gifu,_Japan.jpg",
+    "title": "File:Ogi Shirakawa-gō, Gifu, Japan.jpg"
+  },
+  "takayama": {
+    "src": "/lounge/class/japan/takayama.webp",
+    "credit": "663highland",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:071124_Sanmachi_Takayama_Japan01s3.jpg",
+    "title": "File:071124 Sanmachi Takayama Japan01s3.jpg"
+  },
+  "kanazawa": {
+    "src": "/lounge/class/japan/kanazawa.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:131109_Kenrokuen_Kanazawa_Ishikawa_pref_Japan05s3.jpg",
+    "title": "File:131109 Kenrokuen Kanazawa Ishikawa pref Japan05s3.jpg"
+  },
+  "matsumoto": {
+    "src": "/lounge/class/japan/matsumoto.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Matsumoto_Castle05s5s4592.jpg",
+    "title": "File:Matsumoto Castle05s5s4592.jpg"
+  },
+  "narai": {
+    "src": "/lounge/class/japan/narai.webp",
+    "credit": "Luka Peternel",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Narai-juku-facing-north-east-2019-Luka-Peternel.jpg",
+    "title": "File:Narai-juku-facing-north-east-2019-Luka-Peternel.jpg"
+  },
+  "tsumago": {
+    "src": "/lounge/class/japan/tsumago.webp",
+    "credit": "Gryffindor",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tsumago_2009_4.JPG",
+    "title": "File:Tsumago 2009 4.JPG"
+  },
+  "ine": {
+    "src": "/lounge/class/japan/ine.webp",
+    "credit": "Hiroaki Kaneko from Ota, Tokyo, Japan",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E4%BC%8A%E6%A0%B9%E3%81%AE%E8%88%9F%E5%B1%8B%E7%BE%A4_(Funaya_houses_at_Ine),_september_2014_(15428372595).jpg",
+    "title": "File:伊根の舟屋群 (Funaya houses at Ine), september 2014 (15428372595).jpg"
+  },
+  "kinosaki": {
+    "src": "/lounge/class/japan/kinosaki.webp",
+    "credit": "Asturio Cantabrio",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kinosaki_Onsen_Otani_River_2026-02_ac_(3).jpg",
+    "title": "File:Kinosaki Onsen Otani River 2026-02 ac (3).jpg"
+  },
+  "himeji": {
+    "src": "/lounge/class/japan/himeji.webp",
+    "credit": "Gorgo",
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Himeji_Castle_0804_1.jpg",
+    "title": "File:Himeji Castle 0804 1.jpg"
+  },
+  "koyasan": {
+    "src": "/lounge/class/japan/koyasan.webp",
+    "credit": "Hyppolyte de Saint-Rambert",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Danj%C3%B4-garan_(Wakayama_K%C5%8Dyasan)_Temple_hdsr_S5_tr07.jpg",
+    "title": "File:Danjô-garan (Wakayama Kōyasan) Temple hdsr S5 tr07.jpg"
+  },
+  "kumanokodo": {
+    "src": "/lounge/class/japan/kumanokodo.webp",
+    "credit": "Tim Notari from Tanabe-Shi Wakayama-Ken, Japan",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Inside_the_Kumano_Hongu_Taisha.jpg",
+    "title": "File:Inside the Kumano Hongu Taisha.jpg"
+  },
+  "miyajima": {
+    "src": "/lounge/class/japan/miyajima.webp",
+    "credit": "Jakub Hałun",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Itsukushima-jinja_torii_at_sunset,_Miyajima,_Japan,_20240816_1812_4144.jpg",
+    "title": "File:Itsukushima-jinja torii at sunset, Miyajima, Japan, 20240816 1812 4144.jpg"
+  },
+  "iwamiginzan": {
+    "src": "/lounge/class/japan/iwamiginzan.webp",
+    "credit": "663highland",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:180504_Omori_of_Iwami_Ginzan_Silver_Mine_Oda_Shimane_pref_Japan02bs4.jpg",
+    "title": "File:180504 Omori of Iwami Ginzan Silver Mine Oda Shimane pref Japan02bs4.jpg"
+  },
+  "onomichi": {
+    "src": "/lounge/class/japan/onomichi.webp",
+    "credit": "RitikaPahwa4444",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Onomichi_44.jpg",
+    "title": "File:Onomichi 44.jpg"
+  },
+  "kurashiki": {
+    "src": "/lounge/class/japan/kurashiki.webp",
+    "credit": "Motokoka",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kurashiki_Bikan_historical_quarter_2.jpg",
+    "title": "File:Kurashiki Bikan historical quarter 2.jpg"
+  },
+  "hagi": {
+    "src": "/lounge/class/japan/hagi.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hagi_Ware_Museum_20170504.jpg",
+    "title": "File:Hagi Ware Museum 20170504.jpg"
+  },
+  "naoshima": {
+    "src": "/lounge/class/japan/naoshima.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Benesse_house01s3200.jpg",
+    "title": "File:Benesse house01s3200.jpg"
+  },
+  "kotohira": {
+    "src": "/lounge/class/japan/kotohira.webp",
+    "credit": "Sei F",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Konpira_Shrine,_Kagawa_Prefecture;_November_2019_(01).jpg",
+    "title": "File:Konpira Shrine, Kagawa Prefecture; November 2019 (01).jpg"
+  },
+  "yufuin": {
+    "src": "/lounge/class/japan/yufuin.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Forest_of_Quercus_serrata_and_Chagall_Museum_on_side_of_Lake_Kinrinko.JPG",
+    "title": "File:Forest of Quercus serrata and Chagall Museum on side of Lake Kinrinko.JPG"
+  },
+  "yakushima": {
+    "src": "/lounge/class/japan/yakushima.webp",
+    "credit": "Grendelkhan",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Forest_on_Yakushima_from_Route_592.jpg",
+    "title": "File:Forest on Yakushima from Route 592.jpg"
+  },
+  "yomeimon": {
+    "src": "/lounge/class/japan/spots/yomeimon.webp",
+    "credit": "Jpatokal",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nikko_Toshogu_Yomeimon_Gate_2024.jpg",
+    "title": "File:Nikko Toshogu Yomeimon Gate 2024.jpg"
+  },
+  "shinkyo": {
+    "src": "/lounge/class/japan/spots/shinkyo.webp",
+    "credit": "Joli Rumi",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Shinkyo_Bridge_over_the_Daiya_River_at_Nikko,_Japan.jpg",
+    "title": "File:Shinkyo Bridge over the Daiya River at Nikko, Japan.jpg"
+  },
+  "kegon-falls": {
+    "src": "/lounge/class/japan/spots/kegon-falls.webp",
+    "credit": "inazakira",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Japan,_Tochigi-_Nikko,_Kegon_waterfall_2015_6.jpg",
+    "title": "File:Japan, Tochigi- Nikko, Kegon waterfall 2015 6.jpg"
+  },
+  "motsuji": {
+    "src": "/lounge/class/japan/spots/motsuji.webp",
+    "credit": "Geomr",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Oizumi_Pond_Motsuji_Hiraizumi_2007-01-27.jpg",
+    "title": "File:Oizumi Pond Motsuji Hiraizumi 2007-01-27.jpg"
+  },
+  "bukeyashiki": {
+    "src": "/lounge/class/japan/spots/bukeyashiki.webp",
+    "credit": "掬茶",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Bukeyashiki_Street_in_Kakunodate_20180428b.jpg",
+    "title": "File:Bukeyashiki Street in Kakunodate 20180428b.jpg"
+  },
+  "hinokinai": {
+    "src": "/lounge/class/japan/spots/hinokinai.webp",
+    "credit": "掬茶",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Cherry_blossom_along_the_Hinokinai_River_20180428c.jpg",
+    "title": "File:Cherry blossom along the Hinokinai River 20180428c.jpg"
+  },
+  "ginzan-street": {
+    "src": "/lounge/class/japan/spots/ginzan-street.webp",
+    "credit": "さかおり",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Night_in_Ginzan_Onsen_town_January_2022_A.jpg",
+    "title": "File:Night in Ginzan Onsen town January 2022 A.jpg"
+  },
+  "ginzan-snow": {
+    "src": "/lounge/class/japan/spots/ginzan-snow.webp",
+    "credit": "takacchi",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ginzan_onsen_spa(%E9%8A%80%E5%B1%B1%E6%B8%A9%E6%B3%89)_-_panoramio.jpg",
+    "title": "File:Ginzan onsen spa(銀山温泉) - panoramio.jpg"
+  },
+  "ouchi-street": {
+    "src": "/lounge/class/japan/spots/ouchi-street.webp",
+    "credit": "TANAKA Juuyoh (田中十洋)",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ouchi-juku,_Fukushima;_September_2009_(16).jpg",
+    "title": "File:Ouchi-juku, Fukushima; September 2009 (16).jpg"
+  },
+  "ouchi-winter": {
+    "src": "/lounge/class/japan/spots/ouchi-winter.webp",
+    "credit": "くろふね",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E5%86%AC%E3%81%AE%E5%A4%A7%E5%86%85%E5%AE%BF20221226-P1009121.jpg",
+    "title": "File:冬の大内宿20221226-P1009121.jpg"
+  },
+  "ogimachi": {
+    "src": "/lounge/class/japan/spots/ogimachi.webp",
+    "credit": "Bernard Gagnon",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Gassho-zukuri_farmhouse-01.jpg",
+    "title": "File:Gassho-zukuri farmhouse-01.jpg"
+  },
+  "shirakawago-winter": {
+    "src": "/lounge/class/japan/spots/shirakawago-winter.webp",
+    "credit": "tsuda from Tsushima, Aichi, Japan",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Shirakawa-go_002.jpg",
+    "title": "File:Shirakawa-go 002.jpg"
+  },
+  "sanmachi": {
+    "src": "/lounge/class/japan/spots/sanmachi.webp",
+    "credit": "Ankur P from Pune, India",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Takayama_Old_Town_(Sanmachi_Suji)_(35819349621).jpg",
+    "title": "File:Takayama Old Town (Sanmachi Suji) (35819349621).jpg"
+  },
+  "takayama-jinya": {
+    "src": "/lounge/class/japan/spots/takayama-jinya.webp",
+    "credit": "Wpcpey",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Takayama_Jinya_inside_view_201706.jpg",
+    "title": "File:Takayama Jinya inside view 201706.jpg"
+  },
+  "kenrokuen": {
+    "src": "/lounge/class/japan/spots/kenrokuen.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:131109_Kenrokuen_Kanazawa_Ishikawa_pref_Japan05s3.jpg",
+    "title": "File:131109 Kenrokuen Kanazawa Ishikawa pref Japan05s3.jpg"
+  },
+  "higashi-chaya": {
+    "src": "/lounge/class/japan/spots/higashi-chaya.webp",
+    "credit": "Andrea Schaffer from Sydney, Australia",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Higashi_Chaya_district,_Kanazawa_(3810720612).jpg",
+    "title": "File:Higashi Chaya district, Kanazawa (3810720612).jpg"
+  },
+  "matsumoto-castle": {
+    "src": "/lounge/class/japan/spots/matsumoto-castle.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:130608_Matsumoto_Castle_Matsumoto_Nagano_pref_Japan02bs4.jpg",
+    "title": "File:130608 Matsumoto Castle Matsumoto Nagano pref Japan02bs4.jpg"
+  },
+  "nakamachi": {
+    "src": "/lounge/class/japan/spots/nakamachi.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Nakamachi_street_Matsumoto_Nagano_pref_Japan07n.jpg",
+    "title": "File:Nakamachi street Matsumoto Nagano pref Japan07n.jpg"
+  },
+  "narai-street": {
+    "src": "/lounge/class/japan/spots/narai-street.webp",
+    "credit": "lumoplank",
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Narai-juku_-_Naraijuku6557.jpg",
+    "title": "File:Narai-juku - Naraijuku6557.jpg"
+  },
+  "tsumago-street": {
+    "src": "/lounge/class/japan/spots/tsumago-street.webp",
+    "credit": "z tanuki",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tsumago-juku(post_town)_,_%E5%A6%BB%E7%B1%A0%E5%AE%BF_-_panoramio_(11).jpg",
+    "title": "File:Tsumago-juku(post town) , 妻籠宿 - panoramio (11).jpg"
+  },
+  "magome": {
+    "src": "/lounge/class/japan/spots/magome.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Sett_of_Magome-juku_5.jpg",
+    "title": "File:Sett of Magome-juku 5.jpg"
+  },
+  "ine-bay": {
+    "src": "/lounge/class/japan/spots/ine-bay.webp",
+    "credit": "Naokijp",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ine_Bay_and_Aoshima_in_Ine_Town_Yosa_District,_Kyoto_Prefecture_001.jpg",
+    "title": "File:Ine Bay and Aoshima in Ine Town Yosa District, Kyoto Prefecture 001.jpg"
+  },
+  "kinosaki-night": {
+    "src": "/lounge/class/japan/spots/kinosaki-night.webp",
+    "credit": "Samchan91",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kinosaki_Onsen_summer_fireworks.jpg",
+    "title": "File:Kinosaki Onsen summer fireworks.jpg"
+  },
+  "himeji-keep": {
+    "src": "/lounge/class/japan/spots/himeji-keep.webp",
+    "credit": "Yasuo Hamashima",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Himeji_castle_20241025-_YAS2703.jpg",
+    "title": "File:Himeji castle 20241025- YAS2703.jpg"
+  },
+  "himeji-sakura": {
+    "src": "/lounge/class/japan/spots/himeji-sakura.webp",
+    "credit": "Oren Rozen",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Japan_040416_Himeji_Castle_005.jpg",
+    "title": "File:Japan 040416 Himeji Castle 005.jpg"
+  },
+  "okunoin": {
+    "src": "/lounge/class/japan/spots/okunoin.webp",
+    "credit": "Adam Jones from Kelowna, BC, Canada",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Choishi_Path_-_Okunoin_Cemetery_-_Koyasan_-_Japan_-_22_(47949824922).jpg",
+    "title": "File:Choishi Path - Okunoin Cemetery - Koyasan - Japan - 22 (47949824922).jpg"
+  },
+  "konpon-daito": {
+    "src": "/lounge/class/japan/spots/konpon-daito.webp",
+    "credit": "Andrea Schaffer from Sydney, Australia",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Konpon_Daito,_Koyasan_(3811155264).jpg",
+    "title": "File:Konpon Daito, Koyasan (3811155264).jpg"
+  },
+  "nachi-falls": {
+    "src": "/lounge/class/japan/spots/nachi-falls.webp",
+    "credit": "Zairon",
+    "license": "CC BY 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nachikatsuura_Seiganto-ji_Three-Storied_Pagoda_View_to_the_Nachi_Falls_3.jpg",
+    "title": "File:Nachikatsuura Seiganto-ji Three-Storied Pagoda View to the Nachi Falls 3.jpg"
+  },
+  "otorii": {
+    "src": "/lounge/class/japan/spots/otorii.webp",
+    "credit": "Josep M. Gracia",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:MY_-_Great_torii_of_Itsukushima_Shrine_at_night,_Miyajima,_Japan,_2015.jpg",
+    "title": "File:MY - Great torii of Itsukushima Shrine at night, Miyajima, Japan, 2015.jpg"
+  },
+  "itsukushima-shrine": {
+    "src": "/lounge/class/japan/spots/itsukushima-shrine.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:East_corridor_and_Gojunoto_Tower_of_Itsukushima_Shrine.jpg",
+    "title": "File:East corridor and Gojunoto Tower of Itsukushima Shrine.jpg"
+  },
+  "ryugenji-mabu": {
+    "src": "/lounge/class/japan/spots/ryugenji-mabu.webp",
+    "credit": "Wakuwaku99",
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Iwami_Ginzan_Silver_Mine,_Ryugenji_Mabu_Mine_Shaft_002.JPG",
+    "title": "File:Iwami Ginzan Silver Mine, Ryugenji Mabu Mine Shaft 002.JPG"
+  },
+  "senkoji-view": {
+    "src": "/lounge/class/japan/spots/senkoji-view.webp",
+    "credit": "HKT3012",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Onomichi_city_and_ropeway_from_Senko-ji.JPG",
+    "title": "File:Onomichi city and ropeway from Senko-ji.JPG"
+  },
+  "onomichi-slope": {
+    "src": "/lounge/class/japan/spots/onomichi-slope.webp",
+    "credit": "The Other View from Onomichi, Hiroshima",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Onomichi_ramen_shop_by_The_Other_View_in_Onomichi.jpg",
+    "title": "File:Onomichi ramen shop by The Other View in Onomichi.jpg"
+  },
+  "kurashiki-canal": {
+    "src": "/lounge/class/japan/spots/kurashiki-canal.webp",
+    "credit": "Malaiya",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kurashiki_Canal_Area.jpg",
+    "title": "File:Kurashiki Canal Area.jpg"
+  },
+  "ohara-museum": {
+    "src": "/lounge/class/japan/spots/ohara-museum.webp",
+    "credit": "Suicasmo",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Ohara_Museum_of_Art_20190324.jpg",
+    "title": "File:Ohara Museum of Art 20190324.jpg"
+  },
+  "hagiyaki": {
+    "src": "/lounge/class/japan/spots/hagiyaki.webp",
+    "credit": "AnonymousUnknown author",
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:Hagi_ware_Japanese_tea_bowl,_18th-19th_century,_Freer_Gallery_of_Art.jpg",
+    "title": "File:Hagi ware Japanese tea bowl, 18th-19th century, Freer Gallery of Art.jpg"
+  },
+  "konpira-steps": {
+    "src": "/lounge/class/japan/spots/konpira-steps.webp",
+    "credit": "Maarten Heerlien from Voorschoten, The Netherlands",
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Torii_and_steps_leading_to_Kotohira-g%C5%AB_inner_shrine_(6453432445).jpg",
+    "title": "File:Torii and steps leading to Kotohira-gū inner shrine (6453432445).jpg"
+  },
+  "kanamaruza": {
+    "src": "/lounge/class/japan/spots/kanamaruza.webp",
+    "credit": "Photos of Japan",
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Stage_and_seating_of_Konpira_Grand_Theatre.jpg",
+    "title": "File:Stage and seating of Konpira Grand Theatre.jpg"
+  },
+  "kinrinko": {
+    "src": "/lounge/class/japan/spots/kinrinko.webp",
+    "credit": "Ivan P",
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Lake_Kinrin_in_Yufuin,_Oita_-_October_2026_(02).jpg",
+    "title": "File:Lake Kinrin in Yufuin, Oita - October 2026 (02).jpg"
+  },
+  "yufudake": {
+    "src": "/lounge/class/japan/spots/yufudake.webp",
+    "credit": "Suicasmo",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mount_Yufu_20221022-2.jpg",
+    "title": "File:Mount Yufu 20221022-2.jpg"
+  },
+  "yanagawa-canal": {
+    "src": "/lounge/class/japan/spots/yanagawa-canal.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Berth_for_boats_of_Yanagawa_River_Tour_near_Ohana_Hotel_from_Bungobashi_Bridge.JPG",
+    "title": "File:Berth for boats of Yanagawa River Tour near Ohana Hotel from Bungobashi Bridge.JPG"
+  },
+  "ohana": {
+    "src": "/lounge/class/japan/spots/ohana.webp",
+    "credit": "江戸村のとくぞう",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Yanagawa_Ohana_200223a.jpg",
+    "title": "File:Yanagawa Ohana 200223a.jpg"
+  },
+  "shiratani": {
+    "src": "/lounge/class/japan/spots/shiratani.webp",
+    "credit": "lumoplank",
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Shiratani_Unsuikyo_Ravine-_Part_II_-_ShirataniUnsuikyo342.jpg",
+    "title": "File:Shiratani Unsuikyo Ravine- Part II - ShirataniUnsuikyo342.jpg"
+  },
+  "jomon-sugi": {
+    "src": "/lounge/class/japan/spots/jomon-sugi.webp",
+    "credit": "Σ64",
+    "license": "CC BY 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Jomon_Sugi_02.jpg",
+    "title": "File:Jomon Sugi 02.jpg"
+  },
+  "yanagawa": {
+    "src": "/lounge/class/japan/yanagawa.webp",
+    "credit": "ブルーノ・プラス",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Yanagawa_kawakudari1.jpg",
+    "title": "File:Yanagawa kawakudari1.jpg"
+  },
+  "chusonji": {
+    "src": "/lounge/class/japan/spots/chusonji.webp",
+    "credit": "Tak1701d",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Chuson-ji_Hondo_201806.jpg",
+    "title": "File:Chuson-ji Hondo 201806.jpg"
+  },
+  "kiso-ohashi": {
+    "src": "/lounge/class/japan/spots/kiso-ohashi.webp",
+    "credit": "Qurren (talk) Taken with Canon IXY 10S (Digital IXUS 210)",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Narai_River_and_Kiso_no_ohashi.jpg",
+    "title": "File:Narai River and Kiso no ohashi.jpg"
+  },
+  "funaya-row": {
+    "src": "/lounge/class/japan/spots/funaya-row.webp",
+    "credit": "Naokijp",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Funaya_in_Ine_Town,_Yosa_District,_Kyoto_Prefecture_001.jpg",
+    "title": "File:Funaya in Ine Town, Yosa District, Kyoto Prefecture 001.jpg"
+  },
+  "otani-river": {
+    "src": "/lounge/class/japan/spots/otani-river.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:161029_Kinosaki_Onsen_Toyooka_Hyogo_pref_Japan01s.jpg",
+    "title": "File:161029 Kinosaki Onsen Toyooka Hyogo pref Japan01s.jpg"
+  },
+  "kumano-path": {
+    "src": "/lounge/class/japan/spots/kumano-path.webp",
+    "credit": "Steve Shattuck from Canberra, Australia",
+    "license": "CC BY-SA 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kumano_Kodo_Pilgrimage_Trail,_Koguchi_to_Nachisan,_Japan_(48912307128).jpg",
+    "title": "File:Kumano Kodo Pilgrimage Trail, Koguchi to Nachisan, Japan (48912307128).jpg"
+  },
+  "hagi-street": {
+    "src": "/lounge/class/japan/spots/hagi-street.webp",
+    "credit": "そらみみ",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kikuya_Lane_in_Hagi_Castle_Town_4.jpg",
+    "title": "File:Kikuya Lane in Hagi Castle Town 4.jpg"
+  },
+  "naoshima-bath": {
+    "src": "/lounge/class/japan/spots/naoshima-bath.webp",
+    "credit": "松岡明芳",
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Naoshima_Bath_I%E2%99%A5%E6%B9%AF_%E7%9B%B4%E5%B3%B6%E9%8A%AD%E6%B9%AF_Akiyoshi_Matsuoka_PC182203.jpg",
+    "title": "File:Naoshima Bath I♥湯 直島銭湯 Akiyoshi Matsuoka PC182203.jpg"
+  },
+  "shimizudani": {
+    "src": "/lounge/class/japan/spots/shimizudani.webp",
+    "credit": "Naokijp",
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Shimizudani_Refinery_Ruins_at_Iwami_Ginzan_Silver_Mine_001.jpg",
+    "title": "File:Shimizudani Refinery Ruins at Iwami Ginzan Silver Mine 001.jpg"
+  },
+  "chichu": {
+    "src": "/lounge/class/japan/spots/chichu.webp",
+    "credit": "663highland",
+    "license": "CC BY 2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Chichu_art_museum02s2560.jpg",
+    "title": "File:Chichu art museum02s2560.jpg"
+  }
+}
