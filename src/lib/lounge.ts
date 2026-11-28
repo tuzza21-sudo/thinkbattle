@@ -311,7 +311,7 @@ export const loungeHosts = [
   {
     // 민서하 (2026-11-27, the owner's card): a national-park expedition documentarian, curious, a good explainer, a sharp teaser.
     id: 'explorer', name: '탐험 다큐멘터리스트', tag: '길은 정확하게 읽고, 사람은 더 정확하게 놀린다', emoji: '🏔️', color: '#cfe3ee',
-    portrait: '/lounge/host-explorer-v1.webp', voiceSample: '/lounge/host-explorer-v2.mp3?v=1', voiceLabel: '밝고 살짝 허스키한 중저음 · 시원한 해요체',
+    portrait: '/lounge/host-explorer-v1.webp', voiceSample: '/lounge/host-explorer-v3.mp3?v=1', voiceLabel: '밝고 살짝 허스키한 중저음 · 시원한 해요체',
     description: '세계의 끝을 기록하는 35세 탐험가. 파타고니아의 바람을 먼저 맞아 본 사람이 길도, 사람도 정확하게 읽는다',
     greeting: '사진 찍을 시간은 줄게요. 근데 진짜 중요한 건 카메라 내려놓은 다음에 보여요.',
     instruction: `탐험 다큐멘터리스트: 국립공원을 기록하는 35세 탐험 다큐멘터리스트 진행자다. 밝고 시원한 해요체로 짧게 말하고, 지금 나온 이야기에서 가장 궁금한 한 지점을 먼저 짚는다.
@@ -375,7 +375,7 @@ export const loungeHostLoudness: Record<string, number> = { velvet: 2.5 };
  * each with its voice and speech instruction): ElevenLabs ran -18.0 to -23.5 dBFS on one sentence (선우령 -19.7, 백도하 -18.0, 윤지안 -20.7 need none; 임시우 about 4 dB lower, so 1.5x; 윤서연 (Hailey, 2026-10-26) -15.9, about 3 dB louder, so 0.8x), Gemini Sulafat -18.6 needs none, and the
  * detective's Gemini voice (Algenib) is 6 dB below the others (-25.2 against -14 to -20), so 2x.
  */
-const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { jaeseok: 1.5, ina: 0.8, auditor: 0.66, shaman: 1.4, trickster: 1.5, poker: 1.2 }, typecast: {} };
+const loungeEngineLoudness: Partial<Record<LoungeSpeechEngine, Record<string, number>>> = { gemini: {}, 'eleven-v4-turbo': { explorer: 1.15, jaeseok: 1.5, ina: 0.8, auditor: 0.66, shaman: 1.4, trickster: 1.5, poker: 1.2 }, typecast: {} };
 /** The playback gain of a host's voice in an engine (the OpenAI voices when none is given, as the lobby samples are). */
 export const getLoungeHostLoudness = (id?: string | null, engine: LoungeSpeechEngine = 'openai') => (engine === 'openai' ? loungeHostLoudness : loungeEngineLoudness[engine] ?? {})[id ?? ''] ?? 1;
 /** How the lobby groups the eight hosts: two easygoing defaults and six stronger personalities. */
@@ -744,7 +744,7 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
     // 2026-11-28, when ElevenLabs came back: picked by me by their descriptions, not yet heard by the owner (other candidates in
     // docs/voice-samples/eleven-2026-11-28): 민서하 bright and energetic in her early 30s, 아사쿠라 미오 calm and understated.
-    explorer: '8zHuDw1bbkbkL93Inv5N', // Sujin - Bright & Energetic
+    explorer: 'SE9upoSoM2ipDUdAVW8q', // Mono Beige - Calm & Contemporary (2026-11-28, by the owner: the voice first given to 미오; Sujin before)
     // 2026-11-28, by the owner: a Japanese woman's voice for 미오. A Japanese library voice reading Korean keeps a light Japanese
     // accent; Kana was the closest by description (Kaori, Morioki, Popo and the Korean Mono Beige in docs/voice-samples).
     mio: 'dhGvgIx0X6G3xzSWqOye', // Kana - Japanese Young Female (thirties, bright but calm, soft but clear)
