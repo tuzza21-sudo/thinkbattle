@@ -1512,3 +1512,9 @@
 .lounge-class-map figcaption { display:grid; gap:2px; font-size:12px; line-height:1.4; }
 .lounge-class-map figcaption small { opacity:.65; }
 .lounge-class-intro .lounge-class-map > div { width:170px; }
+.lounge-class-detail .lounge-class-map > div { width:170px; }
+.lounge-class-map.region { align-items:flex-start; margin:4px 0 10px; }
+.lounge-class-map.region > div { width:170px; }
+button.lounge-class-map-dot { padding:0; border:0; cursor:pointer; }
+.lounge-class-map.region figcaption { display:flex; flex-wrap:wrap; gap:4px 6px; }
+.lounge-class-map.region figcaption button { padding:3px 8px; border-radius:999px; border:1px solid #ffffff24; background:#ffffff0d; color:inherit; font-size:12px; cursor:pointer; }
