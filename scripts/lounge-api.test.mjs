@@ -4009,10 +4009,15 @@ test('윤지안 (id diplomat) speaks with Gemini through the same PCM stream, an
   }
 });
 
-test('while ElevenLabs is paused (its billing is blocked, 2026-11-26) every character speaks with Gemini and OpenAI speaks when that fails; ElevenLabs is never asked', async () => {
-  assert.equal(lounge.loungeElevenPaused, true, 'paused in the code until it is paid');
-  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok'), 'gemini'); assert.equal(lounge.loungeDefaultSpeechEngine('c_0123456789abcdef0123456789abcdef'), 'gemini');
-  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok', false), 'eleven-v4-turbo', 'paid again: ElevenLabs');
+test('ElevenLabs speaks again (2026-11-28); paused (LOUNGE_ELEVEN_PAUSED=on) every character speaks with Gemini and OpenAI when that fails, ElevenLabs never asked', async () => {
+  assert.equal(lounge.loungeElevenPaused, false, 'resumed in the code on 2026-11-28');
+  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok'), 'eleven-v4-turbo'); assert.equal(lounge.loungeDefaultSpeechEngine('c_0123456789abcdef0123456789abcdef'), 'eleven-v4-turbo');
+  assert.equal(lounge.loungeDefaultSpeechEngine('jaeseok', true), 'gemini', 'paused again: Gemini');
+  // Every house character has a voice of its own, and a clone the plan refuses (서도현's) has a Korean stand-in of its gender.
+  for (const id of ['explorer', 'mio']) assert.ok(lounge.loungeEngineVoices.eleven[id], `${id} has its own ElevenLabs voice`);
+  assert.notEqual(lounge.loungeEngineVoices.eleven.explorer, lounge.loungeEngineVoices.eleven.mio);
+  assert.equal(lounge.loungeElevenStandIn('auditor'), lounge.loungeEngineVoices.eleven.male);
+  assert.equal(lounge.loungeElevenStandIn('mio'), lounge.loungeEngineVoices.eleven.female);
   const pcm = Uint8Array.from({ length: 3000 }, (_, index) => (index * 7) % 256), fallback = new Uint8Array([9, 8, 7, 6]);
   const sse = chunks => chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join('');
   const piece = bytes => ({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'audio/l16; rate=24000', data: Buffer.from(bytes).toString('base64') } }] } }] });

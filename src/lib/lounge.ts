@@ -311,7 +311,7 @@ export const loungeHosts = [
   {
     // 민서하 (2026-11-27, the owner's card): a national-park expedition documentarian, curious, a good explainer, a sharp teaser.
     id: 'explorer', name: '탐험 다큐멘터리스트', tag: '길은 정확하게 읽고, 사람은 더 정확하게 놀린다', emoji: '🏔️', color: '#cfe3ee',
-    portrait: '/lounge/host-explorer-v1.webp', voiceSample: '/lounge/host-explorer-v1.wav?v=1', voiceLabel: '밝고 살짝 허스키한 중저음 · 시원한 해요체',
+    portrait: '/lounge/host-explorer-v1.webp', voiceSample: '/lounge/host-explorer-v2.mp3?v=1', voiceLabel: '밝고 살짝 허스키한 중저음 · 시원한 해요체',
     description: '세계의 끝을 기록하는 35세 탐험가. 파타고니아의 바람을 먼저 맞아 본 사람이 길도, 사람도 정확하게 읽는다',
     greeting: '사진 찍을 시간은 줄게요. 근데 진짜 중요한 건 카메라 내려놓은 다음에 보여요.',
     instruction: `탐험 다큐멘터리스트: 국립공원을 기록하는 35세 탐험 다큐멘터리스트 진행자다. 밝고 시원한 해요체로 짧게 말하고, 지금 나온 이야기에서 가장 궁금한 한 지점을 먼저 짚는다.
@@ -334,7 +334,7 @@ export const loungeHosts = [
     // 아사쿠라 미오 (2026-11-28, the owner's bible "일본 소도시 기행"): a Japanese local-culture writer who walks Japan's small towns
     // with the member. The first travel companion: her 1:1 room has the trip board itself (loungeTravelCompanions), no separate class.
     id: 'mio', name: '로컬 문화 기록가', tag: '정답보다 골목을 믿는 일본 소도시 기록가', emoji: '🏮', color: '#efd9c4',
-    portrait: '/lounge/host-mio-v1.webp', voiceSample: '/lounge/host-mio-v1.wav?v=1', voiceLabel: '차분하고 약간 낮은 30대 목소리 · 또렷한 해요체',
+    portrait: '/lounge/host-mio-v1.webp', voiceSample: '/lounge/host-mio-v2.mp3?v=1', voiceLabel: '차분하고 약간 낮은 30대 목소리 · 또렷한 해요체',
     description: '관광 안내책자에서 빠진 일본을 보여 주는 36세 지역문화 기록가. 골목의 소리와 대를 이은 식당의 맛을 기록한다',
     greeting: '도쿄는 누구나 보여 줄 수 있어요. 저는 안내책자에서 빠진 일본을 보여 줄게요.',
     instruction: `로컬 문화 기록가: 일본 소도시의 골목과 식당, 동네 사람들의 생활을 기록하는 36세 일본인 문화 작가 진행자다. 차분하고 또렷한 해요체로 짧게 말하고, 지금 나온 이야기에서 가장 구체적인 장면 하나를 먼저 짚는다.
@@ -663,11 +663,11 @@ export type LoungeSpeechEngine = typeof loungeSpeechEngines[number]['id'];
 export const isLoungeSpeechEngine = (value: unknown): value is LoungeSpeechEngine => loungeSpeechEngines.some(engine => engine.id === value);
 export const getLoungeSpeechEngine = (id?: string | null) => loungeSpeechEngines.find(engine => engine.id === id) ?? loungeSpeechEngines[0];
 /**
- * ElevenLabs is paused (2026-11-26, by the owner: its billing is blocked until it is paid): every character speaks with Gemini,
- * and OpenAI speaks when Gemini fails. When it is paid, set this to false (or LOUNGE_ELEVEN_PAUSED=off in Vercel, which the
- * server reads first, to resume at once without a release).
+ * ElevenLabs was paused from 2026-11-26 while its billing was blocked (every character spoke with Gemini, OpenAI when Gemini
+ * failed); resumed 2026-11-28 by the owner. To pause it again, set this to true (or LOUNGE_ELEVEN_PAUSED=on in Vercel, which
+ * the server reads first, to pause at once without a release).
  */
-export const loungeElevenPaused = true;
+export const loungeElevenPaused = false;
 /** The engine every character speaks with: ElevenLabs alone since 2026-10-26 (a reply it cannot speak stays text, so the voice never changes in a call), Gemini while it is paused. */
 export const loungeDefaultSpeechEngine = (_hostId: string, paused: boolean = loungeElevenPaused): LoungeSpeechEngine => paused ? 'gemini' : 'eleven-v4-turbo';
 /** The engine that speaks where the default is not open to the member (a guest, or the month's allowance used): Gemini; OpenAI speaks when that fails too. */
@@ -742,6 +742,10 @@ export const loungeEngineVoices: Record<'gemini' | 'eleven' | 'typecast', Partia
     teacher: 'Kndx0DUJ5HQE1HQgiMY8', // Jin - calm, low-pitched Korean woman in her 30s (차유진, 2026-11-16; picked by me, alternatives in docs/voice-samples/teacher-2026-11-16)
     interpreter: 'pJtMZEFAxLgFoi6crgwM', // Minseong - Calm & Gentle: warm, calm mid-low tone of a man in his 30s (문정우, 2026-11-20; picked by me by its description, not heard by the owner; three alternatives in docs/voice-samples/interpreter-2026-11-20)
     guide: 'CxErO97xpQgQXYmapDKX', // Theo - Warm, Smooth and Soft (2026-10-27; three other candidates were sampled for the owner)
+    // 2026-11-28, when ElevenLabs came back: picked by me by their descriptions, not yet heard by the owner (other candidates in
+    // docs/voice-samples/eleven-2026-11-28): 민서하 bright and energetic in her early 30s, 아사쿠라 미오 calm and understated.
+    explorer: '8zHuDw1bbkbkL93Inv5N', // Sujin - Bright & Energetic
+    mio: 'SE9upoSoM2ipDUdAVW8q', // Mono Beige - Calm & Contemporary
     c_ba586cab127802ac2eddebf308c507e0: 'y3J9lm4KG5NLFtSFEB5A', // Minzy (chosen by the owner for 강혜인, the club member, 2026-10-27)
     female: 'uyVNoMrnUku1dZyVEXwD', // Anna Kim - Tender, Calm and Clear
     male: 'PDoCXqBQFGsvfO0hNkEs', // KKC HQ
@@ -776,6 +780,12 @@ export const registerLoungeCustomElevenVoice = (hostId: string, voiceId: string)
 const loungeHostGender = (hostId: string) => houseVoiceGender[hostId] ?? (openAiFemaleVoices.has(getLoungeHost(hostId).voice) ? 'female' : 'male');
 /** The ElevenLabs premade voice of a character, for when its library voice is refused (an account without a paid plan). */
 export const loungeElevenPremadeVoice = (hostId: string) => loungeElevenPremadeVoices[hostId] ?? loungeElevenPremadeVoices[loungeHostGender(hostId)];
+/**
+ * The Korean library voice of a character's gender, which speaks when its own voice is a clone the plan does not include
+ * (2026-11-28: ElevenLabs refuses 서도현's cloned voice with 401 ivc_not_permitted on the current plan). His own comes back by
+ * itself once the plan allows clones.
+ */
+export const loungeElevenStandIn = (hostId: string) => loungeEngineVoices.eleven[loungeHostGender(hostId)];
 /** ElevenLabs in Korean (v4 Turbo, or Flash v2.5 as its backup). It takes the stability settings; a "speed" setting is accepted but changes nothing (measured 2026-10-23), so none is sent. */
 export function loungeElevenSpeechRequest(input: string, model: string = loungeElevenModel, hostId?: string) {
   // A tutor's lines mix English and Korean: with no language set, the model reads each in its own (2026-11-25).
