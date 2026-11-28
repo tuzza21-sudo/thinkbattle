@@ -142,6 +142,25 @@ test('a lesson turn: asked, the expression said unprompted moves on; a miss gets
   assert.equal(turn.step, 'wrap');
 });
 
+test('said in other words, the member sentence is polished and the expression of the task is named beside it (2026-11-28)', () => {
+  const items = [item('a', { expression: 'remain essential', meaning: '여전히 필수적이다', nuance: '공식 자리에서 쓰는 단정한 말' }), item('b')];
+  let turn = lesson.advanceLoungeLesson({ items, plan: ['a', 'b'], now, said: 'hello', grade: grade() });
+  assert.equal(turn.target.id, 'a');
+  const said = grade({ target: 'paraphrased', better: 'Even with automation, we would still need human support.' });
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'Even automation, we would still need human help.', grade: said });
+  assert.equal(turn.step, 'other'); assert.equal(turn.state.current.given, true); assert.equal(turn.verdicts.length, 0, 'nothing is judged yet');
+  const prompt = lesson.loungeLessonForPrompt(turn, 'B1', said);
+  assert.equal(prompt.target.expression, 'remain essential', 'the expression of the task is named');
+  assert.equal(prompt.target.nuance, '공식 자리에서 쓰는 단정한 말');
+  assert.equal(prompt.feedback.better, said.better, 'and the member own sentence is polished');
+  assert.equal(lesson.loungeLessonTask(turn.state, items, now).item.expression, 'remain essential', 'the task card shows it too');
+  assert.match(lesson.loungeLessonRules, /other: /);
+  turn = lesson.advanceLoungeLesson({ state: turn.state, items, plan: [], now, said: 'Human support will remain essential.', grade: grade({ target: 'correct' }) });
+  assert.equal(turn.finished.verdict, 'given'); assert.equal(turn.target.id, 'b');
+  assert.equal(lesson.readLoungeLessonGrade({ ...said }).target, 'paraphrased');
+  assert.match(lesson.loungeLessonGradeInstructions, /paraphrased/);
+});
+
 test('a lesson goes on where it was the same day, starts again the next, keeps the size it started with, and skips or stops', () => {
   const items = [item('a'), item('b')];
   let turn = lesson.advanceLoungeLesson({ items, plan: ['a', 'b'], now, said: 'hello', grade: grade() });
