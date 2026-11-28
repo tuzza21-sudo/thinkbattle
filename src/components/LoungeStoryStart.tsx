@@ -13,7 +13,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
  * one until another is picked; a conversation the member already has with the character goes on). The persona button (`extra`) sits at the
  * button's right. `scenarios` is null while they load. Nothing of the stories is shown while there are none, but the persona button is.
  */
-export function LoungeStoryStart({ scenarios, user, extra }: { scenarios: LoungeScenarioRow[] | null; user: AppUser | null; extra?: ReactNode }) {
+export function LoungeStoryStart({ scenarios, user, extra, label = '대화 시작하기' }: { scenarios: LoungeScenarioRow[] | null; user: AppUser | null; extra?: ReactNode; /** The button's words: 여행하기, 탐험하기 for a travel companion. */ label?: string }) {
   const navigate = useNavigate();
   const { hash } = useLocation();
   const [picked, setPicked] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function LoungeStoryStart({ scenarios, user, extra }: { scenarios: Lounge
   };
   return <>
     <div id="stories" className="lounge-character-actions lounge-character-start">
-      {user ? <button type="button" className="lounge-character-cta" disabled={busy || !current} onClick={() => void start()}>{busy ? <LoaderCircle size={17} className="lounge-spin" /> : <MessageCircle size={17} />}대화 시작하기</button>
+      {user ? <button type="button" className="lounge-character-cta" disabled={busy || !current} onClick={() => void start()}>{busy ? <LoaderCircle size={17} className="lounge-spin" /> : <MessageCircle size={17} />}{label}</button>
         : <Link to="/" className="lounge-character-cta"><MessageCircle size={17} />로그인하고 시작하기</Link>}
       {extra}
     </div>

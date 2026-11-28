@@ -19,7 +19,7 @@ test('the ringback is scheduled whole on the audio clock, with soft rings that n
 
 test('a character\'s page starts a conversation from small story cards under the button, and the persona is made and picked in one sheet (2026-11-20)', () => {
   const page = read('src/components/LoungeCharacterPage.tsx');
-  assert.match(page, /<LoungeStoryStart scenarios=\{scenarios\} user=\{user\} extra=\{picker\} \/>/, 'the persona button is beside the start button');
+  assert.match(page, /<LoungeStoryStart scenarios=\{scenarios\} user=\{user\} extra=\{picker\} label=\{loungeTravelStartLabels\[character\.id\]\} \/>/, 'the persona button is beside the start button');
   assert.doesNotMatch(page, /LoungeScenarioCards|toStories|scrollIntoView/, 'the button no longer scrolls down to a section');
   assert.doesNotMatch(page, /대화 시작하기/, 'the section below is gone');
   const start = read('src/components/LoungeStoryStart.tsx');
@@ -84,4 +84,15 @@ test('a pass is paid by card or by Naver Pay, Kakao Pay or Toss Pay, all through
   assert.equal(plans.readLoungePayMethod('bitcoin'), 'card', 'anything else is a card');
   assert.match(read('api/payments.ts'), /\.\.\.loungePayRequest\(readLoungePayMethod\(body\.method\)\)/);
   assert.match(read('src/components/LoungeBusinessFooter.tsx'), /고객센터<\/span> <a href="tel:\+821030567987">010-3056-7987<\/a>/);
+});
+
+test('travel companions start with 여행하기 and 탐험하기, and the trip bar folds beside its short buttons (2026-11-28)', () => {
+  const start = read('src/components/LoungeStoryStart.tsx');
+  assert.match(start, /label = '대화 시작하기'/, 'other characters keep 대화 시작하기');
+  const travel = read('src/lib/loungeClass.ts');
+  assert.match(travel, /guide: '여행하기', explorer: '탐험하기'/);
+  const bar = read('src/components/LoungeClass.tsx');
+  assert.match(bar, /aria-label=\{folded \? '펼치기' : '최소화'\}/, 'a fold button on the bar');
+  assert.match(bar, /parks: '공원'/, '이 국립공원 안내 is 공원 안내');
+  assert.doesNotMatch(bar, /이 \{loungeTravelTrips\[trip\]\.stop\} 안내<\/button>/, 'the long label is only read aloud');
 });
