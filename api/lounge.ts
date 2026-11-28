@@ -22,7 +22,7 @@ import { loungeMessageVoiceEstimate, loungeMessageVoiceLimitSeconds, loungeMessa
 
 /** Where the voices of chat messages are kept (migration 20270107000000), under the member's own folder. */
 const loungeMessageVoiceBucket = 'lounge-message-voices';
-import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeCallTogether, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeVoiceEmotionRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
+import { getLoungeHost, getLoungeTheme, readLoungeRoomBackground, isLoungeChatRoom, isLoungeCustomCharacterId, isLoungeHelpKind, loungeIsSolo, loungeSpokenText, loungePresentMembers, loungeTranscriptionHedgeMs, loungeSpeechLimits, loungeSpeechRequest, loungeSpeechStall, loungeElevenBusyWaitsMs, loungeElevenModel, loungeElevenBackupModel, loungeGeminiSpeech, loungeGeminiSpeechModel, loungeGeminiSpeechRequest, loungeDefaultSpeechEngine, loungeEngineVoice, loungeElevenSpeechRequest, loungeCallTogether, loungeTimeAway, loungeTimeAwayInstruction, loungeSceneBackgroundInstruction, loungeElevenPremadeVoice, loungeElevenStandIn, isLoungePremiumSpeech, loungePremiumSpeech, loungeSpeechAllowance, loungePremiumSpeechLimits, type LoungePremiumSpeechEngine, loungeTypecastSpeechRequest, createLoungePcmConverter, loungeFirstSpokenSentence, normalizeLoungeTopicBrief, type LoungeSpeechEngine, type LoungeTopicBrief, type LoungeTopicStudy, loungePhoneCallRules, loungeVoiceEmotionRule, loungeAfterCallRule, joinLoungeInnerVoice, splitLoungeInnerVoice } from '../src/lib/lounge';
 import { loungeStudyInstructions, loungeStudySchema, readLoungeSearchSources, readLoungeStudy } from '../src/lib/loungeStudy';
 import { fetchLoungeFilmMaterials, isLoungeFilmTopic, limitedLoungeFilmStudy, loungeFilmAnalysisInstructions, loungeFilmCardsSchema, loungeFilmDiscoveryInstructions, readLoungeFilmCards } from '../src/lib/loungeFilmStudy';
 import { loungeTopicSuggestionInstructions, loungeTopicSuggestionSchema, readLoungeTopicSuggestions } from '../src/lib/loungeTopics';
@@ -66,6 +66,8 @@ const loungeKnowledgeThreshold = (name: string, fallback: number) => { const val
 /** Whether a character has any usable knowledge entry, remembered for a minute so empty characters are never looked up. */
 // ElevenLabs refuses library voices on a free plan (402). After that its premade voices speak for ten minutes, without asking the library voice first.
 let elevenLibraryRefusedUntil = 0;
+// A cloned voice the plan does not include (401 ivc_not_permitted): its stand-in speaks for ten minutes without asking it again.
+const elevenCloneRefusedUntil = new Map<string, number>();
 // Gemini speech answers 429 once a quota is used up (Tier 1: 100 requests a day for the model, and a reply takes two). After that OpenAI speaks without asking Gemini again until the time it names, at most ten minutes, so each sentence does not pay for a refused request.
 let geminiBlockedUntil = 0;
 const knowledgePresence = new Map<string, { present: boolean; at: number }>();
@@ -1056,6 +1058,8 @@ export default async function handler(req: Request, context?: { waitUntil?: Loun
       if (!key || !voice) throw new LoungeUpstreamError('지금은 음성 변환을 쓸 수 없어요.', 503, 'lounge_speech_not_configured', false, 60);
       const speak = (id: string) => fetchTimed(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(id)}?output_format=mp3_44100_128`, { method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' }, body: JSON.stringify(loungeElevenSpeechRequest(text, undefined, mine.host_persona)) }, 45_000);
       let spoken = await speak(voice);
+      const standIn = loungeElevenStandIn(mine.host_persona);
+      if (spoken.status === 401 && standIn && standIn !== voice) spoken = await speak(standIn);
       // As in a call: a library voice refused to an account without a paid plan speaks with the premade one; a full plan is asked once more.
       const premade = loungeElevenPremadeVoice(mine.host_persona);
       if (spoken.status === 402 && premade && premade !== voice) spoken = await speak(premade);
@@ -2319,7 +2323,11 @@ photo_asked: 사용자의 가장 최근 발언이 캐릭터의 사진이나 지�
           elevenBusyRetries++;
         }
       };
-      let response = await speak(premade && Date.now() < elevenLibraryRefusedUntil ? premade : plan.voice!);
+      const standIn = loungeElevenStandIn(host.id);
+      const cloneRefused = (elevenCloneRefusedUntil.get(plan.voice!) ?? 0) > Date.now();
+      let response = await speak(premade && Date.now() < elevenLibraryRefusedUntil ? premade : cloneRefused && standIn ? standIn : plan.voice!);
+      // A clone the plan does not include (2026-11-28, 서도현's): the Korean library voice of the character's gender speaks instead.
+      if (response.status === 401 && standIn && standIn !== plan.voice) { await response.body?.cancel().catch(() => {}); elevenCloneRefusedUntil.set(plan.voice!, Date.now() + 10 * 60_000); console.warn('[Lounge speech] elevenlabs cloned voice not on this plan, using the stand-in', JSON.stringify({ host: host.id })); response = await speak(standIn); }
       // A free account may not use library voices through the API: the premade voice speaks, and the library voice is not asked again for a while.
       if (response.status === 402 && premade && premade !== plan.voice) { elevenLibraryRefusedUntil = Date.now() + 10 * 60_000; console.warn('[Lounge speech] elevenlabs library voice refused (paid plan needed), using the premade voice'); response = await speak(premade); }
       if (!response.ok || !response.body) throw new Error(`elevenlabs ${response.status}`);
