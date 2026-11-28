@@ -37,6 +37,8 @@ export const loungeClassOf = (characterId?: string | null): LoungeClassId | unde
 // 한지오 and 민서하 joined 2026-11-28 (owner: the trip and the talk in one room, as 미오's); their old class cards (guideclass,
 // explorerclass) leave their pages, while rooms already opened with them keep working.
 export const loungeTravelCompanions: Readonly<Record<string, LoungeTravelTripId>> = { mio: 'japan', guide: 'italy', explorer: 'parks' };
+/** The start button on a travel companion's page (2026-11-28, by the owner: 여행하기, 탐험하기 instead of 대화). */
+export const loungeTravelStartLabels: Readonly<Record<string, string>> = { guide: '여행하기', explorer: '탐험하기' };
 export const isLoungeTravelCompanion = (id?: string | null) => Boolean(id && Object.prototype.hasOwnProperty.call(loungeTravelCompanions, id));
 export const loungeClassKindOf = (id?: string | null): LoungeClassKind | undefined => isLoungeClass(id) ? loungeClasses[id].kind : isLoungeTravelCompanion(id) ? 'travel' : undefined;
 export const loungeClassScenarioIds: readonly string[] = Object.values(loungeClasses).map(entry => entry.scenario);

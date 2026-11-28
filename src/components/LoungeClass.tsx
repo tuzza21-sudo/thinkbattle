@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, Info, Maximize2, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, ChevronUp, ExternalLink, Info, Maximize2, Feather, Landmark, LoaderCircle, MapPin, Newspaper, Palette, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { AppUser } from '../types';
 import { requestLoungeClassPick, requestLoungeClassSpot, startLoungeScenario } from '../lib/loungeApi';
@@ -12,6 +12,14 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
 const titleOf = (kind: LoungeClassKind, id?: string) => { const item = loungeClassItem(kind, id); return item ? ('name' in item ? item.name : item.title) : ''; };
 const boardName = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => kind === 'travel' ? loungeTravelTrips[trip].board : kind === 'art' ? '작품 갤러리' : '글쓰기 과제';
+/**
+ * The bar's buttons in few letters (2026-11-28, by the owner: "이 국립공원 안내" and "국립공원 지도" filled the line, and the
+ * fold button goes beside them): the trip's place in a word, and 지도 for its board.
+ */
+const shortStop: Record<LoungeTravelTripId, string> = { italy: '명소', parks: '공원', japan: '마을' };
+const barBoardName = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => kind === 'travel' ? '지도' : boardName(kind, trip);
+// Bars the member folded, kept outside the component so a redraw of the room page does not open them again.
+const foldedBars = new Set<string>();
 
 /** Where a place is in Japan (2026-11-28, by the owner): a small map with a dot, in the town board and the town's guide,
  *  never over the chat (it took too much room there, owner 2026-11-28). */
@@ -49,6 +57,9 @@ function Credit({ image }: { image: LoungeClassImage }) {
 export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send, disabled }: { kind: LoungeClassKind; trip?: LoungeTravelTripId; roomId: string; storyState?: unknown; send?: (text: string) => Promise<void>; disabled?: boolean }) {
   const [override, setOverride] = useState<LoungeClassState | null>(null);
   const [open, setOpen] = useState(false);
+  // The place over the chat folds to its one line (2026-11-28, by the owner), as the lesson's task card does.
+  const [folded, setFolded] = useState(() => foldedBars.has(roomId));
+  const fold = () => setFolded(value => { const next = !value; if (next) foldedBars.add(roomId); else foldedBars.delete(roomId); return next; });
   useEffect(() => { setOverride(null); }, [storyState]);
   const state = override ?? readLoungeClassState(storyState, kind);
   const item = loungeClassItem(kind, state.item);
@@ -80,13 +91,14 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
     <div className="lounge-lesson-head">
       <Icon size={16} />
       <span className="lounge-lesson-progress"><b>{item ? titleOf(kind, state.item) : loungeClassLabel(kind, trip)}</b></span>
-      {kind === 'travel' && item && <button type="button" className="lounge-lesson-button" onClick={() => setIntro(true)}><Info size={15} /> 이 {loungeTravelTrips[trip].stop} 안내</button>}
-      <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)}><BookOpen size={15} /> {boardName(kind, trip)}</button>
+      <button type="button" className="lounge-lesson-fold" onClick={fold} aria-expanded={!folded} aria-label={folded ? '펼치기' : '최소화'} title={folded ? '펼치기' : '최소화'}>{folded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}</button>
+      {kind === 'travel' && item && <button type="button" className="lounge-lesson-button" onClick={() => setIntro(true)} aria-label={`이 ${loungeTravelTrips[trip].stop} 안내`}><Info size={15} /> {shortStop[trip]} 안내</button>}
+      <button type="button" className="lounge-lesson-button" onClick={() => setOpen(true)} aria-label={boardName(kind, trip)}><BookOpen size={15} /> {barBoardName(kind, trip)}</button>
     </div>
-    {item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
+    {!folded && item && 'task' in item && <section className="lounge-lesson-task lounge-class-now" aria-label="지금 수업">
       <div><p className="lounge-lesson-scene"><span>과제</span>{item.task}</p><p className="lounge-lesson-meaning"><span>분량</span>{item.length} · {item.focus.join(' · ')}</p></div>
     </section>}
-    {item && !('task' in item) && scene && <section className="lounge-lesson-task lounge-class-view" aria-label="지금 보는 곳">
+    {!folded && item && !('task' in item) && scene && <section className="lounge-lesson-task lounge-class-view" aria-label="지금 보는 곳">
       {/* No large picture over the chat (2026-11-27, by the owner): a small one beside the line, and 크게 보기 next to it. */}
       <div className="lounge-class-view-line">
         {spots.length === 0 && <button type="button" className="lounge-class-view-thumb" onClick={() => setLarge(scene)} aria-label={`${sceneName} 크게 보기`}><img src={scene.src} alt="" /></button>}
@@ -106,7 +118,7 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
       <p><b>{sceneName}</b> · <a href={large.source} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()}>{large.credit} · {large.license} · Wikimedia Commons</a></p>
       <button type="button" aria-label="닫기" onClick={() => setLarge(null)}><X size={20} /></button>
     </div>}
-    {!item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? loungeTravelTrips[trip].empty : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
+    {!folded && !item && <section className="lounge-lesson-task quiet"><p>{kind === 'travel' ? loungeTravelTrips[trip].empty : kind === 'art' ? '작품 갤러리에서 보고 싶은 작품을 골라요. 선우령이 먼저 무엇이 보이는지 묻고 해설해요.' : '글쓰기 과제를 골라 써 보세요. 쓴 글에는 첨삭 카드가 붙어요.'}</p></section>}
     {open && <LoungeClassBoard kind={kind} trip={trip} roomId={roomId} state={state} onPicked={next => void picked(next)} onClose={() => setOpen(false)} disabled={disabled} />}
     {intro && item && 'city' in item && <TownIntro site={item} trip={trip} spots={spots} current={spot?.id} busy={busySpot !== null} disabled={disabled} onVisit={(id, name) => void visit(id, name)} onClose={() => setIntro(false)} />}
   </div>;
