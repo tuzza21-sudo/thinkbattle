@@ -14,6 +14,9 @@ export type LoungeWritingExercise = { id: string; title: string; goal: string; t
 
 /** 윤서연 (출판 편집자): 감성적이고 문학적인 글. */
 export const loungeEmotionalExercises: readonly LoungeWritingExercise[] = [
+  // Members write their own diary and feelings (2026-11-28, by the owner): an exercise of its own, read for what is inside.
+  { id: 'diary', title: '오늘의 일기', goal: '그날의 일과 마음을 있는 그대로 적고, 그 아래 숨은 마음까지 들여다보기',
+    task: '오늘 있었던 일 하나와 그때의 마음을 일기로 써 보세요. 잘 쓰려 하지 말고, 그 순간 무엇을 보고 무슨 생각을 했는지부터 적어요.', length: '자유', focus: ['솔직함', '내면의 깊이', '장면의 구체성'] },
   { id: 'senses', title: '오감으로 쓰는 한 장면', goal: '보이는 것 말고 들리고, 냄새 나고, 만져지는 것으로 장면을 살리기',
     task: '오늘 하루 중 한 순간을 골라, 눈으로 본 것 말고 다른 감각 두 가지 이상으로 써 보세요.', length: '5~8문장', focus: ['감각의 구체성', '장면의 생생함', '문장 리듬'] },
   { id: 'unnamed', title: '이름 없는 감정', goal: '감정을 이름으로 말하지 않고 행동과 사물로 보여 주기',

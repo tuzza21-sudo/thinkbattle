@@ -26,7 +26,7 @@ test('the four classes are characters of their own, with the story character\'s 
 });
 
 test('the catalogue: assignments for each writing class, Florence and Venice sites, modern works; pictures only free ones, with credit', () => {
-  assert.equal(classes.loungeClassExercises('emotional').length, 6); assert.equal(classes.loungeClassExercises('logical').length, 7);
+  assert.equal(classes.loungeClassExercises('emotional').length, 7); assert.equal(classes.loungeClassExercises('logical').length, 7);
   const sites = classes.loungeClassSites;
   assert.ok(sites.filter(site => site.city === '피렌체').length >= 7 && sites.filter(site => site.city === '베네치아').length >= 6);
   for (const site of sites) {
@@ -193,4 +193,23 @@ test('일본 소도시 기행 (2026-11-28): 아사쿠라 미오 walks the trip i
     assert.ok(left > 2 && left < 98 && top > 2 && top < 98, `${site.id} falls inside the map (${left.toFixed(1)}, ${top.toFixed(1)})`);
   }
   assert.equal(classes.loungeClassForPrompt(picked, 'start').item.geo, undefined, 'the coordinates are not sent to the reply');
+});
+
+test('윤서연 reads the heart of a diary, asks one layer deeper and shows a line in two writers\' styles (2026-11-28)', () => {
+  const said = '오늘 엄마한테 괜찮다고 했다. 전화를 끊고 한참 동안 식탁에 앉아 있었다. 괜찮지 않았다.';
+  const raw = { is_writing: true, strengths: ['반복으로 마음을 뒤집었어요'], edits: [], rewrite: '괜찮다고 말한 뒤, 나는 한참 식탁을 떠나지 못했다.', scores: [4, 4, 4, 5], next: '식탁 위의 물건 하나를 넣어 보세요',
+    inner: '걱정을 끼치지 않으려는 마음과 들키고 싶은 마음이 함께 읽혀요.', deeper: '전화를 끊은 순간 식탁 위에 무엇이 있었나요?',
+    styles: [{ author: '체호프', sentence: '괜찮다고 말했다. 식탁 위의 찻잔은 식어 있었다.', how: '말하지 않은 것을 찻잔에 남겼어요' }, { author: '체호프', sentence: '중복', how: '' }, { author: '아무개', sentence: '없는 작가', how: '' }, { author: '도스토옙스키', sentence: '나는 왜 거짓말을 했을까, 아니 그것은 거짓말이었을까.', how: '자기를 해부하는 고백' }] };
+  const critique = classes.readLoungeWritingCritique(raw, 'emotional', said, 'diary');
+  assert.equal(critique.inner, raw.inner); assert.equal(critique.deeper, raw.deeper);
+  assert.deepEqual(critique.styles.map(style => style.author), ['체호프', '도스토옙스키'], 'known writers only, each once, two at most');
+  const prompt = classes.loungeClassForPrompt(classes.advanceLoungeClass(classes.pickLoungeClassItem(classes.readLoungeClassState(null, 'emotional'), 'diary'), critique).state, 'continue', critique);
+  assert.equal(prompt.critique.styles.length, 2); assert.equal(prompt.critique.inner, raw.inner);
+  assert.equal(classes.readLoungeWritingCritique(raw, 'logical', said).styles, undefined, '윤지안\'s class has no styles');
+  const instructions = classes.loungeWritingCritiqueInstructions('emotional');
+  for (const name of ['셰익스피어', '도스토옙스키', '발자크', '무라카미 하루키']) assert.match(instructions, new RegExp(name));
+  assert.match(instructions, /지어내지 않는다/); assert.match(classes.loungeWritingCritiqueInstructions('logical'), /styles는 빈 배열/);
+  assert.match(classes.loungeClassRules('emotional'), /critique\.inner/);
+  assert.deepEqual(classes.loungeWritingCritiqueSchema.required.slice(-3), ['inner', 'deeper', 'styles']);
+  assert.equal(classes.loungeClassItem('emotional', 'diary').title, '오늘의 일기');
 });

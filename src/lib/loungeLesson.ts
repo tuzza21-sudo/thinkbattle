@@ -464,7 +464,7 @@ free_used: others 가운데 학습자가 시키지 않았는데 said에서 자�
 errors: said의 영어에서 뜻을 해치거나 B2 학습자가 반드시 고쳐야 할 오류만 많아야 2개다. wrong은 학습자가 실제로 한 말의 해당 부분, right는 고친 부분, why는 한국어 한 줄(40자 이내)이다. 구두점·대소문자·받아 적기 흔적·한국어 부분은 오류가 아니다. 오류가 없으면 빈 배열.
 intent가 answer나 korean이 아니면(힌트 요청, 수업에 대한 질문, 넘어가기 등) 학습자가 영어로 표현하려 한 말이 아니므로 errors, better, polished, keep, keep_meaning을 모두 비운다.
 better: said의 영어 문장 전체를 학습자가 하려던 말 그대로, level.target 수준의 자연스러운 영어 한두 문장으로 다시 쓴다. 실제로 더 정확하거나 자연스러워질 때만 쓴다. 이미 자연스럽거나, 같은 수준의 다른 말로 바꾸기만 하는 것이면 빈 문자열. target이 있고 학습자가 그 표현을 쓰지 않았으면 better와 polished에 target 표현을 넣지 않는다(학습자가 스스로 떠올려야 한다). 학습자가 한국어로만 말했으면 그 뜻을 level.target 수준의 영어로 쓴다. 짧은 대답(yes, okay, 인사)이면 빈 문자열.
-polished: better를 한 단계 더 세련되게(level.target이 B2면 C1, C1이면 원어민 비즈니스 수준) 한 문장으로 쓴다. better가 비었으면 빈 문자열.
+polished: better를 한 단계 더 세련되게(level.target이 B1이면 B2, B2면 C1, C1이면 원어민 비즈니스 수준) 한 문장으로 쓴다. better가 비었으면 빈 문자열.
 keep: better나 polished에서 학습자가 said에서 쓰지 않은, 다음에 다시 써 볼 만한 2~6단어 표현 하나(예: "I'm not entirely sure", "get my work done"). level.target 학습자에게 쓸모 있는 기능 표현(의견·동의와 반대·추측·완곡한 말·연결어·구동사·자주 붙어 다니는 단어 조합)만 고른다. 학습자 문장에서 떼어 낸 평범한 조각("I still think we need", "next month")이나 흔한 단어 하나, target 자체는 아니다. 없으면 빈 문자열. keep_meaning은 그 표현의 한국어 뜻(20자 이내), keep이 비면 빈 문자열.`;
 
 /** The grader's answer read defensively: anything missing is the plainest reading. */

@@ -1797,7 +1797,7 @@ ${photoRule}`;
         try {
           const exercise = loungeClassItem(kind, prior.item) as LoungeWritingExercise | undefined;
           const result = await readJson<ModelResult>(await openai('responses', JSON.stringify({
-            model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 2500 : 1000, store: false, prompt_cache_key: `lounge-writing-${kind}`,
+            model: 'gpt-6-luna', reasoning: { effort: chat ? 'low' : 'none' }, max_output_tokens: chat ? 3500 : 1600, store: false, prompt_cache_key: `lounge-writing-${kind}`,
             instructions: loungeWritingCritiqueInstructions(kind), input: JSON.stringify(loungeWritingCritiqueInput(kind, exercise, lastHuman)),
             text: { format: { type: 'json_schema', name: 'lounge_writing_critique', strict: true, schema: loungeWritingCritiqueSchema } },
           }), undefined, chat ? 25_000 : 8_000), 'openai');

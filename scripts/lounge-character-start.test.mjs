@@ -90,7 +90,7 @@ test('travel companions start with 여행하기 and 탐험하기, and the trip b
   const start = read('src/components/LoungeStoryStart.tsx');
   assert.match(start, /label = '대화 시작하기'/, 'other characters keep 대화 시작하기');
   const travel = read('src/lib/loungeClass.ts');
-  assert.match(travel, /guide: '여행하기', explorer: '탐험하기'/);
+  assert.match(travel, /mio: '여행하기', guide: '여행하기', explorer: '탐험하기'/);
   const bar = read('src/components/LoungeClass.tsx');
   assert.match(bar, /aria-label=\{folded \? '펼치기' : '최소화'\}/, 'a fold button on the bar');
   assert.match(bar, /parks: '공원'/, '이 국립공원 안내 is 공원 안내');
