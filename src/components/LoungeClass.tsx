@@ -276,8 +276,8 @@ export function LoungeClassStart({ characterId, user }: { characterId: string; u
   const [error, setError] = useState('');
   const id = loungeClassOf(characterId);
   const name = getLoungeCharacter(characterId)?.name ?? '';
-  // A travel companion has no class of its own (2026-11-28): its trip is in its story, started just above.
-  if (!id && isLoungeTravelCompanion(characterId)) {
+  // A travel companion's trip is in its story, started just above (2026-11-28); 한지오's and 민서하's old classes are not offered.
+  if (isLoungeTravelCompanion(characterId)) {
     const trip = loungeTravelTrips[loungeClassTrip(characterId)];
     return <div className="lounge-lesson-start">
       <div className="lounge-lesson-start-head"><MapPin size={18} /><b>{name}와 함께하는 {loungeClassLabel('travel', loungeClassTrip(characterId))}</b><span>이야기 안에서</span></div>
