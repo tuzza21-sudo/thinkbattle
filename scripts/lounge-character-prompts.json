@@ -89,5 +89,21 @@
       "file": "host-explorer-work-v1.webp",
       "prompt": "{{common}} The same strikingly beautiful Korean woman, exactly the same youthful face as the portrait, at work as an expedition documentary filmmaker at a glacier viewpoint at sunrise: kneeling beside a well-used cinema camera on a tripod, she has just looked up from the viewfinder and turns her face toward the camera with a delighted, teasing grin, a pencil and a small weathered field notebook in one hand. Same fitted olive shirt open at the collarbone, cobalt windbreaker, hair loosely tied with strands blowing in the wind. Ice and peaks glowing pink behind her. Nothing readable on any sign or paper."
     }
+  },
+  "mio": {
+    "portrait": {
+      "file": "host-mio-v1.webp",
+      "prompt": "{{common}} a strikingly beautiful, elegant and magnetic fictional Japanese woman, 36, slender but soft 166cm figure, lightly sun-kissed skin with a natural glow, a near-black dark brown chin-to-shoulder-length bob tucked behind one ear, clear vivid eyes with a calm, observant gaze, lips that only soften into a small knowing smile. She wears a thin beige linen shirt with the top button open at the collarbone under an unstructured navy jacket, a worn leather crossbody strap across her chest, a small old silver voice recorder held loosely in one hand. Behind her, softly out of focus, the wooden funaya boathouses and calm water of Ine Bay in late-afternoon warm light. Alluring, intelligent and quietly sexy but tasteful, magazine-portrait quality."
+    },
+    "full": {
+      "portrait": "host-mio-v1.webp",
+      "file": "host-mio-full-v1.webp",
+      "prompt": "{{common}} The same strikingly beautiful Japanese woman, exactly the same face as the portrait, stands three-quarter length in a quiet old wooden street of an Edo-era post town at golden hour, dark latticed shop fronts and a hanging cedar ball behind her softly out of focus. Thin beige linen shirt open at the collarbone, unstructured navy jacket, slim easy trousers and comfortable leather shoes, a worn leather crossbody bag at her hip. She tucks her bob behind one ear and glances at the camera with a dry, knowing half-smile, weight on one hip. Alluring, elegant and quietly sexy but tasteful. Nothing readable on any sign."
+    },
+    "work": {
+      "portrait": "host-mio-v1.webp",
+      "file": "host-mio-work-v1.webp",
+      "prompt": "{{common}} The same strikingly beautiful Japanese woman, exactly the same face as the portrait, at work as a local-culture writer at a small morning market stall by a river in an old Japanese town: she leans in toward a basket of seasonal vegetables, holding out a small old voice recorder in one hand and a worn notebook with a pencil in the other, and has just turned her face to the camera with an amused, curious smile. Same beige shirt and navy jacket, bob tucked behind one ear. Soft morning light, steam from a food stall behind her. Nothing readable on any sign or paper."
+    }
   }
 }

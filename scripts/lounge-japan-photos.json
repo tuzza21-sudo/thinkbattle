@@ -1,0 +1,406 @@
+[
+  {
+    "id": "nikko",
+    "dir": "japan",
+    "query": "Nikko Toshogu shrine"
+  },
+  {
+    "id": "hiraizumi",
+    "dir": "japan",
+    "query": "Konjikido Chusonji",
+    "file": "File:Konjikido at Chuson-ji.jpg"
+  },
+  {
+    "id": "kakunodate",
+    "dir": "japan",
+    "query": "Kakunodate samurai district"
+  },
+  {
+    "id": "ginzan",
+    "dir": "japan",
+    "query": "Ginzan Onsen"
+  },
+  {
+    "id": "ouchijuku",
+    "dir": "japan",
+    "query": "Ouchi-juku"
+  },
+  {
+    "id": "shirakawago",
+    "dir": "japan",
+    "query": "Shirakawa-go village"
+  },
+  {
+    "id": "takayama",
+    "dir": "japan",
+    "query": "Takayama Sanmachi"
+  },
+  {
+    "id": "kanazawa",
+    "dir": "japan",
+    "query": "Kenroku-en Kanazawa"
+  },
+  {
+    "id": "matsumoto",
+    "dir": "japan",
+    "query": "Matsumoto Castle"
+  },
+  {
+    "id": "narai",
+    "dir": "japan",
+    "query": "Narai-juku"
+  },
+  {
+    "id": "tsumago",
+    "dir": "japan",
+    "query": "Tsumago-juku"
+  },
+  {
+    "id": "ine",
+    "dir": "japan",
+    "query": "Ine funaya Kyoto boathouses sea",
+    "file": "File:伊根の舟屋群 (Funaya houses at Ine), september 2014 (15428372595).jpg"
+  },
+  {
+    "id": "kinosaki",
+    "dir": "japan",
+    "query": "Kinosaki Onsen Otani River"
+  },
+  {
+    "id": "himeji",
+    "dir": "japan",
+    "query": "Himeji Castle"
+  },
+  {
+    "id": "koyasan",
+    "dir": "japan",
+    "query": "Koyasan Danjo Garan"
+  },
+  {
+    "id": "kumanokodo",
+    "dir": "japan",
+    "query": "Kumano Hongu Taisha"
+  },
+  {
+    "id": "miyajima",
+    "dir": "japan",
+    "query": "Itsukushima Shrine torii"
+  },
+  {
+    "id": "iwamiginzan",
+    "dir": "japan",
+    "query": "Iwami Ginzan Omori"
+  },
+  {
+    "id": "onomichi",
+    "dir": "japan",
+    "query": "Onomichi"
+  },
+  {
+    "id": "kurashiki",
+    "dir": "japan",
+    "query": "Kurashiki Bikan"
+  },
+  {
+    "id": "hagi",
+    "dir": "japan",
+    "query": "Hagi Yamaguchi castle town"
+  },
+  {
+    "id": "naoshima",
+    "dir": "japan",
+    "query": "Naoshima"
+  },
+  {
+    "id": "kotohira",
+    "dir": "japan",
+    "query": "Kotohiragu Hongu",
+    "file": "File:Konpira Shrine, Kagawa Prefecture; November 2019 (01).jpg"
+  },
+  {
+    "id": "yufuin",
+    "dir": "japan",
+    "query": "Yufuin Kinrinko"
+  },
+  {
+    "id": "yanagawa",
+    "dir": "japan",
+    "query": "Yanagawa Fukuoka"
+  },
+  {
+    "id": "yakushima",
+    "dir": "japan",
+    "query": "Yakushima forest"
+  },
+  {
+    "id": "yomeimon",
+    "dir": "japan/spots",
+    "query": "Yomeimon gate Nikko Toshogu"
+  },
+  {
+    "id": "shinkyo",
+    "dir": "japan/spots",
+    "query": "Shinkyo bridge Nikko"
+  },
+  {
+    "id": "kegon-falls",
+    "dir": "japan/spots",
+    "query": "Kegon waterfall Nikko"
+  },
+  {
+    "id": "chusonji",
+    "dir": "japan/spots",
+    "query": "Chuson-ji Hondo"
+  },
+  {
+    "id": "motsuji",
+    "dir": "japan/spots",
+    "query": "Motsu-ji garden pond Hiraizumi"
+  },
+  {
+    "id": "bukeyashiki",
+    "dir": "japan/spots",
+    "query": "Kakunodate bukeyashiki street"
+  },
+  {
+    "id": "hinokinai",
+    "dir": "japan/spots",
+    "query": "Hinokinai River cherry blossoms Kakunodate"
+  },
+  {
+    "id": "ginzan-street",
+    "dir": "japan/spots",
+    "query": "Ginzan Onsen street night"
+  },
+  {
+    "id": "ginzan-snow",
+    "dir": "japan/spots",
+    "query": "Ginzan Onsen snow"
+  },
+  {
+    "id": "ouchi-street",
+    "dir": "japan/spots",
+    "query": "Ouchi-juku thatched houses street"
+  },
+  {
+    "id": "ouchi-winter",
+    "dir": "japan/spots",
+    "query": "Ouchijuku snow festival",
+    "file": "File:冬の大内宿20221226-P1009121.jpg"
+  },
+  {
+    "id": "ogimachi",
+    "dir": "japan/spots",
+    "query": "Ogimachi gassho-zukuri"
+  },
+  {
+    "id": "shirakawago-winter",
+    "dir": "japan/spots",
+    "query": "Shirakawa-go winter snow"
+  },
+  {
+    "id": "sanmachi",
+    "dir": "japan/spots",
+    "query": "Sanmachi Suji Takayama"
+  },
+  {
+    "id": "takayama-jinya",
+    "dir": "japan/spots",
+    "query": "Takayama Jinya"
+  },
+  {
+    "id": "kenrokuen",
+    "dir": "japan/spots",
+    "query": "Kenrokuen garden"
+  },
+  {
+    "id": "higashi-chaya",
+    "dir": "japan/spots",
+    "query": "Higashi Chaya Kanazawa street"
+  },
+  {
+    "id": "matsumoto-castle",
+    "dir": "japan/spots",
+    "query": "Matsumoto Castle keep moat"
+  },
+  {
+    "id": "nakamachi",
+    "dir": "japan/spots",
+    "query": "Nakamachi street Matsumoto"
+  },
+  {
+    "id": "narai-street",
+    "dir": "japan/spots",
+    "query": "Narai-juku post town street"
+  },
+  {
+    "id": "kiso-ohashi",
+    "dir": "japan/spots",
+    "query": "Kiso Ohashi"
+  },
+  {
+    "id": "tsumago-street",
+    "dir": "japan/spots",
+    "query": "Tsumago post town"
+  },
+  {
+    "id": "magome",
+    "dir": "japan/spots",
+    "query": "Magome-juku"
+  },
+  {
+    "id": "funaya-row",
+    "dir": "japan/spots",
+    "query": "Funaya boat houses Ine Kyoto",
+    "file": "File:Funaya in Ine Town, Yosa District, Kyoto Prefecture 001.jpg"
+  },
+  {
+    "id": "ine-bay",
+    "dir": "japan/spots",
+    "query": "Ine Bay Kyoto"
+  },
+  {
+    "id": "otani-river",
+    "dir": "japan/spots",
+    "query": "Kinosaki willow bridge",
+    "file": "File:161029 Kinosaki Onsen Toyooka Hyogo pref Japan01s.jpg"
+  },
+  {
+    "id": "kinosaki-night",
+    "dir": "japan/spots",
+    "query": "Kinosaki Onsen night"
+  },
+  {
+    "id": "himeji-keep",
+    "dir": "japan/spots",
+    "query": "Himeji castle Daitenshu"
+  },
+  {
+    "id": "himeji-sakura",
+    "dir": "japan/spots",
+    "query": "Himeji Castle sakura"
+  },
+  {
+    "id": "okunoin",
+    "dir": "japan/spots",
+    "query": "Okunoin Koyasan",
+    "file": "File:Choishi Path - Okunoin Cemetery - Koyasan - Japan - 22 (47949824922).jpg"
+  },
+  {
+    "id": "konpon-daito",
+    "dir": "japan/spots",
+    "query": "Konpon Daito Koyasan"
+  },
+  {
+    "id": "nachi-falls",
+    "dir": "japan/spots",
+    "query": "Nachi Falls pagoda Seigantoji"
+  },
+  {
+    "id": "kumano-path",
+    "dir": "japan/spots",
+    "query": "Kumano Kodo"
+  },
+  {
+    "id": "otorii",
+    "dir": "japan/spots",
+    "query": "Itsukushima great torii"
+  },
+  {
+    "id": "itsukushima-shrine",
+    "dir": "japan/spots",
+    "query": "Itsukushima Shrine",
+    "file": "File:East corridor and Gojunoto Tower of Itsukushima Shrine.jpg"
+  },
+  {
+    "id": "ryugenji-mabu",
+    "dir": "japan/spots",
+    "query": "Ryugenji Mabu Iwami Ginzan"
+  },
+  {
+    "id": "shimizudani",
+    "dir": "japan/spots",
+    "query": "Shimizudani Refinery Ruins Iwami Ginzan"
+  },
+  {
+    "id": "senkoji-view",
+    "dir": "japan/spots",
+    "query": "Senko-ji Onomichi view"
+  },
+  {
+    "id": "onomichi-slope",
+    "dir": "japan/spots",
+    "query": "Onomichi slope street"
+  },
+  {
+    "id": "kurashiki-canal",
+    "dir": "japan/spots",
+    "query": "Kurashiki canal"
+  },
+  {
+    "id": "ohara-museum",
+    "dir": "japan/spots",
+    "query": "Ohara Museum Kurashiki building",
+    "file": "File:Ohara Museum of Art 20190324.jpg"
+  },
+  {
+    "id": "hagi-street",
+    "dir": "japan/spots",
+    "query": "Kikuya Yokocho Hagi"
+  },
+  {
+    "id": "hagiyaki",
+    "dir": "japan/spots",
+    "query": "Hagi ware"
+  },
+  {
+    "id": "chichu",
+    "dir": "japan/spots",
+    "query": "Chichu Art Museum"
+  },
+  {
+    "id": "naoshima-bath",
+    "dir": "japan/spots",
+    "query": "Naoshima Sento"
+  },
+  {
+    "id": "konpira-steps",
+    "dir": "japan/spots",
+    "query": "Konpira steps Kotohira"
+  },
+  {
+    "id": "kanamaruza",
+    "dir": "japan/spots",
+    "query": "Kanamaru-za"
+  },
+  {
+    "id": "kinrinko",
+    "dir": "japan/spots",
+    "query": "Lake Kinrin Yufuin"
+  },
+  {
+    "id": "yufudake",
+    "dir": "japan/spots",
+    "query": "Mount Yufu"
+  },
+  {
+    "id": "yanagawa-canal",
+    "dir": "japan/spots",
+    "query": "Yanagawa river boat"
+  },
+  {
+    "id": "ohana",
+    "dir": "japan/spots",
+    "query": "Ohana Tachibana Yanagawa garden"
+  },
+  {
+    "id": "shiratani",
+    "dir": "japan/spots",
+    "query": "Shiratani Unsuikyo"
+  },
+  {
+    "id": "jomon-sugi",
+    "dir": "japan/spots",
+    "query": "Jomon Sugi"
+  }
+]

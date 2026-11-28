@@ -27,7 +27,7 @@ export const loungeExperienceSegments = [
   { id: 'negotiation', label: '협상', ids: ['closer'] },
   { id: 'interview', label: '면접', ids: ['trickster'] },
   { id: 'writing', label: '글쓰기', ids: ['ina', 'diplomat'] },
-  { id: 'travel', label: '여행', ids: ['guide', 'explorer'] },
+  { id: 'travel', label: '여행', ids: ['guide', 'explorer', 'mio'] },
   { id: 'art', label: '미술', ids: ['velvet'] },
 ] as const;
 export type LoungeExperienceSegment = typeof loungeExperienceSegments[number]['id'];
@@ -40,6 +40,7 @@ export const loungeTrainingCast = [
   { id: 'diplomat', label: '논리적·설득적 글쓰기', ready: true },
   { id: 'guide', label: '이탈리아 문화기행', ready: true },
   { id: 'explorer', label: '세계 국립공원 탐험', ready: true },
+  { id: 'mio', label: '일본 소도시 기행', ready: true },
   { id: 'velvet', label: '근현대 미술사', ready: true },
 ] as const;
 
@@ -186,7 +187,7 @@ export function LoungeHome({ user, onGuestRequest }: { user: AppUser | null; onG
     return <>
       <img src={host.portrait} alt={`${character.name}의 AI 생성 인물 사진`} loading="lazy" style={{ background: host.color }} />
       <span><strong>{character.name}</strong><small>{training ? training.label : character.job}</small>
-        {training ? <em className={`lounge-cast-topic lounge-cast-training${training.ready ? '' : ' soon'}`}><GraduationCap size={11} aria-hidden="true" /><b>{!training.ready ? '곧 열려요' : ['ina', 'diplomat', 'guide', 'velvet'].includes(training.id) ? '1:1 클래스' : '1:1 실전 훈련'}</b></em> : <TopicPill titles={topics[character.id]} />}</span>
+        {training ? <em className={`lounge-cast-topic lounge-cast-training${training.ready ? '' : ' soon'}`}><GraduationCap size={11} aria-hidden="true" /><b>{!training.ready ? '곧 열려요' : training.id === 'mio' ? '함께 여행' : ['ina', 'diplomat', 'guide', 'velvet'].includes(training.id) ? '1:1 클래스' : '1:1 실전 훈련'}</b></em> : <TopicPill titles={topics[character.id]} />}</span>
     </>;
   };
   // Places with no open room follow the rooms, each inviting the first room there.

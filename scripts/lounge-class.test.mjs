@@ -143,3 +143,38 @@ test("세계 국립공원 탐험 (2026-11-27): 민서하's trip of the travel cl
   assert.match(characters.getLoungeCharacter('explorerclass').bible.humor, /퀴즈/);
   assert.notEqual(characters.getLoungeCharacter('explorerclass').bible.voice.tone, characters.getLoungeCharacter('inaclass').bible.voice.tone);
 });
+
+test('일본 소도시 기행 (2026-11-28): 아사쿠라 미오 walks the trip in her own story room, not a separate class', () => {
+  // Her own character is the travel companion: the board, the spots and the pictures of a travel class, in her 1:1 room.
+  assert.equal(classes.isLoungeClass('mio'), false, 'no class room of her own');
+  assert.equal(classes.isLoungeTravelCompanion('mio'), true);
+  assert.equal(classes.loungeClassKindOf('mio'), 'travel');
+  assert.equal(classes.loungeClassTrip('mio'), 'japan');
+  assert.equal(classes.isLoungeTravelCompanion('explorer'), false);
+  const towns = classes.loungeClassSites.filter(site => site.trip === 'japan');
+  assert.equal(towns.length, 26);
+  assert.deepEqual([...new Set(towns.map(site => site.city))], classes.loungeTravelTrips.japan.tabs.map(tab => tab.name));
+  // Every World Heritage town the owner asked for is there.
+  for (const id of ['nikko', 'hiraizumi', 'shirakawago', 'himeji', 'koyasan', 'kumanokodo', 'miyajima', 'iwamiginzan', 'yakushima']) assert.ok(towns.some(site => site.id === id), id);
+  // The seven towns of the owner's bible.
+  for (const id of ['ine', 'takayama', 'narai', 'kinosaki', 'ouchijuku', 'onomichi', 'hagi']) assert.ok(towns.some(site => site.id === id), id);
+  for (const site of towns) {
+    assert.ok(site.image, `${site.id} has a picture`);
+    assert.ok(classes.loungeClassSpots(site.id).length >= 2, `${site.id} has viewing points with pictures`);
+    assert.ok(site.food?.length && site.life && site.hook, `${site.id} says what is eaten, who lives there and how 미오 might start`);
+    assert.doesNotMatch(`${site.name}${site.local}`, /도쿄|오사카|東京|大阪/, 'no Tokyo or Osaka');
+  }
+  // Her room picks only Japanese towns, and the reply gets the town's facts, food and life with them.
+  const empty = classes.readLoungeClassState(null, 'travel');
+  assert.ok(classes.pickLoungeClassItem(empty, 'ine', new Date(), 'japan'));
+  assert.equal(classes.pickLoungeClassItem(empty, 'duomo', new Date(), 'japan'), undefined);
+  assert.equal(classes.pickLoungeClassItem(empty, 'ine', new Date(), 'parks'), undefined);
+  const picked = classes.pickLoungeClassItem(empty, 'ine', new Date(), 'japan');
+  const prompt = classes.loungeClassForPrompt(picked, 'start');
+  assert.equal(prompt.item.id, 'ine'); assert.ok(prompt.item.food.length && prompt.item.life);
+  // Her rules are a companion's, not a lesson's: no "이야기나 연애 장면이 아니다", no ban on actions; facts only from the town.
+  const rules = classes.loungeTravelCompanionRules('japan');
+  assert.match(rules, /일본 소도시 지도/); assert.match(rules, /수업이 아니라/); assert.match(rules, /지어내지 않/); assert.match(rules, /관계/);
+  assert.doesNotMatch(rules, /연애 장면이 아니다|별표\(\*\)와 행동 묘사를 쓰지 않는다/);
+  assert.equal(characters.getLoungeCharacter('mio').place, 'inebay');
+});

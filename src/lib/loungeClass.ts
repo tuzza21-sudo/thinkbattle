@@ -2,6 +2,7 @@ import { getLoungeHost, loungeElevenPremadeVoices, loungeEngineVoices, loungeGem
 import { getLoungeCharacter, registerLoungeCustomCharacter, type LoungeCharacter } from './loungeCharacters.js';
 import { loungeArtWorks, loungeEmotionalExercises, loungeLogicalExercises, loungeTravelSites, loungeTravelSpots, type LoungeClassImage, type LoungeTravelSpot, type LoungeArtWork, type LoungeTravelSite, type LoungeTravelTripId, type LoungeWritingExercise } from './loungeClassContent.js';
 import { loungeParkSites, loungeParkSpots } from './loungeParkContent.js';
+import { loungeJapanSites, loungeJapanSpots } from './loungeJapanContent.js';
 import { loungeClassImages } from './loungeClassImages.js';
 
 /*
@@ -27,12 +28,20 @@ export type LoungeClassKind = typeof loungeClasses[LoungeClassId]['kind'];
 export const isLoungeClass = (id?: string | null): id is LoungeClassId => Boolean(id && Object.prototype.hasOwnProperty.call(loungeClasses, id));
 export const loungeClassOf = (characterId?: string | null): LoungeClassId | undefined =>
   (Object.keys(loungeClasses) as LoungeClassId[]).find(id => loungeClasses[id].base === characterId);
-export const loungeClassKindOf = (id?: string | null): LoungeClassKind | undefined => isLoungeClass(id) ? loungeClasses[id].kind : undefined;
+/**
+ * Travel companions (2026-11-28, by the owner): a character whose trip is walked in its own 1:1 story room, not in a separate
+ * class. The room shows the same board, spots and pictures, while the character keeps its relationship, memory, life and own
+ * story (the companion engine runs as in any 1:1 chat); the picked town's facts go to the reply with loungeTravelCompanionRules.
+ * The class state is kept in the room's story_state, so such a character's stories have no episodes.
+ */
+export const loungeTravelCompanions: Readonly<Record<string, LoungeTravelTripId>> = { mio: 'japan' };
+export const isLoungeTravelCompanion = (id?: string | null) => Boolean(id && Object.prototype.hasOwnProperty.call(loungeTravelCompanions, id));
+export const loungeClassKindOf = (id?: string | null): LoungeClassKind | undefined => isLoungeClass(id) ? loungeClasses[id].kind : isLoungeTravelCompanion(id) ? 'travel' : undefined;
 export const loungeClassScenarioIds: readonly string[] = Object.values(loungeClasses).map(entry => entry.scenario);
 /** The trip of a travel class (Italy for 한지오, the national parks for 민서하). */
 export const loungeClassTrip = (id?: string | null): LoungeTravelTripId => {
   const entry = isLoungeClass(id) ? loungeClasses[id] as { trip?: LoungeTravelTripId } : undefined;
-  return entry?.trip ?? 'italy';
+  return entry?.trip ?? (id && isLoungeTravelCompanion(id) ? loungeTravelCompanions[id] : 'italy');
 };
 
 /** What each travel trip says on its board and page: the board, what a stop is called, the tabs and their notes. */
@@ -55,6 +64,16 @@ export const loungeTravelTrips: Record<LoungeTravelTripId, { board: string; stop
     ],
     empty: '국립공원 지도에서 가 보고 싶은 공원을 골라요. 민서하가 그곳에 먼저 도착해 길과 풍경을 안내해요.', start: '이 공원 탐험하기', visited: '다녀옴',
     points: ['미국 서부, 알래스카·하와이, 로키 산맥, 안데스 산맥, 동유럽, 러시아의 국립공원과 보호구역 25곳을 사진과 함께 골라요.', '공원마다 지질과 역사, 보호하는 이유, 꼭 볼 곳과 안전 수칙을 보여 줘요.', '고르면 민서하가 그곳에 함께 선 것처럼 길과 풍경을 풀어 줘요.'] },
+  japan: { board: '일본 소도시 지도', stop: '마을', guide: '아사쿠라 미오',
+    tabs: [
+      { name: '도호쿠·간토', note: '금색당의 히라이즈미, 닛코의 사당, 무사의 마을과 눈 오는 온천 거리. 북쪽의 오래된 길이에요.' },
+      { name: '주부·호쿠리쿠', note: '갓쇼즈쿠리 마을과 나카센도 옛길, 장인의 도시 다카야마와 가나자와. 미오의 고향 기소도 이 산속이에요.' },
+      { name: '간사이', note: '바다가 현관인 이네, 유카타로 걷는 기노사키, 백로성 히메지, 고야산과 구마노의 순례길이에요.' },
+      { name: '주고쿠·시코쿠', note: '바다 위 도리이, 숲에 묻힌 은광, 계단의 항구도시와 예술 섬, 785계단의 곤피라예요.' },
+      { name: '규슈', note: '아침 안개의 유후인, 수로의 야나가와, 수천 년 삼나무의 야쿠시마예요.' },
+    ],
+    empty: '일본 소도시 지도에서 가 보고 싶은 마을을 골라요. 미오가 함께 내려서 골목과 식당, 그곳 사람들 이야기를 들려줘요.', start: '이 마을로 가기', visited: '다녀옴',
+    points: ['도쿄와 오사카 밖, 세계유산 9곳을 포함한 일본 소도시와 옛 마을 26곳을 사진과 함께 골라요.', '마을마다 역사와 지켜 온 것, 꼭 볼 곳, 그곳에서 먹는 것과 사는 사람들 이야기를 보여 줘요.', '미오와 걷는 동안 대화와 관계는 이어지고, 미오의 원고와 고향 이야기도 여행 사이에 나와요.'] },
 };
 
 const classHosts: Record<LoungeClassId, Partial<LoungeHost>> = {
@@ -149,11 +168,11 @@ for (const id of Object.keys(loungeClasses) as LoungeClassId[]) {
 // ── The catalogue of each class, with the pictures ──────────────────────────────────────────────────────────────────
 
 export const loungeClassExercises = (kind: LoungeClassKind): readonly LoungeWritingExercise[] => kind === 'emotional' ? loungeEmotionalExercises : kind === 'logical' ? loungeLogicalExercises : [];
-export const loungeClassSites: readonly LoungeTravelSite[] = [...loungeTravelSites, ...loungeParkSites].map(site => ({ ...site, ...(loungeClassImages[site.id] ? { image: loungeClassImages[site.id] } : {}) }));
+export const loungeClassSites: readonly LoungeTravelSite[] = [...loungeTravelSites, ...loungeParkSites, ...loungeJapanSites].map(site => ({ ...site, ...(loungeClassImages[site.id] ? { image: loungeClassImages[site.id] } : {}) }));
 export const loungeClassWorks: readonly LoungeArtWork[] = loungeArtWorks.map(work => ({ ...work, ...(loungeClassImages[work.id] ? { image: loungeClassImages[work.id] } : {}) }));
 /** The viewing points of a site, each with its picture (a spot without one is left out). */
 export const loungeClassSpots = (siteId?: string | null): Array<LoungeTravelSpot & { image: LoungeClassImage }> =>
-  ({ ...loungeTravelSpots, ...loungeParkSpots }[siteId ?? ''] ?? []).flatMap(spot => loungeClassImages[spot.id] ? [{ ...spot, image: loungeClassImages[spot.id] }] : []);
+  ({ ...loungeTravelSpots, ...loungeParkSpots, ...loungeJapanSpots }[siteId ?? ''] ?? []).flatMap(spot => loungeClassImages[spot.id] ? [{ ...spot, image: loungeClassImages[spot.id] }] : []);
 /**
  * The picture behind the class (2026-11-26, by the owner: the Arno bridge stayed whatever site was picked): the spot the
  * member stands at, else the site, else the work being looked at.
@@ -281,6 +300,25 @@ export function loungeClassForPrompt(state: LoungeClassState, step: 'pick' | 'st
     ...(state.class === 'travel' || state.class === 'art' ? { seen_count: state.done.length } : {}),
   };
 }
+
+/**
+ * The trip inside a travel companion's own story room (2026-11-28, by the owner: the experience and the character are one). Not
+ * a lesson: the character's actions, inner voice, relationship, memory and own story go on, and the picked town's facts come in
+ * the class field (the same as a class's, loungeClassForPrompt).
+ */
+export const loungeTravelCompanionRules = (trip: LoungeTravelTripId) => {
+  const travel = loungeTravelTrips[trip];
+  return `여행 동행: 너는 사용자와 함께 여행하는 동행이다. 수업이 아니라 네 이야기 속 여행이고, 네 성격·말투·관계 단계·기억·자기 생활과 고민은 여행 중에도 그대로 이어진다. 입력의 class가 있으면 지금 함께 있는 곳의 자료다(사용자가 입력창 위 '${travel.board}'에서 고른 ${travel.stop}).
+- class.item이 있으면 둘은 지금 그 ${travel.stop}에 함께 있다. memory·scene·recent에 적힌 장소가 다르면 사용자가 지도에서 골라 함께 옮겨 온 것이니, 이전 장소에 아직 있는 것처럼 말하지 않고 class.item을 따른다.
+- 장소의 사실(연도, 인물, 이름, 높이, 음식, 가게)은 class.item과 class.spot에 있는 것만 말한다. 자료에 없는 사실은 지어내지 않고, 모르면 모른다고 하거나 네 느낌으로만 말한다. 가게 영업·가격·예약·교통편은 확인이 필요하다고 말하고, 예약이나 연락을 했다고 하지 않는다.
+- class.step=start: 사용자가 이 ${travel.stop}을 골랐고 둘이 방금 함께 도착했다. 이동은 짧게 넘기고, 도착한 순간의 장면(빛, 소리, 냄새, 날씨)과 네 첫 반응으로 시작한다. item.hook은 네가 할 법한 첫마디의 예이며 그대로 읽지 않는다. summary와 history 가운데 이야기 하나만 풀고 나머지는 걸으면서 꺼낸다.
+- class.step=spot: 사용자가 class.spot 앞에 막 섰고 화면에 그 사진이 보인다. 함께 보는 것처럼 무엇이 보이는지, 네가 왜 거기서 멈추는지 구체적으로 짚는다.
+- class.step=continue: 같은 곳을 계속 걷는다. 사용자의 말에 먼저 답하고, mustSee·experience·food·life 가운데 지금 대화에 닿는 것 하나만 꺼낸다. 매 턴 장소 정보를 넣을 의무는 없다. 대화가 사적인 이야기·감정·관계로 흐르면 여행 설명을 멈추고 그 이야기를 한다.
+- 네 자기 이야기(일, 원고, 고향, 지난 여행)는 이 ${travel.stop}과 닿는 순간에 자연스럽게 꺼내되 매 턴 끼워 넣지 않는다. 관계 단계가 허락하는 만큼만 털어놓는다.
+- 다른 ${travel.stop}으로 옮기는 건 사용자가 지도에서 고르거나 말로 원할 때다. 네가 먼저 다음 곳을 제안할 수는 있지만 매 턴 "다음 장소로 가 볼까요"로 끝내지 않는다. class.spots가 있으면 가 볼 곳을 그 이름으로 말할 수 있고, 입력창 위 사진을 누르면 그 앞으로 간다.
+- class가 없으면 아직 고른 곳이 없다. 평소처럼 대화하고, 여행 이야기가 나오면 '${travel.board}'에서 ${travel.stop}을 고를 수 있다고 한 번쯤 알려 줄 수 있다.
+- 주민의 생활과 사유지, 촬영 동의를 지키고 무례하거나 위험한 행동은 부추기지 않는다.`;
+};
 
 export const loungeClassRules = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => {
   const travel = loungeTravelTrips[trip];
