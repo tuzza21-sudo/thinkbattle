@@ -24,16 +24,17 @@ function TripMap({ site }: { site: LoungeTravelSite }) {
   </figure>;
 }
 
-/** The towns of one region tab on the map: each dot opens that town. */
-function RegionMap({ sites, onOpen }: { sites: LoungeTravelSite[]; onOpen: (id: string) => void }) {
+/** The towns of one region tab as dots on the map (each opens that town), and beside it what to know about the region
+ *  (owner 2026-11-28: its character, not the list of towns again). */
+function RegionMap({ sites, traits, onOpen }: { sites: LoungeTravelSite[]; traits?: ReadonlyArray<{ label: string; text: string }>; onOpen: (id: string) => void }) {
   const placed = sites.filter(site => site.trip === 'japan' && site.geo);
   if (!placed.length) return null;
-  return <figure className="lounge-class-map region" aria-label="이 지역 마을의 위치">
+  return <figure className="lounge-class-map region" aria-label="이 지역 마을의 위치와 특색">
     <div><img src={loungeJapanMap.src} alt="일본 지도" />{placed.map(site => {
       const { left, top } = loungeJapanMapPoint(site.geo!);
       return <button key={site.id} type="button" className="lounge-class-map-dot" style={{ left: `${left}%`, top: `${top}%` }} title={site.name} aria-label={`${site.name} 보기`} onClick={() => onOpen(site.id)} />;
     })}</div>
-    <figcaption>{placed.map(site => <button key={site.id} type="button" onClick={() => onOpen(site.id)}>{site.name}</button>)}</figcaption>
+    {traits?.length ? <figcaption><dl>{traits.map(trait => <div key={trait.label}><dt>{trait.label}</dt><dd>{trait.text}</dd></div>)}</dl></figcaption> : null}
   </figure>;
 }
 
@@ -144,7 +145,7 @@ function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClo
         : kind === 'travel' ? <div className="lounge-memory-panel">
           <div className="lounge-memory-tabs lounge-class-tabs" role="tablist">{travel.tabs.map(({ name }) => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
           <p className="lounge-memory-note">{travel.tabs.find(tab => tab.name === city)?.note} {travel.stop}를 눌러 배경과 역사, 꼭 볼 것을 보고 탐험을 시작해요.</p>
-          <RegionMap sites={townsHere} onOpen={setView} />
+          <RegionMap sites={townsHere} traits={travel.tabs.find(tab => tab.name === city)?.traits} onOpen={setView} />
           <ul className="lounge-class-grid">{townsHere.map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
             {item.image ? <img src={item.image.src} alt="" loading="lazy" /> : <span className="lounge-class-noimage"><Landmark size={22} /></span>}
             <span><b>{item.name}</b><small>{item.era}</small>{seen.has(item.id) && <em>{travel.visited}</em>}</span>

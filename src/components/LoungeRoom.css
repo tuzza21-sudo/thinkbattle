@@ -1516,5 +1516,8 @@
 .lounge-class-map.region { align-items:flex-start; margin:4px 0 10px; }
 .lounge-class-map.region > div { width:170px; }
 button.lounge-class-map-dot { padding:0; border:0; cursor:pointer; }
-.lounge-class-map.region figcaption { display:flex; flex-wrap:wrap; gap:4px 6px; }
-.lounge-class-map.region figcaption button { padding:3px 8px; border-radius:999px; border:1px solid #ffffff24; background:#ffffff0d; color:inherit; font-size:12px; cursor:pointer; }
+.lounge-class-map.region > div { width:140px; }
+.lounge-class-map.region figcaption { flex:1; min-width:0; }
+.lounge-class-map.region dl { display:grid; gap:7px; margin:0; }
+.lounge-class-map.region dt { font-size:11px; font-weight:700; opacity:.7; }
+.lounge-class-map.region dd { margin:1px 0 0; font-size:12px; line-height:1.5; }
