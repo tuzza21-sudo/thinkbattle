@@ -285,6 +285,12 @@ export const requestLoungeLessonSituation = (roomId: string, situation: string) 
 /** 영어 수업 학습 보드: importance, difficulty and a situation written for the member's expressions that have none yet. */
 /** 실전 훈련: a new negotiation or interview in the member's training room (see loungeTraining.ts); returns the room's new state. */
 /** 클래스: the assignment, site or work the member picked on the class board (see loungeClass.ts); returns the room's new state. */
+/** 받아쓰기: a recording from the message box's mic, written down and handed back (nothing is posted). */
+export async function dictateLoungeAudio(roomId: string, audio: Blob, anyLanguage = false) {
+  const encoded = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1] ?? ''); reader.onerror = reject; reader.readAsDataURL(audio); });
+  const result = await apiRequest({ action: 'dictate', roomId, audio: encoded, mimeType: audio.type, ...(anyLanguage ? { language: 'auto' } : {}) }) as { text?: string };
+  return typeof result.text === 'string' ? result.text : '';
+}
 export const requestLoungeClassPick = (roomId: string, item: string) => apiRequest({ action: 'class-pick', roomId, item }) as Promise<{ state: unknown }>;
 /** 문화기행: the viewing point of the current site the member went to. */
 export const requestLoungeClassSpot = (roomId: string, spot: string) => apiRequest({ action: 'class-pick', roomId, spot }) as Promise<{ state: unknown }>;
