@@ -262,8 +262,8 @@ export function applyLoungeLessonVerdict(item: LoungeLessonItem, verdict: Lounge
 
 // ── The tutors' own expressions (B1 → B2, then B2 → C1) ─────────────────────────────────────────────────────────────
 
-export type LoungeLessonPackEntry = { id: string; level: 'B2' | 'C1'; expression: string; meaning: string; situation: string };
-const pack = (level: 'B2' | 'C1', rows: ReadonlyArray<readonly [string, string, string, string]>): LoungeLessonPackEntry[] =>
+export type LoungeLessonPackEntry = { id: string; level: 'B1' | 'B2' | 'C1'; expression: string; meaning: string; situation: string };
+const pack = (level: 'B1' | 'B2' | 'C1', rows: ReadonlyArray<readonly [string, string, string, string]>): LoungeLessonPackEntry[] =>
   rows.map(([id, expression, meaning, situation]) => ({ id: `${level.toLowerCase()}-${id}`, level, expression, meaning, situation }));
 /**
  * Written for this lesson (not copied from a published list): what a learner at B1 needs to give opinions and reasons,
@@ -271,7 +271,21 @@ const pack = (level: 'B2' | 'C1', rows: ReadonlyArray<readonly [string, string, 
  * without naming it.
  */
 export const loungeLessonPack: readonly LoungeLessonPackEntry[] = [
+  // Single words (2026-11-28, by the owner: five a level, B1 to C1, shared by both tutors), each with a situation that calls for
+  // it; they come first in their level's list. B1 had no list before: a B1 goal takes these, then the B2 list.
+  ...pack('B1', [
+    ['afford', 'afford', '(…할) 여유가 있다', '친구가 새 차를 사라고 권한다. 지금은 살 여유가 없다고 말하고 싶다.'],
+    ['convenient', 'convenient', '편리한, (시간이) 괜찮은', '동료가 회의 시간을 언제로 잡을지 묻는다. 내일 오후 3시가 편하다고 말하고 싶다.'],
+    ['recommend', 'recommend', '추천하다', '외국인 친구가 서울에서 가 볼 만한 식당을 묻는다. 내가 좋아하는 곳을 추천하고 싶다.'],
+    ['available', 'available', '(시간이) 되는, 이용할 수 있는', '거래처가 이번 주에 통화할 수 있는 시간을 묻는다. 목요일 오전이 된다고 답하고 싶다.'],
+    ['improve', 'improve', '나아지다, 향상시키다', '외국인 동료가 영어 공부가 잘되냐고 묻는다. 작년보다 실력이 늘었다고 말하고 싶다.'],
+  ]),
   ...pack('B2', [
+    ['reluctant', 'reluctant', '(…하기를) 꺼리는, 마지못해 하는', '팀장이 주말 근무를 부탁했다. 결국 하겠다고 했지만 내키지 않았다는 마음을 친구에게 말하고 싶다.'],
+    ['feasible', 'feasible', '실현 가능한', '상사가 3주 안에 새 서비스를 출시하자고 한다. 그 일정이 현실적으로 가능한지 내 의견을 말하고 싶다.'],
+    ['overwhelmed', 'overwhelmed', '(일·감정에) 압도된, 벅찬', '이직한 첫 주, 배울 게 너무 많아서 벅차다고 친구에게 털어놓고 싶다.'],
+    ['reliable', 'reliable', '믿을 만한, 믿음직한', '새 협력 업체를 추천하면서, 그 업체가 납기를 늘 잘 지킨다고 말하고 싶다.'],
+    ['prioritize', 'prioritize', '우선순위를 정하다, 먼저 처리하다', '오늘 할 일이 너무 많다. 마감이 가까운 일부터 먼저 하겠다고 팀에 말하고 싶다.'],
     ['see-where', "I see where you're coming from, but …", '무슨 말인지는 알지만 …(정중하게 반대)', '팀장이 마감 연장을 반대한다. 그 이유는 이해하지만, 그래도 연장이 필요하다고 정중하게 말해야 한다.'],
     ['not-entirely-sure', "I'm not entirely sure, but I think …", '확실하진 않지만 …인 것 같아요', '동료가 새 시스템이 언제 도입되는지 묻는다. 정확히는 모르지만 다음 달쯤인 것 같다고 답하고 싶다.'],
     ['it-depends', 'It depends on …', '…에 따라 달라요', '친구가 재택근무가 사무실보다 나으냐고 묻는다. 하는 일의 종류에 따라 다르다고 답하고 싶다.'],
@@ -306,6 +320,11 @@ export const loungeLessonPack: readonly LoungeLessonPackEntry[] = [
     ['keep-up-with', 'keep up with', '(속도·변화를) 따라가다', '요즘 AI 기술이 너무 빨리 바뀐다. 따라가기 벅차다고 말하고 싶다.'],
   ]),
   ...pack('C1', [
+    ['nuanced', 'nuanced', '미묘한 차이를 살린, 섬세한', '동료의 보고서가 장단점을 한쪽으로 치우치지 않고 섬세하게 다뤘다고 칭찬하고 싶다.'],
+    ['scrutinize', 'scrutinize', '면밀히 검토하다', '거래처가 계약서에 바로 서명해 달라고 한다. 서명 전에 조항을 꼼꼼히 살펴보겠다고 말하고 싶다.'],
+    ['inadvertently', 'inadvertently', '무심코, 의도치 않게', '회의 초대 메일에 외부 사람을 실수로 넣었다. 의도한 게 아니었다고 사과하고 싶다.'],
+    ['compelling', 'compelling', '설득력 있는, 강렬한', '경쟁사 제안과 비교해 우리 제안의 근거가 더 설득력 있다고 말하고 싶다.'],
+    ['mitigate', 'mitigate', '(위험·피해를) 완화하다, 줄이다', '출시가 늦어질 위험이 있다. 그 위험을 줄일 방법을 회의에서 제안하고 싶다.'],
     ['broadly-on-board', "I'm broadly on board, though I'd question …", '대체로 동의하지만 …은 다시 생각해 보고 싶어요', '새 마케팅 전략에 대부분 찬성하지만, 예산 배분 한 가지는 의문이 든다고 말하고 싶다.'],
     ['not-to-say', "That's not to say …", '그렇다고 …라는 건 아니에요', '재택근무의 단점을 말했는데, 그렇다고 사무실 출근이 무조건 낫다는 뜻은 아니라고 덧붙이고 싶다.'],
     ['by-and-large', 'By and large, …', '대체로, 전반적으로', '이번 분기 결과를 요약해 달라는 요청을 받았다. 몇 가지 문제는 있었지만 전반적으로 성공적이었다고 말하고 싶다.'],
@@ -410,9 +429,10 @@ export function planLoungeLessonMore(items: readonly LoungeLessonItem[], stateVa
 /** The tutor's expressions of the member's level the member does not have yet, in order. */
 export const loungeLessonPackFor = (level: LoungeLessonLevel, items: readonly LoungeLessonItem[], count: number) => {
   const have = new Set(items.map(item => item.pack_id).filter(Boolean));
-  // There is no B1 list yet: a B1 goal takes the B2 one.
-  const target = loungeLessonLevel(level).target === 'C1' ? 'C1' : 'B2';
-  return loungeLessonPack.filter(entry => entry.level === target && !have.has(entry.id)).slice(0, count);
+  // A B1 goal takes the B1 words first, then the B2 list (2026-11-28: there was no B1 list before).
+  const target = loungeLessonLevel(level).target;
+  const levels = target === 'C1' ? ['C1'] : target === 'B1' ? ['B1', 'B2'] : ['B2'];
+  return levels.flatMap(at => loungeLessonPack.filter(entry => entry.level === at && !have.has(entry.id))).slice(0, count);
 };
 
 // ── Reading the member's words (the grader) ─────────────────────────────────────────────────────────────────────────

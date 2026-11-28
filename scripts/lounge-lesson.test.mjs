@@ -350,7 +350,11 @@ test('the session goal: three levels, the member purpose and topics, and each tu
   assert.deepEqual(lesson.loungeLessonLevels.map(level => [level.id, level.label, level.target]), [['A2', 'B1 초급', 'B1'], ['B1', 'B2 중급', 'B2'], ['B2', 'C1 상급', 'C1']]);
   assert.equal(lesson.readLoungeLessonLevel('A2'), 'A2'); assert.equal(lesson.readLoungeLessonLevel('x'), 'B1');
   assert.deepEqual(lesson.loungeLessonFeedbackLabels('A2'), { better: 'B1 표현', polished: 'B2 · 더 자연스럽게' });
-  assert.ok(lesson.loungeLessonPackFor('A2', [], 3).every(entry => entry.level === 'B2'), 'a B1 goal takes the B2 list');
+  // 2026-11-28: a B1 goal takes the B1 words first, then the B2 list; B2 and C1 start with their five words.
+  assert.deepEqual(lesson.loungeLessonPackFor('A2', [], 7).map(entry => entry.level), ['B1', 'B1', 'B1', 'B1', 'B1', 'B2', 'B2']);
+  assert.deepEqual(lesson.loungeLessonPackFor('B1', [], 5).map(entry => entry.expression), ['reluctant', 'feasible', 'overwhelmed', 'reliable', 'prioritize']);
+  assert.deepEqual(lesson.loungeLessonPackFor('B2', [], 5).map(entry => entry.expression), ['nuanced', 'scrutinize', 'inadvertently', 'compelling', 'mitigate']);
+  for (const level of ['B1', 'B2', 'C1']) assert.ok(lesson.loungeLessonPack.filter(entry => entry.level === level && !/\s/.test(entry.expression)).length >= 5, `${level} has five single words`);
   assert.deepEqual(lesson.readLoungeLessonProfile({ level: 'A2', purpose: '  업무·회의 ', topics: ['여행', '여행', ' K-pop ', 3] }), { level: 'A2', purpose: '업무·회의', purposes: ['업무·회의'], topics: ['여행', 'K-pop'] });
   assert.deepEqual(lesson.readLoungeLessonProfile(undefined), { level: 'B1', purpose: '', purposes: [], topics: [] });
   const turn = lesson.advanceLoungeLesson({ items: [item('a')], plan: ['a'], now, said: 'hi', grade: grade() });
