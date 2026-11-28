@@ -13,13 +13,27 @@ const plain = (text: string) => text.replace(/\s+/g, ' ').trim();
 const titleOf = (kind: LoungeClassKind, id?: string) => { const item = loungeClassItem(kind, id); return item ? ('name' in item ? item.name : item.title) : ''; };
 const boardName = (kind: LoungeClassKind, trip: LoungeTravelTripId = 'italy') => kind === 'travel' ? loungeTravelTrips[trip].board : kind === 'art' ? '작품 갤러리' : '글쓰기 과제';
 
-/** Where a place is in Japan (2026-11-28, by the owner): a small map with a dot, under 크게 보기 and in the place's guide. */
+/** Where a place is in Japan (2026-11-28, by the owner): a small map with a dot, in the town board and the town's guide,
+ *  never over the chat (it took too much room there, owner 2026-11-28). */
 function TripMap({ site }: { site: LoungeTravelSite }) {
   if (site.trip !== 'japan' || !site.geo) return null;
   const { left, top } = loungeJapanMapPoint(site.geo);
   return <figure className="lounge-class-map" aria-label={`${site.name}의 위치`}>
     <div><img src={loungeJapanMap.src} alt="일본 지도" /><span className="lounge-class-map-dot" style={{ left: `${left}%`, top: `${top}%` }} /></div>
     <figcaption><b>{site.name}</b><small>{site.local}</small></figcaption>
+  </figure>;
+}
+
+/** The towns of one region tab on the map: each dot opens that town. */
+function RegionMap({ sites, onOpen }: { sites: LoungeTravelSite[]; onOpen: (id: string) => void }) {
+  const placed = sites.filter(site => site.trip === 'japan' && site.geo);
+  if (!placed.length) return null;
+  return <figure className="lounge-class-map region" aria-label="이 지역 마을의 위치">
+    <div><img src={loungeJapanMap.src} alt="일본 지도" />{placed.map(site => {
+      const { left, top } = loungeJapanMapPoint(site.geo!);
+      return <button key={site.id} type="button" className="lounge-class-map-dot" style={{ left: `${left}%`, top: `${top}%` }} title={site.name} aria-label={`${site.name} 보기`} onClick={() => onOpen(site.id)} />;
+    })}</div>
+    <figcaption>{placed.map(site => <button key={site.id} type="button" onClick={() => onOpen(site.id)}>{site.name}</button>)}</figcaption>
   </figure>;
 }
 
@@ -78,7 +92,6 @@ export function LoungeClassBar({ kind, trip = 'italy', roomId, storyState, send,
         <p className="lounge-lesson-scene"><span>{spot ? '지금 보는 것' : 'city' in item ? item.city : item.year}</span>{spot ? `${spot.name} · ${spot.note}` : 'city' in item ? item.summary : `${item.artist} · ${item.movement}`}</p>
         <button type="button" className="lounge-class-view-zoom" onClick={() => setLarge(scene)}><Maximize2 size={14} /> 크게 보기</button>
       </div>
-      {'city' in item && <TripMap site={item} />}
       {spots.length > 0 && <div className="lounge-class-spots" role="group" aria-label="꼭 봐야 할 곳">
         <button type="button" className={!spot ? 'active' : ''} disabled={busySpot !== null || disabled} onClick={() => setStateOverride({ ...state, spot: undefined })}>
           {image && <img src={image.src} alt="" loading="lazy" />}<small>{titleOf(kind, state.item).split(' (')[0]}</small></button>
@@ -118,6 +131,7 @@ function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClo
   const start = (id: string, label: string) => <button type="button" className="lounge-class-start" disabled={busy || disabled} onClick={() => void pick(id)}>{busy ? <LoaderCircle size={15} className="lounge-spin" /> : <ArrowRight size={15} />} {label}</button>;
   const site = kind === 'travel' && view ? loungeClassSites.find(item => item.id === view) : undefined;
   const work = kind === 'art' && view ? loungeClassWorks.find(item => item.id === view) : undefined;
+  const townsHere = kind === 'travel' ? loungeClassSites.filter(item => (item.trip ?? 'italy') === trip && item.city === city) : [];
   const exercise = (kind === 'emotional' || kind === 'logical') && view ? loungeClassExercises(kind).find(item => item.id === view) : undefined;
   return <>
     <div className="lounge-background-backdrop" onClick={() => { if (!busy) onClose(); }} />
@@ -130,7 +144,8 @@ function LoungeClassBoard({ kind, trip = 'italy', roomId, state, onPicked, onClo
         : kind === 'travel' ? <div className="lounge-memory-panel">
           <div className="lounge-memory-tabs lounge-class-tabs" role="tablist">{travel.tabs.map(({ name }) => <button key={name} type="button" role="tab" aria-selected={city === name} className={city === name ? 'active' : ''} onClick={() => setCity(name)}>{name}</button>)}</div>
           <p className="lounge-memory-note">{travel.tabs.find(tab => tab.name === city)?.note} {travel.stop}를 눌러 배경과 역사, 꼭 볼 것을 보고 탐험을 시작해요.</p>
-          <ul className="lounge-class-grid">{loungeClassSites.filter(item => (item.trip ?? 'italy') === trip && item.city === city).map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
+          <RegionMap sites={townsHere} onOpen={setView} />
+          <ul className="lounge-class-grid">{townsHere.map(item => <li key={item.id}><button type="button" onClick={() => setView(item.id)}>
             {item.image ? <img src={item.image.src} alt="" loading="lazy" /> : <span className="lounge-class-noimage"><Landmark size={22} /></span>}
             <span><b>{item.name}</b><small>{item.era}</small>{seen.has(item.id) && <em>{travel.visited}</em>}</span>
           </button></li>)}</ul>
@@ -197,6 +212,7 @@ function SiteDetail({ site, start }: { site: LoungeTravelSite; start: React.Reac
     {site.image && <figure><img src={site.image.src} alt={site.name} /><figcaption><Credit image={site.image} /></figcaption></figure>}
     {spots.length > 0 && <div className="lounge-class-spots static" aria-label="꼭 봐야 할 곳 미리 보기">{spots.map(entry => <figure key={entry.id}><img src={entry.image.src} alt={entry.name} loading="lazy" /><small>{entry.name}</small></figure>)}</div>}
     <h3>{site.name}</h3><p className="lounge-class-local">{site.local} · {site.era}</p>
+    <TripMap site={site} />
     <p className="lounge-class-lead">{site.summary}</p>
     <h4>배경과 역사</h4><p>{site.history}</p>
     <h4>{heritageTitle(site)}</h4><p>{site.heritage}</p>
