@@ -267,7 +267,10 @@ function LoungeClassCritiqueBody({ critique, kind }: { critique: LoungeClassStat
     <div className="lounge-class-scores">{Object.entries(critique.scores).map(([name, value]) => <span key={name}><small>{name}</small><i><b style={{ width: `${value * 20}%` }} /></i></span>)}</div>
     {critique.strengths.map(item => <p key={item} className="lounge-class-good">잘된 점 · {item}</p>)}
     {critique.edits.length > 0 && <ul className="lounge-lesson-errors">{critique.edits.map((edit, index) => <li key={index}><s>{edit.before}</s> → <b>{edit.after}</b><small>{edit.why}</small></li>)}</ul>}
+    {critique.inner && <p className="lounge-class-rewrite lounge-class-inner"><span>글 속의 마음</span>{critique.inner}</p>}
     {critique.rewrite && <p className="lounge-class-rewrite"><span>다시 써 본 예</span>{critique.rewrite}</p>}
+    {critique.styles?.map(style => <p key={style.author} className="lounge-class-rewrite lounge-class-style"><span>{style.author}의 문체로</span>{style.sentence}{style.how && <small>{style.how}</small>}</p>)}
+    {critique.deeper && <p className="lounge-class-next">한 겹 더 · {critique.deeper}</p>}
     {critique.next && <p className="lounge-class-next">다음 고쳐 쓰기 · {critique.next}</p>}
   </>;
 }

@@ -1464,6 +1464,9 @@
 .lounge-class-good { color:#c4ecc9; }
 .lounge-class-rewrite span { display:block; font-size:10.5px; font-weight:700; color:#9fd8a8; }
 .lounge-class-next { color:#ffe3a3; }
+.lounge-class-inner span { color:#f3c6d8; }
+.lounge-class-style span { color:#c9c2ff; }
+.lounge-class-style small { display:block; margin-top:2px; font-size:11px; opacity:.75; }
 .lounge-class-critique p { margin:0; }
 
 /* 협상 설정: 직접 만들기, 내 상황에 맞게 고치기; 결과의 실전 문장과 팁 (2026-11-26). */
