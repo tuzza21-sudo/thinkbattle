@@ -1502,3 +1502,5 @@
   .lounge-class-spots button img, .lounge-class-spots button .lounge-class-spot-busy { height:40px; }
   .lounge-class-view-thumb { width:52px; height:40px; }
 }
+/* The guide of a place just picked (2026-11-28): the hint beside 꼭 봐야 할 곳. */
+.lounge-class-intro h4 small { margin-left:6px; font-size:11px; font-weight:400; opacity:.6; }

@@ -176,5 +176,7 @@ test('일본 소도시 기행 (2026-11-28): 아사쿠라 미오 walks the trip i
   const rules = classes.loungeTravelCompanionRules('japan');
   assert.match(rules, /일본 소도시 지도/); assert.match(rules, /수업이 아니라/); assert.match(rules, /지어내지 않/); assert.match(rules, /관계/);
   assert.doesNotMatch(rules, /연애 장면이 아니다|별표\(\*\)와 행동 묘사를 쓰지 않는다/);
+  // Picking a town first gives its guide (food, life, what to see first), and the next stop is suggested from the board (2026-11-28).
+  assert.match(rules, /첫 안내/); assert.match(rules, /대표 음식과 특산품/); assert.match(rules, /간사이 — 이네, 기노사키 온천/);
   assert.equal(characters.getLoungeCharacter('mio').place, 'inebay');
 });
